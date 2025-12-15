@@ -1,0 +1,299 @@
+[APP INIT] TurretEnhancements initialized
+WIDGET: tracking_btn present; signals: clicked, pressed, released, toggled
+WIDGET: aiming_btn present; signals: clicked, pressed, released, toggled
+WIDGET: go_home_button present; signals: clicked, pressed, released, toggled
+WIDGET: connect_button present; signals: clicked, pressed, released, toggled
+WIDGET: btn_up present; signals: clicked, pressed, released, toggled
+WIDGET: btn_down present; signals: clicked, pressed, released, toggled
+WIDGET: btn_left present; signals: clicked, pressed, released, toggled
+WIDGET: btn_right present; signals: clicked, pressed, released, toggled
+WIDGET: btn_center present; signals: clicked, pressed, released, toggled
+WIDGET: fire_button present; signals: clicked, pressed, released, toggled
+WIDGET: safety_button present; signals: clicked, pressed, released, toggled
+WIDGET: open_trainer_btn present; signals: clicked, pressed, released, toggled
+Layout 'standard' loaded successfully
+WIDGET: tracking_btn present; signals: clicked, pressed, released, toggled
+WIDGET: aiming_btn present; signals: clicked, pressed, released, toggled
+WIDGET: go_home_button present; signals: clicked, pressed, released, toggled
+WIDGET: connect_button present; signals: clicked, pressed, released, toggled
+WIDGET: btn_up present; signals: clicked, pressed, released, toggled
+WIDGET: btn_down present; signals: clicked, pressed, released, toggled
+WIDGET: btn_left present; signals: clicked, pressed, released, toggled
+WIDGET: btn_right present; signals: clicked, pressed, released, toggled
+WIDGET: btn_center present; signals: clicked, pressed, released, toggled
+WIDGET: fire_button present; signals: clicked, pressed, released, toggled
+WIDGET: safety_button present; signals: clicked, pressed, released, toggled
+WIDGET: open_trainer_btn present; signals: clicked, pressed, released, toggled[INIT] Bulletproof state manager initialized
+Sound effects DISABLED
+Settings loaded successfully.
+Resolution changed: 640x480 -> 1024x768 (1024x768)
+Camera will re-open with new resolution 1024x768
+Resolution changed: 1024x768 -> 1024x768 (1024x768)
+Camera will re-open with new resolution 1024x768
+Dock widths equalized to 320px. (applied widths -> L: 395,460,395,395,395 R: 320,396,397,396,396)
+[DIAG] Dock equalize mismatch detected - emitting per-dock details:
+[DIAG] LEFT 'Configuration & Connection': floating=False width=395 min=320 max=524287 hint=238
+[DIAG] LEFT 'Home Position': floating=False width=460 min=320 max=524287 hint=512
+[DIAG] LEFT 'Servo Limits': floating=False width=395 min=320 max=524287 hint=147
+[DIAG] LEFT 'Accessories': floating=False width=395 min=320 max=524287 hint=164
+[DIAG] LEFT 'Serial / Log Output': floating=False width=395 min=320 max=524287 hint=394
+[DIAG] RIGHT 'Manual Movement & Firing': floating=False width=320 min=320 max=524287 hint=320
+[DIAG] RIGHT 'Behavior Presets': floating=False width=396 min=320 max=524287 hint=399
+[DIAG] RIGHT 'Target Detection': floating=False width=397 min=320 max=524287 hint=409
+[DIAG] RIGHT 'System': floating=False width=396 min=320 max=524287 hint=188
+[DIAG] RIGHT 'Tracking Behavior': floating=False width=396 min=320 max=524287 hint=327
+[DIAG] layout: total_w=1200 central_min=540 per_column_cap=330 candidate=460 pref=320 target=320 central_hint=735
+Dock widths equalized to 320px. (applied widths -> L: 472,472,472,472,472 R: 320,409,409,409,409)
+[DIAG] Dock equalize mismatch detected - emitting per-dock details:
+[DIAG] LEFT 'Configuration & Connection': floating=False width=472 min=320 max=524287 hint=238
+[DIAG] LEFT 'Home Position': floating=False width=472 min=320 max=524287 hint=512
+[DIAG] LEFT 'Servo Limits': floating=False width=472 min=320 max=524287 hint=147
+[DIAG] LEFT 'Accessories': floating=False width=472 min=320 max=524287 hint=164
+[DIAG] LEFT 'Serial / Log Output': floating=False width=472 min=320 max=524287 hint=394
+[DIAG] RIGHT 'Manual Movement & Firing': floating=False width=320 min=320 max=524287 hint=320
+[DIAG] RIGHT 'Behavior Presets': floating=False width=409 min=320 max=524287 hint=399
+[DIAG] RIGHT 'Target Detection': floating=False width=409 min=320 max=524287 hint=409
+[DIAG] RIGHT 'System': floating=False width=409 min=320 max=524287 hint=188
+[DIAG] RIGHT 'Tracking Behavior': floating=False width=409 min=320 max=524287 hint=327
+[DIAG] layout: total_w=1440 central_min=648 per_column_cap=396 candidate=472 pref=320 target=320 central_hint=735
+Dock widths equalized to 320px. (applied widths -> L: 471,472,471,471,471 R: 320,409,409,409,409)
+[DIAG] Dock equalize mismatch detected - emitting per-dock details:
+[DIAG] LEFT 'Configuration & Connection': floating=False width=471 min=320 max=524287 hint=238
+[DIAG] LEFT 'Home Position': floating=False width=472 min=320 max=524287 hint=512
+[DIAG] LEFT 'Servo Limits': floating=False width=471 min=320 max=524287 hint=147
+[DIAG] LEFT 'Accessories': floating=False width=471 min=320 max=524287 hint=164
+[DIAG] LEFT 'System': floating=False width=471 min=320 max=524287 hint=188
+[DIAG] RIGHT 'Manual Movement & Firing': floating=False width=320 min=320 max=524287 hint=320
+[DIAG] RIGHT 'Behavior Presets': floating=False width=409 min=320 max=524287 hint=399
+[DIAG] RIGHT 'Serial / Log Output': floating=False width=409 min=320 max=524287 hint=394
+[DIAG] RIGHT 'Target Detection': floating=False width=409 min=320 max=524287 hint=409
+[DIAG] RIGHT 'Tracking Behavior': floating=False width=409 min=320 max=524287 hint=327
+[DIAG] layout: total_w=1440 central_min=648 per_column_cap=396 candidate=472 pref=320 target=320 central_hint=735
+Dock widths equalized to 320px. (applied widths -> L: 320,320,320,320,320 R: 320,320,320,320,320)
+Dock widths equalized to 320px. (applied widths -> L: 320,320,320,320,320 R: 320,320,320,320,320)
+Dock widths equalized to 320px. (applied widths -> L: 320,320,320,320,320 R: 320,320,320,320,320)
+Dock widths equalized to 320px. (applied widths -> L: 320,320,320,320,320 R: 320,320,320,320,320)
+Dock widths equalized to 320px. (applied widths -> L: 420,420,420,420,420 R: 320,358,358,358,358)
+[DIAG] Dock equalize mismatch detected - emitting per-dock details:
+[DIAG] LEFT 'Configuration & Connection': floating=False width=420 min=320 max=524287 hint=238
+[DIAG] LEFT 'Home Position': floating=False width=420 min=320 max=524287 hint=512
+[DIAG] LEFT 'Servo Limits': floating=False width=420 min=320 max=524287 hint=147
+[DIAG] LEFT 'Accessories': floating=False width=420 min=320 max=524287 hint=164
+[DIAG] LEFT 'System': floating=False width=420 min=320 max=524287 hint=188
+[DIAG] RIGHT 'Manual Movement & Firing': floating=False width=320 min=320 max=524287 hint=320
+[DIAG] RIGHT 'Behavior Presets': floating=False width=358 min=320 max=524287 hint=399
+[DIAG] RIGHT 'Serial / Log Output': floating=False width=358 min=320 max=524287 hint=394
+[DIAG] RIGHT 'Target Detection': floating=False width=358 min=320 max=524287 hint=409
+[DIAG] RIGHT 'Tracking Behavior': floating=False width=358 min=320 max=524287 hint=327
+[DIAG] layout: total_w=1440 central_min=648 per_column_cap=396 candidate=420 pref=320 target=320 central_hint=735
+
+Serial opened: COM28 @ 115200Connected to COM28 @ 115200
+[RECONNECT] Syncing tilt position from encoder...
+Tracking started. Opening camera in background...
+Aiming activated (servos enabled).
+[AIM DIAG] aiming_active=True tracking_active=True manual_override=False _manual_override_active=False _manual_override_until=0.0 _suspend_tracking_until=0 _suppress_detection_until=0 _in_go_home=False backSub=no
+Tracking started.
+[SERVO] Warning: approaching MIN position - pan=0° (MIN=0), tilt=0° (MIN=0)
+TO MCU -> Pan=0°, Tilt=0° | Fire=no | LED=off | Laser=off | Safety=SAFE | Mode=TRACK   [MOTION] Large move: Pan +9999°, Tilt +9999°   (raw: WILL SEND: P0T0F0L0R0G0S1M0)
+ARDUINO: [EEPROM] Loaded home Pan=90 Tilt=60
+[SERVO] Warning: approaching MIN position - pan=0° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+TO MCU -> Pan=2°, Tilt=0° | Fire=no | LED=off | Laser=off | Safety=SAFE | Mode=TRACK   [MOTION] Adjustment: Pan +2°, Tilt +0°   (raw: WILL SEND: P2T0F0L0R0G0S1M0)
+ARDUINO: === Turret Ready ===
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[SERVO] Warning: approaching MIN position - pan=2° (MIN=0), tilt=0° (MIN=0)
+[RESET] Tracking + Idle state cleared before Go Home
+Started host-side interpolated Go Home (speed_deg/s=0.400, step_deg=0.050)
+Host-interpolated Go Home complete, tracking resumed
+Go Home complete — fresh tracking started at home (detection history cleared)
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=3
+Aiming stopped (servos locked).
+[AIM DIAG] aiming_active=False tracking_active=False manual_override=False _manual_override_active=False _manual_override_until=0.0 _suspend_tracking_until=0 _suppress_detection_until=0 _in_go_home=True backSub=yes
+Tracking stopped.
+[TRACK] Hold window expired (5.0s) - stopped tracking, entering idle mode
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+[RESET] Tracking + Idle state cleared before Go Home
+Started host-side interpolated Go Home (speed_deg/s=0.400, step_deg=0.050)
+Host-interpolated Go Home complete, tracking resumed
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=3
+[TRACK] Hold window expired (5.0s) - stopped tracking, entering idle mode
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — fresh tracking started at home (detection history cleared)
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=3
+[TRACK] Hold window expired (5.0s) - stopped tracking, entering idle mode
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=3
+Go Home complete — awaiting user input.
+Aiming activated (servos enabled).
+[AIM DIAG] aiming_active=True tracking_active=True manual_override=False _manual_override_active=False _manual_override_until=0.0 _suspend_tracking_until=0 _suppress_detection_until=0 _in_go_home=False backSub=yes
+Tracking started.
+🎯 AUTO-TRACKING ACTIVATED (idle mode disabled, detection found)

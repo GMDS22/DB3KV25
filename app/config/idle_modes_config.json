@@ -1,0 +1,90 @@
+{
+  "rest": {
+    "enabled": true,
+    "hold_position": true,
+    "position_memory": [
+      {
+        "label": "Center",
+        "pan": 90,
+        "tilt": 40
+      },
+      {
+        "label": "Left",
+        "pan": 45,
+        "tilt": 50
+      },
+      {
+        "label": "Position3",
+        "pan": 110.188559,
+        "tilt": 10.253656750000001
+      }
+    ]
+  },
+  "guard": {
+    "enabled": true,
+    "patrol_points": [
+      {
+        "label": "Home",
+        "pan": 90,
+        "tilt": 50
+      },
+      {
+        "label": "Left",
+        "pan": 30,
+        "tilt": 50
+      },
+      {
+        "label": "Right",
+        "pan": 150,
+        "tilt": 50
+      },
+      {
+        "label": "Top Left",
+        "pan": 40,
+        "tilt": 25
+      },
+      {
+        "label": "Top Right",
+        "pan": 140,
+        "tilt": 25
+      },
+      {
+        "label": "Bottom Left",
+        "pan": 40,
+        "tilt": 75
+      },
+      {
+        "label": "Bottom Right",
+        "pan": 140,
+        "tilt": 75
+      },
+      {
+        "label": "Center Top",
+        "pan": 90,
+        "tilt": 25
+      }
+    ],
+    "dwell_time": 5,
+    "movement_speed": 50,
+    "random_order": false
+  },
+  "watch": {
+    "enabled": true,
+    "left_limit": 30,
+    "right_limit": 150,
+    "sweep_speed": 10,
+    "pause_time": 2
+  },
+  "search": {
+    "enabled": true,
+    "search_area": {
+      "pan_min": 5,
+      "pan_max": 180,
+      "tilt_min": 20,
+      "tilt_max": 110
+    },
+    "movement_style": "grid",
+    "speed_variation": true,
+    "direction_changes": 5
+  }
+}

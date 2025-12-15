@@ -1,0 +1,142 @@
+✅ Decisions (clear, no ambiguity)
+1️⃣ Detection bounding boxes
+
+Decision:
+✅ KEEP them in update_frame()
+
+Reason:
+
+They are object-specific
+
+They depend on per-frame detection results
+
+They are not HUD / UI chrome
+
+This separation is architecturally correct.
+
+2️⃣ Quick Strike overlay
+
+Decision:
+⚠️ SPLIT responsibility
+
+Visual banner + text (“QUICK STRIKE”) → move to _add_crosshair_and_scope()
+
+Target circle drawn at target position → KEEP in update_frame()
+
+Reason:
+
+Banner = HUD state indicator
+
+Target circle = dynamic, world-space overlay tied to detection coordinates
+
+This avoids coordinate confusion and keeps math simple.
+
+3️⃣ Grid layout
+
+Decision:
+✅ APPROVED as proposed
+
+The grid you outlined is good and balanced. No changes needed.
+
+Important constraint to add:
+
+Use fixed margins + line height
+
+No relative stacking based on previous text visibility
+
+That guarantees no overlap.
+
+4️⃣ Color palette
+
+Decision:
+✅ APPROVED with one clarification
+
+Your palette is good. Just lock it as constants:
+
+HUD_CYAN    = (255, 255, 0)
+HUD_ORANGE  = (0, 165, 255)
+HUD_RED     = (0, 0, 255)
+HUD_GREEN   = (0, 255, 0)
+HUD_GRAY    = (180, 180, 180)
+
+
+No ad-hoc colors anywhere else.
+
+5️⃣ Font system
+
+Decision:
+✅ APPROVED
+
+One more rule to add:
+
+No inline font sizes
+
+All text must use named styles (HEADER, STATUS, DEBUG)
+
+This prevents regression later.
+
+🚨 One critical safety rule (must add)
+
+DO NOT remove drawing code blindly.
+
+Instead:
+
+Comment out inline cv2.putText in update_frame()
+
+Replace with data collection only
+
+Pass values into _add_crosshair_and_scope()
+
+This avoids breaking logic paths that expect values to exist.
+
+📋 The exact response to paste back to Copilot
+
+Paste everything below as-is:
+
+COPILOT CONFIRMATION (PASTE AS-IS)
+
+Confirmed. Proceed with execution under these decisions:
+
+Bounding Boxes
+
+Keep detection bounding boxes, labels, and confidence drawing in update_frame().
+
+Quick Strike Overlay
+
+Move the Quick Strike banner and text to _add_crosshair_and_scope().
+
+Keep the Quick Strike target circle in update_frame() since it is world-coordinate dependent.
+
+HUD Consolidation
+
+Move ALL remaining status/debug/UI text drawing into _add_crosshair_and_scope().
+
+In update_frame(), replace inline drawing with value collection only.
+
+Layout
+
+Implement the proposed grid layout exactly as described.
+
+Use fixed margins and fixed line spacing to prevent overlap.
+
+Color Palette
+
+Use a unified color palette defined as constants.
+
+Do not introduce new colors or inline BGR values.
+
+Fonts
+
+Use consistent font styles (HEADER / STATUS / DEBUG).
+
+Do not use inline font sizes or thickness values.
+
+Constraints
+
+Do NOT modify tracking, detection, camera, or rendering pipeline logic.
+
+Do NOT change coordinate math for detections.
+
+Comment out old drawing code safely instead of deleting blindly.
+
+Proceed with implementation.
