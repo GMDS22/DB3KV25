@@ -495,12 +495,50 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     def _apply_tooltip_styles_and_texts(self):
         from PyQt5.QtWidgets import QToolTip
         from PyQt5.QtGui import QFont, QPalette, QColor
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtCore import QObject, QEvent, QTimer
+        from PyQt5.QtWidgets import QLabel
+        from PyQt5.QtCore import Qt as _Qt
         try:
             QToolTip.setFont(QFont("Segoe UI", 9))
             pal = QPalette()
             pal.setColor(QPalette.ToolTipBase, QColor("#fffacd"))
             pal.setColor(QPalette.ToolTipText, QColor("#000000"))
             QToolTip.setPalette(pal)
+        except Exception:
+            pass
+
+        # Ensure an application-level stylesheet enforces readable tooltip colors
+        try:
+            app = QApplication.instance()
+            if app is not None:
+                current = app.styleSheet() or ""
+                # Append a QToolTip rule to override widget-level styles
+                tip_rule = (
+                    "QToolTip { background-color: #FFFACD; color: #000000; "
+                    "border: 1px solid #666; border-radius: 4px; padding: 3px 6px; "
+                    "font-size: 10pt; font-family: 'Segoe UI'; }"
+                )
+                if "QToolTip" not in current:
+                    app.setStyleSheet(current + "\n" + tip_rule)
+        except Exception:
+            pass
+
+        # Debug dump: write effective styles and palette colors to help diagnose overrides
+        try:
+            p = QPalette()
+            if app is not None:
+                p = app.palette()
+            debug = {
+                "styleSheet_contains_QToolTip": ("QToolTip" in (app.styleSheet() or "")),
+                "styleSheet_length": len(app.styleSheet() or ""),
+                "toolTipBase": p.color(QPalette.ToolTipBase).name(),
+                "toolTipText": p.color(QPalette.ToolTipText).name(),
+            }
+            with open("tooltip_debug.txt", "w", encoding="utf-8") as df:
+                df.write(str(debug))
+                df.write("\n---styleSheet---\n")
+                df.write((app.styleSheet() or "")[:10000])
         except Exception:
             pass
 
@@ -517,6 +555,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             "fire_button": "Manual fire control (use only when safe).",
             "sound_checkbox": "Toggle UI sound effects (notifications and alerts).",
             "overshoot_input": "Percent overshoot applied to motion gain; positive = more aggressive.",
+            "precision_mode_checkbox": "Enable sub-pixel precision aiming (host-side PID and ROI refinement).",
+            "precision_roi_input": "ROI size in pixels used for contour/template refinement (larger = more stable, more CPU).",
+            "precision_kp_input": "Precision PID proportional gain (small values).",
+            "precision_ki_input": "Precision PID integral gain (helps remove steady-state error).",
+            "precision_kd_input": "Precision PID derivative gain (damps oscillation).",
+            "precision_hfov_input": "Approximate camera horizontal field-of-view in degrees (used to convert pixels → degrees).",
+            "precision_max_step_input": "Maximum degrees the precision PID may command per frame (safety clamp).",
+            "precision_frac_threshold_input": "Micro-step trigger threshold in degrees (smaller = more sensitive micro-steps).",
             "lost_hold_input": "When target is lost, keep aiming at the last known position for this many seconds (0 = disable).",
             "hold_infinite_checkbox": "Hold the last known target position indefinitely after loss (no timeout).",
             "aim_aggression_slider": "How aggressively the turret recenters on target: 0=conservative, 50=balanced, 100=very aggressive (may overshoot).",
@@ -529,8 +575,109 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 w = getattr(self, attr, None)
                 if w is not None and hasattr(w, "setToolTip"):
                     w.setToolTip(text)
+                    # Install a lightweight custom tooltip filter so the tooltip
+                    # appearance is controlled regardless of platform/theme.
+                    try:
+                        class _TooltipFilter(QObject):
+                            def __init__(self, widget, tip_text):
+                                super().__init__(widget)
+                                self._w = widget
+                                self._text = tip_text
+                                self._label = None
+
+                            def eventFilter(self, obj, ev):
+                                if ev.type() == QEvent.ToolTip or ev.type() == QEvent.Enter:
+                                    try:
+                                        if self._label is None:
+                                            self._label = QLabel(self._text)
+                                            self._label.setWindowFlags(_Qt.ToolTip)
+                                            self._label.setAttribute(_Qt.WA_TransparentForMouseEvents)
+                                            self._label.setStyleSheet(
+                                                "QLabel { background-color: #FFFACD; color: #000000; "
+                                                "border: 1px solid #666; padding: 4px; border-radius: 4px; }"
+                                            )
+                                        pos = self._w.mapToGlobal(self._w.rect().bottomLeft())
+                                        self._label.move(pos)
+                                        self._label.show()
+                                        QTimer.singleShot(4000, lambda: self._label.hide())
+                                    except Exception:
+                                        pass
+                                    return True
+                                if ev.type() == QEvent.Leave:
+                                    try:
+                                        if self._label is not None:
+                                            self._label.hide()
+                                    except Exception:
+                                        pass
+                                return False
+                        f = _TooltipFilter(w, text)
+                        w.installEventFilter(f)
+                        # Keep a reference so it isn't garbage-collected
+                        if not hasattr(self, "_tooltip_filters"):
+                            self._tooltip_filters = []
+                        self._tooltip_filters.append(f)
+                    except Exception:
+                        pass
             except Exception:
                 pass
+
+    def _create_precision_diagnostics(self):
+        """Create a small dock showing precision diagnostics for live tuning."""
+        try:
+            from PyQt5.QtWidgets import QDockWidget, QWidget, QVBoxLayout, QLabel
+            dock = QDockWidget("Precision Diagnostics", self)
+            dock.setObjectName("precision_diagnostics_dock")
+            container = QWidget()
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(6, 6, 6, 6)
+            layout.setSpacing(4)
+            self.precision_diag_label = QLabel("Precision diagnostics not available")
+            try:
+                self.precision_diag_label.setWordWrap(True)
+            except Exception:
+                pass
+            layout.addWidget(self.precision_diag_label)
+            container.setLayout(layout)
+            dock.setWidget(container)
+            try:
+                self.addDockWidget(cast(Any, Qt.RightDockWidgetArea), dock)
+            except Exception:
+                try:
+                    self.addDockWidget(Qt.RightDockWidgetArea, dock)
+                except Exception:
+                    pass
+            # Start hidden by default; user can enable if desired
+            try:
+                dock.setVisible(False)
+            except Exception:
+                pass
+            self._precision_diag_dock = dock
+        except Exception:
+            pass
+
+    def _update_precision_diagnostics(self, cx=None, cy=None, pan_pid=None, tilt_pid=None, pan_accum=None, tilt_accum=None):
+        try:
+            if not getattr(self, "_precision_diag_dock", None):
+                return
+            if not getattr(self._precision_diag_dock, "isVisible", lambda: False)():
+                # user hasn't opened diagnostics dock
+                return
+            text = []
+            if cx is not None and cy is not None:
+                text.append(f"Centroid: x={cx:.2f}px, y={cy:.2f}px")
+            if pan_pid is not None and tilt_pid is not None:
+                text.append(f"PID_out: pan={pan_pid:.4f}°, tilt={tilt_pid:.4f}°")
+            if pan_accum is not None and tilt_accum is not None:
+                text.append(f"Accumulators: pan={pan_accum:.4f}°, tilt={tilt_accum:.4f}°")
+            # Add current threshold and settings
+            try:
+                th = float(self._safe_float_widget_value("precision_frac_threshold_input", getattr(self, "_frac_send_threshold", 0.25)))
+                text.append(f"Micro-threshold: {th:.3f}°")
+            except Exception:
+                pass
+            self.precision_diag_label.setText("\n".join(text))
+        except Exception:
+            pass
 
     def _init_shortcut_and_notes_tabs(self):
         from PyQt5.QtWidgets import QTabWidget, QTextEdit, QLabel, QWidget, QVBoxLayout, QScrollArea, QDockWidget
@@ -976,6 +1123,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 recording_form.addRow(storage_label, self.storage_limit_spinbox)
             except Exception:
                 pass
+
+            # Segment Length (auto-split) - minutes (0 = disabled)
+            try:
+                segment_label = QLabel("Segment Length (min):")
+                if getattr(self, "record_segment_spinbox", None) is None:
+                    self.record_segment_spinbox = QSpinBox()
+                    self.record_segment_spinbox.setRange(0, 240)
+                    self.record_segment_spinbox.setValue(0)
+                    self.record_segment_spinbox.setSingleStep(1)
+                try:
+                    self._safe_connect("record_segment_spinbox", "valueChanged", self.save_settings)
+                except Exception:
+                    pass
+                recording_form.addRow(segment_label, self.record_segment_spinbox)
+            except Exception:
+                pass
             
             # Auto-Cleanup when limit reached
             try:
@@ -1219,6 +1382,30 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.last_known_pan = float(self.HOME_PAN)
         self.last_known_tilt = float(self.HOME_TILT)
         self.trigger_fired = False
+        # Fractional carry accumulators for micro-steps (precision mode)
+        # These allow small fractional PID corrections to eventually move servos
+        self._pan_frac_accum = 0.0
+        self._tilt_frac_accum = 0.0
+        # Threshold (degrees) at which accumulated fractional correction will trigger a micro-step send
+        self._frac_send_threshold = 0.25  # default micro-step threshold (degrees)
+        # ========== RECORDING STATE & ROTATION ==========
+        self._test_recording_active = False
+        self._test_recording_filepath = None
+        self._test_recording_format = None
+
+        self.recording_writer = None
+        self._recording_current_filepath = None
+        self._recording_segment_start = 0.0
+        self._record_segment_index = 0
+
+        # Default recording parameters (overridden by apply_recording_settings / load_settings)
+        self.recording_dir = str(Path.home() / "Videos" / "Turret")
+        self.recording_format = "MP4 (H.264)"
+        self.recording_fps = 30
+        self.recording_segment_minutes = 0  # 0 = no segmentation (continuous single file)
+        self.recording_segment_seconds = 0  # computed from minutes when settings applied
+        self.storage_limit_gb = 10.0
+        self.autocleanup_enabled = True
         self.last_trigger_time = 0.0
         self._firing_start_time = 0.0  # Track when firing started (for timeout)
         self._max_firing_duration = 3.0  # Max seconds to fire continuously (default: 3 sec)
@@ -4536,6 +4723,114 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
         behavior_layout.addWidget(self.overshoot_input, br, 1)
+        br += 1
+
+        # Precision aiming controls (optional)
+        behavior_layout.addWidget(QLabel("Precision Aim (sub-pixel)"), br, 0)
+        precision_box = QHBoxLayout()
+        if getattr(self, "precision_mode_checkbox", None) is None:
+            self.precision_mode_checkbox = QCheckBox("Enable Precision Mode")
+        try:
+            self.precision_mode_checkbox.setChecked(False)
+            self._safe_connect("precision_mode_checkbox", "stateChanged", self.save_settings)
+        except Exception:
+            pass
+        precision_box.addWidget(self.precision_mode_checkbox)
+        # ROI size for refinement (px)
+        if getattr(self, "precision_roi_input", None) is None:
+            self.precision_roi_input = QSpinBox()
+        try:
+            self._safe_widget_call("precision_roi_input", "setRange", 8, 512)
+            self._safe_widget_call("precision_roi_input", "setValue", 48)
+            self._safe_widget_call("precision_roi_input", "setSingleStep", 8)
+            self._safe_connect("precision_roi_input", "valueChanged", self.save_settings)
+        except Exception:
+            pass
+        precision_box.addWidget(QLabel("ROI px:"))
+        precision_box.addWidget(self.precision_roi_input)
+        behavior_layout.addLayout(precision_box, br, 1)
+        br += 1
+
+        # Precision PID gains
+        behavior_layout.addWidget(QLabel("Precision PID Kp, Ki, Kd"), br, 0)
+        pid_row = QHBoxLayout()
+        if getattr(self, "precision_kp_input", None) is None:
+            self.precision_kp_input = QDoubleSpinBox()
+        try:
+            self._safe_widget_call("precision_kp_input", "setRange", 0.0, 1.0)
+            self._safe_widget_call("precision_kp_input", "setSingleStep", 0.001)
+            self._safe_widget_call("precision_kp_input", "setValue", 0.02)
+            self._safe_connect("precision_kp_input", "valueChanged", self.save_settings)
+        except Exception:
+            pass
+        pid_row.addWidget(QLabel("Kp"))
+        pid_row.addWidget(self.precision_kp_input)
+
+        if getattr(self, "precision_ki_input", None) is None:
+            self.precision_ki_input = QDoubleSpinBox()
+        try:
+            self._safe_widget_call("precision_ki_input", "setRange", 0.0, 1.0)
+            self._safe_widget_call("precision_ki_input", "setSingleStep", 0.0005)
+            self._safe_widget_call("precision_ki_input", "setValue", 0.001)
+            self._safe_connect("precision_ki_input", "valueChanged", self.save_settings)
+        except Exception:
+            pass
+        pid_row.addWidget(QLabel("Ki"))
+        pid_row.addWidget(self.precision_ki_input)
+
+        if getattr(self, "precision_kd_input", None) is None:
+            self.precision_kd_input = QDoubleSpinBox()
+        try:
+            self._safe_widget_call("precision_kd_input", "setRange", 0.0, 1.0)
+            self._safe_widget_call("precision_kd_input", "setSingleStep", 0.001)
+            self._safe_widget_call("precision_kd_input", "setValue", 0.005)
+            self._safe_connect("precision_kd_input", "valueChanged", self.save_settings)
+        except Exception:
+            pass
+        pid_row.addWidget(QLabel("Kd"))
+        pid_row.addWidget(self.precision_kd_input)
+        behavior_layout.addLayout(pid_row, br, 1)
+        br += 1
+
+        # Precision conversion and limits
+        behavior_layout.addWidget(QLabel("Precision HFOV (deg) / Max step (deg)"), br, 0)
+        conv_row = QHBoxLayout()
+        if getattr(self, "precision_hfov_input", None) is None:
+            self.precision_hfov_input = QDoubleSpinBox()
+        try:
+            self._safe_widget_call("precision_hfov_input", "setRange", 10.0, 200.0)
+            self._safe_widget_call("precision_hfov_input", "setSingleStep", 1.0)
+            self._safe_widget_call("precision_hfov_input", "setValue", 90.0)
+            self._safe_connect("precision_hfov_input", "valueChanged", self.save_settings)
+        except Exception:
+            pass
+        conv_row.addWidget(QLabel("HFOV°"))
+        conv_row.addWidget(self.precision_hfov_input)
+
+        if getattr(self, "precision_max_step_input", None) is None:
+            self.precision_max_step_input = QDoubleSpinBox()
+        try:
+            self._safe_widget_call("precision_max_step_input", "setRange", 0.1, 5.0)
+            self._safe_widget_call("precision_max_step_input", "setSingleStep", 0.1)
+            self._safe_widget_call("precision_max_step_input", "setValue", 1.0)
+            self._safe_connect("precision_max_step_input", "valueChanged", self.save_settings)
+        except Exception:
+            pass
+        conv_row.addWidget(QLabel("Max°/frame"))
+        conv_row.addWidget(self.precision_max_step_input)
+        # Fractional micro-step threshold control
+        if getattr(self, "precision_frac_threshold_input", None) is None:
+            self.precision_frac_threshold_input = QDoubleSpinBox()
+        try:
+            self._safe_widget_call("precision_frac_threshold_input", "setRange", 0.05, 2.0)
+            self._safe_widget_call("precision_frac_threshold_input", "setSingleStep", 0.05)
+            self._safe_widget_call("precision_frac_threshold_input", "setValue", 0.25)
+            self._safe_connect("precision_frac_threshold_input", "valueChanged", self.save_settings)
+        except Exception:
+            pass
+        conv_row.addWidget(QLabel("Micro°"))
+        conv_row.addWidget(self.precision_frac_threshold_input)
+        behavior_layout.addLayout(conv_row, br, 1)
         br += 1
 
         # ========== CAMERA RESOLUTION - REMOVED (Dec 2024) ==========
@@ -13536,21 +13831,23 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             pan_offset = pixel_deviation_x * degrees_per_pixel_x
             tilt_offset = -pixel_deviation_y * degrees_per_pixel_y  # Inverted
             
-            # Calculate target angles from current position (more accurate than HOME)
-            current_pan = getattr(self, "target_pan", getattr(self, "HOME_PAN", 90))
-            current_tilt = getattr(self, "target_tilt", getattr(self, "HOME_TILT", 45))
-            
-            # Since err_x/err_y represent deviation, we add the offset to current position
-            # But we're starting from pixel deviation, so use home as reference
+            # Calculate target angles from current turret position (use current as reference)
+            current_pan = float(getattr(self, "target_pan", getattr(self, "HOME_PAN", 90)))
+            current_tilt = float(getattr(self, "target_tilt", getattr(self, "HOME_TILT", 45)))
+
+            # Apply pixel-derived offsets to the current turret angles so Quick Strike
+            # moves relative to the turret's current orientation instead of always
+            # mapping from HOME. This avoids repeatedly returning to the same
+            # fixed HOME-based setpoint on each press.
             target_pan = float(np.clip(
-                self.HOME_PAN + pan_offset,
+                current_pan + pan_offset,
                 self.PAN_MIN,
-                self.PAN_MAX
+                self.PAN_MAX,
             ))
             target_tilt = float(np.clip(
-                self.HOME_TILT + tilt_offset,
+                current_tilt + tilt_offset,
                 self.TILT_MIN,
-                self.TILT_MAX
+                self.TILT_MAX,
             ))
             
             # Activate Quick Strike mode
@@ -14104,9 +14401,20 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 indicator_color = HUD_GRAY
             draw_text_with_bg(status_indicator, (HUD_MARGIN, bottom_y - 40), FONT_STATUS, indicator_color)
             
-            # Recording (Red - important alert)
+            # Recording (Red - important alert) -> show elapsed timer and filename
             if recording:
-                draw_text_with_bg("REC", (HUD_MARGIN, bottom_y - 60), FONT_STATUS, HUD_RED)
+                rec_time = hud_data.get('recording_time', 0)
+                mins = int(rec_time) // 60
+                secs = int(rec_time) % 60
+                filename = str(hud_data.get('recording_filename', ''))
+                time_text = f"REC {mins:02d}:{secs:02d}"
+                draw_text_with_bg(time_text, (HUD_MARGIN + 40, bottom_y - 60), FONT_STATUS, HUD_RED)
+                # small blinking dot
+                dot_color = HUD_RED if (int(time.time() * 2) % 2 == 0) else (0, 0, 0)
+                cv2.circle(frame, (HUD_MARGIN + 10, bottom_y - 66), 6, dot_color, -1)
+                if filename:
+                    short_name = filename if len(filename) <= 24 else ("..." + filename[-21:])
+                    draw_text_with_bg(short_name, (HUD_MARGIN, bottom_y - 80), FONT_DEBUG, HUD_GRAY)
             
             # --- BOTTOM-RIGHT: Pan/Tilt (ALWAYS DRAWN - Yellow for values) ---
             # This is UNCONDITIONAL - no if, no check, always visible
@@ -15714,8 +16022,37 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     try:
                         # FIX DEC8: Use floating point division to preserve sub-pixel precision
                         # Integer division loses 0.5-0.8 pixels per frame, accumulating 2-3° drift per 1000 frames
+                        # Attempt to compute a contour-based (moment) centroid inside the detected box
+                        # for better sub-pixel accuracy. Fall back to box center if refinement fails.
                         cx = x + w / 2.0
                         cy = y + h / 2.0
+                        try:
+                            if frame1 is not None and int(w) > 2 and int(h) > 2:
+                                # Extract ROI safely (clip boundaries)
+                                x0 = max(0, int(x))
+                                y0 = max(0, int(y))
+                                x1 = min(int(self.frame_width), int(x + w))
+                                y1 = min(int(self.frame_height), int(y + h))
+                                roi = frame1[y0:y1, x0:x1]
+                                if roi is not None and getattr(roi, 'size', 0) > 0:
+                                    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+                                    # Use Otsu threshold to separate foreground in ROI
+                                    try:
+                                        _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                                    except Exception:
+                                        # Fallback simple threshold if Otsu errors
+                                        _, th = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
+                                    contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                                    if contours:
+                                        c = max(contours, key=cv2.contourArea)
+                                        M = cv2.moments(c)
+                                        if M and M.get('m00', 0) > 1e-5:
+                                            # Centroid relative to ROI
+                                            cx = x0 + (M['m10'] / M['m00'])
+                                            cy = y0 + (M['m01'] / M['m00'])
+                        except Exception:
+                            # On any error, retain box center (safe fallback)
+                            pass
                         if frame1 is not None:
                             # Use stored frame dimensions (set by frame ratio selector)
                             # This ensures all calculations are consistent with selected resolution
@@ -16270,6 +16607,86 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     target_tilt_val = prev_tilt + tilt_micro_movement  # Move up
 
                     try:
+                        # ===== Precision PID refinement (host-side) =====
+                        try:
+                            precision_enabled = (
+                                getattr(self, "precision_mode_checkbox", None)
+                                and getattr(self.precision_mode_checkbox, "isChecked", lambda: False)()
+                            )
+                        except Exception:
+                            precision_enabled = False
+
+                        if precision_enabled:
+                            try:
+                                # Activation: only when close to center (within 3x deadzone)
+                                precision_activation_px = max(3 * deadzone_px, int(self._safe_int_widget_value("precision_roi_input", 48)))
+                                if abs(err_x) <= precision_activation_px and abs(err_y) <= precision_activation_px:
+                                    # Convert pixel error to degrees using HFOV
+                                    hfov = float(self._safe_float_widget_value("precision_hfov_input", 90.0))
+                                    frame_w = float(self.frame_width)
+                                    deg_per_px = hfov / max(1.0, frame_w)
+
+                                    pan_err_deg = err_x * deg_per_px
+                                    tilt_err_deg = err_y * deg_per_px
+
+                                    # Initialize PID state
+                                    if not hasattr(self, "_precision_pid_pan"):
+                                        self._precision_pid_pan = {"i": 0.0, "last": 0.0}
+                                    if not hasattr(self, "_precision_pid_tilt"):
+                                        self._precision_pid_tilt = {"i": 0.0, "last": 0.0}
+
+                                    now = time.time()
+                                    dt = now - getattr(self, "_last_precision_time", now)
+                                    dt = max(dt, 1e-3)
+
+                                    kp = float(self._safe_float_widget_value("precision_kp_input", 0.02))
+                                    ki = float(self._safe_float_widget_value("precision_ki_input", 0.001))
+                                    kd = float(self._safe_float_widget_value("precision_kd_input", 0.005))
+
+                                    # PAN PID
+                                    p_state = self._precision_pid_pan
+                                    p_state["i"] += pan_err_deg * dt
+                                    # anti-windup clamp
+                                    max_i = 5.0
+                                    p_state["i"] = float(np.clip(p_state["i"], -max_i, max_i))
+                                    d = (pan_err_deg - p_state["last"]) / dt
+                                    pan_out = kp * pan_err_deg + ki * p_state["i"] + kd * d
+                                    p_state["last"] = pan_err_deg
+
+                                    # TILT PID
+                                    t_state = self._precision_pid_tilt
+                                    t_state["i"] += tilt_err_deg * dt
+                                    t_state["i"] = float(np.clip(t_state["i"], -max_i, max_i))
+                                    dd = (tilt_err_deg - t_state["last"]) / dt
+                                    tilt_out = kp * tilt_err_deg + ki * t_state["i"] + kd * dd
+                                    t_state["last"] = tilt_err_deg
+
+                                    # Clamp per-frame output by user-configured max step
+                                    max_step = float(self._safe_float_widget_value("precision_max_step_input", 1.0))
+                                    pan_out = float(np.clip(pan_out, -abs(max_step), abs(max_step)))
+                                    tilt_out = float(np.clip(tilt_out, -abs(max_step), abs(max_step)))
+                                    # Update on-screen diagnostics if available
+                                    try:
+                                        self._update_precision_diagnostics(
+                                            cx=cx if 'cx' in locals() else None,
+                                            cy=cy if 'cy' in locals() else None,
+                                            pan_pid=pan_out,
+                                            tilt_pid=tilt_out,
+                                            pan_accum=getattr(self, '_pan_frac_accum', 0.0),
+                                            tilt_accum=getattr(self, '_tilt_frac_accum', 0.0),
+                                        )
+                                    except Exception:
+                                        pass
+
+                                    # Apply PID outputs to target values (respect pan/tilt direction flips)
+                                    target_pan_val = prev_pan + (pan_out * pan_dir)
+                                    target_tilt_val = prev_tilt - (tilt_out * tilt_dir)
+
+                                    # Store last precision timestamp
+                                    self._last_precision_time = now
+                            except Exception:
+                                pass
+
                         # Keep the running target as float so small fractional updates
                         # accumulate across frames (then we int() only when sending to hardware).
                         self.target_pan = float(
@@ -16826,25 +17243,19 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     
                     # If hold window has expired and tracking is still on, stop it
                     if time_since_seen > hold_window and getattr(self, "tracking_active", False):
-                        self.tracking_active = False
-                        self.aiming_active = False
+                        # Do NOT disable tracking/aiming on hold timeout.
+                        # Mark that we entered idle due to loss so idle behavior can run,
+                        # but keep `tracking_active`/`aiming_active` True so detection resumes instantly.
                         try:
-                            if getattr(self, "tracking_btn", None) is not None:
-                                self.tracking_btn.setChecked(False)
-                                self.tracking_btn.setText("Start Tracking")
+                            self._idle_due_to_loss = True
                         except Exception:
                             pass
                         try:
-                            if getattr(self, "aiming_btn", None) is not None:
-                                self.aiming_btn.setChecked(False)
-                                self.aiming_btn.setText("Start Aiming")
-                        except Exception:
-                            pass
-                        try:
-                            self.enhancer.log_serial_output(
-                                f"[TRACK] Hold window expired ({hold_window:.1f}s) - stopped tracking, entering idle mode",
-                                fire=False
-                            )
+                            if getattr(self, "enhancer", None):
+                                self.enhancer.log_serial_output(
+                                    f"[TRACK] Hold window expired ({hold_window:.1f}s) - entering idle behavior (tracking preserved)",
+                                    fire=False,
+                                )
                         except Exception:
                             pass
                 except Exception:
@@ -17252,6 +17663,94 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         rgb = cv2.cvtColor(frame1, cv2.COLOR_BGR2RGB)
         # Add sniper scope crosshair and unified HUD overlay
         rgb = self._add_crosshair_and_scope(rgb)
+        # --- Recording management: start/stop writer, segment rotation, storage cleanup ---
+        try:
+            desired = bool(getattr(self, "_test_recording_active", False))
+            try:
+                if getattr(self, "recording_enabled_checkbox", None) and getattr(self, "autorecord_checkbox", None):
+                    desired = desired or (self.recording_enabled_checkbox.isChecked() and self.autorecord_checkbox.isChecked() and bool(getattr(self, "tracking_active", False)))
+            except Exception:
+                pass
+
+            if desired and self.recording_writer is None:
+                if getattr(self, "_test_recording_active", False) and getattr(self, "_test_recording_filepath", None):
+                    filepath = self._test_recording_filepath
+                    fmt = getattr(self, "_test_recording_format", self.recording_format)
+                else:
+                    ts = time.strftime("%Y%m%d_%H%M%S")
+                    ext = self._get_extension_for_format(self.recording_format)
+                    base_dir = Path(getattr(self, "recording_dir", self.recording_dir))
+                    filepath = str(base_dir / f"recording_{ts}_{self._record_segment_index}{ext}")
+                    fmt = self.recording_format
+                    self._record_segment_index += 1
+
+                try:
+                    self._enforce_storage_limit()
+                except Exception:
+                    pass
+
+                fps_setting = None
+                try:
+                    if getattr(self, "fps_combo", None):
+                        fps_text = self.fps_combo.currentText().strip()
+                        if fps_text.endswith("FPS"):
+                            fps_setting = int(fps_text.split()[0])
+                except Exception:
+                    fps_setting = getattr(self, "recording_fps", 30)
+
+                self._start_recording(filepath, fmt=fmt, fps=fps_setting)
+
+            if not desired and self.recording_writer is not None:
+                self._stop_recording()
+
+            if self.recording_writer is not None and getattr(self.recording_writer, 'isOpened', lambda: True)():
+                try:
+                    to_write = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                except Exception:
+                    to_write = rgb
+                try:
+                    self.recording_writer.write(to_write)
+                except Exception as e:
+                    if getattr(self, "enhancer", None):
+                        self.enhancer.log_serial_output(f"[RECORDING] Write error: {e}")
+
+                elapsed = time.time() - float(self._recording_segment_start or time.time())
+                try:
+                    if not hasattr(self, 'hud_data'):
+                        self.hud_data = {}
+                    self.hud_data['recording'] = True
+                    self.hud_data['recording_time'] = int(elapsed)
+                    if self._recording_current_filepath:
+                        self.hud_data['recording_filename'] = os.path.basename(self._recording_current_filepath)
+                    else:
+                        self.hud_data['recording_filename'] = ''
+                except Exception:
+                    pass
+
+                seg_sec = int(getattr(self, "recording_segment_seconds", getattr(self, "recording_segment_minutes", 0) * 60) or 0)
+                if seg_sec > 0 and elapsed >= seg_sec:
+                    old_path = self._recording_current_filepath
+                    self._stop_recording()
+                    try:
+                        self._enforce_storage_limit()
+                    except Exception:
+                        pass
+                    if not getattr(self, "_test_recording_active", False):
+                        ts = time.strftime("%Y%m%d_%H%M%S")
+                        ext = self._get_extension_for_format(self.recording_format)
+                        base_dir = Path(getattr(self, "recording_dir", self.recording_dir))
+                        new_path = str(base_dir / f"recording_{ts}_{self._record_segment_index}{ext}")
+                        self._record_segment_index += 1
+                        try:
+                            self._start_recording(new_path, fmt=self.recording_format, fps=self.recording_fps)
+                        except Exception:
+                            pass
+        except Exception:
+            try:
+                if getattr(self, "enhancer", None):
+                    self.enhancer.log_serial_output("[RECORDING] Management error", fire=False)
+            except Exception:
+                pass
         
         # NOTE: All HUD elements (opacity info, status, etc.) are now drawn
         # in _add_crosshair_and_scope() using grid-based layout
@@ -17731,6 +18230,64 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         command = f"P{pan_angle}T{tilt_angle}F{fire_token}L{led_token}R{laser_token}G{acc3_token}S{safety_token}M{mode_token}\n"
         
+        # --- Fractional accumulation to allow micro-corrections (prevents "stuck at last integer" issue) ---
+        try:
+            # ensure accumulators exist
+            self._pan_frac_accum = getattr(self, "_pan_frac_accum", 0.0)
+            self._tilt_frac_accum = getattr(self, "_tilt_frac_accum", 0.0)
+            self._frac_send_threshold = getattr(self, "_frac_send_threshold", 0.25)
+
+            # Reference last sent integer position (fallback to prev angles if sentinel)
+            last_pan_int = int(getattr(self, "last_sent_pan", int(pan_angle)))
+            last_tilt_int = int(getattr(self, "last_sent_tilt", int(tilt_angle)))
+
+            # Compute desired float deltas relative to last sent integer position
+            desired_pan_delta = float(target_pan_raw) - float(last_pan_int)
+            desired_tilt_delta = float(target_tilt_raw) - float(last_tilt_int)
+
+            # Only apply accumulation when precision mode is enabled, otherwise keep original behavior.
+            precision_enabled = bool(
+                getattr(self, "precision_mode_checkbox", None)
+                and getattr(self.precision_mode_checkbox, "isChecked", lambda: False)()
+            )
+
+            if precision_enabled:
+                # Accumulate fractional deltas
+                self._pan_frac_accum += desired_pan_delta
+                self._tilt_frac_accum += desired_tilt_delta
+
+                # If accumulator crosses threshold, prepare a one-degree micro-step
+                pan_override = None
+                tilt_override = None
+
+                if abs(self._pan_frac_accum) >= float(self._frac_send_threshold):
+                    step = int(np.sign(self._pan_frac_accum))
+                    pan_override = int(last_pan_int + step)
+                    self._pan_frac_accum -= step  # consume step
+
+                if abs(self._tilt_frac_accum) >= float(self._frac_send_threshold):
+                    step = int(np.sign(self._tilt_frac_accum))
+                    tilt_override = int(last_tilt_int + step)
+                    self._tilt_frac_accum -= step  # consume step
+
+                # Apply overrides so we can send micro-step even if rounded target equals last_sent
+                if pan_override is not None:
+                    pan_angle = int(np.clip(pan_override, self.PAN_MIN, self.PAN_MAX))
+                if tilt_override is not None:
+                    tilt_angle = int(np.clip(tilt_override, self.TILT_MIN, self.TILT_MAX))
+
+                # Debug logging when micro-step triggered
+                if (pan_override is not None or tilt_override is not None) and getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked():
+                    try:
+                        self.enhancer.log_serial_output(
+                            f"[MICRO-SEND] applied micro-step -> pan={pan_angle} tilt={tilt_angle} | accum_pan={self._pan_frac_accum:.3f} accum_tilt={self._tilt_frac_accum:.3f}",
+                            fire=False
+                        )
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
         # ========== BULLETPROOF FIX: PREVENT REDUNDANT SERVO COMMANDS ==========
         # ISSUE: Sending same command repeatedly causes servo jitter/hunting/twitching
         # The servo can't distinguish between "move to 40°" and "stay at 40°"
@@ -17749,14 +18306,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             mode_token == int(getattr(self, "_last_mode_token", 0))):
             should_send = False
 
-        # Log unchanged commands only in debug mode
-        if not should_send and debug_on:
+        # Diagnostic: when skipping, log reason and current fractional state (debug-only)
+        if not should_send and getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked():
             try:
-                if getattr(self, "enhancer", None):
-                    self.enhancer.log_serial_output(
-                        f"[REDUNDANT] Command unchanged: P{pan_angle}T{tilt_angle} (skipping send)",
-                        fire=False
-                    )
+                msg = (
+                    f"[SKIP] unchanged-rounded-ints | raw=P{target_pan_raw:.4f}°/T{target_tilt_raw:.4f}° -> "
+                    f"rounded=P{pan_angle}°/T{tilt_angle}° | last_sent=P{last_pan}°/T{last_tilt}° | "
+                    f"accum_pan={getattr(self,'_pan_frac_accum',0.0):.3f} accum_tilt={getattr(self,'_tilt_frac_accum',0.0):.3f} "
+                    f"flags: manual_override={getattr(self,'manual_override',False)} serial_tx_paused={getattr(self,'serial_tx_paused',False)} _mcu_tilt_safety_locked={getattr(self,'_mcu_tilt_safety_locked',False)}"
+                )
+                self.enhancer.log_serial_output(msg, fire=False)
             except Exception:
                 pass
 
@@ -18961,9 +19520,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             if getattr(self, "video_format_combo", None):
                 settings["video_format"] = self.video_format_combo.currentText()
             
-            # FPS
+            # FPS (parse numeric value from display text like '30 FPS')
             if getattr(self, "fps_combo", None):
-                settings["fps"] = int(self.fps_combo.currentText())
+                try:
+                    import re
+                    txt = str(self.fps_combo.currentText())
+                    m = re.search(r"\d+", txt)
+                    settings["fps"] = int(m.group()) if m else 30
+                except Exception:
+                    try:
+                        settings["fps"] = int(self.fps_combo.currentText())
+                    except Exception:
+                        settings["fps"] = 30
             
             # Quality
             if getattr(self, "quality_combo", None):
@@ -18980,6 +19548,27 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # Auto-cleanup enabled
             if getattr(self, "autocleanup_checkbox", None):
                 settings["autocleanup"] = self.autocleanup_checkbox.isChecked()
+            
+            # Segment length (minutes)
+            if getattr(self, "record_segment_spinbox", None):
+                settings["segment_length_min"] = int(self.record_segment_spinbox.value())
+
+            # Mirror important values to runtime attributes
+            try:
+                self.recording_segment_minutes = int(settings.get("segment_length_min", 0))
+                self.recording_segment_seconds = self.recording_segment_minutes * 60
+            except Exception:
+                self.recording_segment_minutes = 0
+                self.recording_segment_seconds = 0
+
+            try:
+                self.storage_limit_gb = float(settings.get("storage_limit_gb", self.storage_limit_gb))
+            except Exception:
+                pass
+            try:
+                self.autocleanup_enabled = bool(settings.get("autocleanup", self.autocleanup_enabled))
+            except Exception:
+                pass
             
             # Save to settings.json
             try:
@@ -19004,6 +19593,100 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     )
         except Exception as e:
             print(f"[ERROR] apply_recording_settings: {e}")
+
+        # ===== RECORDING HELPERS =====
+        def _get_extension_for_format(self, fmt):
+            ext_map = {
+                "MP4 (H.264)": ".mp4",
+                "AVI (MJPEG)": ".avi",
+                "MOV (H.264)": ".mov",
+            }
+            return ext_map.get(fmt, ".mp4")
+
+        def _fourcc_for_format(self, fmt):
+            if fmt and fmt.startswith("MP4"):
+                return cv2.VideoWriter_fourcc(*"mp4v")
+            if fmt and ("MJPEG" in fmt or fmt.startswith("AVI")):
+                return cv2.VideoWriter_fourcc(*"MJPG")
+            return cv2.VideoWriter_fourcc(*"mp4v")
+
+        def _start_recording(self, filepath, fmt=None, fps=None):
+            try:
+                if fmt:
+                    self.recording_format = fmt
+                if fps:
+                    self.recording_fps = int(fps)
+                Path(os.path.dirname(filepath)).mkdir(parents=True, exist_ok=True)
+                fourcc = self._fourcc_for_format(self.recording_format)
+                width = int(getattr(self, "frame_width", 1280))
+                height = int(getattr(self, "frame_height", 720))
+                writer = cv2.VideoWriter(filepath, fourcc, float(self.recording_fps), (width, height))
+                if not writer or writer.isOpened() is False:
+                    writer = cv2.VideoWriter(filepath, cv2.VideoWriter_fourcc(*"XVID"), float(self.recording_fps), (width, height))
+                self.recording_writer = writer
+                self._recording_current_filepath = filepath
+                self._recording_segment_start = time.time()
+                if getattr(self, "enhancer", None):
+                    self.enhancer.log_serial_output(f"[RECORDING] Started: {os.path.basename(filepath)}")
+            except Exception as e:
+                self.recording_writer = None
+                if getattr(self, "enhancer", None):
+                    self.enhancer.log_serial_output(f"[RECORDING] Failed to start recording: {e}")
+
+        def _stop_recording(self):
+            try:
+                if self.recording_writer is not None:
+                    try:
+                        self.recording_writer.release()
+                    except Exception:
+                        pass
+                if getattr(self, "enhancer", None) and self._recording_current_filepath:
+                    self.enhancer.log_serial_output(f"[RECORDING] Saved: {os.path.basename(self._recording_current_filepath)}")
+                self.recording_writer = None
+                self._recording_current_filepath = None
+                self._recording_segment_start = 0.0
+            except Exception as e:
+                if getattr(self, "enhancer", None):
+                    self.enhancer.log_serial_output(f"[RECORDING] Stop error: {e}")
+
+        def _get_recording_files_sorted(self):
+            try:
+                out_dir = Path(getattr(self, "recording_dir", self.recording_dir))
+                if not out_dir.exists():
+                    return []
+                exts = {".mp4", ".avi", ".mov"}
+                files = [f for f in out_dir.iterdir() if f.is_file() and f.suffix.lower() in exts]
+                files.sort(key=lambda p: p.stat().st_mtime)
+                return files
+            except Exception:
+                return []
+
+        def _enforce_storage_limit(self):
+            try:
+                if not getattr(self, "autocleanup_enabled", True):
+                    return
+                limit_gb = float(getattr(self, "storage_limit_gb", self.storage_limit_gb) or 0.0)
+                if limit_gb <= 0.0:
+                    return
+                limit_bytes = limit_gb * 1024 ** 3
+                files = self._get_recording_files_sorted()
+                total = sum(f.stat().st_size for f in files)
+                idx = 0
+                while total > limit_bytes and idx < len(files):
+                    f = files[idx]
+                    try:
+                        size = f.stat().st_size
+                        f.unlink()
+                        total -= size
+                        if getattr(self, "enhancer", None):
+                            self.enhancer.log_serial_output(f"[RECORDING] Auto-deleted: {f.name}")
+                    except Exception as e:
+                        if getattr(self, "enhancer", None):
+                            self.enhancer.log_serial_output(f"[RECORDING] Failed to delete {f.name}: {e}")
+                    idx += 1
+            except Exception as e:
+                if getattr(self, "enhancer", None):
+                    self.enhancer.log_serial_output(f"[RECORDING] Cleanup error: {e}")
 
     def test_recording(self):
         """Start/stop test recording for verification."""
