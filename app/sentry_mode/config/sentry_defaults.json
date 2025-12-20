@@ -1,0 +1,81 @@
+{
+  "guard_point": [
+    0.8121761658031088,
+    0.5512820512820513
+  ],
+  "peripheral_inner_radius": 0.15,
+  "peripheral_outer_radius": 0.45,
+  "kill_zone_radius": 0.08,
+  "min_passes_to_confirm": 2,
+  "track_similarity_time_window": 30.0,
+  "path_similarity_threshold": 0.15,
+  "min_track_length": 10,
+  "max_stored_tracks": 50,
+  "track_expiry_seconds": 300.0,
+  "kalman_process_noise": 0.03,
+  "kalman_measurement_noise": 0.1,
+  "prediction_lookahead": 0.5,
+  "velocity_smoothing": 0.3,
+  "min_speed_threshold": 10.0,
+  "fire_window_before": 0.05,
+  "fire_window_after": 0.1,
+  "burst_enabled": true,
+  "burst_count": 3,
+  "burst_interval_ms": 50,
+  "mechanical_lead_time": 0.02,
+  "fire_confidence_threshold": 0.7,
+  "fire_cooldown": 1.0,
+  "max_ambush_points": 3,
+  "ambush_priority_method": "frequency",
+  "manual_ambush_enabled": true,
+  "color_peripheral_zone": [
+    255,
+    255,
+    0
+  ],
+  "color_confirmed_track": [
+    0,
+    255,
+    0
+  ],
+  "color_learning_track": [
+    0,
+    255,
+    255
+  ],
+  "color_ambush_point": [
+    0,
+    0,
+    255
+  ],
+  "color_prediction_vector": [
+    255,
+    0,
+    255
+  ],
+  "color_kill_zone": [
+    0,
+    100,
+    255
+  ],
+  "zone_line_thickness": 2,
+  "track_line_thickness": 2,
+  "show_debug_overlay": true,
+  "show_velocity_vectors": true,
+  "show_prediction_path": true,
+  "show_confidence_meter": true,
+  "persist_tracks": true,
+  "tracks_save_path": "config/sentry_tracks.json",
+  "auto_save_interval": 60.0,
+  "yolo_confidence": 0.5,
+  "target_classes": [
+    "mouse",
+    "rat",
+    "bird",
+    "cat"
+  ],
+  "min_detection_area": 500,
+  "min_learning_duration": 5.0,
+  "watching_timeout": 60.0,
+  "aiming_timeout": 3.0
+}

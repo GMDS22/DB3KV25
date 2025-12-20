@@ -5,7 +5,7 @@ Servo Calibration Tool for Pan & Tilt Servos
 
 This tool allows you to:
 1. Discover the full range of the PAN servo (expects >200°)
-2. Verify/adjust TILT servo safe limits (currently 18-90°)
+2. Verify/adjust TILT servo safe limits (currently 0-70°)
 3. Save calibrated values to servo_calibration.json
 4. Apply values to main app and Arduino sketch
 
@@ -42,6 +42,12 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject
 from PyQt5.QtGui import QFont, QColor
+
+
+# Use a stable, script-relative calibration path so running the tool from
+# different working directories does not create multiple calibration files.
+BASE_DIR = Path(__file__).resolve().parent
+CALIB_FILE = BASE_DIR / "servo_calibration.json"
 
 
 class SerialCommands:
@@ -595,27 +601,27 @@ class ServoCalibrationTool(QMainWindow):
         """Reset tilt to safe defaults"""
         reply = QMessageBox.question(
             self, "Reset Tilt",
-            "Reset TILT to safe defaults (18-90°)?",
+            "Reset TILT to safe defaults (0-70°)?",
             QMessageBox.Yes | QMessageBox.No
         )
         if reply == QMessageBox.Yes:
-            self.tilt_min = 18
-            self.tilt_max = 90
-            self.tilt_min_spin.setValue(18)
-            self.tilt_max_spin.setValue(90)
-            self.log("Tilt reset to safe defaults (18-90°)")
+            self.tilt_min = 0
+            self.tilt_max = 70
+            self.tilt_min_spin.setValue(0)
+            self.tilt_max_spin.setValue(70)
+            self.log("Tilt reset to safe defaults (0-70°)")
     
     def load_calibration(self):
         """Load existing calibration from file"""
-        calib_file = Path("servo_calibration.json")
+        calib_file = CALIB_FILE
         if calib_file.exists():
             try:
                 with open(calib_file) as f:
                     data = json.load(f)
-                    self.pan_min = data.get("pan_min", 5)
-                    self.pan_max = data.get("pan_max", 185)
-                    self.tilt_min = data.get("tilt_min", 18)
-                    self.tilt_max = data.get("tilt_max", 90)
+                    self.pan_min = data.get("pan_min", 0)
+                    self.pan_max = data.get("pan_max", 220)
+                    self.tilt_min = data.get("tilt_min", 0)
+                    self.tilt_max = data.get("tilt_max", 70)
             except Exception as e:
                 print(f"Failed to load calibration: {e}")
     
@@ -630,9 +636,9 @@ class ServoCalibrationTool(QMainWindow):
         }
         
         try:
-            with open("servo_calibration.json", "w") as f:
+            with open(CALIB_FILE, "w") as f:
                 json.dump(data, f, indent=2)
-            self.log("✓ Calibration saved to servo_calibration.json")
+            self.log(f"✓ Calibration saved to {CALIB_FILE}")
             return True
         except Exception as e:
             self.log(f"Failed to save calibration: {e}")

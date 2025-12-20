@@ -29,6 +29,23 @@ Safety & Tuning
 - `HFOV°` should approximate the camera lens HFOV for best conversion; if unknown start with 90°.
 - Precision Mode is opt-in and off by default.
 
+Persistence & Presets (Dec 20, 2025)
+
+- Precision Mode settings now persist in `settings.json` and do not reset every launch.
+- Presets can explicitly control these keys:
+   - `precision_mode` (bool)
+   - `precision_roi` (int)
+   - `precision_kp`, `precision_ki`, `precision_kd` (float)
+   - `precision_hfov` (float)
+   - `precision_max_step` (float)
+   - `precision_frac_threshold` (float)
+
+Recommended defaults (1280×720)
+
+- `precision_mode=False`, `precision_roi=48`
+- `precision_kp=0.02`, `precision_ki=0.001`, `precision_kd=0.005`
+- `precision_hfov=90.0`, `precision_max_step=1.0`, `precision_frac_threshold=0.25`
+
 Next steps / Enhancements
 
 - Add a UI diagnostic readout showing PID outputs and refined centroid (helpful for tuning).

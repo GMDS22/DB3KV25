@@ -9,6 +9,28 @@
 
 Camera now displays at full resolution filling the entire frame without errors.
 
+---
+
+## CAMERA ORIENTATION (Flip / Invert Pan/Tilt)
+
+If the camera view orientation is "wrong" every time you launch, it is almost always caused by one of these:
+
+1. The app loading a different `settings.json` depending on the current working directory (CWD).
+2. Runtime code force-toggling orientation (e.g., forcing Flip Frame ON when tracking starts).
+
+### Canonical settings file
+
+As of Dec 20, 2025, the app resolves `settings.json` relative to the project root (not CWD).
+This ensures orientation persists consistently regardless of whether you run `run.py` from the repo root or start the app another way.
+
+### Known-working orientation (this build)
+
+- `flip_image = False`
+- `invert_pan = True`
+- `invert_tilt = False`
+
+**Do not reintroduce any code that forces these values during runtime** (especially during tracking start). Changes should only come from user UI choices + persisted `settings.json`.
+
 **See these files for details:**
 - `CAMERA_RESOLUTION_GUIDE.md` - Complete technical guide (changing resolution, troubleshooting)
 - `QUICK_RESOLUTION_GUIDE.txt` - Quick reference (the 4 locations to change)

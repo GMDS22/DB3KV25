@@ -1,10 +1,13 @@
-# Rapid-Fire Support — Arduino Firmware Requirements
+# Auto Turret — Setup & Troubleshooting
+
+## Rapid-Fire Support — Arduino Firmware Requirements
 
 The rapid-fire feature in this software works by sending repeated ON/OFF commands to the Arduino to pulse the firing trigger at the configured rate and duty cycle.
 
 **IMPORTANT:** For rapid-fire to work as intended, your Arduino sketch (firmware) must support receiving and acting on multiple ON/OFF trigger commands in quick succession. If your current firmware only responds to a single ON/OFF (i.e., it latches the trigger and ignores further ON/OFF commands until reset), you will need to update your Arduino code.
 
 **Recommended:**
+
 - Ensure your Arduino code toggles the firing output each time it receives an ON or OFF command from the host.
 - The host will send ON/OFF commands at the rapid-fire rate you set in the UI.
 - If you want true rapid-fire, the Arduino must not ignore repeated ON/OFF commands.
@@ -12,7 +15,7 @@ The rapid-fire feature in this software works by sending repeated ON/OFF command
 If you are unsure, check your Arduino sketch for logic that only allows a single trigger pulse per session, and update it to allow repeated pulsing.
 
 If you need a sample Arduino code snippet for rapid-fire support, ask in the project issues or see the documentation.
-# Auto Turret — Setup & Troubleshooting
+
 
 This README contains quick setup steps and troubleshooting guidance, especially
 for Windows users with AMD GPUs.
@@ -28,6 +31,7 @@ for Windows users with AMD GPUs.
 1. Create and activate a virtual environment (recommended):
 
    PowerShell:
+
    ```powershell
    python -m venv .venv; .\.venv\Scripts\Activate.ps1
    ```
@@ -35,6 +39,7 @@ for Windows users with AMD GPUs.
 2. Install the pinned runtime dependencies:
 
    PowerShell:
+
    ```powershell
    pip install -r requirements-main.txt
    ```
@@ -42,6 +47,7 @@ for Windows users with AMD GPUs.
 3. (Optional) Install development tools or optional heavy packages:
 
    PowerShell:
+
    ```powershell
    pip install -r requirements-dev.txt
    pip install -r requirements-optional.txt  # only if you want torch/pygame etc.
@@ -104,6 +110,15 @@ or you prefer not to use it, switch to:
 - `Background Subtraction`
 
 These modes work without ultralytics/torch and are suitable for many use cases.
+
+## Presets (minimal UI workflow)
+
+Factory presets (from `app/turret_presets.py`) can be applied from two places:
+
+- **Configuration & Connection dock** (COM/Connect/Tracking area): a **Factory Preset** dropdown is available for quick preset changes without opening the Behavior panel.
+- **Tracking Behavior dock**: includes the full behavior/preset controls.
+
+Implementation note for future editors: when launching via `run.py`, the Connection-panel dropdown is created in `app/MAIN_FILE_SINGLE_CAM.py` as `connection_preset_combo` and it calls `apply_preset()`. (There is also a mirrored implementation in `app/ui_builder.py` for alternate UI build paths.)
 
 ## Next steps
 

@@ -22,285 +22,735 @@
 #   yolo_model (string): YOLO model file to use (yolov8n/s/m/l/x.pt).
 #
 # DETECTION MODE:
-#   detection_mode: ONLY included for target-specific presets that REQUIRE YOLO.
-#       General performance presets do NOT set detection_mode, preserving user's
-#       current detection mode selection.
+#   detection_mode: If present, the preset will switch the detection mode dropdown.
+#       (Most size-tier presets include it to ensure consistent behavior.)
 #
 # MOTION DETECTION SETTINGS (for BackgroundSub/FrameDiff modes):
 #   threshold, blur_kernel, min_contour, max_contour, dilate_iter, backsub_warmup
 #
 
+# Precision Aim defaults (persisted + presettable). These are conservative for 1280x720.
+PRECISION_DEFAULTS = {
+    "precision_mode": False,
+    "precision_roi": 48,
+    "precision_kp": 0.02,
+    "precision_ki": 0.001,
+    "precision_kd": 0.005,
+    "precision_hfov": 90.0,
+    "precision_max_step": 1.0,
+    "precision_frac_threshold": 0.25,
+}
+
 PRESETS = {
-    # ==========================================================================
-    # BASE PERFORMANCE PROFILES
-    # These presets control tracking aggressiveness WITHOUT changing detection mode.
-    # Users can combine any of these with their preferred detection method.
-    # ==========================================================================
-    
-    "Smooth / Conservative": {
-        # Gentle, smooth tracking - ideal for slow-moving targets or demos
-        "tracking_speed": 20,
-        "movement_sensitivity": 15,
-        "smoothing_factor": 0.98,
-        "deadzone": 30,
-        "snap_threshold": 50,
-        "aim_aggression": 10,           # Very conservative aiming
-        "final_approach_boost": False,  # No boost - smooth all the way
-        # YOLO settings (applied if YOLO mode is active)
-        "yolo_confidence": 0.6,
-        "yolo_classes": "person",
-        "yolo_model": "yolov8n.pt",
-        # NOTE: No detection_mode - preserves user's current selection
-    },
-    
-    "Balanced": {
-        # Good all-around preset - recommended starting point
-        "tracking_speed": 40,
-        "movement_sensitivity": 30,
-        "smoothing_factor": 0.95,
-        "deadzone": 20,
-        "snap_threshold": 80,
-        "aim_aggression": 35,           # Moderate aggression
-        "final_approach_boost": True,   # Boost for final centering
-        "yolo_confidence": 0.5,
-        "yolo_classes": "person",
-        "yolo_model": "yolov8n.pt",
-    },
-    
-    "Responsive": {
-        # Quick response for moderately fast targets
-        "tracking_speed": 60,
-        "movement_sensitivity": 50,
-        "smoothing_factor": 0.85,
-        "deadzone": 12,
-        "snap_threshold": 120,
-        "aim_aggression": 55,           # Above average aggression
-        "final_approach_boost": True,
-        "yolo_confidence": 0.45,
-        "yolo_classes": "person",
-        "yolo_model": "yolov8s.pt",
-    },
-    
-    "Aggressive": {
-        # Fast tracking with strong centering force
-        "tracking_speed": 80,
-        "movement_sensitivity": 70,
+    # ======================================================================
+    # CONSISTENT PRESET NAMING (Dec 2025)
+    # Format: "Target / <Detection Mode> / <Size Tier> / <Profile>"
+    # Size tiers:
+    #   Small  = rat-sized contour band
+    #   Medium = dog-sized contour band
+    #   Person = person/human-sized contour band
+    #
+    # Goal: while you learn the technical UI settings, these presets give you
+    # predictable, size-gated behavior that prevents giant blobs from locking
+    # and firing. All presets set BOTH min_contour and max_contour.
+    # ======================================================================
+
+    # ----------------------------------------------------------------------
+    # Shared tracking behavior (applies across modes)
+    # ----------------------------------------------------------------------
+
+    "Behavior / Smooth": {
+        "tracking_speed": 45,
+        "movement_sensitivity": 35,
         "smoothing_factor": 0.75,
-        "deadzone": 8,
-        "snap_threshold": 160,
-        "aim_aggression": 75,           # High aggression
+        "deadzone": 22,
+        "snap_threshold": 90,
+        "aim_aggression": 35,
         "final_approach_boost": True,
-        "yolo_confidence": 0.4,
-        "yolo_classes": "person",
-        "yolo_model": "yolov8m.pt",
+        **PRECISION_DEFAULTS,
     },
-    
-    "Very Aggressive": {
-        # Maximum stock aggression - fast but may overshoot
-        "tracking_speed": 95,
-        "movement_sensitivity": 90,
-        "smoothing_factor": 0.6,
-        "deadzone": 4,
-        "snap_threshold": 220,
-        "aim_aggression": 90,           # Very high aggression
-        "final_approach_boost": True,
-        "yolo_confidence": 0.35,
-        "yolo_classes": "person",
-        "yolo_model": "yolov8m.pt",
-    },
-    
-    "Maximum Aggression": {
-        # NEW: Absolute maximum tracking aggression
-        # Warning: May cause overshoot/oscillation on some servo setups
-        "tracking_speed": 100,
-        "movement_sensitivity": 100,
-        "smoothing_factor": 0.3,        # Minimal smoothing for instant response
-        "deadzone": 2,                  # Tiny deadzone - always correcting
-        "snap_threshold": 300,
-        "aim_aggression": 100,          # Maximum aggression
-        "final_approach_boost": True,
-        "yolo_confidence": 0.3,
-        "yolo_classes": "person",
-        "yolo_model": "yolov8m.pt",
-    },
-    
-    "Precision Sniper": {
-        # NEW: Optimized for accurate centering over speed
-        # Moderate speed but very precise final approach
-        "tracking_speed": 50,
-        "movement_sensitivity": 45,
-        "smoothing_factor": 0.7,
-        "deadzone": 3,                  # Very small deadzone for precision
-        "snap_threshold": 100,
-        "aim_aggression": 85,           # High aggression for final centering
-        "final_approach_boost": True,
-        "yolo_confidence": 0.5,
-        "yolo_classes": "person",
-        "yolo_model": "yolov8s.pt",
-    },
-    
-    # ==========================================================================
-    # TARGET-SPECIFIC PRESETS
-    # These presets ARE designed for specific YOLO classes, so they INCLUDE
-    # detection_mode to ensure YOLO is active when selected.
-    # ==========================================================================
-    
-    "Track Person": {
-        # Optimized for human tracking
-        "tracking_speed": 55,
-        "movement_sensitivity": 40,
-        "smoothing_factor": 0.9,
-        "deadzone": 15,
-        "snap_threshold": 100,
-        "aim_aggression": 50,
-        "final_approach_boost": True,
-        "yolo_confidence": 0.5,
-        "yolo_classes": "person",
-        "yolo_model": "yolov8m.pt",
-        "detection_mode": "YOLO Object Detection",  # REQUIRED: Needs YOLO for person class
-    },
-    
-    "Track Mouse": {
-        # Fast, aggressive tracking for small rodents
-        "tracking_speed": 80,
-        "movement_sensitivity": 85,
-        "smoothing_factor": 0.7,
-        "deadzone": 4,
-        "snap_threshold": 160,
-        "aim_aggression": 80,
-        "final_approach_boost": True,
-        "yolo_confidence": 0.3,
-        "yolo_classes": "mouse, rodent",
-        "yolo_model": "yolov8x.pt",  # Larger model for small object accuracy
-        "detection_mode": "YOLO Object Detection",  # REQUIRED: Needs YOLO for mouse class
-        # Motion detection fallback settings
-        "threshold": 30,
-        "blur_kernel": 7,
-        "min_contour": 400,
-        "dilate_iter": 3,
-    },
-    
-    "Track Cats": {
-        # Balanced tracking for cats - medium speed, good precision
+
+    "Behavior / Responsive": {
         "tracking_speed": 65,
-        "movement_sensitivity": 55,
-        "smoothing_factor": 0.85,
-        "deadzone": 10,
-        "snap_threshold": 130,
-        "aim_aggression": 60,
-        "final_approach_boost": True,
-        "yolo_confidence": 0.45,
-        "yolo_classes": "cat",
-        "yolo_model": "yolov8m.pt",
-        "detection_mode": "YOLO Object Detection",  # REQUIRED: Needs YOLO for cat class
-        "threshold": 40,
-        "blur_kernel": 5,
-        "min_contour": 800,
-        "dilate_iter": 2,
-    },
-    
-    "Track Dogs": {
-        # Slightly slower than cats - dogs are generally larger/slower
-        "tracking_speed": 60,
         "movement_sensitivity": 50,
-        "smoothing_factor": 0.88,
-        "deadzone": 12,
+        "smoothing_factor": 0.55,
+        "deadzone": 18,
         "snap_threshold": 120,
         "aim_aggression": 55,
         "final_approach_boost": True,
-        "yolo_confidence": 0.45,
-        "yolo_classes": "dog",
-        "yolo_model": "yolov8m.pt",
-        "detection_mode": "YOLO Object Detection",  # REQUIRED: Needs YOLO for dog class
-        "threshold": 45,
-        "blur_kernel": 5,
-        "min_contour": 1000,
-        "dilate_iter": 2,
+        **PRECISION_DEFAULTS,
     },
-    
-    "Track Vehicles": {
-        # Optimized for cars, trucks, motorcycles
-        "tracking_speed": 70,
+
+    "Behavior / Aggressive": {
+        "tracking_speed": 80,
         "movement_sensitivity": 65,
-        "smoothing_factor": 0.8,
-        "deadzone": 20,
-        "snap_threshold": 180,
-        "aim_aggression": 65,
+        "smoothing_factor": 0.35,
+        "deadzone": 14,
+        "snap_threshold": 160,
+        "aim_aggression": 75,
         "final_approach_boost": True,
-        "yolo_confidence": 0.4,
-        "yolo_classes": "car, truck, bus, motorcycle",
-        "yolo_model": "yolov8l.pt",
-        "detection_mode": "YOLO Object Detection",  # REQUIRED: Needs YOLO for vehicle classes
-        "threshold": 50,
-        "blur_kernel": 5,
-        "min_contour": 1200,
-        "dilate_iter": 2,
+        **PRECISION_DEFAULTS,
     },
-    
-    # ==========================================================================
-    # RESOLUTION-OPTIMIZED PRESETS
-    # These presets are optimized for specific camera resolutions and FOV.
-    # They do NOT set detection_mode - user can choose their preferred method.
-    # ==========================================================================
-    
-    "Wide FOV (1920x1080)": {
-        # Full width capture for 170° wide-angle cameras
-        "frame_ratio_setting": "1920x1080 (Full Wide FOV)",
-        "tracking_speed": 35,
-        "movement_sensitivity": 25,
-        "smoothing_factor": 0.92,
-        "deadzone": 25,
-        "snap_threshold": 60,
-        "aim_aggression": 40,
-        "final_approach_boost": True,
-        "yolo_confidence": 0.5,
-        "yolo_classes": "person",
-        "yolo_model": "yolov8n.pt",
-        # NOTE: No detection_mode - user can use BackgroundSub, YOLO, or FrameDiff
-        # Motion detection tuned for high resolution
-        "threshold": 35,
+
+    # ----------------------------------------------------------------------
+    # Target / Frame Difference (Mode 0)
+    # ----------------------------------------------------------------------
+
+    "Target / Frame Difference / Small / Balanced": {
+        "detection_mode": "Frame Difference",
+        "threshold": 30,
         "blur_kernel": 5,
-        "min_contour": 800,  # Adjusted for larger frame area
-        "dilate_iter": 2,
-        "backsub_warmup": 40,
-    },
-    
-    "Balanced (1280x720)": {
-        # Recommended default - good balance of FOV, processing speed, and accuracy
-        "frame_ratio_setting": "1280x720 (HD)",
-        "tracking_speed": 50,
-        "movement_sensitivity": 35,
-        "smoothing_factor": 0.90,
-        "deadzone": 20,
-        "snap_threshold": 90,
-        "aim_aggression": 45,
-        "final_approach_boost": True,
-        "yolo_confidence": 0.5,
-        "yolo_classes": "person",
-        "yolo_model": "yolov8n.pt",
-        "threshold": 32,
-        "blur_kernel": 5,
-        "min_contour": 600,
-        "dilate_iter": 2,
-        "backsub_warmup": 35,
-    },
-    
-    "Fast (640x480)": {
-        # Minimum processing for maximum speed - best for low-power systems
-        "frame_ratio_setting": "640x480 (Fast)",
-        "tracking_speed": 65,
+        "dilate_iter": 1,
+        "min_contour": 900,
+        "max_contour": 25000,
+        "backsub_warmup": 10,
+        "tracking_speed": 60,
         "movement_sensitivity": 45,
-        "smoothing_factor": 0.85,
-        "deadzone": 15,
-        "snap_threshold": 110,
+        "smoothing_factor": 0.55,
+        "deadzone": 22,
+        "snap_threshold": 120,
         "aim_aggression": 50,
         "final_approach_boost": True,
-        "yolo_confidence": 0.55,
-        "yolo_classes": "person",
-        "yolo_model": "yolov8n.pt",
-        "threshold": 28,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Frame Difference / Small / Sensitive": {
+        "detection_mode": "Frame Difference",
+        "threshold": 24,
         "blur_kernel": 3,
-        "min_contour": 200,  # Smaller min for lower resolution
+        "dilate_iter": 2,
+        "min_contour": 500,
+        "max_contour": 22000,
+        "backsub_warmup": 10,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.50,
+        "deadzone": 22,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Frame Difference / Medium / Balanced": {
+        "detection_mode": "Frame Difference",
+        "threshold": 26,
+        "blur_kernel": 5,
+        "dilate_iter": 2,
+        "min_contour": 8000,
+        "max_contour": 140000,
+        "backsub_warmup": 10,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.50,
+        "deadzone": 20,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Frame Difference / Medium / Sensitive": {
+        "detection_mode": "Frame Difference",
+        "threshold": 24,
+        "blur_kernel": 5,
+        "dilate_iter": 2,
+        "min_contour": 6000,
+        "max_contour": 160000,
+        "backsub_warmup": 10,
+        "tracking_speed": 70,
+        "movement_sensitivity": 55,
+        "smoothing_factor": 0.45,
+        "deadzone": 20,
+        "snap_threshold": 150,
+        "aim_aggression": 60,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Frame Difference / Person / Precision Clamp": {
+        "detection_mode": "Frame Difference",
+        "threshold": 24,
+        "blur_kernel": 3,
         "dilate_iter": 1,
+        "min_contour": 60000,
+        "max_contour": 450000,
+        "backsub_warmup": 10,
+        "tracking_speed": 70,
+        "movement_sensitivity": 55,
+        "smoothing_factor": 0.45,
+        "deadzone": 16,
+        "snap_threshold": 150,
+        "aim_aggression": 60,
+        "final_approach_boost": True,
+        # Enable precision for large targets (helps final lock without overshoot)
+        "precision_mode": True,
+        "precision_roi": 64,
+        "precision_kp": 0.018,
+        "precision_ki": 0.001,
+        "precision_kd": 0.006,
+        "precision_hfov": 90.0,
+        "precision_max_step": 0.9,
+        "precision_frac_threshold": 0.25,
+    },
+
+    # ----------------------------------------------------------------------
+    # Target / Background Subtraction (Mode 1)
+    # ----------------------------------------------------------------------
+
+    "Target / Background Subtraction / Small / Stable": {
+        "detection_mode": "Background Subtraction",
+        "threshold": 28,
+        "blur_kernel": 5,
+        "dilate_iter": 1,
+        "min_contour": 900,
+        "max_contour": 25000,
+        "backsub_warmup": 25,
+        "tracking_speed": 60,
+        "movement_sensitivity": 45,
+        "smoothing_factor": 0.55,
+        "deadzone": 22,
+        "snap_threshold": 120,
+        "aim_aggression": 50,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Background Subtraction / Small / Sensitive": {
+        "detection_mode": "Background Subtraction",
+        "threshold": 24,
+        "blur_kernel": 3,
+        "dilate_iter": 2,
+        "min_contour": 500,
+        "max_contour": 22000,
+        "backsub_warmup": 18,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.50,
+        "deadzone": 22,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Background Subtraction / Medium / Balanced": {
+        "detection_mode": "Background Subtraction",
+        "threshold": 26,
+        "blur_kernel": 5,
+        "dilate_iter": 1,
+        "min_contour": 8000,
+        "max_contour": 140000,
+        "backsub_warmup": 30,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.50,
+        "deadzone": 20,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Background Subtraction / Medium / Stable": {
+        "detection_mode": "Background Subtraction",
+        "threshold": 28,
+        "blur_kernel": 5,
+        "dilate_iter": 1,
+        "min_contour": 8000,
+        "max_contour": 140000,
+        "backsub_warmup": 40,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.55,
+        "deadzone": 20,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Background Subtraction / Person / Precision Clamp": {
+        "detection_mode": "Background Subtraction",
+        "threshold": 24,
+        "blur_kernel": 3,
+        "dilate_iter": 1,
+        "min_contour": 60000,
+        "max_contour": 450000,
+        "backsub_warmup": 35,
+        "tracking_speed": 70,
+        "movement_sensitivity": 55,
+        "smoothing_factor": 0.45,
+        "deadzone": 16,
+        "snap_threshold": 150,
+        "aim_aggression": 60,
+        "final_approach_boost": True,
+        "precision_mode": True,
+        "precision_roi": 64,
+        "precision_kp": 0.018,
+        "precision_ki": 0.001,
+        "precision_kd": 0.006,
+        "precision_hfov": 90.0,
+        "precision_max_step": 0.9,
+        "precision_frac_threshold": 0.25,
+    },
+
+    # ----------------------------------------------------------------------
+    # Target / Hybrid: Frame Diff + BackSub (Mode 3)
+    # ----------------------------------------------------------------------
+
+    "Target / Hybrid: Frame Diff + BackSub / Small / OR Lenient": {
+        "detection_mode": "Hybrid: Frame Diff + BackSub",
+        "fusion_strategy": 1,
+        "threshold": 26,
+        "blur_kernel": 5,
+        "dilate_iter": 2,
+        "min_contour": 900,
+        "max_contour": 25000,
+        "backsub_warmup": 20,
+        "tracking_speed": 60,
+        "movement_sensitivity": 45,
+        "smoothing_factor": 0.55,
+        "deadzone": 22,
+        "snap_threshold": 120,
+        "aim_aggression": 50,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: Frame Diff + BackSub / Small / AND Strict": {
+        "detection_mode": "Hybrid: Frame Diff + BackSub",
+        "fusion_strategy": 0,
+        "threshold": 28,
+        "blur_kernel": 5,
+        "dilate_iter": 1,
+        "min_contour": 1200,
+        "max_contour": 25000,
+        "backsub_warmup": 25,
+        "tracking_speed": 60,
+        "movement_sensitivity": 45,
+        "smoothing_factor": 0.60,
+        "deadzone": 22,
+        "snap_threshold": 120,
+        "aim_aggression": 50,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: Frame Diff + BackSub / Medium / AND Strict": {
+        "detection_mode": "Hybrid: Frame Diff + BackSub",
+        "fusion_strategy": 0,
+        "threshold": 26,
+        "blur_kernel": 5,
+        "dilate_iter": 1,
+        "min_contour": 8000,
+        "max_contour": 140000,
+        "backsub_warmup": 25,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.50,
+        "deadzone": 20,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: Frame Diff + BackSub / Medium / OR Lenient": {
+        "detection_mode": "Hybrid: Frame Diff + BackSub",
+        "fusion_strategy": 1,
+        "threshold": 26,
+        "blur_kernel": 5,
+        "dilate_iter": 2,
+        "min_contour": 8000,
+        "max_contour": 140000,
+        "backsub_warmup": 20,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.50,
+        "deadzone": 20,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: Frame Diff + BackSub / Person / Precision Clamp": {
+        "detection_mode": "Hybrid: Frame Diff + BackSub",
+        "fusion_strategy": 0,
+        "threshold": 24,
+        "blur_kernel": 3,
+        "dilate_iter": 1,
+        "min_contour": 60000,
+        "max_contour": 450000,
+        "backsub_warmup": 30,
+        "tracking_speed": 70,
+        "movement_sensitivity": 55,
+        "smoothing_factor": 0.45,
+        "deadzone": 16,
+        "snap_threshold": 150,
+        "aim_aggression": 60,
+        "final_approach_boost": True,
+        "precision_mode": True,
+        "precision_roi": 64,
+        "precision_kp": 0.018,
+        "precision_ki": 0.001,
+        "precision_kd": 0.006,
+        "precision_hfov": 90.0,
+        "precision_max_step": 0.9,
+        "precision_frac_threshold": 0.25,
+    },
+
+    # ----------------------------------------------------------------------
+    # Target / YOLO (Mode 2)
+    # ----------------------------------------------------------------------
+
+    "Target / YOLO / Small / Sensitive": {
+        "detection_mode": "YOLO Object Detection",
+        "yolo_classes": "person",
+        "yolo_model": "yolov8s.pt",
+        "yolo_confidence": 0.35,
+        "yolo_min_area": 5000,
+        "yolo_max_results": 5,
+        "tracking_speed": 60,
+        "movement_sensitivity": 45,
+        "smoothing_factor": 0.55,
+        "deadzone": 22,
+        "snap_threshold": 120,
+        "aim_aggression": 50,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / YOLO / Small / Balanced": {
+        "detection_mode": "YOLO Object Detection",
+        "yolo_classes": "person",
+        "yolo_model": "yolov8s.pt",
+        "yolo_confidence": 0.40,
+        "yolo_min_area": 7000,
+        "yolo_max_results": 5,
+        "tracking_speed": 60,
+        "movement_sensitivity": 45,
+        "smoothing_factor": 0.55,
+        "deadzone": 22,
+        "snap_threshold": 120,
+        "aim_aggression": 50,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / YOLO / Medium / Balanced": {
+        "detection_mode": "YOLO Object Detection",
+        "yolo_classes": "person",
+        "yolo_model": "yolov8m.pt",
+        "yolo_confidence": 0.45,
+        "yolo_min_area": 15000,
+        "yolo_max_results": 5,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.50,
+        "deadzone": 20,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / YOLO / Medium / Sensitive": {
+        "detection_mode": "YOLO Object Detection",
+        "yolo_classes": "person",
+        "yolo_model": "yolov8m.pt",
+        "yolo_confidence": 0.40,
+        "yolo_min_area": 12000,
+        "yolo_max_results": 5,
+        "tracking_speed": 70,
+        "movement_sensitivity": 55,
+        "smoothing_factor": 0.45,
+        "deadzone": 20,
+        "snap_threshold": 150,
+        "aim_aggression": 60,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / YOLO / Person / Precision": {
+        "detection_mode": "YOLO Object Detection",
+        "yolo_classes": "person",
+        "yolo_model": "yolov8m.pt",
+        "yolo_confidence": 0.50,
+        "yolo_min_area": 40000,
+        "yolo_max_results": 5,
+        "tracking_speed": 70,
+        "movement_sensitivity": 55,
+        "smoothing_factor": 0.45,
+        "deadzone": 16,
+        "snap_threshold": 150,
+        "aim_aggression": 60,
+        "final_approach_boost": True,
+        "precision_mode": True,
+        "precision_roi": 64,
+        "precision_kp": 0.018,
+        "precision_ki": 0.001,
+        "precision_kd": 0.006,
+        "precision_hfov": 90.0,
+        "precision_max_step": 0.9,
+        "precision_frac_threshold": 0.25,
+    },
+
+    # ----------------------------------------------------------------------
+    # Target / Hybrid: Frame Diff + YOLO (Mode 4)
+    # ----------------------------------------------------------------------
+
+    "Target / Hybrid: Frame Diff + YOLO / Small / Motion Gate Lenient": {
+        "detection_mode": "Hybrid: Frame Diff + YOLO",
+        "motion_gate_threshold": 0.85,
+        "threshold": 28,
+        "blur_kernel": 5,
+        "dilate_iter": 2,
+        "min_contour": 900,
+        "max_contour": 25000,
+        "yolo_classes": "person",
+        "yolo_model": "yolov8s.pt",
+        "yolo_confidence": 0.35,
+        "yolo_min_area": 5000,
+        "yolo_max_results": 5,
+        "tracking_speed": 60,
+        "movement_sensitivity": 45,
+        "smoothing_factor": 0.55,
+        "deadzone": 22,
+        "snap_threshold": 120,
+        "aim_aggression": 50,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: Frame Diff + YOLO / Small / Motion Gate Balanced": {
+        "detection_mode": "Hybrid: Frame Diff + YOLO",
+        "motion_gate_threshold": 0.95,
+        "threshold": 26,
+        "blur_kernel": 5,
+        "dilate_iter": 2,
+        "min_contour": 900,
+        "max_contour": 25000,
+        "yolo_classes": "person",
+        "yolo_model": "yolov8s.pt",
+        "yolo_confidence": 0.40,
+        "yolo_min_area": 7000,
+        "yolo_max_results": 5,
+        "tracking_speed": 60,
+        "movement_sensitivity": 45,
+        "smoothing_factor": 0.55,
+        "deadzone": 22,
+        "snap_threshold": 120,
+        "aim_aggression": 50,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: Frame Diff + YOLO / Medium / Motion Gate Balanced": {
+        "detection_mode": "Hybrid: Frame Diff + YOLO",
+        "motion_gate_threshold": 1.0,
+        "threshold": 26,
+        "blur_kernel": 5,
+        "dilate_iter": 1,
+        "min_contour": 8000,
+        "max_contour": 140000,
+        "yolo_classes": "person",
+        "yolo_model": "yolov8m.pt",
+        "yolo_confidence": 0.45,
+        "yolo_min_area": 15000,
+        "yolo_max_results": 5,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.50,
+        "deadzone": 20,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: Frame Diff + YOLO / Medium / Motion Gate Lenient": {
+        "detection_mode": "Hybrid: Frame Diff + YOLO",
+        "motion_gate_threshold": 0.9,
+        "threshold": 26,
+        "blur_kernel": 5,
+        "dilate_iter": 2,
+        "min_contour": 8000,
+        "max_contour": 160000,
+        "yolo_classes": "person",
+        "yolo_model": "yolov8m.pt",
+        "yolo_confidence": 0.40,
+        "yolo_min_area": 12000,
+        "yolo_max_results": 5,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.50,
+        "deadzone": 20,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: Frame Diff + YOLO / Person / Motion Gate Strict": {
+        "detection_mode": "Hybrid: Frame Diff + YOLO",
+        "motion_gate_threshold": 1.15,
+        "threshold": 24,
+        "blur_kernel": 3,
+        "dilate_iter": 1,
+        "min_contour": 60000,
+        "max_contour": 450000,
+        "yolo_classes": "person",
+        "yolo_model": "yolov8m.pt",
+        "yolo_confidence": 0.50,
+        "yolo_min_area": 40000,
+        "yolo_max_results": 5,
+        "tracking_speed": 70,
+        "movement_sensitivity": 55,
+        "smoothing_factor": 0.45,
+        "deadzone": 16,
+        "snap_threshold": 150,
+        "aim_aggression": 60,
+        "final_approach_boost": True,
+        "precision_mode": True,
+        "precision_roi": 64,
+        "precision_kp": 0.018,
+        "precision_ki": 0.001,
+        "precision_kd": 0.006,
+        "precision_hfov": 90.0,
+        "precision_max_step": 0.9,
+        "precision_frac_threshold": 0.25,
+    },
+
+    # ----------------------------------------------------------------------
+    # Target / Hybrid: BackSub + YOLO (Best) (Mode 5)
+    # ----------------------------------------------------------------------
+
+    "Target / Hybrid: BackSub + YOLO (Best) / Small / Overlap Lenient": {
+        "detection_mode": "Hybrid: BackSub + YOLO (Best)",
+        "overlap_threshold": 22.0,
+        "threshold": 28,
+        "blur_kernel": 5,
+        "dilate_iter": 1,
+        "min_contour": 900,
+        "max_contour": 25000,
+        "backsub_warmup": 25,
+        "yolo_classes": "person",
+        "yolo_model": "yolov8s.pt",
+        "yolo_confidence": 0.35,
+        "yolo_min_area": 5000,
+        "yolo_max_results": 5,
+        "tracking_speed": 60,
+        "movement_sensitivity": 45,
+        "smoothing_factor": 0.55,
+        "deadzone": 22,
+        "snap_threshold": 120,
+        "aim_aggression": 50,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: BackSub + YOLO (Best) / Small / Overlap Balanced": {
+        "detection_mode": "Hybrid: BackSub + YOLO (Best)",
+        "overlap_threshold": 26.0,
+        "threshold": 28,
+        "blur_kernel": 5,
+        "dilate_iter": 1,
+        "min_contour": 900,
+        "max_contour": 25000,
+        "backsub_warmup": 30,
+        "yolo_classes": "person",
+        "yolo_model": "yolov8s.pt",
+        "yolo_confidence": 0.40,
+        "yolo_min_area": 7000,
+        "yolo_max_results": 5,
+        "tracking_speed": 60,
+        "movement_sensitivity": 45,
+        "smoothing_factor": 0.55,
+        "deadzone": 22,
+        "snap_threshold": 120,
+        "aim_aggression": 50,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: BackSub + YOLO (Best) / Medium / Overlap Balanced": {
+        "detection_mode": "Hybrid: BackSub + YOLO (Best)",
+        "overlap_threshold": 28.0,
+        "threshold": 26,
+        "blur_kernel": 5,
+        "dilate_iter": 1,
+        "min_contour": 8000,
+        "max_contour": 140000,
+        "backsub_warmup": 30,
+        "yolo_classes": "person",
+        "yolo_model": "yolov8m.pt",
+        "yolo_confidence": 0.45,
+        "yolo_min_area": 15000,
+        "yolo_max_results": 5,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.50,
+        "deadzone": 20,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: BackSub + YOLO (Best) / Medium / Overlap Lenient": {
+        "detection_mode": "Hybrid: BackSub + YOLO (Best)",
+        "overlap_threshold": 24.0,
+        "threshold": 26,
+        "blur_kernel": 5,
+        "dilate_iter": 1,
+        "min_contour": 8000,
+        "max_contour": 160000,
+        "backsub_warmup": 35,
+        "yolo_classes": "person",
+        "yolo_model": "yolov8m.pt",
+        "yolo_confidence": 0.40,
+        "yolo_min_area": 12000,
+        "yolo_max_results": 5,
+        "tracking_speed": 65,
+        "movement_sensitivity": 50,
+        "smoothing_factor": 0.50,
+        "deadzone": 20,
+        "snap_threshold": 130,
+        "aim_aggression": 55,
+        "final_approach_boost": True,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Hybrid: BackSub + YOLO (Best) / Person / Overlap Strict": {
+        "detection_mode": "Hybrid: BackSub + YOLO (Best)",
+        "overlap_threshold": 32.0,
+        "threshold": 24,
+        "blur_kernel": 3,
+        "dilate_iter": 1,
+        "min_contour": 60000,
+        "max_contour": 450000,
+        "backsub_warmup": 35,
+        "yolo_classes": "person",
+        "yolo_model": "yolov8m.pt",
+        "yolo_confidence": 0.50,
+        "yolo_min_area": 40000,
+        "yolo_max_results": 5,
+        "tracking_speed": 70,
+        "movement_sensitivity": 55,
+        "smoothing_factor": 0.45,
+        "deadzone": 16,
+        "snap_threshold": 150,
+        "aim_aggression": 60,
+        "final_approach_boost": True,
+        "precision_mode": True,
+        "precision_roi": 64,
+        "precision_kp": 0.018,
+        "precision_ki": 0.001,
+        "precision_kd": 0.006,
+        "precision_hfov": 90.0,
+        "precision_max_step": 0.9,
+        "precision_frac_threshold": 0.25,
     },
 }

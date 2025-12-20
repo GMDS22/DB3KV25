@@ -137,6 +137,30 @@ def build_ui(app: QMainWindow):
     except Exception:
         pass
     settings_layout.addWidget(app.baud_rate_input, 1, 1)
+    # Factory preset quick-access (keeps UI usable even if Behavior dock is hidden)
+    # NOTE: This is a separate combo box from any behavior-panel preset widget.
+    # Qt widgets cannot have multiple parents.
+    settings_layout.addWidget(QLabel("Factory Preset:"), 2, 0)
+    if getattr(app, "connection_preset_combo", None) is None:
+        app.connection_preset_combo = QComboBox()
+        try:
+            app.connection_preset_combo.setToolTip(
+                "Quick-apply a factory preset without opening the Behavior panel."
+            )
+        except Exception:
+            pass
+    try:
+        # Keep items in the same order that apply_preset() expects
+        if getattr(app, "connection_preset_combo", None) is not None:
+            if app.connection_preset_combo.count() == 0:
+                app.connection_preset_combo.addItems(list(PRESETS.keys()))
+            app._safe_connect(
+                "connection_preset_combo", "currentIndexChanged", app.apply_preset
+            )
+    except Exception:
+        pass
+    settings_layout.addWidget(app.connection_preset_combo, 2, 1)
+
     if getattr(app, "connect_button", None) is None:
         app.connect_button = QPushButton("Connect")
     try:
@@ -145,7 +169,7 @@ def build_ui(app: QMainWindow):
             if logger: log_connection_error("connect_button", "clicked", "handle_connect_sound", "Connection failed")
     except Exception as e:
         if logger: log_exception(e, "Connecting connect_button.clicked signal")
-    settings_layout.addWidget(app.connect_button, 2, 0, 1, 2)
+    settings_layout.addWidget(app.connect_button, 3, 0, 1, 2)
 
     if getattr(app, "sound_checkbox", None) is None:
         app.sound_checkbox = QCheckBox("Sound Effects")
@@ -206,7 +230,7 @@ def build_ui(app: QMainWindow):
                 pass
     except Exception:
         pass
-    settings_layout.addWidget(app.sound_checkbox, 3, 0, 1, 2)
+    settings_layout.addWidget(app.sound_checkbox, 4, 0, 1, 2)
 
     # Small status label to show override/suspend states (manual, go-home, hold)
     app.override_status_label = QLabel("")
@@ -219,7 +243,7 @@ def build_ui(app: QMainWindow):
             pass
     except Exception:
         pass
-    settings_layout.addWidget(app.override_status_label, 6, 0, 1, 2)
+    settings_layout.addWidget(app.override_status_label, 7, 0, 1, 2)
 
     # Camera selection (allow user to prefer a specific camera index or use Auto)
     if getattr(app, "camera_index_combo", None) is None:
@@ -229,7 +253,7 @@ def build_ui(app: QMainWindow):
                 app.camera_index_combo.addItems(["Auto", "0", "1", "2", "3", "4"])
         except Exception:
             pass
-    settings_layout.addWidget(app.camera_index_combo, 5, 1)
+    settings_layout.addWidget(app.camera_index_combo, 6, 1)
 
     # Tracking toggle (replaces separate Start/Stop buttons)
     if getattr(app, "tracking_btn", None) is None:
@@ -263,8 +287,8 @@ def build_ui(app: QMainWindow):
     except Exception:
         pass
 
-    settings_layout.addWidget(app.tracking_btn, 4, 0)
-    settings_layout.addWidget(app.aiming_btn, 4, 1)
+    settings_layout.addWidget(app.tracking_btn, 5, 0)
+    settings_layout.addWidget(app.aiming_btn, 5, 1)
     settings_group.setLayout(settings_layout)
 
     # Home position
@@ -1709,39 +1733,30 @@ def build_ui(app: QMainWindow):
     pad_layout.addWidget(app.btn_down, 2, 1)
     # Connect D-pad buttons to manual movement (pressed = start move, released = stop)
     try:
-        # Use lambdas that read current step size at call time via safe helper
+        # Use explicit pan/tilt helpers to avoid any axis mixups.
+        # These helpers already read the current step size safely.
         app._safe_connect(
             "btn_up",
             "pressed",
-            lambda _=None: app.move_manual(
-                pan=0, tilt=-app._safe_int_widget_value("step_size_input", app.STEP_INCREMENT)
-            ),
+            lambda _=None: app.tilt_up(),
         )
         app._safe_connect("btn_up", "released", app.manual_control_released)
         app._safe_connect(
             "btn_down",
             "pressed",
-            lambda _=None: app.move_manual(
-                pan=0, tilt=app._safe_int_widget_value("step_size_input", app.STEP_INCREMENT)
-            ),
+            lambda _=None: app.tilt_down(),
         )
         app._safe_connect("btn_down", "released", app.manual_control_released)
         app._safe_connect(
             "btn_left",
             "pressed",
-            lambda _=None: app.move_manual(
-                pan=-app._safe_int_widget_value("step_size_input", app.STEP_INCREMENT),
-                tilt=0,
-            ),
+            lambda _=None: app.pan_left(),
         )
         app._safe_connect("btn_left", "released", app.manual_control_released)
         app._safe_connect(
             "btn_right",
             "pressed",
-            lambda _=None: app.move_manual(
-                pan=app._safe_int_widget_value("step_size_input", app.STEP_INCREMENT),
-                tilt=0,
-            ),
+            lambda _=None: app.pan_right(),
         )
         app._safe_connect("btn_right", "released", app.manual_control_released)
         app._safe_connect(

@@ -1,0 +1,9 @@
+Last-commit (HEAD) export
+
+Version (from DB3K_VERSION.txt): 4.1
+Commit (HEAD): 61b074fd86fffb59a1470bb45e7219976bb59740
+Export folder (created outside repo root): sibling folder next to this repo named:
+  DB3000V4.1_LAST_COMMIT
+
+Notes:
+- Export was generated via `git archive HEAD`, so it excludes all uncommitted/untracked working-tree changes.

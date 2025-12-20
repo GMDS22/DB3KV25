@@ -186,11 +186,7 @@ Both flags are set together in a single function, preventing intermediate states
 If any error occurs during flag synchronization, both flags default to False (safe state).
 
 ### ✓ Existing Safeguards Preserved
-- Hardware angle limits (PAN_MIN/MAX, TILT_MIN/MAX)
-- Angle validation (NaN/Inf checking)
-- Redundant command filtering (prevents servo jitter)
-- Tilt safety switch support
-- Manual override suppression
+ Tilt safety switch support (optional hardware; disabled by default; no effect when not installed)
 
 ---
 
