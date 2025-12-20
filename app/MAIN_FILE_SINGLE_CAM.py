@@ -1,4 +1,4 @@
-﻿# [MAIN FILE]
+# [MAIN FILE]
 # ==========================================================
 #  Movement_Detect_Yolo_me.py
 #  ----------------------------------------------------------
@@ -22,6 +22,10 @@
 #   • turret_presets.py
 #   • sounds/ folder (fire.wav, lockon.wav, startup.wav)
 # ==========================================================
+# VERSIONING NOTE (editors):
+# - App version is read from DB3K_VERSION.txt (repo root).
+# - Commits to main should be prefixed: db3kv<version> (see COMMIT_NAMING_CONVENTION.md).
+# - Home tab bottom shows the last 10 items from RECENT_UPDATES.json.
 import base64
 import json
 import random  # For guard mode random positions
@@ -29,6 +33,15 @@ import os
 from pathlib import Path
 import math  # For NaN/Inf checks in serial validation
 from datetime import datetime
+
+try:
+    from db3k_meta import get_app_title, load_recent_updates
+except Exception:
+    def get_app_title(prefix: str = "Multi-Detection Auto Tracker") -> str:  # type: ignore
+        return f"{prefix} V4.1"
+
+    def load_recent_updates(max_items: int = 10):  # type: ignore
+        return []
 
 # === AGENT-MANAGED BLOCK START ===
 # The following markers and logic were added programmatically by the assistant
@@ -69,6 +82,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
     QMainWindow,
     QPushButton,
     QScrollArea,
@@ -102,6 +116,17 @@ from turret_presets import PRESETS
 from yolo_detector import YoloDetector
 from behavior_presets import BehaviorPresets  # For user-saved behavior presets
 
+# Color detection (optional)
+try:
+    from color_detection import ColorDetector, fuse_detections_and, fuse_detections_or
+    COLOR_DETECTION_AVAILABLE = True
+except Exception as e:
+    print(f"[COLOR] Import failed: {e}")
+    ColorDetector = None
+    fuse_detections_and = None
+    fuse_detections_or = None
+    COLOR_DETECTION_AVAILABLE = False
+
 # Import centralized logger for error tracking
 try:
     from helpers.logger import get_logger, log_exception
@@ -134,6 +159,15 @@ try:
     from checklist_panel import ChecklistPanel
 except Exception:
     ChecklistPanel = None
+
+# Sentry Ambush Mode (intelligent guard turret)
+try:
+    from sentry_mode.sentry_tab_widget import SentryTabWidget
+    SENTRY_MODE_AVAILABLE = True
+except Exception as e:
+    print(f"[SENTRY] Import failed: {e}")
+    SentryTabWidget = None
+    SENTRY_MODE_AVAILABLE = False
 
 # Try to register QTextCursor as a Qt metatype to avoid queued-argument warnings
 # Use guarded lookup since some PyQt5 builds may not expose qRegisterMetaType directly
@@ -184,10 +218,15 @@ try:
 except Exception:
     CodeFixer = None
 
-# Floating panel window
+# Floating panel window (optional module - create if needed for advanced UI)
 try:
     from floating_panel_window import FloatingPanelWindow
-except Exception:
+except (ImportError, ModuleNotFoundError):
+    # Module not yet implemented - set to None and continue without it
+    FloatingPanelWindow = None
+except Exception as e:
+    # Log any other errors but don't crash
+    print(f"Warning: Could not import FloatingPanelWindow: {e}")
     FloatingPanelWindow = None
 
 # RUNTIME BANNER: moved into the module main guard to avoid printing when
@@ -680,7 +719,19 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             pass
 
     def _init_shortcut_and_notes_tabs(self):
-        from PyQt5.QtWidgets import QTabWidget, QTextEdit, QLabel, QWidget, QVBoxLayout, QScrollArea, QDockWidget
+        from PyQt5.QtWidgets import (
+            QAbstractItemView,
+            QDockWidget,
+            QHeaderView,
+            QLabel,
+            QScrollArea,
+            QTabWidget,
+            QTableWidget,
+            QTableWidgetItem,
+            QTextEdit,
+            QVBoxLayout,
+            QWidget,
+        )
         from PyQt5.QtCore import Qt
         import json
         import os
@@ -704,8 +755,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         home_content_layout.setSpacing(20)
         home_content.setStyleSheet("background-color: #2d2d2d;")  # Match window dark grey
         
-        # Add title
-        title_label = QLabel("AI TRACKING TURRET V4.0")
+        # Add title (versioned)
+        title_label = QLabel(get_app_title())
         title_font = QFont()
         title_font.setPointSize(24)
         title_font.setBold(True)
@@ -765,12 +816,80 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         status_info.setStyleSheet("color: #FFFFFF; font-size: 11px; line-height: 1.6; background-color: #2d2d2d;")
         home_content_layout.addWidget(status_info)
         
-        # Tilt Safety Status (NEW)
-        self.tilt_safety_label = QLabel("🛡️ Tilt Safety: OK")
-        self.tilt_safety_label.setStyleSheet("color: #00FF00; font-size: 10px; background-color: #2d2d2d;")
+        # Tilt Safety Status (OPTIONAL HARDWARE)
+        # NOTE: The tilt safety encoder/switch hardware is NOT installed by default.
+        # This label is informational only; enforcement is gated elsewhere.
+        self.tilt_safety_label = QLabel("🛡️ Tilt Safety: Not Installed")
+        self.tilt_safety_label.setStyleSheet("color: #FFFF00; font-size: 10px; background-color: #2d2d2d;")
         home_content_layout.addWidget(self.tilt_safety_label)
         
+        # === RECORDING INDICATOR (Dec 2025) ===
+        # Visible on main screen when recording is active
+        self.recording_indicator_label = QLabel("")
+        self.recording_indicator_label.setStyleSheet("color: #FF0000; font-size: 14px; font-weight: bold; background-color: #2d2d2d;")
+        self.recording_indicator_label.setAlignment(Qt.AlignCenter)
+        self.recording_indicator_label.hide()  # Hidden when not recording
+        home_content_layout.addWidget(self.recording_indicator_label)
+        # === END RECORDING INDICATOR ===
+        
+        # Push the updates section to the bottom when there's spare vertical space
         home_content_layout.addStretch()
+
+        # === RECENT UPDATES (V1) ===
+        updates_label = QLabel("Recent Updates")
+        updates_font = QFont()
+        updates_font.setPointSize(12)
+        updates_font.setBold(True)
+        updates_label.setFont(updates_font)
+        updates_label.setStyleSheet("color: #00FF00; background-color: #2d2d2d;")
+        home_content_layout.addWidget(updates_label)
+
+        updates = []
+        try:
+            updates = list(load_recent_updates(max_items=10))
+        except Exception:
+            updates = []
+
+        updates_table = QTableWidget()
+        updates_table.setColumnCount(2)
+        updates_table.setHorizontalHeaderLabels(["Date", "Update"])
+        updates_table.setRowCount(len(updates))
+        updates_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        updates_table.setSelectionMode(QAbstractItemView.NoSelection)
+        updates_table.setFocusPolicy(Qt.NoFocus)
+        try:
+            updates_table.verticalHeader().setVisible(False)
+        except Exception:
+            pass
+        try:
+            header = updates_table.horizontalHeader()
+            header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+            header.setSectionResizeMode(1, QHeaderView.Stretch)
+        except Exception:
+            pass
+        updates_table.setStyleSheet(
+            "QTableWidget { background-color: #2d2d2d; color: #FFFFFF; gridline-color: #555555; }"
+            "QHeaderView::section { background-color: #1d1d1d; color: #00FF00; padding: 4px; border: 1px solid #555555; }"
+        )
+
+        for row, item in enumerate(updates):
+            try:
+                date_item = QTableWidgetItem(getattr(item, "date", ""))
+                title_item = QTableWidgetItem(getattr(item, "title", ""))
+                try:
+                    date_item.setFlags(date_item.flags() & ~Qt.ItemIsEditable)
+                    title_item.setFlags(title_item.flags() & ~Qt.ItemIsEditable)
+                except Exception:
+                    pass
+                updates_table.setItem(row, 0, date_item)
+                updates_table.setItem(row, 1, title_item)
+            except Exception:
+                pass
+
+        # Keep it compact (scroll area will handle overflow)
+        updates_table.setMinimumHeight(220)
+        home_content_layout.addWidget(updates_table)
+        # === END RECENT UPDATES ===
         
         scroll_home = QScrollArea()
         scroll_home.setWidgetResizable(True)
@@ -818,6 +937,37 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             notes_layout.addWidget(self.notes_edit)
 
         self.main_tab_widget.addTab(notes_container, "📝 Notes")
+        
+        # ========== AGENT-MANAGED BLOCK: SENTRY MODE TAB ==========
+        # Intelligent guard turret with pattern learning and predictive fire
+        # Added: Dec 2024 | See: app/sentry_mode/README.md
+        # Dependencies: sentry_mode.sentry_tab_widget.SentryTabWidget
+        # DO NOT MODIFY without checking CHANGE_IMPACT_REFERENCE.md Section 12
+        self.sentry_tab = None
+        self.sentry_mode_active = False
+        if SENTRY_MODE_AVAILABLE and SentryTabWidget is not None:
+            try:
+                self.sentry_tab = SentryTabWidget()
+                self.main_tab_widget.addTab(self.sentry_tab, "🎯 Sentry")
+                
+                # Connect sentry signals to main app
+                # AGENT-MANAGED: Signal connections for sentry mode (Dec 2024)
+                # See CHANGE_IMPACT_REFERENCE.md Section 12 for signal flow
+                self.sentry_tab.turret_move_requested.connect(self._on_sentry_turret_move)
+                self.sentry_tab.fire_requested.connect(self._on_sentry_fire)
+                self.sentry_tab.sentry_enabled_changed.connect(self._on_sentry_enabled_changed)
+                self.sentry_tab.manual_move_requested.connect(self._on_sentry_manual_move)
+                
+                # Connect tab change to detect when sentry tab is active
+                self.main_tab_widget.currentChanged.connect(self._on_tab_changed)
+                
+                print("[SENTRY] Sentry Mode tab initialized successfully")
+            except Exception as e:
+                print(f"[SENTRY] Failed to create tab: {e}")
+                import traceback
+                traceback.print_exc()
+                self.sentry_tab = None
+        # ========== END AGENT-MANAGED BLOCK: SENTRY MODE TAB ==========
         
         # === SERIAL SETTINGS TAB ===
         serial_settings_container = QWidget()
@@ -1130,7 +1280,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 if getattr(self, "record_segment_spinbox", None) is None:
                     self.record_segment_spinbox = QSpinBox()
                     self.record_segment_spinbox.setRange(0, 240)
-                    self.record_segment_spinbox.setValue(0)
+                    self.record_segment_spinbox.setValue(2)  # Default 2 minutes
                     self.record_segment_spinbox.setSingleStep(1)
                 try:
                     self._safe_connect("record_segment_spinbox", "valueChanged", self.save_settings)
@@ -1294,8 +1444,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception as e:
             print(f"Error in setup_dockable_tabs: {e}")
 
-    SETTINGS_FILE = "settings.json"
-    PREFERRED_FILE = "preferred_defaults.json"
+    # NOTE (Dec 2025 - camera orientation stability):
+    # Always resolve settings paths relative to the project root (NOT current working directory)
+    # to avoid "wrong orientation every launch" when running via different entry points.
+    # Working orientation for this build/hardware:
+    #   flip_image=False, invert_pan=True, invert_tilt=False
+    # Do NOT force-toggle these in runtime code (e.g., on tracking start).
+    SETTINGS_FILE = str(Path(__file__).resolve().parent.parent / "settings.json")
+    PREFERRED_FILE = str(Path(__file__).resolve().parent.parent / "preferred_defaults.json")
     STEP_INCREMENT = 5
     # Preferred default dock column width (px). Used as a conservative cap so
     # left/right dock columns default to a reasonable size matching the UI
@@ -1402,8 +1558,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.recording_dir = str(Path.home() / "Videos" / "Turret")
         self.recording_format = "MP4 (H.264)"
         self.recording_fps = 30
-        self.recording_segment_minutes = 0  # 0 = no segmentation (continuous single file)
-        self.recording_segment_seconds = 0  # computed from minutes when settings applied
+        self.recording_segment_minutes = 2  # Default 2 min segments (0 = no segmentation)
+        self.recording_segment_seconds = 120  # computed from minutes when settings applied
         self.storage_limit_gb = 10.0
         self.autocleanup_enabled = True
         self.last_trigger_time = 0.0
@@ -1416,17 +1572,24 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         # Static configuration
         self.STEP_INCREMENT = 5  # Default step size for manual control
-        self.PREFERRED_FILE = "preferred_defaults.json"
-        self.SETTINGS_FILE = "settings.json"
+        self.PREFERRED_FILE = self.__class__.PREFERRED_FILE
+        self.SETTINGS_FILE = self.__class__.SETTINGS_FILE
 
         # Controls state
         self.trigger_mode_bb = False
         self.relay1_state = 0
         self.relay2_state = 0
         self.safety_state = 1
-        # BULLETPROOF FIX: Tilt safety switch - only blocks if this is True AND switch connected
-        self.tilt_safety_switch_enabled = False  # User must enable in settings if they have the switch
+        # Tilt Safety (OPTIONAL HARDWARE)
+        # User request (Dec 2025): tilt safety encoder is NOT installed yet and should not affect the app.
+        # When this is False, host ignores all MCU tilt-safety messages and never suppresses tilt commands.
+        self.tilt_safety_hardware_installed = False
+        # Only meaningful when tilt_safety_hardware_installed=True.
+        self.tilt_safety_switch_enabled = False  # User must enable if they have the switch
         self.tilt_safety_triggered = False
+        # Host-side MCU tilt safety latch (only affects command encoding). Defaults to False;
+        # gets updated from MCU responses in send_serial_command().
+        self._mcu_tilt_safety_locked = False
         # Auto-fire flag (controlled by the Auto-Fire checkbox)
         self.auto_fire_enabled = False
         # Whether tracking loop is actively controlling targeting
@@ -1714,6 +1877,19 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Background subtractor used by background-subtraction detection mode
         self.backSub = None
 
+        # Optional color detector (modes 6-9)
+        self.color_detector = None
+        self.color_calibration_mode = False
+        self.show_color_mask = False
+        try:
+            if COLOR_DETECTION_AVAILABLE and ColorDetector is not None:
+                # Enhancer is initialized later; attach after TurretEnhancements exists
+                self.color_detector = ColorDetector(enhancer=None)
+                print("[COLOR] Color detector initialized")
+        except Exception as e:
+            print(f"[COLOR] Failed to initialize: {e}")
+            self.color_detector = None
+
         # Keep a small history of last detections for fallback/testing
         self.last_detections: list[tuple[int, int, int, int]] = []
         # Diagnostic frame counter for throttled per-frame logs
@@ -1774,6 +1950,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self._safe_append_log("[APP INIT] TurretEnhancements initialized")
                 except Exception:
                     print("[APP INIT] TurretEnhancements initialized")
+
+                # Attach enhancer to optional color detector (if present)
+                try:
+                    if getattr(self, "color_detector", None) is not None:
+                        self.color_detector.enhancer = self.enhancer
+                except Exception:
+                    pass
             except Exception as e:
                 try:
                     import traceback
@@ -1870,7 +2053,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     if isinstance(text, str):
                         if "[SAFETY] TILT SAFETY SWITCH TRIGGERED" in text:
                             # BULLETPROOF FIX: Only trigger if user confirmed switch is connected
-                            if getattr(self, "tilt_safety_switch_enabled", False):
+                            if (
+                                getattr(self, "tilt_safety_hardware_installed", False)
+                                and getattr(self, "tilt_safety_switch_enabled", False)
+                            ):
                                 self.tilt_safety_triggered = True
                                 try:
                                     self.tilt_safety_label.setText("🛡️ Tilt Safety: TRIGGERED!")
@@ -1880,17 +2066,26 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             else:
                                 # Switch not enabled - just display message, don't block movement
                                 try:
-                                    self.tilt_safety_label.setText("🛡️ Tilt Safety: Not Enabled")
+                                    if getattr(self, "tilt_safety_hardware_installed", False):
+                                        self.tilt_safety_label.setText("🛡️ Tilt Safety: Not Enabled")
+                                    else:
+                                        self.tilt_safety_label.setText("🛡️ Tilt Safety: Not Installed")
                                     self.tilt_safety_label.setStyleSheet("color: #FFFF00; font-size: 10px; background-color: #2d2d2d;")
                                 except Exception:
                                     pass
                         elif "[SAFETY] Tilt safety switch reset" in text:
                             self.tilt_safety_triggered = False
                             try:
-                                if getattr(self, "tilt_safety_switch_enabled", False):
+                                if (
+                                    getattr(self, "tilt_safety_hardware_installed", False)
+                                    and getattr(self, "tilt_safety_switch_enabled", False)
+                                ):
                                     self.tilt_safety_label.setText("🛡️ Tilt Safety: OK")
                                 else:
-                                    self.tilt_safety_label.setText("🛡️ Tilt Safety: OK (Disabled)")
+                                    if getattr(self, "tilt_safety_hardware_installed", False):
+                                        self.tilt_safety_label.setText("🛡️ Tilt Safety: OK (Disabled)")
+                                    else:
+                                        self.tilt_safety_label.setText("🛡️ Tilt Safety: Not Installed")
                                 self.tilt_safety_label.setStyleSheet("color: #00FF00; font-size: 10px; background-color: #2d2d2d;")
                             except Exception:
                                 pass
@@ -2252,14 +2447,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             try:
                 try:
                     if not self._safe_connect("timer", "timeout", self.update_frame):
-                        try:
-                            # Guarded direct connect fallback
-                            sig = getattr(getattr(self, "timer", None), "timeout", None)
-                            conn = getattr(sig, "connect", None)
-                            if callable(conn):
-                                conn(self.update_frame)
-                        except Exception:
-                            pass
+                        pass
                 except Exception:
                     pass
             except Exception:
@@ -2295,15 +2483,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     if not self._safe_connect(
                         "serial_timer", "timeout", self.send_serial_command
                     ):
-                        try:
-                            sig = getattr(
-                                getattr(self, "serial_timer", None), "timeout", None
-                            )
-                            conn = getattr(sig, "connect", None)
-                            if callable(conn):
-                                conn(self.send_serial_command)
-                        except Exception:
-                            pass
+                        pass
                 except Exception:
                     pass
             except Exception:
@@ -2315,6 +2495,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             QTimer.singleShot(500, self._auto_equalize_docks_on_startup)
         except Exception:
             pass
+
+        # === RESIZE-FIX: Timer to resume frame updates after window resize/move ===
+        # Added Dec 2025 - Prevents freeze during window manipulation
+        # To revert this fix: Remove this block and the event handlers marked RESIZE-FIX
+        self._resize_resume_timer = QTimer(self)
+        self._resize_resume_timer.setSingleShot(True)
+        self._resize_resume_timer.timeout.connect(self._resume_frame_timer_after_resize)
+        self._frame_timer_was_active = True  # Track if timer was running before resize
+        # === END RESIZE-FIX INIT ===
 
     def _calculate_max_contour_for_resolution(self, resolution_label="640x480 (Fast)"):
         """
@@ -2555,7 +2744,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
     def init_ui(self):
         # Authoritative UI builder
-        self.setWindowTitle("AUTO TURRET CONTROL SYSTEM")
+        try:
+            self.setWindowTitle(get_app_title())
+        except Exception:
+            self.setWindowTitle("AUTOTRACKER - CONTROL SYSTEM")
 
         try:
             QApplication.setStyle(QStyleFactory.create("Fusion"))
@@ -2668,134 +2860,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Initialize shortcut and notes tabs with the video frame
         self._init_shortcut_and_notes_tabs()
 
-        # Sniper view dock (hidden by default)
-        if getattr(self, "sniper_dock", None) is None:
-            self.sniper_dock = QDockWidget("Sniper Scope", self)
-        self.sniper_dock.setObjectName("SniperScopeDock")
-        
-        # Create sniper container with video label and zoom control
-        sniper_container = QWidget()
-        sniper_layout = QVBoxLayout()
-        sniper_layout.setSpacing(6)
-        sniper_layout.setContentsMargins(6, 6, 6, 6)
-        
-        # Zoom control
-        zoom_control_layout = QHBoxLayout()
-        zoom_control_layout.addWidget(QLabel("Zoom:"))
-        if getattr(self, "sniper_zoom_slider", None) is None:
-            self.sniper_zoom_slider = QSlider(Qt.Horizontal)
-            self.sniper_zoom_slider.setRange(5, 40)  # 0.5x to 4.0x
-            self.sniper_zoom_slider.setValue(10)  # Default 1.0x
-            self.sniper_zoom_slider.setTickPosition(QSlider.TicksBelow)
-            self.sniper_zoom_slider.setTickInterval(5)
-        zoom_control_layout.addWidget(self.sniper_zoom_slider)
-        if getattr(self, "sniper_zoom_label", None) is None:
-            self.sniper_zoom_label = QLabel("1.0x")
-            self.sniper_zoom_label.setMinimumWidth(40)
-            self.sniper_zoom_label.setStyleSheet("color: #00ff99;")
-        zoom_control_layout.addWidget(self.sniper_zoom_label)
-        sniper_layout.addLayout(zoom_control_layout)
-        
-        # Video display label
-        if getattr(self, "sniper_view_label", None) is None:
-            self.sniper_view_label = QLabel("No Target")
-        try:
-            sv = getattr(self, "sniper_view_label", None)
-            if sv is not None:
-                try:
-                    try:
-                        sv.setAlignment(cast(Any, getattr(Qt, "AlignCenter", 0)))
-                    except Exception:
-                        pass
-                except Exception:
-                    pass
-                try:
-                    self._safe_widget_call(
-                        "sniper_view_label", "setScaledContents", True
-                    )
-                except Exception:
-                    pass
-                try:
-                    sv.setStyleSheet("background-color: black; border: 2px solid #444;")
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        sniper_layout.addWidget(self.sniper_view_label)
-        sniper_container.setLayout(sniper_layout)
-        
-        try:
-            def on_sniper_zoom_changed(val):
-                try:
-                    zoom = val / 10.0
-                    self.sniper_zoom_label.setText(f"{zoom:.1f}x")
-                except Exception:
-                    pass
-            self.sniper_zoom_slider.valueChanged.connect(on_sniper_zoom_changed)
-        except Exception:
-            pass
-        
-        try:
-            self.sniper_dock.setWidget(sniper_container)
-        except Exception:
-            pass
-        # Make sniper dock behave like other widgets: allow closing, floating,
-        # and resizing when floating. Install an event filter so we can detect
-        # user-initiated closes and respect that intent (don't auto-reopen).
-        try:
-            # Allow all features (movable/floatable/closable/tabable)
-            try:
-                self.sniper_dock.setFeatures(QDockWidget.AllDockWidgetFeatures)
-            except Exception:
-                try:
-                    # Fallback: at least allow movable/floatable/closable
-                    self.sniper_dock.setFeatures(
-                        QDockWidget.DockWidgetMovable
-                        | QDockWidget.DockWidgetFloatable
-                        | QDockWidget.DockWidgetClosable
-                    )
-                except Exception:
-                    pass
-            # Make label expand so floating sniper windows are resizable
-            try:
-                self._safe_widget_call(
-                    "sniper_view_label", "setSizePolicy", QSizePolicy.Expanding, QSizePolicy.Expanding
-                )
-            except Exception:
-                pass
-            try:
-                sv = getattr(self, "sniper_view_label", None)
-                if sv is not None:
-                    try:
-                        sv.setMinimumSize(120, 60)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            # Track whether the user explicitly closed the sniper dock so we
-            # don't auto-show it against their wishes.
-            try:
-                self._sniper_user_closed = False
-            except Exception:
-                pass
-            try:
-                # Install event filter to capture Close events from the dock
-                # (user clicking the close button triggers a QEvent.Close).
-                try:
-                    self.sniper_dock.installEventFilter(self)
-                except Exception:
-                    pass
-            except Exception:
-                pass
-        except Exception:
-            pass
-        # Initially hide until first use (preserve older behavior)
-        try:
-            self.sniper_dock.hide()
-        except Exception:
-            pass
+        # Sniper scope feature removed (Dec 2024)
+        # All sniper dock initialization code has been disabled
 
-        # ===== SCOPE VISUAL SETTINGS FLOATING WINDOW =====
+        # ===== SCOPE VISUAL SETTINGS WINDOW - RESTORED (Dec 2024) =====
+        # This creates the crosshair and HUD overlay settings (NOT the sniper dock)
         try:
             if getattr(self, "scope_settings_window", None) is None:
                 self.scope_settings_window = QMainWindow()
@@ -2847,10 +2916,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 scope_layout.addWidget(self.gap_label, r, 2)
                 r += 1
                 
-                # Crosshair Thickness (1-4, default 2)
+                # Crosshair Thickness (1-5, default 2)
                 scope_layout.addWidget(QLabel("Crosshair Thickness:"), r, 0)
                 self.crosshair_thickness_slider = QSlider(Qt.Horizontal)
-                self.crosshair_thickness_slider.setRange(1, 4)
+                self.crosshair_thickness_slider.setRange(1, 5)
                 self.crosshair_thickness_slider.setValue(2)
                 self.crosshair_thickness_slider.setTickPosition(QSlider.TicksBelow)
                 self.crosshair_thickness_slider.setTickInterval(1)
@@ -2858,15 +2927,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self.crosshair_thickness_label.setMinimumWidth(35)
                 self.crosshair_thickness_label.setStyleSheet("color: #00ff99;")
                 
-                def on_thickness_changed(val):
+                def on_crosshair_thickness_changed(val):
                     self.crosshair_thickness_label.setText(str(val))
                     self.save_settings()
-                self.crosshair_thickness_slider.valueChanged.connect(on_thickness_changed)
+                self.crosshair_thickness_slider.valueChanged.connect(on_crosshair_thickness_changed)
                 scope_layout.addWidget(self.crosshair_thickness_slider, r, 1)
                 scope_layout.addWidget(self.crosshair_thickness_label, r, 2)
                 r += 1
                 
-                # Scope Radius % (25-50, default 35)
+                # Scope Radius (25-50%, default 35%)
                 scope_layout.addWidget(QLabel("Scope Radius %:"), r, 0)
                 self.scope_radius_percent_slider = QSlider(Qt.Horizontal)
                 self.scope_radius_percent_slider.setRange(25, 50)
@@ -2885,14 +2954,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 scope_layout.addWidget(self.scope_radius_percent_label, r, 2)
                 r += 1
                 
-                # Corner Size (20-80, default 40)
+                # Corner Size (20-100, default 50)
                 scope_layout.addWidget(QLabel("Corner Size:"), r, 0)
                 self.corner_size_slider = QSlider(Qt.Horizontal)
-                self.corner_size_slider.setRange(20, 80)
-                self.corner_size_slider.setValue(40)
+                self.corner_size_slider.setRange(20, 100)
+                self.corner_size_slider.setValue(50)
                 self.corner_size_slider.setTickPosition(QSlider.TicksBelow)
-                self.corner_size_slider.setTickInterval(5)
-                self.corner_size_label = QLabel("40")
+                self.corner_size_slider.setTickInterval(10)
+                self.corner_size_label = QLabel("50")
                 self.corner_size_label.setMinimumWidth(35)
                 self.corner_size_label.setStyleSheet("color: #00ff99;")
                 
@@ -3233,16 +3302,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 # Use 'toggled' for checkable toggle buttons to avoid double-press issues
                 self._safe_connect("tracking_btn", "toggled", self.toggle_tracking)
             except Exception:
-                # Best-effort fallback to direct signal connect
-                try:
-                    btn = getattr(self, "tracking_btn", None)
-                    if btn is not None:
-                        sig = getattr(btn, "toggled", None)
-                        conn = getattr(sig, "connect", None)
-                        if callable(conn):
-                            conn(self.toggle_tracking)
-                except Exception:
-                    pass
+                pass
         except Exception:
             pass
 
@@ -3258,15 +3318,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 # Use 'toggled' for checkable toggle buttons to avoid double-press issues
                 self._safe_connect("aiming_btn", "toggled", self.toggle_aiming)
             except Exception:
-                try:
-                    btn2 = getattr(self, "aiming_btn", None)
-                    if btn2 is not None:
-                        sig = getattr(btn2, "toggled", None)
-                        conn = getattr(sig, "connect", None)
-                        if callable(conn):
-                            conn(self.toggle_aiming)
-                except Exception:
-                    pass
+                pass
         except Exception:
             pass
 
@@ -3378,22 +3430,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         try:
             self.idle_mode_toggle_btn.setCheckable(True)
             self.idle_mode_toggle_btn.setEnabled(True)
-            # Use the custom click handler instead of signals
-            self.idle_mode_toggle_btn.set_click_handler(self.toggle_idle_mode)
-            if getattr(self, "enhancer", None):
-                self.enhancer.log_serial_output("[IDLE] Toggle button created with direct click detection", fire=False)
-        except Exception as e:
+            # CRITICAL: Must be connected via _safe_connect (see CHANGE_IMPACT_REFERENCE.md)
             try:
-                # Fallback: try old signal method
-                sig = getattr(self.idle_mode_toggle_btn, "clicked", None)
-                conn = getattr(sig, "connect", None)
-                if callable(conn):
-                    conn(self.toggle_idle_mode)
-                    if getattr(self, "enhancer", None):
-                        self.enhancer.log_serial_output("[IDLE] Toggle button fallback connection succeeded", fire=False)
-            except Exception as fallback_err:
-                if getattr(self, "enhancer", None):
-                    self.enhancer.log_serial_output(f"[IDLE] Button connection failed: {str(fallback_err)}", fire=False)
+                self._safe_connect("idle_mode_toggle_btn", "clicked", self.toggle_idle_mode)
+            except Exception:
+                pass
+            if getattr(self, "enhancer", None):
+                self.enhancer.log_serial_output("[IDLE] Toggle button wired via _safe_connect(clicked)", fire=False)
+        except Exception:
+            pass
         try:
             btn = getattr(self, "idle_mode_toggle_btn", None)
             if btn is not None and not btn.isEnabled():
@@ -3438,15 +3483,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.save_settings,
                     )
                 except Exception:
-                    try:
-                        sig = getattr(
-                            self.home_return_mode_combo, "currentIndexChanged", None
-                        )
-                        conn = getattr(sig, "connect", None)
-                        if callable(conn):
-                            conn(self.save_settings)
-                    except Exception:
-                        pass
+                    pass
             except Exception:
                 pass
             home_layout.addWidget(self.home_return_mode_combo, 3, 1, 1, 2)
@@ -3466,13 +3503,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     "home_return_suspend_input", "valueChanged", self.save_settings
                 )
             except Exception:
-                try:
-                    sig = getattr(self.home_return_suspend_input, "valueChanged", None)
-                    conn = getattr(sig, "connect", None)
-                    if callable(conn):
-                        conn(self.save_settings)
-                except Exception:
-                    pass
+                pass
             home_layout.addWidget(self.home_return_suspend_input, 3, 4, 1, 2)
         except Exception:
             pass
@@ -3669,6 +3700,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         # Target Detection
         detection_group = QGroupBox("Target Detection Settings")
+        try:
+            # Keep a reference so other sections (e.g., hybrid settings) can be
+            # inserted into this panel later without relying on local variables.
+            self.detection_settings_group = detection_group
+        except Exception:
+            pass
         detection_layout = QGridLayout()
         detection_layout.setSpacing(6)
         detection_layout.setContentsMargins(8, 8, 8, 8)
@@ -3757,11 +3794,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
         # Ensure the threshold label is present (fix missing label in screenshot)
-        detection_layout.addWidget(QLabel("Detection Threshold:"), r, 0)
+        if getattr(self, "_det_label_threshold", None) is None:
+            self._det_label_threshold = QLabel("Detection Threshold:")
+        detection_layout.addWidget(self._det_label_threshold, r, 0)
         detection_layout.addWidget(self.threshold_input, r, 1)
         r += 1
 
-        detection_layout.addWidget(QLabel("Blur Kernel Size (odd num):"), r, 0)
+        if getattr(self, "_det_label_blur", None) is None:
+            self._det_label_blur = QLabel("Blur Kernel Size (odd num):")
+        detection_layout.addWidget(self._det_label_blur, r, 0)
         if getattr(self, "blur_kernel_input", None) is None:
             self.blur_kernel_input = QSpinBox()
         try:
@@ -3779,7 +3820,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         detection_layout.addWidget(self.blur_kernel_input, r, 1)
         r += 1
 
-        detection_layout.addWidget(QLabel("Dilation Iterations:"), r, 0)
+        if getattr(self, "_det_label_dilate", None) is None:
+            self._det_label_dilate = QLabel("Dilation Iterations:")
+        detection_layout.addWidget(self._det_label_dilate, r, 0)
         if getattr(self, "dilate_iter_input", None) is None:
             self.dilate_iter_input = QSpinBox()
         try:
@@ -3801,19 +3844,29 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.detection_mode_combo = QComboBox()
         try:
             try:
+                # Preserve existing indices 0-5; append new modes 6-9 only if missing.
+                desired = [
+                    "Frame Difference",  # 0
+                    "Background Subtraction",  # 1
+                    "YOLO Object Detection",  # 2
+                    "Hybrid: Frame Diff + BackSub",  # 3
+                    "Hybrid: Frame Diff + YOLO",  # 4
+                    "Hybrid: BackSub + YOLO (Best)",  # 5
+                    "Color Detection",  # 6
+                    "Hybrid: Color + Frame Diff",  # 7
+                    "Hybrid: Color + BackSub",  # 8
+                    "Hybrid: Color + YOLO",  # 9
+                ]
+
                 if self.detection_mode_combo.count() == 0:
-                    self._safe_widget_call(
-                        "detection_mode_combo",
-                        "addItems",
-                        [
-                            "Frame Difference",
-                            "Background Subtraction",
-                            "YOLO Object Detection",
-                            "Hybrid: Frame Diff + BackSub",
-                            "Hybrid: Frame Diff + YOLO",
-                            "Hybrid: BackSub + YOLO (Best)",
-                        ],
-                    )
+                    self._safe_widget_call("detection_mode_combo", "addItems", desired)
+                elif self.detection_mode_combo.count() < len(desired):
+                    # Only append the new color modes in-order.
+                    for item in desired[self.detection_mode_combo.count() :]:
+                        try:
+                            self.detection_mode_combo.addItem(item)
+                        except Exception:
+                            pass
             except Exception:
                 pass
             try:
@@ -3925,6 +3978,23 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             pass
         detection_layout.addWidget(self.detection_mode_combo, r, 1)
         r += 1
+
+        # Basic/Advanced toggle: keeps the panel compact by hiding rarely-used controls
+        if getattr(self, "show_advanced_detection_checkbox", None) is None:
+            self.show_advanced_detection_checkbox = QCheckBox("Show advanced settings")
+        try:
+            self._safe_connect(
+                "show_advanced_detection_checkbox",
+                "stateChanged",
+                self._on_show_advanced_detection_changed,
+            )
+            # Default off; restored from settings.json if present
+            self._safe_widget_call("show_advanced_detection_checkbox", "setChecked", False)
+        except Exception:
+            pass
+        detection_layout.addWidget(self.show_advanced_detection_checkbox, r, 1)
+        r += 1
+
         # Debug toggle: gate verbose pipeline prints
         if getattr(self, "debug_checkbox", None) is None:
             self.debug_checkbox = QCheckBox("Debug")
@@ -3935,7 +4005,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
         # Warmup frames for BackgroundSubtractor (skip detections while building background)
-        detection_layout.addWidget(QLabel("BackSub Warmup Frames:"), r, 0)
+        if getattr(self, "_det_label_backsub_warmup", None) is None:
+            self._det_label_backsub_warmup = QLabel("BackSub Warmup Frames:")
+        detection_layout.addWidget(self._det_label_backsub_warmup, r, 0)
         if getattr(self, "backsub_warmup_input", None) is None:
             self.backsub_warmup_input = QSpinBox()
         try:
@@ -3950,7 +4022,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         r += 1
         
         # Minimum contour size - filter out small noise/specks
-        detection_layout.addWidget(QLabel("Min Contour Size (px):"), r, 0)
+        if getattr(self, "_det_label_min_contour", None) is None:
+            self._det_label_min_contour = QLabel("Min Contour Size (px):")
+        detection_layout.addWidget(self._det_label_min_contour, r, 0)
         if getattr(self, "min_contour_input", None) is None:
             self.min_contour_input = QSpinBox()
         try:
@@ -3964,7 +4038,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         r += 1
         
         # Maximum contour size - filter out large objects (e.g., full frame)
-        detection_layout.addWidget(QLabel("Max Contour Size (px):"), r, 0)
+        if getattr(self, "_det_label_max_contour", None) is None:
+            self._det_label_max_contour = QLabel("Max Contour Size (px):")
+        detection_layout.addWidget(self._det_label_max_contour, r, 0)
         if getattr(self, "max_contour_input", None) is None:
             self.max_contour_input = QSpinBox()
         try:
@@ -3981,7 +4057,32 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         detection_layout.addWidget(self.debug_checkbox, r, 1)
         r += 1
-        detection_group.setLayout(detection_layout)
+
+        # Wrap the grid in a vbox so we can attach optional panels beneath it.
+        detection_outer = QVBoxLayout()
+        try:
+            detection_outer.setContentsMargins(0, 0, 0, 0)
+        except Exception:
+            pass
+        detection_outer.addLayout(detection_layout)
+
+        # Optional color settings panel (hidden unless color mode selected)
+        try:
+            if COLOR_DETECTION_AVAILABLE:
+                from color_detection.ui_components import (
+                    build_color_detection_panel,
+                    connect_color_signals,
+                )
+
+                build_color_detection_panel(self, detection_outer)
+                connect_color_signals(self)
+        except Exception as e:
+            try:
+                print(f"[COLOR UI] Panel init failed: {e}")
+            except Exception:
+                pass
+
+        detection_group.setLayout(detection_outer)
 
         # YOLO settings
         if getattr(self, "yolo_settings_group", None) is None:
@@ -4024,13 +4125,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             self.save_settings,
                         )
                     except Exception:
-                        try:
-                            sig = getattr(ycombo, "currentIndexChanged", None)
-                            conn = getattr(sig, "connect", None)
-                            if callable(conn):
-                                conn(self.save_settings)
-                        except Exception:
-                            pass
+                        pass
                     try:
                         self._safe_connect(
                             "yolo_model_combo",
@@ -4038,28 +4133,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             self.on_yolo_model_changed,
                         )
                     except Exception:
-                        try:
-                            sig2 = getattr(ycombo, "currentIndexChanged", None)
-                            conn2 = getattr(sig2, "connect", None)
-                            if callable(conn2):
-                                conn2(self.on_yolo_model_changed)
-                        except Exception:
-                            pass
+                        pass
             except Exception:
                 pass
             # Connect the browse button (safe connect)
             try:
                 self._safe_connect("yolo_browse_btn", "clicked", self.browse_yolo_model)
             except Exception:
-                try:
-                    btn = getattr(self, "yolo_browse_btn", None)
-                    if btn is not None:
-                        sig = getattr(btn, "clicked", None)
-                        conn = getattr(sig, "connect", None)
-                        if callable(conn):
-                            conn(self.browse_yolo_model)
-                except Exception:
-                    pass
+                pass
         except Exception:
             pass
         try:
@@ -4309,7 +4390,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
         # Additional YOLO settings: Max Results and Min Area
-        yolo_layout.addWidget(QLabel("Max Results (0=all):"), y, 0)
+        if getattr(self, "yolo_max_results_label", None) is None:
+            self.yolo_max_results_label = QLabel("Max Results (0=all):")
+        yolo_layout.addWidget(self.yolo_max_results_label, y, 0)
         if getattr(self, "yolo_max_results_input", None) is None:
             self.yolo_max_results_input = QSpinBox()
             try:
@@ -4324,17 +4407,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "yolo_max_results_input", "valueChanged", self.save_settings
             )
         except Exception:
-            try:
-                sig = getattr(self.yolo_max_results_input, "valueChanged", None)
-                conn = getattr(sig, "connect", None)
-                if callable(conn):
-                    conn(self.save_settings)
-            except Exception:
-                pass
+            pass
         yolo_layout.addWidget(self.yolo_max_results_input, y, 1)
         y += 1
 
-        yolo_layout.addWidget(QLabel("Min Area (px):"), y, 0)
+        if getattr(self, "yolo_min_area_label", None) is None:
+            self.yolo_min_area_label = QLabel("Min Area (px):")
+        yolo_layout.addWidget(self.yolo_min_area_label, y, 0)
         if getattr(self, "yolo_min_area_input", None) is None:
             self.yolo_min_area_input = QSpinBox()
             try:
@@ -4349,20 +4428,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "yolo_min_area_input", "valueChanged", self.save_settings
             )
         except Exception:
-            try:
-                sig = getattr(self.yolo_min_area_input, "valueChanged", None)
-                conn = getattr(sig, "connect", None)
-                if callable(conn):
-                    conn(self.save_settings)
-            except Exception:
-                pass
+            pass
         yolo_layout.addWidget(self.yolo_min_area_input, y, 1)
         y += 1
         # Small status label to show current detection count for easier debugging
         try:
             if getattr(self, "yolo_detect_status_label", None) is None:
                 self.yolo_detect_status_label = QLabel("Idle")
-            yolo_layout.addWidget(QLabel("Detect Status:"), y, 0)
+            if getattr(self, "yolo_detect_status_title", None) is None:
+                self.yolo_detect_status_title = QLabel("Detect Status:")
+            yolo_layout.addWidget(self.yolo_detect_status_title, y, 0)
             yolo_layout.addWidget(self.yolo_detect_status_label, y, 1, 1, 2)
             y += 1
         except Exception:
@@ -4387,7 +4462,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         h = 0
 
         # Fusion strategy for modes 3 and 4
-        hybrid_layout.addWidget(QLabel("Fusion Strategy:"), h, 0)
+        if getattr(self, "_hybrid_fusion_strategy_label", None) is None:
+            self._hybrid_fusion_strategy_label = QLabel("Fusion Strategy:")
+        hybrid_layout.addWidget(self._hybrid_fusion_strategy_label, h, 0)
         if getattr(self, "fusion_strategy_combo", None) is None:
             self.fusion_strategy_combo = QComboBox()
             try:
@@ -4408,7 +4485,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         h += 1
 
         # Frame Diff + YOLO motion gate threshold (for mode 4)
-        hybrid_layout.addWidget(QLabel("Motion Gate % (FrameDiff+YOLO):"), h, 0)
+        if getattr(self, "_hybrid_motion_gate_label", None) is None:
+            self._hybrid_motion_gate_label = QLabel("Motion Gate % (FrameDiff+YOLO):")
+        hybrid_layout.addWidget(self._hybrid_motion_gate_label, h, 0)
         if getattr(self, "motion_gate_threshold_input", None) is None:
             self.motion_gate_threshold_input = QDoubleSpinBox()
             try:
@@ -4424,7 +4503,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         h += 1
 
         # BackSub + YOLO overlap threshold (for mode 5)
-        hybrid_layout.addWidget(QLabel("Overlap Threshold % (BackSub+YOLO):"), h, 0)
+        if getattr(self, "_hybrid_overlap_label", None) is None:
+            self._hybrid_overlap_label = QLabel("Overlap Threshold % (BackSub+YOLO):")
+        hybrid_layout.addWidget(self._hybrid_overlap_label, h, 0)
         if getattr(self, "overlap_threshold_input", None) is None:
             self.overlap_threshold_input = QDoubleSpinBox()
             try:
@@ -4443,6 +4524,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.hybrid_settings_group.setSizePolicy(
             QSizePolicy.Preferred, QSizePolicy.Preferred
         )
+
+        # Insert this group into the Target Detection panel (beneath the grid)
+        try:
+            det_group = getattr(self, "detection_settings_group", None)
+            outer = det_group.layout() if det_group is not None else None
+            if outer is not None and outer.indexOf(self.hybrid_settings_group) == -1:
+                outer.addWidget(self.hybrid_settings_group)
+        except Exception:
+            pass
+
+        # Start hidden; shown only for hybrid modes (3-5)
+        try:
+            self.hybrid_settings_group.hide()
+        except Exception:
+            pass
         # Set minimum height so YOLO panel has adequate space when shown
         self.yolo_settings_group.setMinimumHeight(400)
         self.yolo_settings_group.adjustSize()
@@ -4998,18 +5094,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                                         str(v)
                                                     ),
                                                 ):
-                                                    sig = getattr(
-                                                        self.snap_threshold_slider,
-                                                        "valueChanged",
-                                                        None,
-                                                    )
-                                                    conn = getattr(sig, "connect", None)
-                                                    if callable(conn):
-                                                        conn(
-                                                            lambda v: self.snap_threshold_label.setText(
-                                                                str(v)
-                                                            )
-                                                        )
+                                                    pass
                                             except Exception:
                                                 pass
                                         except Exception:
@@ -5383,9 +5468,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                             "stateChanged",
                                             None,
                                         )
-                                        conn = getattr(sig, "connect", None)
-                                        if callable(conn):
-                                            conn(lambda s: self.set_flip_pan(bool(s)))
+                                        pass
                                 except Exception:
                                     pass
                             except Exception:
@@ -5416,9 +5499,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                             "stateChanged",
                                             None,
                                         )
-                                        conn = getattr(sig, "connect", None)
-                                        if callable(conn):
-                                            conn(self.save_settings)
+                                        pass
                                 except Exception:
                                     pass
                             except Exception:
@@ -5461,9 +5542,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                             "stateChanged",
                                             None,
                                         )
-                                        conn = getattr(sig, "connect", None)
-                                        if callable(conn):
-                                            conn(lambda s: self.set_flip_tilt(bool(s)))
+                                        pass
                                 except Exception:
                                     pass
                             except Exception:
@@ -5480,9 +5559,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             sig = getattr(
                                 self.invert_tilt_checkbox, "stateChanged", None
                             )
-                            conn = getattr(sig, "connect", None)
-                            if callable(conn):
-                                conn(self.save_settings)
+                            pass
                         except Exception:
                             pass
                 except Exception:
@@ -5501,9 +5578,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 ):
                     try:
                         sig = getattr(self.flip_checkbox, "stateChanged", None)
-                        conn = getattr(sig, "connect", None)
-                        if callable(conn):
-                            conn(self.save_settings)
+                        pass
                     except Exception:
                         pass
             except Exception:
@@ -6405,7 +6480,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         try:
                             from subprocess import Popen
                             import sys
-                            Popen([sys.executable, "servo_calibration_tool.py"])
+                            import os
+                            tool_path = os.path.join(os.path.dirname(__file__), "servo_calibration_tool.py")
+                            tool_cwd = os.path.dirname(tool_path)
+                            Popen([sys.executable, tool_path], cwd=tool_cwd)
                         except Exception as e:
                             try:
                                 if hasattr(self, "enhancer"):
@@ -6596,19 +6674,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         pass
                     if enabled:
                         try:
-                            self.equalize_dock_columns()
+                            QTimer.singleShot(0, lambda: self.equalize_dock_columns())
                         except Exception:
                             pass
 
                 try:
-                    conn = getattr(self.auto_equalize_action, "toggled", None)
-                    if conn is not None:
-                        try:
-                            c = getattr(conn, "connect", None)
-                            if callable(c):
-                                c(_toggle_auto_equalize)
-                        except Exception:
-                            pass
+                    self._safe_connect("auto_equalize_action", "toggled", _toggle_auto_equalize)
                 except Exception:
                     pass
 
@@ -6659,19 +6730,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             pass
 
                     try:
-                        self.equalize_dock_columns()
+                        QTimer.singleShot(0, lambda: self.equalize_dock_columns())
                     except Exception:
                         pass
 
                 try:
-                    conn = getattr(self.force_exact_action, "toggled", None)
-                    if conn is not None:
-                        try:
-                            c = getattr(conn, "connect", None)
-                            if callable(c):
-                                c(_toggle_force_exact)
-                        except Exception:
-                            pass
+                    self._safe_connect("force_exact_action", "toggled", _toggle_force_exact)
                 except Exception:
                     pass
 
@@ -6679,7 +6743,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self.auto_show_sniper_action = cast(Any, tools_menu.addAction("Auto-show Sniper"))
                 try:
                     self.auto_show_sniper_action.setCheckable(True)
-                    self.auto_show_sniper_action.setChecked(bool(getattr(self, "auto_show_sniper", True)))
+                    self.auto_show_sniper_action.setChecked(bool(getattr(self, "auto_show_sniper", False)))
                 except Exception:
                     pass
 
@@ -6701,14 +6765,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         pass
 
                 try:
-                    conn = getattr(self.auto_show_sniper_action, "toggled", None)
-                    if conn is not None:
-                        try:
-                            c = getattr(conn, "connect", None)
-                            if callable(c):
-                                c(_toggle_auto_show_sniper)
-                        except Exception:
-                            pass
+                    self._safe_connect("auto_show_sniper_action", "toggled", _toggle_auto_show_sniper)
                 except Exception:
                     pass
 
@@ -6734,14 +6791,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 print(f"Checklist error: {e}")
                     
                     try:
-                        conn_checklist = getattr(self.show_checklist_action, "triggered", None)
-                        if conn_checklist is not None:
-                            try:
-                                c_checklist = getattr(conn_checklist, "connect", None)
-                                if callable(c_checklist):
-                                    c_checklist(_show_checklist)
-                            except Exception:
-                                pass
+                        self._safe_connect("show_checklist_action", "triggered", _show_checklist)
                     except Exception:
                         pass
                 
@@ -6764,14 +6814,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 print(f"Idle settings error: {e}")
                     
                     try:
-                        conn_idle = getattr(self.show_idle_settings_action, "triggered", None)
-                        if conn_idle is not None:
-                            try:
-                                c_idle = getattr(conn_idle, "connect", None)
-                                if callable(c_idle):
-                                    c_idle(_show_idle_settings)
-                            except Exception:
-                                pass
+                        self._safe_connect("show_idle_settings_action", "triggered", _show_idle_settings)
                     except Exception:
                         pass
 
@@ -7345,8 +7388,20 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         the user explicitly closed it and avoid re-showing it automatically.
         Also lightly instrument clicks inside the settings area to help
         identify which UI actions set detection-suppression flags.
+        Also pause frame timer during dock drag operations (RESIZE-FIX).
         """
         try:
+            # === RESIZE-FIX: Pause timer during dock operations ===
+            try:
+                from PyQt5.QtCore import QEvent
+                if isinstance(a0, QDockWidget):
+                    if a1.type() in (QEvent.Move, QEvent.Resize, QEvent.WindowStateChange,
+                                    QEvent.Show, QEvent.Hide):
+                        self._pause_frame_timer_for_layout()
+            except Exception:
+                pass
+            # === END RESIZE-FIX ===
+            
             sniper = getattr(self, "sniper_dock", None)
             # Detect user close on the sniper dock
             if sniper is not None and a0 is sniper:
@@ -7705,12 +7760,20 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         # Add presets dock
         try:
-            self.add_dock("Behavior Presets", scroll, "right")
+            presets_dock = self.add_dock("Behavior Presets", scroll, "right")
             try:
                 if "Behavior Presets" not in getattr(self, "widget_items", []):
                     self.widget_items.append("Behavior Presets")
             except Exception:
                 pass
+            # === HIDE PRESETS BY DEFAULT - Dec 2025 ===
+            # User can open from Widgets menu if needed
+            try:
+                if presets_dock is not None:
+                    presets_dock.hide()
+            except Exception:
+                pass
+            # === END HIDE PRESETS ===
         except Exception as e:
             print("Failed to add presets dock:", e)
 
@@ -8450,380 +8513,127 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         This is called after docks are created and again after restoring window state so
         Qt's restoreState doesn't re-introduce mismatched widths.
         """
+        # Required safeguards (see CHANGE_IMPACT_REFERENCE.md):
+        # - Pause frame timer during layout operations
+        # - Re-entrancy guard
+        # - Callers should defer via QTimer.singleShot(...)
+        if getattr(self, "_equalize_dock_columns_in_progress", False):
+            return
+        self._equalize_dock_columns_in_progress = True
         try:
-            # Respect user preference: allow disabling automatic equalization.
             try:
-                if not getattr(self, "auto_equalize_dock_columns", True):
-                    return
+                self._pause_frame_timer_for_layout()
             except Exception:
                 pass
-            # Only consider dock widgets docked in the main window (skip floating)
-            docks = [d for d in self.findChildren(QDockWidget) if not d.isFloating()]
+
             try:
-                left_const = getattr(Qt, "LeftDockWidgetArea", None)
+                from PyQt5.QtCore import Qt
+                from PyQt5.QtWidgets import QDockWidget
             except Exception:
-                left_const = None
-            try:
-                right_const = getattr(Qt, "RightDockWidgetArea", None)
-            except Exception:
-                right_const = None
-            left_docks = [
-                d
-                for d in docks
-                if (left_const is not None and self.dockWidgetArea(d) == left_const)
-            ]
-            right_docks = [
-                d
-                for d in docks
-                if (right_const is not None and self.dockWidgetArea(d) == right_const)
-            ]
-            all_docks = left_docks + right_docks
-            if not all_docks:
                 return
 
-            # Compute candidate widths from various hints (widget, dock size, sizeHint)
-            widths = []
-            for d in all_docks:
-                try:
-                    cand = None
-                    w = d.widget()
-                    if w is not None:
-                        try:
-                            cand = int(w.width() or w.sizeHint().width())
-                        except Exception:
-                            try:
-                                cand = int(w.sizeHint().width())
-                            except Exception:
-                                cand = None
-                    if not cand:
-                        try:
-                            cand = int(d.width() or d.sizeHint().width())
-                        except Exception:
-                            cand = None
-                    widths.append(int(cand or 340))
-                except Exception:
-                    widths.append(340)
-
-            # Compute available width and reserve a reasonable central area so docks
-            # cannot force the central widget to collapse. Use DEFAULT_DOCK_COLUMN_WIDTH
-            # as a conservative preferred width to match the UI sketch provided.
-            total_w = self.width() if hasattr(self, "width") else 1200
-            central_min = max(300, int(total_w * 0.45))
-            # Per-column cap is remaining width split across left/right docks
-            per_column_cap = max(200, int(max(200, (total_w - central_min) / 2)))
-            # Pick candidate from content hints
-            candidate = max(widths)
-            if candidate < 200:
-                candidate = 200
-            # Target width should prefer DEFAULT_DOCK_COLUMN_WIDTH but never exceed
-            # the per-column cap (available space). This keeps both columns near the
-            # user's requested visual guide while remaining responsive.
+            # Consider only non-floating, visible docks
             try:
-                pref = int(getattr(self, "DEFAULT_DOCK_COLUMN_WIDTH", 320))
+                docks = [
+                    d
+                    for d in self.findChildren(QDockWidget)
+                    if d is not None and (not d.isFloating()) and d.isVisible()
+                ]
             except Exception:
-                pref = 320
-            target_width = min(pref, per_column_cap, candidate)
+                docks = []
+            if not docks:
+                return
 
-            # Ensure central widget has a minimum width before we force dock widths
             try:
-                cw = self.centralWidget()
-                if cw is not None:
-                    try:
-                        cw.setMinimumWidth(central_min)
-                    except Exception:
-                        pass
+                left_area = getattr(Qt, "LeftDockWidgetArea", None) or self._qt_dock_area(
+                    "LeftDockWidgetArea", 1
+                )
+                right_area = getattr(Qt, "RightDockWidgetArea", None) or self._qt_dock_area(
+                    "RightDockWidgetArea", 2
+                )
             except Exception:
-                pass
+                left_area = self._qt_dock_area("LeftDockWidgetArea", 1)
+                right_area = self._qt_dock_area("RightDockWidgetArea", 2)
 
-            # Apply fixed horizontal sizing for dock columns (Preferred: Fixed width)
-            for d in all_docks:
+            left_docks = []
+            right_docks = []
+            for d in docks:
                 try:
-                    # If operator requested strict equality, force exact widths.
-                    # Use setFixedWidth for stronger enforcement and also set
-                    # the widget's size policy to Fixed. This is intrusive
-                    # but guarantees visual equality where possible.
-                    if getattr(self, "force_exact_dock_widths", False):
-                        try:
-                            d.setFixedWidth(int(target_width))
-                        except Exception:
-                            try:
-                                d.setMinimumWidth(int(target_width))
-                            except Exception:
-                                pass
-                        try:
-                            w = d.widget()
-                            if w is not None:
-                                try:
-                                    w.setFixedWidth(int(target_width))
-                                except Exception:
-                                    try:
-                                        w.setMinimumWidth(int(target_width))
-                                    except Exception:
-                                        pass
-                                try:
-                                    w.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-                                except Exception:
-                                    pass
-                        except Exception:
-                            pass
-                    else:
-                        # Only set a minimum width and prefer flexible policy so docks can be nested/tabbed.
-                        d.setMinimumWidth(int(target_width))
-                        try:
-                            d.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-                        except Exception:
-                            pass
-                except Exception:
-                    # Fallback: try setting inner widget
-                    try:
-                        w = d.widget()
-                        if w is not None:
-                            w.setMinimumWidth(int(target_width))
-                            try:
-                                w.setSizePolicy(
-                                    QSizePolicy.Preferred, QSizePolicy.Preferred
-                                )
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-
-            # Also request Qt to resize docks to the target width (helps when layout/restore overrides direct width hints)
-            try:
-                if left_docks:
-                    try:
-                        orient = getattr(Qt, "Vertical", None)
-                        if orient is None:
-                            orient = self._qt_enum("Vertical", 2)
-                        try:
-                            self.resizeDocks(
-                                left_docks,
-                                [target_width] * len(left_docks),
-                                cast(Any, orient),
-                            )
-                        except Exception:
-                            try:
-                                # Fallback to explicit orient resolved helper
-                                fallback_orient = self._qt_orientation("Vertical", 2)
-                                self.resizeDocks(
-                                    left_docks,
-                                    [target_width] * len(left_docks),
-                                    cast(Any, fallback_orient),
-                                )
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-                if right_docks:
-                    try:
-                        orient = getattr(Qt, "Vertical", None)
-                        if orient is None:
-                            orient = self._qt_enum("Vertical", 2)
-                        try:
-                            self.resizeDocks(
-                                right_docks,
-                                [target_width] * len(right_docks),
-                                cast(Any, orient),
-                            )
-                        except Exception:
-                            try:
-                                fallback_orient = self._qt_orientation("Vertical", 2)
-                                self.resizeDocks(
-                                    right_docks,
-                                    [target_width] * len(right_docks),
-                                    cast(Any, fallback_orient),
-                                )
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-
-            # Apply consistent background to groupboxes and scroll viewports inside docks
-            consistent_bg = """
-                QGroupBox { background-color: #151515; border: 1px solid #888; border-radius: 10px; margin-top: 10px; font-weight: bold; color: #eaeaea; padding: 8px; }
-                QScrollArea QWidget { background-color: #151515; }
-            """
-            for g in self.findChildren(QGroupBox):
-                try:
-                    g.setStyleSheet(consistent_bg)
+                    area = self.dockWidgetArea(d)
+                    if area == left_area:
+                        left_docks.append(d)
+                    elif area == right_area:
+                        right_docks.append(d)
                 except Exception:
                     pass
+            if not left_docks or not right_docks:
+                return
 
-            # Also ensure QDockWidget contents have matching background and style scroll viewports
+            def _column_width(ds):
+                widths = []
+                for dd in ds:
+                    try:
+                        w = int(dd.width())
+                        if w > 0:
+                            widths.append(w)
+                            continue
+                    except Exception:
+                        pass
+                    try:
+                        sh = dd.sizeHint()
+                        if sh is not None:
+                            w2 = int(sh.width())
+                            if w2 > 0:
+                                widths.append(w2)
+                    except Exception:
+                        pass
+                return max(widths) if widths else 0
+
+            left_w = _column_width(left_docks)
+            right_w = _column_width(right_docks)
+            target = max(left_w, right_w)
+
             try:
-                from PyQt5.QtWidgets import QScrollArea
+                default_w = int(getattr(self, "DEFAULT_DOCK_COLUMN_WIDTH", 320))
+                if target <= 0:
+                    target = default_w
+                # Conservative cap to avoid runaway widths
+                if default_w > 0:
+                    target = min(target, default_w)
+            except Exception:
+                if target <= 0:
+                    target = 320
 
-                def apply_style_recursive(widget):
-                    # Avoid modifying the central video widgets
+            # Resize the two dock columns to the same width
+            try:
+                self.resizeDocks(
+                    [left_docks[0], right_docks[0]], [target, target], Qt.Horizontal
+                )
+            except Exception:
+                pass
+
+            # Optional: force exact widths when enabled
+            if bool(getattr(self, "force_exact_dock_widths", False)):
+                for d in (left_docks + right_docks):
                     try:
-                        if widget in (
-                            getattr(self, "video_frame", None),
-                            getattr(self, "video_label", None),
-                            getattr(self, "sniper_view_label", None),
-                        ):
-                            return
+                        d.setMinimumWidth(target)
+                        d.setMaximumWidth(target)
                     except Exception:
                         pass
                     try:
-                        if widget is not None:
-                            try:
-                                widget.setStyleSheet(consistent_bg)
-                            except Exception:
-                                pass
-                            # Recurse into children
-                            try:
-                                for c in widget.findChildren(QWidget):
-                                    try:
-                                        c.setStyleSheet(consistent_bg)
-                                    except Exception:
-                                        pass
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-
-                for d in all_docks:
-                    try:
-                        d.setStyleSheet("QDockWidget { background-color: #151515; }")
                         w = d.widget()
                         if w is not None:
-                            try:
-                                apply_style_recursive(w)
-                            except Exception:
-                                pass
-                            # If it's a scroll area, also style its viewport
-                            try:
-                                if isinstance(w, QScrollArea):
-                                    try:
-                                        w.viewport().setStyleSheet(
-                                            "background-color: #151515;"
-                                        )
-                                    except Exception:
-                                        pass
-                            except Exception:
-                                pass
+                            w.setMinimumWidth(target)
+                            w.setMaximumWidth(target)
                     except Exception:
                         pass
-            except Exception:
-                pass
-
-            # Report final dock widths to serial console (but skip terminal prints)
+        except Exception:
+            pass
+        finally:
             try:
-                if hasattr(self, "enhancer"):
-                    # Measure actual widths after the resize attempt so the log
-                    # reflects what the UI ended up with (helps debugging).
-                    try:
-                        applied_left = [str(int(d.width())) for d in left_docks] if left_docks else []
-                    except Exception:
-                        applied_left = []
-                    try:
-                        applied_right = [str(int(d.width())) for d in right_docks] if right_docks else []
-                    except Exception:
-                        applied_right = []
-                    applied_summary = ""
-                    try:
-                        if applied_left or applied_right:
-                            applied_summary = (
-                                " (applied widths -> L: "
-                                + (",".join(applied_left) if applied_left else "-")
-                                + " R: "
-                                + (",".join(applied_right) if applied_right else "-")
-                                + ")"
-                            )
-                    except Exception:
-                        applied_summary = ""
-
-                    self.enhancer.log_serial_output(
-                        f"Dock widths equalized to {target_width}px.{applied_summary}",
-                        fire=False,
-                    )
-                    # If applied widths don't match the target, emit per-dock diagnostics
-                    try:
-                        all_vals = []
-                        for s in (applied_left + applied_right):
-                            try:
-                                all_vals.append(int(s))
-                            except Exception:
-                                pass
-                        mismatch = False
-                        if all_vals:
-                            try:
-                                mismatch = any(int(v) != int(target_width) for v in all_vals)
-                            except Exception:
-                                mismatch = True
-                        if mismatch:
-                            try:
-                                self.enhancer.log_serial_output(
-                                    "[DIAG] Dock equalize mismatch detected - emitting per-dock details:",
-                                    fire=False,
-                                )
-                            except Exception:
-                                pass
-                            # Left docks diagnostics
-                            try:
-                                for d in left_docks:
-                                    try:
-                                        w = d.widget()
-                                        try:
-                                            hint = w.sizeHint().width() if w is not None else None
-                                        except Exception:
-                                            hint = None
-                                        try:
-                                            self.enhancer.log_serial_output(
-                                                f"[DIAG] LEFT '{d.windowTitle()}': floating={d.isFloating()} width={int(d.width())} min={d.minimumWidth()} max={d.maximumWidth()} hint={hint}",
-                                                fire=False,
-                                            )
-                                        except Exception:
-                                            pass
-                                    except Exception:
-                                        pass
-                            except Exception:
-                                pass
-                            # Right docks diagnostics
-                            try:
-                                for d in right_docks:
-                                    try:
-                                        w = d.widget()
-                                        try:
-                                            hint = w.sizeHint().width() if w is not None else None
-                                        except Exception:
-                                            hint = None
-                                        try:
-                                            self.enhancer.log_serial_output(
-                                                f"[DIAG] RIGHT '{d.windowTitle()}': floating={d.isFloating()} width={int(d.width())} min={d.minimumWidth()} max={d.maximumWidth()} hint={hint}",
-                                                fire=False,
-                                            )
-                                        except Exception:
-                                            pass
-                                    except Exception:
-                                        pass
-                            except Exception:
-                                pass
-                            # Central and layout hints
-                            try:
-                                cw = self.centralWidget()
-                                try:
-                                    ct_hint = cw.sizeHint().width() if cw is not None else None
-                                except Exception:
-                                    ct_hint = None
-                                try:
-                                    self.enhancer.log_serial_output(
-                                        f"[DIAG] layout: total_w={total_w} central_min={central_min} per_column_cap={per_column_cap} candidate={candidate} pref={pref} target={target_width} central_hint={ct_hint}",
-                                        fire=False,
-                                    )
-                                except Exception:
-                                    pass
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
+                self._equalize_dock_columns_in_progress = False
             except Exception:
                 pass
-        except Exception as e:
-            print(f"[WARN] equalize_dock_columns failed: {e}")
-
     def enforce_default_dock_layout(self):
         """Arrange docks into two stacked columns (left/right) in a stable default layout.
 
@@ -8997,35 +8807,163 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         )
         self.save_settings()
 
+    # === AGENT-MANAGED BLOCK START ===
+    # Option C: Basic/Advanced toggle + mode-relevant visibility
+    # AgentChangeID: DETECTION_UI_BASIC_ADVANCED_v1
+    # Date: 2025-12-20
+
+    def _on_show_advanced_detection_changed(self, *args, **kwargs):
+        try:
+            self.save_settings()
+        except Exception:
+            pass
+        try:
+            self.update_detection_settings_visibility()
+        except Exception:
+            pass
+
+    def _set_visible(self, widget, visible: bool):
+        if widget is None:
+            return
+        try:
+            widget.setVisible(bool(visible))
+            return
+        except Exception:
+            pass
+        try:
+            if bool(visible):
+                widget.show()
+            else:
+                widget.hide()
+        except Exception:
+            pass
+
+    def _set_attr_visible(self, attr_name: str, visible: bool):
+        self._set_visible(getattr(self, attr_name, None), visible)
+
+    def update_detection_settings_visibility(self):
+        """Keep the Target Detection panel compact and mode-relevant."""
+        idx = None
+        try:
+            idx = int(self._safe_current_index("detection_mode_combo", 0))
+        except Exception:
+            try:
+                idx = int(getattr(self.detection_mode_combo, "currentIndex", lambda: 0)())
+            except Exception:
+                idx = 0
+
+        try:
+            adv_cb = getattr(self, "show_advanced_detection_checkbox", None)
+            show_adv = bool(getattr(adv_cb, "isChecked", lambda: False)())
+        except Exception:
+            show_adv = False
+
+        motion_modes = {0, 1, 3, 4, 5, 7, 8}
+        backsub_modes = {1, 3, 5, 8}
+        pure_yolo_mode = {2}
+        hybrid_non_color_modes = {3, 4, 5}
+        color_modes = {6, 7, 8, 9}
+        color_hybrid_modes = {7, 8, 9}
+
+        is_motion = idx in motion_modes
+        is_backsub = idx in backsub_modes
+        is_pure_yolo = idx in pure_yolo_mode
+        is_hybrid_non_color = idx in hybrid_non_color_modes
+        is_color = idx in color_modes
+        is_color_hybrid = idx in color_hybrid_modes
+
+        # Motion/BackSub rows (Basic: threshold + min contour; Advanced: blur/dilate/max/warmup/debug)
+        self._set_attr_visible("_det_label_threshold", bool(is_motion))
+        self._set_attr_visible("threshold_input", bool(is_motion))
+
+        self._set_attr_visible("_det_label_min_contour", bool(is_motion))
+        self._set_attr_visible("min_contour_input", bool(is_motion))
+
+        self._set_attr_visible("_det_label_blur", bool(is_motion and show_adv))
+        self._set_attr_visible("blur_kernel_input", bool(is_motion and show_adv))
+
+        self._set_attr_visible("_det_label_dilate", bool(is_motion and show_adv))
+        self._set_attr_visible("dilate_iter_input", bool(is_motion and show_adv))
+
+        self._set_attr_visible("_det_label_max_contour", bool(is_motion and show_adv))
+        self._set_attr_visible("max_contour_input", bool(is_motion and show_adv))
+
+        self._set_attr_visible("_det_label_backsub_warmup", bool(is_backsub and show_adv))
+        self._set_attr_visible("backsub_warmup_input", bool(is_backsub and show_adv))
+
+        self._set_attr_visible("debug_checkbox", bool(show_adv))
+
+        # Hybrid settings live inside Target Detection, but only for modes 3-5.
+        self._set_attr_visible("hybrid_settings_group", bool(is_hybrid_non_color))
+
+        # Hybrid per-mode rows
+        self._set_attr_visible("_hybrid_fusion_strategy_label", bool(is_hybrid_non_color))
+        self._set_attr_visible("fusion_strategy_combo", bool(is_hybrid_non_color))
+        self._set_attr_visible("_hybrid_motion_gate_label", bool((idx == 4) and show_adv))
+        self._set_attr_visible("motion_gate_threshold_input", bool((idx == 4) and show_adv))
+        self._set_attr_visible("_hybrid_overlap_label", bool((idx == 5) and show_adv))
+        self._set_attr_visible("overlap_threshold_input", bool((idx == 5) and show_adv))
+
+        # YOLO floating panel only for pure YOLO mode; its advanced fields follow the same toggle.
+        try:
+            if is_pure_yolo:
+                self._show_yolo_floating_panel()
+            else:
+                self._hide_yolo_floating_panel()
+        except Exception:
+            pass
+        self._set_attr_visible("yolo_max_results_label", bool(show_adv))
+        self._set_attr_visible("yolo_max_results_input", bool(show_adv))
+        self._set_attr_visible("yolo_min_area_label", bool(show_adv))
+        self._set_attr_visible("yolo_min_area_input", bool(show_adv))
+        self._set_attr_visible("yolo_detect_status_title", bool(show_adv))
+        self._set_attr_visible("yolo_detect_status_label", bool(show_adv))
+
+        # Color panel: shown only for color modes; within it, Advanced hides HSV/params/fusion.
+        try:
+            if COLOR_DETECTION_AVAILABLE:
+                from color_detection.ui_components import (
+                    show_hide_color_panel,
+                    set_color_advanced_visible,
+                    set_color_custom_hsv_visible,
+                    set_color_hybrid_visible,
+                )
+
+                show_hide_color_panel(self, bool(is_color))
+                if is_color:
+                    set_color_advanced_visible(self, bool(show_adv))
+                    set_color_hybrid_visible(self, bool(show_adv and is_color_hybrid))
+                    try:
+                        preset = str(
+                            getattr(getattr(self, "color_preset_combo", None), "currentText", lambda: "")()
+                        ).strip().lower()
+                    except Exception:
+                        preset = ""
+                    set_color_custom_hsv_visible(self, bool(show_adv and preset == "custom"))
+        except Exception:
+            pass
+
+    # === AGENT-MANAGED BLOCK END ===
+
     def on_detection_mode_change(self, idx=None):
         # robust handler: accept index change signal or manual call
         try:
             mode_text = self.detection_mode_combo.currentText().lower()
             is_yolo = "yolo" in mode_text or "object detection" in mode_text
             is_hybrid = "hybrid" in mode_text
+            is_color = "color" in mode_text
             self.enhancer.update_mode(self.detection_mode_combo.currentText())
 
-            # Show/hide YOLO floating panel based on detection mode
-            if is_yolo and not is_hybrid:
-                # Show YOLO settings only for pure YOLO mode (mode 2)
-                self._show_yolo_floating_panel()
-            else:
-                # Hide YOLO floating panel for other modes
-                self._hide_yolo_floating_panel()
-
-            # Manage visibility of hybrid settings panel
+            # Centralized visibility logic (mode-aware + advanced toggle)
             try:
-                if hasattr(self, "hybrid_settings_group"):
-                    if is_hybrid:
-                        self.hybrid_settings_group.show()
-                    else:
-                        self.hybrid_settings_group.hide()
+                self.update_detection_settings_visibility()
             except Exception:
                 pass
 
             # ensure the yolo group exists
             if hasattr(self, "yolo_settings_group"):
-                if is_yolo and not is_hybrid:
+                # Only refresh models when the pure YOLO panel is relevant.
+                if is_yolo and (not is_hybrid) and (not is_color):
                     # populate models each time to refresh list (prevents empty combo causing strange collapse)
                     try:
                         models = self.yolo_detector.find_models() or []
@@ -9697,8 +9635,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         safe_call("min_contour_input", "setValue", 300)
         safe_call("threshold_input", "setValue", 40)
         safe_call("trigger_cooldown_input", "setValue", 1.5)
-        # Default to flipped frame; common mounting can require this
-        safe_call("flip_checkbox", "setChecked", True)
+        # Camera orientation defaults (Dec 2025):
+        # Working setting for this hardware: flip OFF, invert_pan ON, invert_tilt OFF.
+        # Do not change unless the camera mount/hardware changes.
+        safe_call("flip_checkbox", "setChecked", False)
         safe_call("trigger_mode_combo", "setCurrentIndex", 0)  # MOSFET
         # Optimized for smooth, precise tracking with quick response
         safe_call("tracking_speed_slider", "setValue", 65)
@@ -9734,15 +9674,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
         self.safety_state = 1  # Sync internal var (1 = locked/safe)
-        # Invert pan/tilt by default for common builds
+        # Invert pan/tilt defaults (Dec 2025): invert PAN only
         safe_call("invert_pan_checkbox", "setChecked", True)
-        safe_call("invert_tilt_checkbox", "setChecked", True)
+        safe_call("invert_tilt_checkbox", "setChecked", False)
         safe_call("home_pan_input", "setValue", 90)
         safe_call("home_tilt_input", "setValue", 40)  # FIXED: Changed from 80 to match __init__ and Arduino
         safe_call("pan_min_input", "setValue", 0)
-        safe_call("pan_max_input", "setValue", 185)
-        safe_call("tilt_min_input", "setValue", 18)
-        safe_call("tilt_max_input", "setValue", 110)
+        # CRITICAL: Keep widget defaults consistent with internal hard defaults.
+        # Mismatch here makes "Apply New Limits" re-introduce unsafe/legacy limits.
+        safe_call("pan_max_input", "setValue", 220)
+        safe_call("tilt_min_input", "setValue", 0)
+        safe_call("tilt_max_input", "setValue", 70)
 
         # Default preset index (Balanced)
         try:
@@ -9868,12 +9810,36 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         
         Applies individually to pan and tilt:
         - Pan: Uses discovered full range
-        - Tilt: Uses safe limits (18-90° by default)
+        - Tilt: Uses safe limits (0-70° by default)
         """
-        calib_file = "servo_calibration.json"
+        # IMPORTANT: Use a stable, script-relative path so the calibration file
+        # does not depend on the process working directory.
+        try:
+            base_dir = os.path.dirname(__file__)
+        except Exception:
+            base_dir = None
+
+        candidates = []
+        try:
+            if base_dir:
+                candidates.append(os.path.join(base_dir, "servo_calibration.json"))
+                candidates.append(os.path.join(base_dir, "config", "servo_calibration.json"))
+        except Exception:
+            pass
+        # Back-compat: allow legacy CWD-relative file if present.
+        candidates.append("servo_calibration.json")
+
+        calib_file = None
+        for p in candidates:
+            try:
+                if p and os.path.exists(p):
+                    calib_file = p
+                    break
+            except Exception:
+                continue
         
         try:
-            if os.path.exists(calib_file):
+            if calib_file and os.path.exists(calib_file):
                 with open(calib_file, "r") as f:
                     calib = json.load(f)
                 
@@ -9889,6 +9855,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 
                 try:
                     if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            f"[CALIBRATION] Loaded from: {calib_file}",
+                            fire=False,
+                        )
                         self.enhancer.log_serial_output(
                             f"[CALIBRATION] Pan: {self.PAN_MIN}-{self.PAN_MAX}° | "
                             f"Tilt: {self.TILT_MIN}-{self.TILT_MAX}°",
@@ -10000,16 +9970,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # The menu item remains functional for manual use during runtime
 
             # Restore Auto-show Sniper preference (controls whether the
-            # Sniper Scope is auto-opened on detections). Default is True.
+            # Sniper Scope is auto-opened on detections). Default is False (Dec 2025).
             try:
-                self.auto_show_sniper = bool(settings.get("auto_show_sniper", True))
+                self.auto_show_sniper = bool(settings.get("auto_show_sniper", False))
             except Exception:
-                self.auto_show_sniper = True
+                self.auto_show_sniper = False
             try:
                 if getattr(self, "auto_show_sniper_action", None) is not None:
                     try:
                         self.auto_show_sniper_action.setChecked(
-                            bool(getattr(self, "auto_show_sniper", True))
+                            bool(getattr(self, "auto_show_sniper", False))
                         )
                     except Exception:
                         pass
@@ -10058,15 +10028,60 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.auto_tracking_enabled = settings.get("auto_tracking", False)
             self.detection_enabled = settings.get("detection_enabled", False)
 
-            # Default to True for invert and flip if not present in settings (safer for many mounts)
+            # Camera orientation defaults (Dec 2025):
+            # Working configuration for this build/hardware:
+            #   flip_image=False, invert_pan=True, invert_tilt=False
+            # If keys are missing, fall back to these values.
             self._safe_widget_call(
                 "invert_pan_checkbox", "setChecked", settings.get("invert_pan", True)
             )
             self._safe_widget_call(
-                "invert_tilt_checkbox", "setChecked", settings.get("invert_tilt", True)
+                "invert_tilt_checkbox", "setChecked", settings.get("invert_tilt", False)
             )
             self._safe_widget_call(
-                "flip_checkbox", "setChecked", settings.get("flip_image", True)
+                "flip_checkbox", "setChecked", settings.get("flip_image", False)
+            )
+
+            # --- Load Precision Aim (persisted) ---
+            self._safe_widget_call(
+                "precision_mode_checkbox",
+                "setChecked",
+                bool(settings.get("precision_mode", False)),
+            )
+            self._safe_widget_call(
+                "precision_roi_input",
+                "setValue",
+                int(settings.get("precision_roi", 48)),
+            )
+            self._safe_widget_call(
+                "precision_kp_input",
+                "setValue",
+                float(settings.get("precision_kp", 0.02)),
+            )
+            self._safe_widget_call(
+                "precision_ki_input",
+                "setValue",
+                float(settings.get("precision_ki", 0.001)),
+            )
+            self._safe_widget_call(
+                "precision_kd_input",
+                "setValue",
+                float(settings.get("precision_kd", 0.005)),
+            )
+            self._safe_widget_call(
+                "precision_hfov_input",
+                "setValue",
+                float(settings.get("precision_hfov", 90.0)),
+            )
+            self._safe_widget_call(
+                "precision_max_step_input",
+                "setValue",
+                float(settings.get("precision_max_step", 1.0)),
+            )
+            self._safe_widget_call(
+                "precision_frac_threshold_input",
+                "setValue",
+                float(settings.get("precision_frac_threshold", 0.25)),
             )
 
             # tooltips for detection widgets
@@ -10134,6 +10149,107 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "setCurrentIndex",
                 settings.get("detection_mode_index", 0),
             )
+
+            # Restore Target Detection panel compactness toggle
+            try:
+                self._safe_widget_call(
+                    "show_advanced_detection_checkbox",
+                    "setChecked",
+                    bool(settings.get("detection_show_advanced", False)),
+                )
+            except Exception:
+                pass
+
+            # --- Load Color Detection (optional) ---
+            try:
+                if COLOR_DETECTION_AVAILABLE:
+                    # Restore UI
+                    preset = settings.get("color_preset", "red")
+                    try:
+                        self._safe_widget_call(
+                            "color_preset_combo",
+                            "setCurrentText",
+                            str(preset),
+                        )
+                    except Exception:
+                        pass
+
+                    for k, default in [
+                        ("color_h_min", 0),
+                        ("color_h_max", 10),
+                        ("color_s_min", 100),
+                        ("color_s_max", 255),
+                        ("color_v_min", 100),
+                        ("color_v_max", 255),
+                        ("color_min_area", 300),
+                        ("color_max_area", 500000),
+                        ("color_blur", 5),
+                        ("color_morph", 2),
+                        ("color_fusion_overlap", 30),
+                    ]:
+                        try:
+                            # keys map to widgets by name for sliders/spinboxes
+                            widget_name = k
+                            if k == "color_min_area":
+                                widget_name = "color_min_area_input"
+                            elif k == "color_max_area":
+                                widget_name = "color_max_area_input"
+                            elif k == "color_blur":
+                                widget_name = "color_blur_input"
+                            elif k == "color_morph":
+                                widget_name = "color_morph_input"
+                            self._safe_widget_call(
+                                widget_name, "setValue", int(settings.get(k, default))
+                            )
+                        except Exception:
+                            pass
+
+                    try:
+                        fusion = str(settings.get("color_fusion_strategy", "AND")).upper()
+                        self._safe_widget_call(
+                            "color_fusion_strategy",
+                            "setCurrentText",
+                            "OR" if fusion == "OR" else "AND",
+                        )
+                    except Exception:
+                        pass
+
+                    try:
+                        show_mask = bool(settings.get("color_show_mask", False))
+                        self._safe_widget_call(
+                            "color_show_mask_checkbox", "setChecked", show_mask
+                        )
+                        self.show_color_mask = show_mask
+                    except Exception:
+                        self.show_color_mask = bool(settings.get("color_show_mask", False))
+
+                    # Sync detector state (if present)
+                    try:
+                        if getattr(self, "color_detector", None) is not None:
+                            if str(preset).lower() == "custom":
+                                h_min = int(settings.get("color_h_min", 0))
+                                h_max = int(settings.get("color_h_max", 10))
+                                s_min = int(settings.get("color_s_min", 100))
+                                s_max = int(settings.get("color_s_max", 255))
+                                v_min = int(settings.get("color_v_min", 100))
+                                v_max = int(settings.get("color_v_max", 255))
+                                self.color_detector.set_custom_range(
+                                    h_min, s_min, v_min, h_max, s_max, v_max
+                                )
+                                self.color_detector.set_active_colors("custom")
+                            else:
+                                self.color_detector.set_active_colors(str(preset))
+
+                            self.color_detector.set_detection_params(
+                                min_area=int(settings.get("color_min_area", 300)),
+                                max_area=int(settings.get("color_max_area", 500000)),
+                                blur_kernel=int(settings.get("color_blur", 5)),
+                                morph_iterations=int(settings.get("color_morph", 2)),
+                            )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
             # Load manual control settings
             try:
@@ -10266,11 +10382,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self.safety_button.setText("Safety: ARMED (Can Fire)")
 
             # ========== FIXED: INITIALIZE TILT_SAFETY_LABEL STATE ==========
-            # Match label text to actual tilt_safety_switch_enabled setting
+            # Match label text to actual tilt safety hardware/enable state
             # (Previously always showed OK even if disabled)
             try:
                 if hasattr(self, "tilt_safety_label"):
-                    if self.tilt_safety_switch_enabled:
+                    if not getattr(self, "tilt_safety_hardware_installed", False):
+                        self.tilt_safety_label.setText("🛡️ Tilt Safety: Not Installed")
+                        self.tilt_safety_label.setStyleSheet("color: #FFFF00; font-size: 10px; background-color: #2d2d2d;")
+                    elif self.tilt_safety_switch_enabled:
                         self.tilt_safety_label.setText("🛡️ Tilt Safety: Enabled")
                         self.tilt_safety_label.setStyleSheet("color: #00FF00; font-size: 10px; background-color: #2d2d2d;")
                     else:
@@ -10545,6 +10664,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
             self.on_detection_mode_change(self.detection_mode_combo.currentIndex())
 
+            # Ensure visibility reflects both mode + advanced toggle after full restore
+            try:
+                self.update_detection_settings_visibility()
+            except Exception:
+                pass
+
             # Restore window/dock geometry/state if present
             try:
                 ws = settings.get("window_state", None)
@@ -10664,6 +10789,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "min_contour": val("min_contour_input", 300),
                 "max_contour": val("max_contour_input", 1400000),
                 "debug_mode": val("debug_checkbox", False, "checked"),
+                "detection_show_advanced": val(
+                    "show_advanced_detection_checkbox", False, "checked"
+                ),
                 "blur_kernel": val("blur_kernel_input", 5),
                 "dilate_iter": val("dilate_iter_input", 2),
                 "overshoot_percent": val("overshoot_input", 0),
@@ -10685,12 +10813,40 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "smoothing_factor": val("smoothing_input", 0.5),
                 "movement_sensitivity": val("movement_sensitivity_slider", 50),
                 "detection_mode_index": val("detection_mode_combo", 0, "index"),
+                # Color detection settings (optional)
+                "color_preset": val("color_preset_combo", "red", "currentText"),
+                "color_h_min": val("color_h_min", 0, "value"),
+                "color_h_max": val("color_h_max", 10, "value"),
+                "color_s_min": val("color_s_min", 100, "value"),
+                "color_s_max": val("color_s_max", 255, "value"),
+                "color_v_min": val("color_v_min", 100, "value"),
+                "color_v_max": val("color_v_max", 255, "value"),
+                "color_min_area": val("color_min_area_input", 300, "value"),
+                "color_max_area": val("color_max_area_input", 500000, "value"),
+                "color_blur": val("color_blur_input", 5, "value"),
+                "color_morph": val("color_morph_input", 2, "value"),
+                "color_fusion_strategy": val(
+                    "color_fusion_strategy", "AND", "currentText"
+                ),
+                "color_fusion_overlap": val("color_fusion_overlap", 30, "value"),
+                "color_show_mask": val(
+                    "color_show_mask_checkbox", False, "checked"
+                ),
                 "home_pan": val("home_pan_input", 90),
                 "home_tilt": val("home_tilt_input", 40),
                 "snap_threshold": val("snap_threshold_slider", 40),
                 # Aim aggression settings (NEW - Dec 2024)
                 "aim_aggression": getattr(self, "aim_aggression", 50),
                 "final_approach_boost": getattr(self, "final_approach_boost", True),
+                # Precision Aim (persisted; used for sub-pixel PID refinement)
+                "precision_mode": val("precision_mode_checkbox", False, "checked"),
+                "precision_roi": val("precision_roi_input", 48),
+                "precision_kp": val("precision_kp_input", 0.02),
+                "precision_ki": val("precision_ki_input", 0.001),
+                "precision_kd": val("precision_kd_input", 0.005),
+                "precision_hfov": val("precision_hfov_input", 90.0),
+                "precision_max_step": val("precision_max_step_input", 1.0),
+                "precision_frac_threshold": val("precision_frac_threshold_input", 0.25),
                 "manual_auto_fire": val("manual_auto_fire_checkbox", False, "checked"),
                 "sound_enabled": getattr(self, "sound_enabled", True),
                 "sound_volume": val("sound_volume_slider", 80),
@@ -11048,6 +11204,30 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 s['detection_mode'] = getattr(self, 'detection_mode_combo', None) and self.detection_mode_combo.currentText() or ''
             except Exception:
                 s['detection_mode'] = ''
+
+            # Motion / hybrid detection tuning
+            s['threshold'] = safe_int('threshold_input', 40)
+            s['min_contour'] = safe_int('min_contour_input', 300)
+            s['max_contour'] = safe_int('max_contour_input', 1400000)
+            s['blur_kernel'] = safe_int('blur_kernel_input', 5)
+            s['dilate_iter'] = safe_int('dilate_iter_input', 2)
+            s['backsub_warmup'] = safe_int('backsub_warmup_input', 30)
+            try:
+                s['fusion_strategy'] = safe_int('fusion_strategy_combo', 0)
+            except Exception:
+                s['fusion_strategy'] = 0
+            try:
+                s['motion_gate_threshold'] = safe_float('motion_gate_threshold_input', 1.0)
+            except Exception:
+                s['motion_gate_threshold'] = 1.0
+            try:
+                s['overlap_threshold'] = safe_float('overlap_threshold_input', 30.0)
+            except Exception:
+                s['overlap_threshold'] = 30.0
+
+            # YOLO extra filters (do not change detection mode)
+            s['yolo_max_results'] = safe_int('yolo_max_results_input', 0)
+            s['yolo_min_area'] = safe_int('yolo_min_area_input', 0)
             s['yolo_model'] = safe_text('yolo_model_combo', '')
             s['yolo_confidence'] = safe_float('yolo_confidence_input', 0.5)
             s['yolo_classes'] = safe_text('yolo_classes_input', '')
@@ -11067,6 +11247,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             s['overshoot_percent'] = safe_int('overshoot_input', 0)
             s['hold_seconds'] = safe_float('lost_hold_input', getattr(self, 'lost_hold_seconds', 5.0))
             s['hold_infinite'] = bool(getattr(self, 'hold_infinite', False))
+
+            # Precision aim (persisted + presettable)
+            s['precision_mode'] = bool(getattr(getattr(self, 'precision_mode_checkbox', None), 'isChecked', lambda: False)())
+            s['precision_roi'] = safe_int('precision_roi_input', 48)
+            s['precision_kp'] = safe_float('precision_kp_input', 0.02)
+            s['precision_ki'] = safe_float('precision_ki_input', 0.001)
+            s['precision_kd'] = safe_float('precision_kd_input', 0.005)
+            s['precision_hfov'] = safe_float('precision_hfov_input', 90.0)
+            s['precision_max_step'] = safe_float('precision_max_step_input', 1.0)
+            s['precision_frac_threshold'] = safe_float('precision_frac_threshold_input', 0.25)
 
             # Manual & rapid-fire
             s['rapid_fire_enabled'] = bool(getattr(self, 'rapid_fire_enabled', False))
@@ -11140,9 +11330,33 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     pass
 
-            for key in ('threshold','blur_kernel','dilate_iter','min_contour'):
+            # Motion / hybrid detection tuning
+            for key in ('threshold', 'blur_kernel', 'dilate_iter', 'min_contour', 'max_contour', 'backsub_warmup'):
                 if key in preset:
-                    try_set(key + '_input', preset[key])
+                    try:
+                        try_set(key + '_input', preset[key])
+                    except Exception:
+                        pass
+
+            # Hybrid tuning
+            try:
+                if 'fusion_strategy' in preset and getattr(self, 'fusion_strategy_combo', None) is not None:
+                    try:
+                        self.fusion_strategy_combo.setCurrentIndex(int(preset['fusion_strategy']))
+                    except Exception:
+                        pass
+                if 'motion_gate_threshold' in preset and getattr(self, 'motion_gate_threshold_input', None) is not None:
+                    try:
+                        self.motion_gate_threshold_input.setValue(float(preset['motion_gate_threshold']))
+                    except Exception:
+                        pass
+                if 'overlap_threshold' in preset and getattr(self, 'overlap_threshold_input', None) is not None:
+                    try:
+                        self.overlap_threshold_input.setValue(float(preset['overlap_threshold']))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
             # YOLO
             if 'yolo_model' in preset and getattr(self, 'yolo_model_combo', None):
@@ -11169,6 +11383,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.yolo_classes_input.setText(str(preset['yolo_classes']))
                 except Exception as e:
                     if logger: log_exception(e, "Setting yolo_classes from preset")
+
+            # YOLO post-filters (do not change detection mode)
+            try:
+                if 'yolo_max_results' in preset and getattr(self, 'yolo_max_results_input', None) is not None:
+                    try:
+                        self.yolo_max_results_input.setValue(int(preset['yolo_max_results']))
+                    except Exception:
+                        pass
+                if 'yolo_min_area' in preset and getattr(self, 'yolo_min_area_input', None) is not None:
+                    try:
+                        self.yolo_min_area_input.setValue(int(preset['yolo_min_area']))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
             # Behavior/others - FIXED: explicit slider mapping (critical fix)
             if 'tracking_speed' in preset:
@@ -11222,6 +11451,51 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.final_approach_boost_checkbox.setChecked(self.final_approach_boost)
                 except Exception as e:
                     if logger: log_exception(e, "Setting final_approach_boost from preset")
+
+            # --- Precision Aim (presettable) ---
+            try:
+                if 'precision_mode' in preset and getattr(self, 'precision_mode_checkbox', None) is not None:
+                    try:
+                        self.precision_mode_checkbox.setChecked(bool(preset['precision_mode']))
+                    except Exception:
+                        pass
+                if 'precision_roi' in preset and getattr(self, 'precision_roi_input', None) is not None:
+                    try:
+                        self.precision_roi_input.setValue(int(preset['precision_roi']))
+                    except Exception:
+                        pass
+                if 'precision_kp' in preset and getattr(self, 'precision_kp_input', None) is not None:
+                    try:
+                        self.precision_kp_input.setValue(float(preset['precision_kp']))
+                    except Exception:
+                        pass
+                if 'precision_ki' in preset and getattr(self, 'precision_ki_input', None) is not None:
+                    try:
+                        self.precision_ki_input.setValue(float(preset['precision_ki']))
+                    except Exception:
+                        pass
+                if 'precision_kd' in preset and getattr(self, 'precision_kd_input', None) is not None:
+                    try:
+                        self.precision_kd_input.setValue(float(preset['precision_kd']))
+                    except Exception:
+                        pass
+                if 'precision_hfov' in preset and getattr(self, 'precision_hfov_input', None) is not None:
+                    try:
+                        self.precision_hfov_input.setValue(float(preset['precision_hfov']))
+                    except Exception:
+                        pass
+                if 'precision_max_step' in preset and getattr(self, 'precision_max_step_input', None) is not None:
+                    try:
+                        self.precision_max_step_input.setValue(float(preset['precision_max_step']))
+                    except Exception:
+                        pass
+                if 'precision_frac_threshold' in preset and getattr(self, 'precision_frac_threshold_input', None) is not None:
+                    try:
+                        self.precision_frac_threshold_input.setValue(float(preset['precision_frac_threshold']))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
             if 'com_port' in preset and getattr(self, 'com_port_input', None):
                 try: 
@@ -12391,6 +12665,36 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.min_contour_input.setValue(int(preset["min_contour"]))
                 except Exception:
                     pass
+            if "max_contour" in preset:
+                try:
+                    self.max_contour_input.setValue(int(preset["max_contour"]))
+                except Exception:
+                    pass
+            if "backsub_warmup" in preset:
+                try:
+                    self.backsub_warmup_input.setValue(int(preset["backsub_warmup"]))
+                except Exception:
+                    pass
+
+            # Hybrid tuning (does not change detection mode)
+            try:
+                if "fusion_strategy" in preset and getattr(self, "fusion_strategy_combo", None) is not None:
+                    try:
+                        self.fusion_strategy_combo.setCurrentIndex(int(preset["fusion_strategy"]))
+                    except Exception:
+                        pass
+                if "motion_gate_threshold" in preset and getattr(self, "motion_gate_threshold_input", None) is not None:
+                    try:
+                        self.motion_gate_threshold_input.setValue(float(preset["motion_gate_threshold"]))
+                    except Exception:
+                        pass
+                if "overlap_threshold" in preset and getattr(self, "overlap_threshold_input", None) is not None:
+                    try:
+                        self.overlap_threshold_input.setValue(float(preset["overlap_threshold"]))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
             # ========== DETECTION MODE ==========
             if "detection_mode" in preset:
@@ -12411,6 +12715,51 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 idx = self.yolo_model_combo.findText(preset["yolo_model"])
                 if idx != -1:
                     self.yolo_model_combo.setCurrentIndex(idx)
+
+            # YOLO post-filters (do not change detection mode)
+            try:
+                if "yolo_max_results" in preset and getattr(self, "yolo_max_results_input", None) is not None:
+                    self.yolo_max_results_input.setValue(int(preset["yolo_max_results"]))
+                if "yolo_min_area" in preset and getattr(self, "yolo_min_area_input", None) is not None:
+                    self.yolo_min_area_input.setValue(int(preset["yolo_min_area"]))
+            except Exception:
+                pass
+
+            # Aim aggression (does not change detection mode)
+            try:
+                if "aim_aggression" in preset:
+                    self.aim_aggression = int(preset["aim_aggression"])
+                    if getattr(self, "aim_aggression_slider", None) is not None:
+                        self.aim_aggression_slider.setValue(self.aim_aggression)
+                    if getattr(self, "aim_aggression_label", None) is not None:
+                        self.aim_aggression_label.setText(str(self.aim_aggression))
+                if "final_approach_boost" in preset:
+                    self.final_approach_boost = bool(preset["final_approach_boost"])
+                    if getattr(self, "final_approach_boost_checkbox", None) is not None:
+                        self.final_approach_boost_checkbox.setChecked(self.final_approach_boost)
+            except Exception:
+                pass
+
+            # Precision aim (presettable)
+            try:
+                if "precision_mode" in preset and getattr(self, "precision_mode_checkbox", None) is not None:
+                    self.precision_mode_checkbox.setChecked(bool(preset["precision_mode"]))
+                if "precision_roi" in preset and getattr(self, "precision_roi_input", None) is not None:
+                    self.precision_roi_input.setValue(int(preset["precision_roi"]))
+                if "precision_kp" in preset and getattr(self, "precision_kp_input", None) is not None:
+                    self.precision_kp_input.setValue(float(preset["precision_kp"]))
+                if "precision_ki" in preset and getattr(self, "precision_ki_input", None) is not None:
+                    self.precision_ki_input.setValue(float(preset["precision_ki"]))
+                if "precision_kd" in preset and getattr(self, "precision_kd_input", None) is not None:
+                    self.precision_kd_input.setValue(float(preset["precision_kd"]))
+                if "precision_hfov" in preset and getattr(self, "precision_hfov_input", None) is not None:
+                    self.precision_hfov_input.setValue(float(preset["precision_hfov"]))
+                if "precision_max_step" in preset and getattr(self, "precision_max_step_input", None) is not None:
+                    self.precision_max_step_input.setValue(float(preset["precision_max_step"]))
+                if "precision_frac_threshold" in preset and getattr(self, "precision_frac_threshold_input", None) is not None:
+                    self.precision_frac_threshold_input.setValue(float(preset["precision_frac_threshold"]))
+            except Exception:
+                pass
 
             # Persist settings
             self.save_settings()
@@ -12566,13 +12915,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         Runs on main Qt thread so it's safe to update GUI.
         Provides clear error messages and status feedback.
         """
+        print(f"[DEBUG] _handle_serial_connection_result called: success={result.get('success')}, error={result.get('error')}")  # DEBUG
         self._serial_connection_in_progress = False
         
         if result['success'] and result['ser'] is not None:
             # ========== CONNECTION SUCCEEDED ==========
+            print("[DEBUG] Connection SUCCEEDED!")  # DEBUG
             self.ser = result['ser']
             elapsed = result.get('elapsed_time', 0)
             self._safe_enhancer_log(f"✓ Connected to {result['port']} @ {result['baud']} baud (took {elapsed:.2f}s)")
+            
+            # Play connection sound on success
+            try:
+                if hasattr(self, "enhancer") and self.enhancer:
+                    self.enhancer.play_sound(self.enhancer.connect_sound)
+            except Exception:
+                pass
             
             # Update button
             try:
@@ -12653,9 +13011,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         2. Update UI
         3. Close camera if open
         """
+        print("[DEBUG] connect_serial() called")  # DEBUG
 
         if self.ser is None or not getattr(self.ser, "is_open", False):
             # Connection mode
+            print("[DEBUG] Attempting to connect...")  # DEBUG
             # Check if connection is already in progress
             if getattr(self, '_serial_connection_in_progress', False):
                 self._safe_enhancer_log("Connection attempt already in progress, please wait...")
@@ -12663,6 +13023,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             
             port = self._safe_widget_method_return("com_port_input", "text", "")
             baud = self._safe_int_widget_value("baud_rate_input", 115200)
+            print(f"[DEBUG] Port={port}, Baud={baud}")  # DEBUG
             
             # Validate port is not empty
             if not port or port.strip() == "":
@@ -12908,20 +13269,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
     def handle_connect_sound(self):
         """Perform serial connection/disconnection and play sound only if successful."""
+        print("[DEBUG] handle_connect_sound() called - Connect button clicked!")  # DEBUG
         try:
             # Check if we're connecting or disconnecting
             connecting = self.ser is None or not getattr(self.ser, "is_open", False)
+            print(f"[DEBUG] connecting={connecting}")  # DEBUG
 
-            # Attempt the operation
-            if self.connect_serial():
-                # Only play sound if the operation was successful AND we were connecting
-                if connecting and hasattr(self, "enhancer") and self.enhancer:
-                    try:
-                        self.enhancer.play_sound(self.enhancer.connect_sound)
-                    except Exception:
-                        pass
-        except Exception:
-            # connect_serial logs its own errors; ignore here
+            # Attempt the operation - connect_serial is now async, so this just starts it
+            self.connect_serial()
+            # Sound will be played by the connection result callback if successful
+        except Exception as e:
+            print(f"[DEBUG] handle_connect_sound error: {e}")  # DEBUG
             pass
 
     def toggle_relay(self, relay_number):
@@ -13409,8 +13767,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 cx = w // 2
                 cy = h // 2
                 deadzone_val = self._safe_int_widget_value("deadzone_slider", 40)
-                # Check if any detection is in deadzone
-                if hasattr(self, "last_detections") and self.last_detections:
+                # Use centroid/yellow-dot point for deadzone checks (preferred).
+                if getattr(self, "last_target_center", None):
+                    tx = int(self.last_target_center[0])
+                    ty = int(self.last_target_center[1])
+                    dist = ((tx - cx) ** 2 + (ty - cy) ** 2) ** 0.5
+                    in_deadzone = dist <= deadzone_val
+                # Fallback: use detection box center(s)
+                elif hasattr(self, "last_detections") and self.last_detections:
                     for x_box, y_box, w_box, h_box in self.last_detections:
                         tx = int(x_box + w_box / 2)
                         ty = int(y_box + h_box / 2)
@@ -13516,8 +13880,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 cx = w // 2
                 cy = h // 2
                 deadzone_val = self._safe_int_widget_value("deadzone_slider", 40)
-                # Check if any detection is in deadzone
-                if hasattr(self, "last_detections") and self.last_detections:
+                # Use centroid/yellow-dot point for deadzone checks (preferred).
+                if getattr(self, "last_target_center", None):
+                    tx = int(self.last_target_center[0])
+                    ty = int(self.last_target_center[1])
+                    dist = ((tx - cx) ** 2 + (ty - cy) ** 2) ** 0.5
+                    in_deadzone = dist <= deadzone_val
+                # Fallback: use detection box center(s)
+                elif hasattr(self, "last_detections") and self.last_detections:
                     for x_box, y_box, w_box, h_box in self.last_detections:
                         tx = int(x_box + w_box / 2)
                         ty = int(y_box + h_box / 2)
@@ -14146,11 +14516,43 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
 
+        # Validate min/max pairs (np.clip behaves poorly/undefined if min > max)
+        try:
+            if self.PAN_MIN > self.PAN_MAX:
+                self.PAN_MIN, self.PAN_MAX = self.PAN_MAX, self.PAN_MIN
+                try:
+                    self._safe_widget_call("pan_min_input", "setValue", int(self.PAN_MIN))
+                    self._safe_widget_call("pan_max_input", "setValue", int(self.PAN_MAX))
+                except Exception:
+                    pass
+            if self.TILT_MIN > self.TILT_MAX:
+                self.TILT_MIN, self.TILT_MAX = self.TILT_MAX, self.TILT_MIN
+                try:
+                    self._safe_widget_call("tilt_min_input", "setValue", int(self.TILT_MIN))
+                    self._safe_widget_call("tilt_max_input", "setValue", int(self.TILT_MAX))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Clamp all known targets/state to new limits so we never send out-of-range values.
+        try:
+            self.HOME_PAN = int(np.clip(getattr(self, "HOME_PAN", 90), self.PAN_MIN, self.PAN_MAX))
+            self.HOME_TILT = int(np.clip(getattr(self, "HOME_TILT", 40), self.TILT_MIN, self.TILT_MAX))
+        except Exception:
+            pass
+
         # keep as floats so any fractional targets are preserved
-        self.target_pan = float(np.clip(self.target_pan, self.PAN_MIN, self.PAN_MAX))
-        self.target_tilt = float(
-            np.clip(self.target_tilt, self.TILT_MIN, self.TILT_MAX)
-        )
+        self.target_pan = float(np.clip(getattr(self, "target_pan", self.HOME_PAN), self.PAN_MIN, self.PAN_MAX))
+        self.target_tilt = float(np.clip(getattr(self, "target_tilt", self.HOME_TILT), self.TILT_MIN, self.TILT_MAX))
+
+        try:
+            self.prev_pan_angle = float(np.clip(getattr(self, "prev_pan_angle", self.target_pan), self.PAN_MIN, self.PAN_MAX))
+            self.prev_tilt_angle = float(np.clip(getattr(self, "prev_tilt_angle", self.target_tilt), self.TILT_MIN, self.TILT_MAX))
+            self.last_sent_pan = int(np.clip(int(getattr(self, "last_sent_pan", int(round(self.target_pan)))), self.PAN_MIN, self.PAN_MAX))
+            self.last_sent_tilt = int(np.clip(int(getattr(self, "last_sent_tilt", int(round(self.target_tilt)))), self.TILT_MIN, self.TILT_MAX))
+        except Exception:
+            pass
 
         try:
             self._safe_widget_call(
@@ -15725,6 +16127,430 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     pass
 
+        # ========== COLOR DETECTION MODES (6, 7, 8, 9) ==========
+        elif detection_mode == 6:  # Color Detection
+            try:
+                boxes = []
+                if COLOR_DETECTION_AVAILABLE and getattr(self, "color_detector", None) is not None:
+                    preset = (
+                        self._safe_widget_method_return(
+                            "color_preset_combo", "currentText", "red"
+                        )
+                        or "red"
+                    )
+                    preset_l = str(preset).strip().lower()
+
+                    if preset_l == "custom":
+                        h_min = int(self._safe_int_widget_value("color_h_min", 0))
+                        h_max = int(self._safe_int_widget_value("color_h_max", 10))
+                        s_min = int(self._safe_int_widget_value("color_s_min", 100))
+                        s_max = int(self._safe_int_widget_value("color_s_max", 255))
+                        v_min = int(self._safe_int_widget_value("color_v_min", 100))
+                        v_max = int(self._safe_int_widget_value("color_v_max", 255))
+                        self.color_detector.set_custom_range(
+                            h_min, s_min, v_min, h_max, s_max, v_max
+                        )
+                        self.color_detector.set_active_colors("custom")
+                    else:
+                        self.color_detector.set_active_colors(preset_l)
+
+                    min_area = int(
+                        self._safe_int_widget_value("color_min_area_input", 300)
+                    )
+                    max_area = int(
+                        self._safe_int_widget_value("color_max_area_input", 500000)
+                    )
+                    blur = int(self._safe_int_widget_value("color_blur_input", 5))
+                    morph = int(self._safe_int_widget_value("color_morph_input", 2))
+                    self.color_detector.set_detection_params(
+                        min_area=min_area,
+                        max_area=max_area,
+                        blur_kernel=blur,
+                        morph_iterations=morph,
+                    )
+
+                    boxes = self.color_detector.detect(frame1)
+
+                    # Optional mask window
+                    try:
+                        if (
+                            getattr(self, "show_color_mask", False)
+                            and getattr(self.color_detector, "last_mask", None) is not None
+                        ):
+                            cv2.imshow("Color Mask", self.color_detector.last_mask)
+                        else:
+                            try:
+                                cv2.destroyWindow("Color Mask")
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+            except Exception as e:
+                boxes = []
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            f"Color Mode 6 error: {e}", fire=False
+                        )
+                except Exception:
+                    pass
+
+        elif detection_mode == 7:  # Hybrid: Color + Frame Diff
+            try:
+                color_boxes = []
+                if COLOR_DETECTION_AVAILABLE and getattr(self, "color_detector", None) is not None:
+                    preset = (
+                        self._safe_widget_method_return(
+                            "color_preset_combo", "currentText", "red"
+                        )
+                        or "red"
+                    )
+                    preset_l = str(preset).strip().lower()
+                    if preset_l == "custom":
+                        h_min = int(self._safe_int_widget_value("color_h_min", 0))
+                        h_max = int(self._safe_int_widget_value("color_h_max", 10))
+                        s_min = int(self._safe_int_widget_value("color_s_min", 100))
+                        s_max = int(self._safe_int_widget_value("color_s_max", 255))
+                        v_min = int(self._safe_int_widget_value("color_v_min", 100))
+                        v_max = int(self._safe_int_widget_value("color_v_max", 255))
+                        self.color_detector.set_custom_range(
+                            h_min, s_min, v_min, h_max, s_max, v_max
+                        )
+                        self.color_detector.set_active_colors("custom")
+                    else:
+                        self.color_detector.set_active_colors(preset_l)
+                    self.color_detector.set_detection_params(
+                        min_area=int(
+                            self._safe_int_widget_value("color_min_area_input", 300)
+                        ),
+                        max_area=int(
+                            self._safe_int_widget_value("color_max_area_input", 500000)
+                        ),
+                        blur_kernel=int(
+                            self._safe_int_widget_value("color_blur_input", 5)
+                        ),
+                        morph_iterations=int(
+                            self._safe_int_widget_value("color_morph_input", 2)
+                        ),
+                    )
+                    color_boxes = self.color_detector.detect(frame1)
+
+                # Frame difference boxes (reuse mode 0 logic)
+                fd_boxes = []
+                try:
+                    f1 = self._ensure_frame(frame1)
+                    f2 = self._ensure_frame(frame2)
+                    if f1.shape != f2.shape:
+                        f2 = cv2.resize(f2, (f1.shape[1], f1.shape[0]))
+                    diff = cv2.absdiff(f1, f2)
+                    gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
+                    k_size = int(self._safe_int_widget_value("blur_kernel_input", 5))
+                    if k_size % 2 == 0:
+                        k_size = max(1, k_size - 1)
+                    blur = cv2.GaussianBlur(gray, (k_size, k_size), 0)
+                    _, thresh = cv2.threshold(
+                        blur,
+                        int(self._safe_int_widget_value("threshold_input", 40)),
+                        255,
+                        cv2.THRESH_BINARY,
+                    )
+                    kernel = np.ones((3, 3), np.uint8)
+                    opened = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=1)
+                    dilated = cv2.dilate(
+                        opened,
+                        kernel,
+                        iterations=int(self._safe_int_widget_value("dilate_iter_input", 2)),
+                    )
+                    contours, _ = cv2.findContours(
+                        dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+                    )
+                    minc = float(self._safe_float_widget_value("min_contour_input", 300.0))
+                    maxc = float(self._safe_float_widget_value("max_contour_input", 1400000.0))
+                    contours = [
+                        c
+                        for c in contours
+                        if (cv2.contourArea(c) > minc and cv2.contourArea(c) < maxc)
+                    ]
+                    fd_boxes = [cv2.boundingRect(c) for c in contours]
+                except Exception:
+                    fd_boxes = []
+
+                fusion = (
+                    self._safe_widget_method_return(
+                        "color_fusion_strategy", "currentText", "AND"
+                    )
+                    or "AND"
+                )
+                fusion = str(fusion).strip().upper()
+                overlap = float(self._safe_int_widget_value("color_fusion_overlap", 30)) / 100.0
+
+                if fusion == "AND" and callable(fuse_detections_and):
+                    boxes = fuse_detections_and(color_boxes, fd_boxes, overlap)
+                elif callable(fuse_detections_or):
+                    boxes = fuse_detections_or(color_boxes, fd_boxes)
+                else:
+                    boxes = list(color_boxes) + list(fd_boxes)
+            except Exception as e:
+                boxes = []
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            f"Color Hybrid Mode 7 error: {e}", fire=False
+                        )
+                except Exception:
+                    pass
+
+        elif detection_mode == 8:  # Hybrid: Color + BackSub
+            try:
+                color_boxes = []
+                if COLOR_DETECTION_AVAILABLE and getattr(self, "color_detector", None) is not None:
+                    preset = (
+                        self._safe_widget_method_return(
+                            "color_preset_combo", "currentText", "red"
+                        )
+                        or "red"
+                    )
+                    preset_l = str(preset).strip().lower()
+                    if preset_l == "custom":
+                        h_min = int(self._safe_int_widget_value("color_h_min", 0))
+                        h_max = int(self._safe_int_widget_value("color_h_max", 10))
+                        s_min = int(self._safe_int_widget_value("color_s_min", 100))
+                        s_max = int(self._safe_int_widget_value("color_s_max", 255))
+                        v_min = int(self._safe_int_widget_value("color_v_min", 100))
+                        v_max = int(self._safe_int_widget_value("color_v_max", 255))
+                        self.color_detector.set_custom_range(
+                            h_min, s_min, v_min, h_max, s_max, v_max
+                        )
+                        self.color_detector.set_active_colors("custom")
+                    else:
+                        self.color_detector.set_active_colors(preset_l)
+                    self.color_detector.set_detection_params(
+                        min_area=int(
+                            self._safe_int_widget_value("color_min_area_input", 300)
+                        ),
+                        max_area=int(
+                            self._safe_int_widget_value("color_max_area_input", 500000)
+                        ),
+                        blur_kernel=int(
+                            self._safe_int_widget_value("color_blur_input", 5)
+                        ),
+                        morph_iterations=int(
+                            self._safe_int_widget_value("color_morph_input", 2)
+                        ),
+                    )
+                    color_boxes = self.color_detector.detect(frame1)
+
+                # Background subtraction boxes (reuse mode 1 logic)
+                bs_boxes = []
+                try:
+                    if self.backSub is None:
+                        self.backSub = cv2.createBackgroundSubtractorMOG2()
+                    fgMask = self.backSub.apply(frame1)
+                    warmup_remaining = int(getattr(self, "backsub_warmup", 0))
+                    if warmup_remaining > 0:
+                        self.backsub_warmup = max(0, warmup_remaining - 1)
+                        bs_boxes = []
+                    else:
+                        k2 = np.ones((3, 3), np.uint8)
+                        fgMask = cv2.morphologyEx(fgMask, cv2.MORPH_OPEN, k2, iterations=1)
+                        contours, _ = cv2.findContours(
+                            fgMask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+                        )
+                        minc = float(self._safe_float_widget_value("min_contour_input", 300.0))
+                        maxc = float(self._safe_float_widget_value("max_contour_input", 1400000.0))
+                        contours = [
+                            c
+                            for c in contours
+                            if (cv2.contourArea(c) > minc and cv2.contourArea(c) < maxc)
+                        ]
+                        bs_boxes = [cv2.boundingRect(c) for c in contours]
+                except Exception:
+                    bs_boxes = []
+
+                fusion = (
+                    self._safe_widget_method_return(
+                        "color_fusion_strategy", "currentText", "AND"
+                    )
+                    or "AND"
+                )
+                fusion = str(fusion).strip().upper()
+                overlap = float(self._safe_int_widget_value("color_fusion_overlap", 30)) / 100.0
+
+                if fusion == "AND" and callable(fuse_detections_and):
+                    boxes = fuse_detections_and(color_boxes, bs_boxes, overlap)
+                elif callable(fuse_detections_or):
+                    boxes = fuse_detections_or(color_boxes, bs_boxes)
+                else:
+                    boxes = list(color_boxes) + list(bs_boxes)
+            except Exception as e:
+                boxes = []
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            f"Color Hybrid Mode 8 error: {e}", fire=False
+                        )
+                except Exception:
+                    pass
+
+        elif detection_mode == 9:  # Hybrid: Color + YOLO
+            try:
+                color_boxes = []
+                if COLOR_DETECTION_AVAILABLE and getattr(self, "color_detector", None) is not None:
+                    preset = (
+                        self._safe_widget_method_return(
+                            "color_preset_combo", "currentText", "red"
+                        )
+                        or "red"
+                    )
+                    preset_l = str(preset).strip().lower()
+                    if preset_l == "custom":
+                        h_min = int(self._safe_int_widget_value("color_h_min", 0))
+                        h_max = int(self._safe_int_widget_value("color_h_max", 10))
+                        s_min = int(self._safe_int_widget_value("color_s_min", 100))
+                        s_max = int(self._safe_int_widget_value("color_s_max", 255))
+                        v_min = int(self._safe_int_widget_value("color_v_min", 100))
+                        v_max = int(self._safe_int_widget_value("color_v_max", 255))
+                        self.color_detector.set_custom_range(
+                            h_min, s_min, v_min, h_max, s_max, v_max
+                        )
+                        self.color_detector.set_active_colors("custom")
+                    else:
+                        self.color_detector.set_active_colors(preset_l)
+                    self.color_detector.set_detection_params(
+                        min_area=int(
+                            self._safe_int_widget_value("color_min_area_input", 300)
+                        ),
+                        max_area=int(
+                            self._safe_int_widget_value("color_max_area_input", 500000)
+                        ),
+                        blur_kernel=int(
+                            self._safe_int_widget_value("color_blur_input", 5)
+                        ),
+                        morph_iterations=int(
+                            self._safe_int_widget_value("color_morph_input", 2)
+                        ),
+                    )
+                    color_boxes = self.color_detector.detect(frame1)
+
+                # YOLO boxes (reuse mode 2 logic)
+                yolo_boxes = []
+                try:
+                    model_loaded = bool(getattr(self.yolo_detector, "model_loaded", False))
+                except Exception:
+                    model_loaded = False
+                try:
+                    if model_loaded:
+                        try:
+                            classes = (
+                                self._safe_widget_method_return(
+                                    "yolo_classes_input", "text", "person"
+                                )
+                                or "person"
+                            )
+                            self.yolo_detector.set_target_classes(classes)
+                        except Exception:
+                            pass
+                        yolo_boxes = self.yolo_detector.detect(
+                            frame1,
+                            self._safe_float_widget_value("yolo_confidence_input", 0.5),
+                        )
+                    else:
+                        model_name = (
+                            self._safe_widget_method_return(
+                                "yolo_model_combo", "currentText", ""
+                            )
+                            or ""
+                        )
+                        if model_name:
+                            try:
+                                self.yolo_detector.load_model(model_name)
+                            except Exception:
+                                pass
+                            try:
+                                classes = (
+                                    self._safe_widget_method_return(
+                                        "yolo_classes_input", "text", "person"
+                                    )
+                                    or "person"
+                                )
+                                self.yolo_detector.set_target_classes(classes)
+                            except Exception:
+                                pass
+                            try:
+                                yolo_boxes = self.yolo_detector.detect(
+                                    frame1,
+                                    self._safe_float_widget_value(
+                                        "yolo_confidence_input", 0.5
+                                    ),
+                                )
+                            except Exception:
+                                yolo_boxes = []
+                except Exception:
+                    yolo_boxes = []
+
+                # Apply YOLO post-processing filters (min area / max results)
+                try:
+                    if yolo_boxes:
+                        try:
+                            min_area = int(
+                                self._safe_int_widget_value("yolo_min_area_input", 0)
+                                or 0
+                            )
+                        except Exception:
+                            min_area = 0
+                        if min_area > 0:
+                            try:
+                                yolo_boxes = [
+                                    b
+                                    for b in yolo_boxes
+                                    if (int(b[2]) * int(b[3])) >= min_area
+                                ]
+                            except Exception:
+                                pass
+                        try:
+                            max_results = int(
+                                self._safe_int_widget_value("yolo_max_results_input", 0)
+                                or 0
+                            )
+                        except Exception:
+                            max_results = 0
+                        if max_results > 0 and yolo_boxes:
+                            try:
+                                yolo_boxes = sorted(
+                                    yolo_boxes,
+                                    key=lambda box: box[2] * box[3],
+                                    reverse=True,
+                                )[:max_results]
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+                fusion = (
+                    self._safe_widget_method_return(
+                        "color_fusion_strategy", "currentText", "AND"
+                    )
+                    or "AND"
+                )
+                fusion = str(fusion).strip().upper()
+                overlap = float(self._safe_int_widget_value("color_fusion_overlap", 30)) / 100.0
+
+                if fusion == "AND" and callable(fuse_detections_and):
+                    boxes = fuse_detections_and(color_boxes, yolo_boxes, overlap)
+                elif callable(fuse_detections_or):
+                    boxes = fuse_detections_or(color_boxes, yolo_boxes)
+                else:
+                    boxes = list(color_boxes) + list(yolo_boxes)
+            except Exception as e:
+                boxes = []
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            f"Color Hybrid Mode 9 error: {e}", fire=False
+                        )
+                except Exception:
+                    pass
+
         # If we're in a slow Go-Home sequence, progress an interpolation step
         try:
             if (
@@ -16052,6 +16878,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                             cy = y0 + (M['m01'] / M['m00'])
                         except Exception:
                             # On any error, retain box center (safe fallback)
+                            pass
+
+                        # Keep last_target_center aligned with the aiming point (yellow dot).
+                        # This ensures deadzone checks for firing use the same point the operator sees.
+                        try:
+                            self.last_target_center = (float(cx), float(cy))
+                        except Exception:
                             pass
                         if frame1 is not None:
                             # Use stored frame dimensions (set by frame ratio selector)
@@ -17324,8 +18157,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             
             if hasattr(self, "last_detections") and self.last_detections:
                 for x_box, y_box, w_box, h_box in self.last_detections:
-                    tx = int(x_box + w_box / 2)
-                    ty = int(y_box + h_box / 2)
+                    # Use centroid/yellow-dot point for deadzone checks (preferred).
+                    # Fallback to box center if centroid is not available.
+                    try:
+                        if getattr(self, "last_target_center", None):
+                            tx = int(self.last_target_center[0])
+                            ty = int(self.last_target_center[1])
+                        else:
+                            tx = int(x_box + w_box / 2)
+                            ty = int(y_box + h_box / 2)
+                    except Exception:
+                        tx = int(x_box + w_box / 2)
+                        ty = int(y_box + h_box / 2)
 
                     dist = ((tx - cx) ** 2 + (ty - cy) ** 2) ** 0.5
 
@@ -17532,8 +18375,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Has target - bool based on detections
         self.hud_data['has_target'] = bool(getattr(self, 'last_detections', None))
         
-        # Recording - bool
-        self.hud_data['recording'] = bool(getattr(self, '_test_recording_active', False))
+        # Recording - bool (check BOTH test recording AND active writer)
+        self.hud_data['recording'] = bool(getattr(self, '_test_recording_active', False)) or (getattr(self, 'recording_writer', None) is not None)
         
         # Debug lines - only when debug checkbox is enabled
         _dbg_lines = []
@@ -17553,115 +18396,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             pass
         self.hud_data['debug_lines'] = _dbg_lines
 
-        # --- Sniper view widget update ---
-        if hasattr(self, "last_detections") and self.last_detections:
-            # Only auto-show the sniper dock if the user hasn't explicitly closed it
-            if (
-                not self.sniper_dock.isVisible()
-                and not getattr(self, "_sniper_user_closed", False)
-                and getattr(self, "auto_show_sniper", True)
-            ):
-                # Position the dock on first show
-                main_geo = self.geometry()
-                self.sniper_dock.setGeometry(
-                    main_geo.right() - 250, main_geo.top() + 80, 220, 220
-                )
-                self.sniper_dock.show()
 
-            try:
-                (x, y, w, h) = self.last_detections[0]
-                cx, cy = x + w // 2, y + h // 2
-
-                # Crop a region around the target from CLEAN frame (no detection rectangles)
-                sniper_frame = getattr(self, '_frame_for_sniper', frame1)
-                zoom_size = max(w, h) * 1.5
-                x1 = max(int(cx - zoom_size / 2), 0)
-                y1 = max(int(cy - zoom_size / 2), 0)
-                x2 = min(int(cx + zoom_size / 2), sniper_frame.shape[1])
-                y2 = min(int(cy + zoom_size / 2), sniper_frame.shape[0])
-                zoom = sniper_frame[y1:y2, x1:x2]
-
-                if zoom.size > 0:
-                    # Convert to pixmap and display (guarded to avoid QPainter warnings
-                    # when the paint device / pixmap is not valid). We defensively
-                    # check sizes and null pixmaps before setting on the label.
-                    try:
-                        zoom_rgb = cv2.cvtColor(zoom, cv2.COLOR_BGR2RGB)
-                        h_z, w_z, ch_z = zoom_rgb.shape
-                        if w_z > 0 and h_z > 0:
-                            qimg_zoom = QImage(
-                                zoom_rgb.data, w_z, h_z, ch_z * w_z, QImage.Format_RGB888
-                            )
-                            pix_zoom = QPixmap.fromImage(qimg_zoom)
-                            if not pix_zoom.isNull() and getattr(self, "sniper_view_label", None):
-                                try:
-                                    lbl_size = self.sniper_view_label.size()
-                                    if lbl_size.width() > 0 and lbl_size.height() > 0:
-                                        try:
-                                            scaled = pix_zoom.scaled(
-                                                lbl_size,
-                                                Qt.AspectRatioMode.KeepAspectRatio,
-                                                Qt.TransformationMode.SmoothTransformation,
-                                            )
-                                            # Queue pixmap update on the Qt main thread
-                                            _queue_set_pixmap(self.sniper_view_label, scaled)
-                                        except Exception:
-                                            # fallback to direct pixmap set (queued)
-                                            try:
-                                                _queue_set_pixmap(self.sniper_view_label, pix_zoom)
-                                            except Exception:
-                                                try:
-                                                    self.sniper_view_label.clear()
-                                                except Exception:
-                                                    pass
-                                    else:
-                                        try:
-                                            _queue_set_pixmap(self.sniper_view_label, pix_zoom)
-                                        except Exception:
-                                            try:
-                                                self.sniper_view_label.clear()
-                                            except Exception:
-                                                pass
-                                except Exception:
-                                    # label may be invalid; clear safely
-                                    try:
-                                        self.sniper_view_label.clear()
-                                    except Exception:
-                                        pass
-                    except Exception as e:
-                        try:
-                            if getattr(self, "enhancer", None):
-                                self.enhancer.log_serial_output(f"Sniper view error: {e}", fire=False)
-                        except Exception:
-                            print("Sniper view error:", e)
-            except Exception as e:
-                self.enhancer.log_serial_output(f"Sniper view error: {e}", fire=True)
-        else:
-            # Always keep sniper dock visible even if no detections — but
-            # respect explicit user-closure so we don't force it back open.
-            try:
-                if (
-                    not self.sniper_dock.isVisible()
-                    and not getattr(self, "_sniper_user_closed", False)
-                    and getattr(self, "auto_show_sniper", True)
-                ):
-                    main_geo = self.geometry()
-                    self.sniper_dock.setGeometry(
-                        main_geo.right() - 250, main_geo.top() + 80, 220, 220
-                    )
-                    self.sniper_dock.show()
-            except Exception:
-                pass
-            # Clear sniper view to blank when no target
-            try:
-                self.sniper_view_label.clear()
-                self.sniper_view_label.setText("No Target")
-            except Exception:
-                pass
+        # --- Sniper view widget - REMOVED (Dec 2024) ---
+        # All sniper dock update code has been disabled
 
         # Convert the final frame (with all overlays) to RGB for display
         rgb = cv2.cvtColor(frame1, cv2.COLOR_BGR2RGB)
-        # Add sniper scope crosshair and unified HUD overlay
+        # Add crosshair and HUD overlay (SCOPE VISUALS - NOT SNIPER DOCK)
         rgb = self._add_crosshair_and_scope(rgb)
         # --- Recording management: start/stop writer, segment rotation, storage cleanup ---
         try:
@@ -17724,6 +18465,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.hud_data['recording_filename'] = os.path.basename(self._recording_current_filepath)
                     else:
                         self.hud_data['recording_filename'] = ''
+                    # === RECORDING UI INDICATOR UPDATE ===
+                    try:
+                        if hasattr(self, 'recording_indicator_label'):
+                            mins = int(elapsed) // 60
+                            secs = int(elapsed) % 60
+                            blink = "🔴" if (int(time.time() * 2) % 2 == 0) else "⚫"
+                            self.recording_indicator_label.setText(f"{blink} REC {mins:02d}:{secs:02d}")
+                            self.recording_indicator_label.show()
+                    except Exception:
+                        pass
+                    # === END RECORDING UI INDICATOR ===
                 except Exception:
                     pass
 
@@ -17778,6 +18530,30 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 Qt.SmoothTransformation
             )
         )
+
+        # ========== SENTRY MODE FRAME UPDATE ==========
+        # AGENT-MANAGED: Sentry integration (Dec 2024)
+        # If sentry mode tab is active, pass frame and detections to sentry controller
+        # This happens EVERY FRAME regardless of enable state so video shows in sentry tab
+        try:
+            if getattr(self, "sentry_mode_active", False) and getattr(self, "sentry_tab", None) is not None:
+                # Pass the original frame (before RGB conversion) and current detections
+                # boxes variable contains YOLO detections in (x, y, w, h, score, class) format
+                sentry_boxes = []
+                try:
+                    if boxes and len(boxes) > 0:
+                        for box in boxes:
+                            if len(box) >= 5:
+                                # Convert to (x, y, w, h, score) tuple
+                                x, y, w, h, score = box[:5]
+                                sentry_boxes.append((int(x), int(y), int(w), int(h), float(score)))
+                except Exception as box_err:
+                    pass
+                # Pass frame to sentry - frame1 is BGR, sentry expects BGR
+                self._update_sentry_frame(frame1, sentry_boxes)
+        except Exception as e:
+            pass  # Silent fail - sentry is non-critical
+        # ========== END SENTRY MODE FRAME UPDATE ==========
 
         # ========== CRITICAL FIX (DEC10): UNCONDITIONAL SERIAL COMMAND ==========
         # MUST send command every frame to MCU, even when no detection occurs.
@@ -18070,8 +18846,34 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.enhancer.log_serial_output(f"Idle mode update error: {e}", fire=False)
             except Exception:
                 pass
+            # Re-apply visibility in case late actions changed widget state
+            try:
+                self.update_detection_settings_visibility()
+            except Exception:
+                pass
 
     def send_serial_command(self):
+        # CHANGE WARNING:
+        # Modifications here affect servo movement, serial protocol encoding,
+        # redundant-command filtering, and safety interlocks.
+        # See CHANGE_IMPACT_REFERENCE.md → Sections 5 and 6.
+        # Last modified: 2025-12-19 by Copilot Agent
+        # ========== SENTRY MODE BLOCK ==========
+        # When sentry mode is active, sentry controls the turret - block main app commands
+        # EXCEPTION: Manual override bypasses this block (user pressing direction buttons)
+        # AGENT-MANAGED: Sentry integration (Dec 2024)
+        # See CHANGE_IMPACT_REFERENCE.md Section 12 for sentry signal flow
+        try:
+            if getattr(self, "sentry_mode_active", False) and getattr(self, "sentry_tab", None) is not None:
+                if self.sentry_tab.is_enabled():
+                    # Allow manual override to bypass sentry block
+                    if not getattr(self, "manual_override", False):
+                        return  # Let sentry handle turret commands
+                    # Manual override is active - allow command through
+        except Exception:
+            pass
+        # ========== END SENTRY MODE BLOCK ==========
+        
         # ========== QUICK TARGET LOCK OVERRIDE ==========
         # If target lock is active, move toward target position instead of normal tracking
         # This temporarily overrides detection/tracking until we reach the target or timeout
@@ -18209,7 +19011,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # prevent host/firmware fighting. Use the last_sent_tilt as the desired
         # angle to keep commands stable while the MCU enforces the safe position.
         try:
-            if getattr(self, "_mcu_tilt_safety_locked", False):
+            if (
+                getattr(self, "tilt_safety_hardware_installed", False)
+                and getattr(self, "tilt_safety_switch_enabled", False)
+                and getattr(self, "_mcu_tilt_safety_locked", False)
+            ):
                 tilt_angle = int(getattr(self, "last_sent_tilt", tilt_angle))
         except Exception:
             pass
@@ -18228,7 +19034,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         safety_token = int(self.safety_state)
         mode_token = 1 if self.trigger_mode_bb else 0
 
-        command = f"P{pan_angle}T{tilt_angle}F{fire_token}L{led_token}R{laser_token}G{acc3_token}S{safety_token}M{mode_token}\n"
+        # NOTE: command string is built after any pan/tilt overrides below.
         
         # --- Fractional accumulation to allow micro-corrections (prevents "stuck at last integer" issue) ---
         try:
@@ -18287,6 +19093,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         pass
         except Exception:
             pass
+
+        # Build the final command string AFTER any pan/tilt overrides.
+        command = f"P{pan_angle}T{tilt_angle}F{fire_token}L{led_token}R{laser_token}G{acc3_token}S{safety_token}M{mode_token}\n"
 
         # ========== BULLETPROOF FIX: PREVENT REDUNDANT SERVO COMMANDS ==========
         # ISSUE: Sending same command repeatedly causes servo jitter/hunting/twitching
@@ -18439,40 +19248,50 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                         # If the MCU reports a tilt safety trigger, remember it so the
                                         # host can avoid sending tilt commands and entering a fight
                                         # with the firmware's safety override.
-                                        if "TILT SAFETY SWITCH TRIGGERED" in uresp or "SAFETY LOCKED" in uresp:
-                                            try:
-                                                self._mcu_tilt_safety_locked = True
-                                                if hasattr(self, "enhancer"):
-                                                    self.enhancer.log_serial_output(
-                                                        "[HOST] MCU reports tilt safety LOCKED — suppressing tilt commands",
-                                                        fire=False,
-                                                    )
-                                                else:
-                                                    try:
-                                                        self._safe_append_log("[HOST] MCU reports tilt safety LOCKED — suppressing tilt commands")
-                                                    except Exception:
-                                                        pass
-                                            except Exception:
-                                                pass
-                                        # Clear lock when MCU reports reset/disabled state
+                                        # IMPORTANT: Avoid locking on generic status lines like "TILT SAFETY: OK".
+                                        # OPTIONAL HARDWARE: only respect these messages when the tilt-safety hardware is installed AND enabled.
                                         if (
-                                            "TILT SAFETY SWITCH RESET" in uresp
-                                            or "TILT SAFETY HANDLER DISABLED" in uresp
-                                            or "TILT SAFETY SWITCH ENABLED" in uresp
-                                            or "TILT SAFETY HANDLER DISABLED" in uresp
+                                            getattr(self, "tilt_safety_hardware_installed", False)
+                                            and getattr(self, "tilt_safety_switch_enabled", False)
                                         ):
                                             try:
-                                                self._mcu_tilt_safety_locked = False
-                                                if hasattr(self, "enhancer"):
-                                                    self.enhancer.log_serial_output(
-                                                        "[HOST] MCU reports tilt safety CLEARED",
-                                                        fire=False,
-                                                    )
-                                                else:
-                                                    try:
-                                                        self._safe_append_log("[HOST] MCU reports tilt safety CLEARED")
-                                                    except Exception:
-                                                        pass
+                                                tilt_safety_trigger = (
+                                                    "TILT SAFETY SWITCH TRIGGERED" in uresp
+                                                    or ("TILT SAFETY" in uresp and "TRIGGERED" in uresp)
+                                                    or ("TILT" in uresp and "SAFETY" in uresp and "LOCKED" in uresp)
+                                                )
+                                                tilt_safety_clear = (
+                                                    "TILT SAFETY SWITCH RESET" in uresp
+                                                    or ("TILT SAFETY" in uresp and ("RESET" in uresp or "CLEARED" in uresp or "OK" in uresp))
+                                                    or "TILT SAFETY HANDLER DISABLED" in uresp
+                                                    or "TILT SAFETY SWITCH ENABLED" in uresp
+                                                )
+
+                                                # Prefer clearing if both match (defensive against ambiguous firmware strings)
+                                                if tilt_safety_clear:
+                                                    self._mcu_tilt_safety_locked = False
+                                                    if hasattr(self, "enhancer"):
+                                                        self.enhancer.log_serial_output(
+                                                            "[HOST] MCU reports tilt safety CLEARED",
+                                                            fire=False,
+                                                        )
+                                                    else:
+                                                        try:
+                                                            self._safe_append_log("[HOST] MCU reports tilt safety CLEARED")
+                                                        except Exception:
+                                                            pass
+                                                elif tilt_safety_trigger:
+                                                    self._mcu_tilt_safety_locked = True
+                                                    if hasattr(self, "enhancer"):
+                                                        self.enhancer.log_serial_output(
+                                                            "[HOST] MCU reports tilt safety LOCKED — suppressing tilt commands",
+                                                            fire=False,
+                                                        )
+                                                    else:
+                                                        try:
+                                                            self._safe_append_log("[HOST] MCU reports tilt safety LOCKED — suppressing tilt commands")
+                                                        except Exception:
+                                                            pass
                                             except Exception:
                                                 pass
                                     except Exception:
@@ -18910,12 +19729,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self._safe_widget_call("idle_mode_toggle_btn", "setText", "Enable Idle Mode")
         except Exception:
             pass
-        # Ensure Flip Frame (180°) is enabled by default when tracking starts
-        try:
-            # Use the safe helper in case UI not yet created
-            self._safe_widget_call("flip_checkbox", "setChecked", True)
-        except Exception:
-            pass
+        # IMPORTANT (Dec 2025): Do NOT force camera orientation on tracking start.
+        # flip_image / invert_pan / invert_tilt must be controlled by persisted settings.json
+        # and the user's UI choices. Forcing this causes orientation to "reset" every launch.
         self.enhancer.log_serial_output("Tracking started.", fire=False)
         
         # CRITICAL FIX DEC14: Move heavy initialization to background thread!
@@ -19645,6 +20461,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self.recording_writer = None
                 self._recording_current_filepath = None
                 self._recording_segment_start = 0.0
+                # === HIDE RECORDING INDICATOR ===
+                try:
+                    if hasattr(self, 'recording_indicator_label'):
+                        self.recording_indicator_label.hide()
+                        self.recording_indicator_label.setText("")
+                except Exception:
+                    pass
+                # === END HIDE RECORDING INDICATOR ===
             except Exception as e:
                 if getattr(self, "enhancer", None):
                     self.enhancer.log_serial_output(f"[RECORDING] Stop error: {e}")
@@ -19791,6 +20615,341 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         
         # Call parent implementation
         super().changeEvent(event)
+
+    # === RESIZE-FIX: Event handlers to prevent freeze during window resize/move ===
+    # Added Dec 2025 - Pauses frame processing during window manipulation
+    # To revert: Remove this block and the _resize_resume_timer setup in __init__
+    
+    def resizeEvent(self, event):
+        """Pause frame timer during resize to prevent UI freeze."""
+        try:
+            if hasattr(self, 'timer') and self.timer is not None:
+                if self.timer.isActive():
+                    self._frame_timer_was_active = True
+                    self.timer.stop()
+                # Schedule resume after resize settles
+                if hasattr(self, '_resize_resume_timer'):
+                    self._resize_resume_timer.stop()  # Cancel pending resume
+                    self._resize_resume_timer.start(150)  # Resume after 150ms
+        except Exception:
+            pass
+        super().resizeEvent(event)
+    
+    def moveEvent(self, event):
+        """Pause frame timer during move to prevent UI freeze."""
+        try:
+            if hasattr(self, 'timer') and self.timer is not None:
+                if self.timer.isActive():
+                    self._frame_timer_was_active = True
+                    self.timer.stop()
+                # Schedule resume after move settles
+                if hasattr(self, '_resize_resume_timer'):
+                    self._resize_resume_timer.stop()  # Cancel pending resume
+                    self._resize_resume_timer.start(150)  # Resume after 150ms
+        except Exception:
+            pass
+        super().moveEvent(event)
+    
+    def _resume_frame_timer_after_resize(self):
+        """Resume frame timer after resize/move operation completes."""
+        try:
+            if hasattr(self, 'timer') and self.timer is not None:
+                if self._frame_timer_was_active and not self.timer.isActive():
+                    self.timer.start(30)  # Resume at 30ms (~33 FPS)
+        except Exception:
+            pass
+    
+    def _pause_frame_timer_for_layout(self):
+        """Pause frame timer during any layout operation (dock drag, etc.)."""
+        try:
+            if hasattr(self, 'timer') and self.timer is not None:
+                if self.timer.isActive():
+                    self._frame_timer_was_active = True
+                    self.timer.stop()
+                if hasattr(self, '_resize_resume_timer'):
+                    self._resize_resume_timer.stop()
+                    self._resize_resume_timer.start(200)  # Resume after 200ms
+        except Exception:
+            pass
+    
+    def event(self, event):
+        """Override to pause frame timer during layout changes (dock rearrange, etc.)."""
+        try:
+            from PyQt5.QtCore import QEvent
+            # Only pause if timer exists (avoid issues during init)
+            if hasattr(self, 'timer') and hasattr(self, '_resize_resume_timer'):
+                # Pause during layout requests and child events that indicate dock movement
+                if event.type() in (QEvent.LayoutRequest, QEvent.ChildAdded, 
+                                    QEvent.ChildRemoved, QEvent.ChildPolished):
+                    self._pause_frame_timer_for_layout()
+        except Exception:
+            pass
+        result = super().event(event)
+        return bool(result) if result is not None else False
+    
+    # === END RESIZE-FIX ===
+
+    # =========================================================================
+    # AGENT-MANAGED BLOCK: SENTRY MODE INTEGRATION
+    # Added: Dec 2024 | See: app/sentry_mode/README.md
+    # Dependencies: SentryTabWidget, SentryController, ByteTracker
+    # DO NOT MODIFY without checking CHANGE_IMPACT_REFERENCE.md Section 12
+    # =========================================================================
+    
+    def _on_tab_changed(self, index: int):
+        """Handle tab change to detect sentry tab activation."""
+        try:
+            if self.sentry_tab is None:
+                return
+            
+            # Get the sentry tab index
+            sentry_index = self.main_tab_widget.indexOf(self.sentry_tab)
+            
+            if index == sentry_index:
+                # Switching TO sentry tab
+                self.sentry_mode_active = True
+                print("[SENTRY] Tab activated - sentry_mode_active = True")
+                
+                # Pause main tracking to prevent conflicts
+                if getattr(self, "tracking_active", False):
+                    self._sentry_previous_tracking_state = True
+                    self.tracking_active = False
+                    try:
+                        if hasattr(self, "start_tracking_btn"):
+                            self.start_tracking_btn.setChecked(False)
+                    except Exception:
+                        pass
+                    try:
+                        if hasattr(self, "enhancer"):
+                            self.enhancer.log_serial_output(
+                                "[SENTRY] Main tracking paused - Sentry Mode active",
+                                fire=False
+                            )
+                    except Exception:
+                        pass
+                else:
+                    self._sentry_previous_tracking_state = False
+                
+            elif getattr(self, "sentry_mode_active", False):
+                # Switching AWAY from sentry tab
+                self.sentry_mode_active = False
+                
+                # Disable sentry mode
+                if self.sentry_tab is not None and self.sentry_tab.is_enabled():
+                    self.sentry_tab.set_enabled(False)
+                
+                # Restore previous tracking state
+                if getattr(self, "_sentry_previous_tracking_state", False):
+                    self.tracking_active = True
+                    try:
+                        if hasattr(self, "start_tracking_btn"):
+                            self.start_tracking_btn.setChecked(True)
+                    except Exception:
+                        pass
+                    try:
+                        if hasattr(self, "enhancer"):
+                            self.enhancer.log_serial_output(
+                                "[SENTRY] Sentry paused - Main tracking resumed",
+                                fire=False
+                            )
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[SENTRY] Tab change error: {e}")
+    
+    def _on_sentry_enabled_changed(self, enabled: bool):
+        """Handle sentry mode enable/disable."""
+        try:
+            if enabled:
+                # Disable main tracking when sentry is enabled
+                if getattr(self, "tracking_active", False):
+                    self._sentry_previous_tracking_state = True
+                    self.tracking_active = False
+                    self.aiming_active = False
+                    try:
+                        if hasattr(self, "aiming_btn"):
+                            self.aiming_btn.setChecked(False)
+                    except Exception:
+                        pass
+                    try:
+                        if hasattr(self, "start_tracking_btn"):
+                            self.start_tracking_btn.setChecked(False)
+                    except Exception:
+                        pass
+                
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            "[SENTRY] Sentry Mode ENABLED - turret control transferred",
+                            fire=False
+                        )
+                except Exception:
+                    pass
+            else:
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            "[SENTRY] Sentry Mode DISABLED",
+                            fire=False
+                        )
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[SENTRY] Enable change error: {e}")
+    
+    def _on_sentry_turret_move(self, pan: float, tilt: float):
+        """Handle turret move request from sentry mode."""
+        try:
+            # Only process if sentry mode is actually active
+            if not getattr(self, "sentry_mode_active", False):
+                return
+            
+            # Clamp values to valid ranges
+            pan = max(5, min(185, pan))
+            tilt = max(20, min(130, tilt))
+            
+            # Update target position
+            self.target_pan = pan
+            self.target_tilt = tilt
+            
+            # Send command immediately
+            try:
+                if hasattr(self, "ser") and self.ser and getattr(self.ser, "is_open", False):
+                    # Build command string matching main app format
+                    fire_val = 1 if getattr(self, "trigger_fired", False) else 0
+                    led_val = 1 if getattr(self, "led_on", False) else 0
+                    laser_val = 1 if getattr(self, "laser_on", False) else 0
+                    safety_val = 1 if getattr(self, "safety_on", True) else 0
+                    
+                    cmd = f"P{int(pan)}T{int(tilt)}F{fire_val}L{led_val}R{laser_val}G0S{safety_val}M0\n"
+                    self.ser.write(cmd.encode("utf-8"))
+            except Exception as e:
+                print(f"[SENTRY] Serial write error: {e}")
+                
+        except Exception as e:
+            print(f"[SENTRY] Turret move error: {e}")
+    
+    def _on_sentry_fire(self, burst_count: int):
+        """Handle fire request from sentry mode."""
+        try:
+            # Only process if sentry mode is active and safety is off
+            if not getattr(self, "sentry_mode_active", False):
+                return
+            
+            if getattr(self, "safety_on", True):
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            "[SENTRY] Fire blocked - SAFETY is ON",
+                            fire=False
+                        )
+                except Exception:
+                    pass
+                return
+            
+            # Fire burst
+            try:
+                if hasattr(self, "ser") and self.ser and getattr(self.ser, "is_open", False):
+                    pan = int(getattr(self, "target_pan", 90))
+                    tilt = int(getattr(self, "target_tilt", 40))
+                    led_val = 1 if getattr(self, "led_on", False) else 0
+                    laser_val = 1 if getattr(self, "laser_on", False) else 0
+                    
+                    for i in range(burst_count):
+                        # Fire ON
+                        cmd = f"P{pan}T{tilt}F1L{led_val}R{laser_val}G0S0M0\n"
+                        self.ser.write(cmd.encode("utf-8"))
+                        time.sleep(0.05)  # 50ms pulse
+                        
+                        # Fire OFF
+                        cmd = f"P{pan}T{tilt}F0L{led_val}R{laser_val}G0S0M0\n"
+                        self.ser.write(cmd.encode("utf-8"))
+                        
+                        if i < burst_count - 1:
+                            time.sleep(0.05)  # 50ms between shots
+                    
+                    try:
+                        if hasattr(self, "enhancer"):
+                            self.enhancer.log_serial_output(
+                                f"[SENTRY] 🔥 FIRE! Burst: {burst_count} shots",
+                                fire=True
+                            )
+                    except Exception:
+                        pass
+            except Exception as e:
+                print(f"[SENTRY] Fire serial error: {e}")
+                
+        except Exception as e:
+            print(f"[SENTRY] Fire error: {e}")
+    
+    def _on_sentry_manual_move(self, pan_delta: int, tilt_delta: int):
+        """
+        Handle manual turret move request from sentry mode.
+        
+        This uses move_manual() which sets the manual_override flag,
+        allowing the command to bypass the sentry block in send_serial_command().
+        
+        AGENT-MANAGED: Sentry manual control integration (Dec 2024)
+        See CHANGE_IMPACT_REFERENCE.md Section 12 for signal flow
+        
+        Args:
+            pan_delta: Degrees to move pan (+right, -left)
+            tilt_delta: Degrees to move tilt (+up, -down)
+        """
+        try:
+            if not getattr(self, "sentry_mode_active", False):
+                return
+            
+            # move_manual sets manual_override flag which bypasses sentry block
+            if hasattr(self, "move_manual"):
+                self.move_manual(pan=pan_delta, tilt=tilt_delta)
+            else:
+                # Fallback: direct position update with manual override
+                self.manual_override = True
+                current_pan = getattr(self, "target_pan", 90)
+                current_tilt = getattr(self, "target_tilt", 90)
+                
+                new_pan = max(5, min(175, current_pan + pan_delta))
+                new_tilt = max(30, min(150, current_tilt + tilt_delta))
+                
+                self.target_pan = new_pan
+                self.target_tilt = new_tilt
+                
+                try:
+                    self.send_serial_command()
+                except Exception:
+                    pass
+                finally:
+                    self.manual_override = False
+                    
+        except Exception as e:
+            print(f"[SENTRY] Manual move error: {e}")
+    
+    def _update_sentry_frame(self, frame: np.ndarray, detections: list):
+        """
+        Pass frame and detections to sentry tab for processing.
+        Called from update_frame() when sentry mode is active.
+        """
+        try:
+            if self.sentry_tab is not None and self.sentry_mode_active:
+                # Convert detections to format expected by sentry
+                # Main app uses (x, y, w, h, score, class_name) format
+                # Sentry expects (x, y, w, h, score)
+                sentry_detections = []
+                if detections:
+                    for det in detections:
+                        if len(det) >= 5:
+                            x, y, w, h, score = det[:5]
+                            sentry_detections.append((x, y, w, h, score))
+                
+                # Process frame through sentry
+                self.sentry_tab.process_frame(frame, sentry_detections)
+        except Exception as e:
+            print(f"[SENTRY] Frame update error: {e}")
+    
+    # =========================================================================
+    # END AGENT-MANAGED BLOCK: SENTRY MODE INTEGRATION
+    # =========================================================================
 
     def closeEvent(self, a0):
         """Ensure cleanup of resources and auto-save notes when the window is closed."""

@@ -53,7 +53,12 @@ if app_dir not in sys.path:
 os.chdir(app_dir)
 
 print("=" * 60)
-print("DADBOT v4 Portable - Starting Application")
+try:
+    from db3k_meta import get_app_title
+
+    print(f"{get_app_title()} - Starting Application")
+except Exception:
+    print("DADBOT v4 Portable - Starting Application")
 print("=" * 60)
 
 # Import and run the main application module

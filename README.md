@@ -17,6 +17,12 @@ If you need a sample Arduino code snippet for rapid-fire support, ask in the pro
 This README contains quick setup steps and troubleshooting guidance, especially
 for Windows users with AMD GPUs.
 
+## Versioning (main)
+
+- Single source of truth: `DB3K_VERSION.txt`
+- Commit subject prefix for `main`: `db3kv<version> - <summary>` (see `COMMIT_NAMING_CONVENTION.md`)
+- Home tab shows a versioned title and a "Recent Updates" list from `RECENT_UPDATES.json`
+
 ## Recommended install (safe)
 
 1. Create and activate a virtual environment (recommended):

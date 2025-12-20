@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "max_items": 10,
+  "items": [
+    {"date": "2025-12-20", "title": "Detection UI: Basic/Advanced toggle + mode-relevant visibility (AgentChangeID: DETECTION_UI_BASIC_ADVANCED_v1)"},
+    {"date": "2025-12-20", "title": "Docs: Hybrid Mode 4/5 thresholds + idle auto-resume/guard defaults + Sentry constants/persistence couplings"},
+    {"date": "2025-12-19", "title": "Docs: Added Sentry Mode integration section"},
+    {"date": "2025-12-19", "title": "Sentry Mode: added manual turret control"},
+    {"date": "2025-12-19", "title": "Fix: manual track crash (wrong method call)"},
+    {"date": "2025-12-19", "title": "Fix: false tilt-safety latch could suppress tilt on OK status messages"},
+    {"date": "2025-12-16", "title": "Tooltips: centralized readable tooltip styles + mappings + audit list"},
+    {"date": "2025-12-15", "title": "Camera: removed camera querying from HUD (fix sipBadCatcherResult)"},
+    {"date": "2025-12-15", "title": "Camera: default resolution set to 1280x720"},
+    {"date": "2025-12-15", "title": "Camera: reliability improvements (BUFFERSIZE=1, multi-backend support, frame verification)"}
+  ]
+}

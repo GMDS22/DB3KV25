@@ -53,7 +53,12 @@ def build_ui(app: QMainWindow):
     All widgets are created and attached to the `app` instance.
     """
     # Authoritative UI builder
-    app.setWindowTitle("AUTO TURRET CONTROL SYSTEM")
+    try:
+        from db3k_meta import get_app_title
+
+        app.setWindowTitle(get_app_title())
+    except Exception:
+        app.setWindowTitle("AUTO TURRET CONTROL SYSTEM")
     try:
         QApplication.setStyle(QStyleFactory.create("Fusion"))
     except Exception as e:
@@ -100,37 +105,8 @@ def build_ui(app: QMainWindow):
     video_layout.addWidget(app.video_label)
     app.setCentralWidget(app.video_frame)
 
-    # Sniper view dock (hidden by default)
-    if getattr(app, "sniper_dock", None) is None:
-        app.sniper_dock = QDockWidget("Sniper Scope", app)
-    app.sniper_dock.setObjectName("SniperScopeDock")
-    if getattr(app, "sniper_view_label", None) is None:
-        app.sniper_view_label = QLabel("No Target")
-    try:
-        sv = getattr(app, "sniper_view_label", None)
-        if sv is not None:
-            try:
-                try:
-                    sv.setAlignment(cast(Any, getattr(Qt, "AlignCenter", 0)))
-                except Exception:
-                    pass
-            except Exception:
-                pass
-            try:
-                app._safe_widget_call("sniper_view_label", "setScaledContents", True)
-            except Exception:
-                pass
-            try:
-                sv.setStyleSheet("background-color: black; border: 2px solid #444;")
-            except Exception:
-                pass
-    except Exception:
-        pass
-    try:
-        app.sniper_dock.setWidget(app.sniper_view_label)
-    except Exception:
-        pass
-    app.sniper_dock.hide()
+    # Sniper view dock - REMOVED (Dec 2024)
+    # All sniper dock initialization code has been disabled
 
     # --- Build panels (create all names that load_settings expects) ---
     # Configuration & Connection
@@ -213,16 +189,7 @@ def build_ui(app: QMainWindow):
                                                             s
                                                         ),
                                                     ):
-                                                        sig = getattr(
-                                                            scb, "stateChanged", None
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(
-                                                                lambda s: app.set_sound_enabled(
-                                                                    s
-                                                                )
-                                                            )
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -276,16 +243,7 @@ def build_ui(app: QMainWindow):
             # Use 'toggled' for checkable toggle buttons to avoid double-press issues
             app._safe_connect("tracking_btn", "toggled", app.toggle_tracking)
         except Exception:
-            # Best-effort fallback to direct signal connect
-            try:
-                btn = getattr(app, "tracking_btn", None)
-                if btn is not None:
-                    sig = getattr(btn, "toggled", None)
-                    conn = getattr(sig, "connect", None)
-                    if callable(conn):
-                        conn(app.toggle_tracking)
-            except Exception:
-                pass
+            pass
     except Exception:
         pass
 
@@ -298,17 +256,10 @@ def build_ui(app: QMainWindow):
             pass
     try:
         try:
-            app._safe_connect("aiming_btn", "clicked", app.toggle_aiming)
+            # Checkable buttons must use 'toggled' per CHANGE_IMPACT_REFERENCE.md
+            app._safe_connect("aiming_btn", "toggled", app.toggle_aiming)
         except Exception:
-            try:
-                btn2 = getattr(app, "aiming_btn", None)
-                if btn2 is not None:
-                    sig = getattr(btn2, "clicked", None)
-                    conn = getattr(sig, "connect", None)
-                    if callable(conn):
-                        conn(app.toggle_aiming)
-            except Exception:
-                pass
+            pass
     except Exception:
         pass
 
@@ -373,12 +324,7 @@ def build_ui(app: QMainWindow):
                                                         "clicked",
                                                         app.go_home,
                                                     ):
-                                                        sig = getattr(
-                                                            go_btn, "clicked", None
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(app.go_home)
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -479,12 +425,7 @@ def build_ui(app: QMainWindow):
                                                         "clicked",
                                                         app.apply_new_limits,
                                                     ):
-                                                        sig = getattr(
-                                                            apply_btn, "clicked", None
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(app.apply_new_limits)
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -547,14 +488,7 @@ def build_ui(app: QMainWindow):
                                                         "currentIndexChanged",
                                                         app.save_settings,
                                                     ):
-                                                        sig = getattr(
-                                                            combo,
-                                                            "currentIndexChanged",
-                                                            None,
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(app.save_settings)
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -663,14 +597,7 @@ def build_ui(app: QMainWindow):
                                                         "currentIndexChanged",
                                                         app.save_settings,
                                                     ):
-                                                        sig = getattr(
-                                                            dcombo,
-                                                            "currentIndexChanged",
-                                                            None,
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(app.save_settings)
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -711,16 +638,7 @@ def build_ui(app: QMainWindow):
                                                         "currentIndexChanged",
                                                         app.on_detection_mode_change,
                                                     ):
-                                                        sig = getattr(
-                                                            dcombo,
-                                                            "currentIndexChanged",
-                                                            None,
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(
-                                                                app.on_detection_mode_change
-                                                            )
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -812,14 +730,7 @@ def build_ui(app: QMainWindow):
                                                         "currentIndexChanged",
                                                         app.save_settings,
                                                     ):
-                                                        sig = getattr(
-                                                            ycombo,
-                                                            "currentIndexChanged",
-                                                            None,
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(app.save_settings)
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -860,16 +771,7 @@ def build_ui(app: QMainWindow):
                                                         "currentIndexChanged",
                                                         app.on_yolo_model_changed,
                                                     ):
-                                                        sig = getattr(
-                                                            ycombo,
-                                                            "currentIndexChanged",
-                                                            None,
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(
-                                                                app.on_yolo_model_changed
-                                                            )
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -915,12 +817,7 @@ def build_ui(app: QMainWindow):
                                                         "clicked",
                                                         app.open_yolo_trainer,
                                                     ):
-                                                        sig = getattr(
-                                                            obtn, "clicked", None
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(app.open_yolo_trainer)
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -997,12 +894,7 @@ def build_ui(app: QMainWindow):
                                                         "textChanged",
                                                         app.save_settings,
                                                     ):
-                                                        sig = getattr(
-                                                            yc2, "textChanged", None
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(app.save_settings)
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -1269,14 +1161,7 @@ def build_ui(app: QMainWindow):
                                                         "valueChanged",
                                                         app.save_settings,
                                                     ):
-                                                        sig = getattr(
-                                                            app.snap_threshold_slider,
-                                                            "valueChanged",
-                                                            None,
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(app.save_settings)
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -1331,18 +1216,7 @@ def build_ui(app: QMainWindow):
                                                     str(v)
                                                 ),
                                             ):
-                                                sig = getattr(
-                                                    app.snap_threshold_slider,
-                                                    "valueChanged",
-                                                    None,
-                                                )
-                                                conn = getattr(sig, "connect", None)
-                                                if callable(conn):
-                                                    conn(
-                                                        lambda v: app.snap_threshold_label.setText(
-                                                            str(v)
-                                                        )
-                                                    )
+                                                pass
                                         except Exception:
                                             pass
                                     except Exception:
@@ -1419,23 +1293,7 @@ def build_ui(app: QMainWindow):
                                                             app.save_settings(),
                                                         ),
                                                     ):
-                                                        sig = getattr(
-                                                            app.lost_hold_input,
-                                                            "valueChanged",
-                                                            None,
-                                                        )
-                                                        conn = getattr(sig, "connect", None)
-                                                        if callable(conn):
-                                                            conn(
-                                                                lambda v: (
-                                                                    setattr(
-                                                                        app,
-                                                                        "lost_hold_seconds",
-                                                                        float(v),
-                                                                    ),
-                                                                    app.save_settings(),
-                                                                )
-                                                            )
+                                                        pass
                                                 except Exception:
                                                     pass
                                             except Exception:
@@ -1619,9 +1477,7 @@ def build_ui(app: QMainWindow):
                                     sig = getattr(
                                         app.invert_pan_checkbox, "stateChanged", None
                                     )
-                                    conn = getattr(sig, "connect", None)
-                                    if callable(conn):
-                                        conn(lambda s: app.set_flip_pan(bool(s)))
+                                    pass
                             except Exception:
                                 pass
                         except Exception:
@@ -1648,9 +1504,7 @@ def build_ui(app: QMainWindow):
                                     sig = getattr(
                                         app.invert_pan_checkbox, "stateChanged", None
                                     )
-                                    conn = getattr(sig, "connect", None)
-                                    if callable(conn):
-                                        conn(app.save_settings)
+                                    pass
                             except Exception:
                                 pass
                         except Exception:
@@ -1691,9 +1545,7 @@ def build_ui(app: QMainWindow):
                                     sig = getattr(
                                         app.invert_tilt_checkbox, "stateChanged", None
                                     )
-                                    conn = getattr(sig, "connect", None)
-                                    if callable(conn):
-                                        conn(lambda s: app.set_flip_tilt(bool(s)))
+                                    pass
                             except Exception:
                                 pass
                         except Exception:
@@ -1708,9 +1560,7 @@ def build_ui(app: QMainWindow):
                 ):
                     try:
                         sig = getattr(app.invert_tilt_checkbox, "stateChanged", None)
-                        conn = getattr(sig, "connect", None)
-                        if callable(conn):
-                            conn(app.save_settings)
+                        pass
                     except Exception:
                         pass
             except Exception:
@@ -1727,9 +1577,7 @@ def build_ui(app: QMainWindow):
             if not app._safe_connect("flip_checkbox", "stateChanged", app.save_settings):
                 try:
                     sig = getattr(app.flip_checkbox, "stateChanged", None)
-                    conn = getattr(sig, "connect", None)
-                    if callable(conn):
-                        conn(app.save_settings)
+                    pass
                 except Exception:
                     pass
         except Exception:
@@ -2025,23 +1873,9 @@ def build_ui(app: QMainWindow):
         app.add_dock("Serial / Log Output", serial_output_group, "right")
         app.add_dock("System", status_group, "right")
         try:
-            # add sniper dock to right as a dock widget (avoid duplicates)
-            if getattr(app, "sniper_dock", None) is not None:
-                try:
-                    # use helper to resolve the enum in a way the analyzer accepts
-                    area = app._qt_dock_area("RightDockWidgetArea", 2)
-                    try:
-                        app.addDockWidget(cast(Any, area), app.sniper_dock)
-                    except Exception:
-                        try:
-                            # fallback: attempt via helper directly
-                            app.addDockWidget(
-                                app._qt_dock_area("RightDockWidgetArea", 2), app.sniper_dock
-                            )
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+            # sniper dock - REMOVED (Dec 2024)
+            # All sniper dock docking code has been disabled
+            pass
         except Exception:
             pass
     except Exception:
