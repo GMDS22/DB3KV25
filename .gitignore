@@ -19,6 +19,22 @@ env/
 # Application logs
 app_debug.log
 
+# Exclude all files in YOLO_MODELS but keep the folder
+YOLO_MODELS/*
+!YOLO_MODELS/.gitkeep
+
+# Exclude logs and cache
+logs/
+*.log
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Exclude other large or generated files
+*.bak
+*.tmp
+
 # Distribution / packaging
 *.egg-info/
 dist/
