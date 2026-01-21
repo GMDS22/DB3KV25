@@ -2,6 +2,8 @@
   "schema": 1,
   "max_items": 10,
   "items": [
+    {"date": "2026-01-09", "title": "Cleanup: Addressed silent exceptions in UI building and YOLO audio with logging; fixed state log dump to stable repo path; added atomic _sync_tracking_flags helper; moved YOLO loading to background thread; archived old .md files to docs/archive/"},
+    {"date": "2026-01-06", "title": "Servo upgrade prep: Current Monitor dock (Pan/Tilt/Total mA) + hardened telemetry parsing (CUR + legacy STAT I=...) and ensured serial input draining even when redundant-command skips or TX pause occur"},
     {"date": "2025-12-20", "title": "Servo: fix manual D-pad up/down axis wiring (use tilt helpers) + fix Sentry tab switching so tracking/aiming state stays consistent (prevents 'autotracking no movement' from silent pause)"},
     {"date": "2025-12-20", "title": "Tools: added non-blocking Pan/Tilt Range Check (Tools menu) with safe pause/restore and best-effort tilt movement confirmation"},
     {"date": "2025-12-20", "title": "Fix: prevent pan/tilt direction desync (sync internal flip_* flags to invert_* UI/settings; persist invert_tilt changes)"},
@@ -9,9 +11,6 @@
     {"date": "2025-12-20", "title": "Docs: Hybrid Mode 4/5 thresholds + idle auto-resume/guard defaults + Sentry constants/persistence couplings"},
     {"date": "2025-12-19", "title": "Docs: Added Sentry Mode integration section"},
     {"date": "2025-12-19", "title": "Sentry Mode: added manual turret control"},
-    {"date": "2025-12-19", "title": "Fix: manual track crash (wrong method call)"},
-    {"date": "2025-12-19", "title": "Fix: false tilt-safety latch could suppress tilt on OK status messages"},
-    {"date": "2025-12-20", "title": "Fix: enforce yellow-dot-in-deadzone gating for automatic firing (Quick Strike + Rapid-fire + main lock loop + Sentry); unify Sentry safety with safety_state; prevent sticky pulse trigger when redundant-command skip occurs"},
-    {"date": "2025-12-16", "title": "Tooltips: centralized readable tooltip styles + mappings + audit list"}
+    {"date": "2025-12-19", "title": "Fix: manual track crash (wrong method call)"}
   ]
 }

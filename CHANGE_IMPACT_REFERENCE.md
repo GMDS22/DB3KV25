@@ -1,3 +1,79 @@
+
+# PAN & TILT SERIAL BUS SERVO UPGRADE WITH CURRENT MONITORING (2026)
+
+## OVERVIEW
+This section documents the required steps, affected subsystems, and review checklist for the following upgrade:
+- Upgrade both Pan and Tilt servos to serial bus servos (using debug board)
+- Monitor each servo's current consumption separately in the monitor panel
+- Monitor total turret current via a dedicated current sensor
+
+**Servo information prerequisite (do before firmware/protocol work):**
+Confirm and record the exact Pan/Tilt bus servo model + protocol details (half-duplex vs full-duplex, baud rate, packet framing, voltage/current specs). Reference images present in repo root:
+- [ce27550c941036c537039cccbb3b8236.jpg_2200x2200q80.jpg](ce27550c941036c537039cccbb3b8236.jpg_2200x2200q80.jpg)
+- [1efe7e1c372359451be7058f9abeda0e.jpg_2200x2200q80.jpg](1efe7e1c372359451be7058f9abeda0e.jpg_2200x2200q80.jpg)
+
+Current working assumption (confirm against datasheet before wiring power):
+- Yahboom **YB-SD35M** “35kg” serial bus servo
+- Rotation range: **0–270°**
+- Connectors: **3 × HY2.0-3Pin**
+
+**MANDATORY AGENT INSTRUCTION:**
+Whenever you see the instruction "INITIATE SERVO UPGRADE", you MUST review this section in full before making any code or documentation changes. Reference this section in all related PRs, commits, and agent-managed blocks.
+
+---
+
+## STEP-BY-STEP UPGRADE PROCESS
+
+1. Update Nano/debug board firmware to:
+        - Control both Pan and Tilt via serial bus servos (remove all PWM logic)
+        - Report per-servo current (Pan, Tilt) and total current over serial
+        - Document protocol and wiring in README.md and hardware setup docs
+2. Update serial protocol documentation and Python serial parsing logic (MAIN_FILE_SINGLE_CAM.py, serial helpers) to:
+        - Send/receive serial bus commands for both servos
+        - Parse and handle per-servo and total current values
+3. Update all servo control logic (MAIN_FILE_SINGLE_CAM.py, servo helpers) to:
+        - Use serial bus protocol for both Pan and Tilt
+        - Remove all PWM-based logic
+4. Update the monitor panel UI (ui_builder.py, layout_manager.py) to:
+        - Display Pan current, Tilt current, and Total current in real time
+        - Ensure clear labeling and correct refresh logic
+5. Update logging and diagnostics to:
+        - Optionally log per-servo and total current readings
+        - Update/add test scripts for serial bus servo control and current monitoring (SERIAL_CONNECTION_TEST.py, servo_fix_test.py)
+6. Update presets/settings (turret_presets.py, preferred_defaults.json) to:
+        - Add thresholds/alerts for Pan, Tilt, and Total current if needed
+        - Document new settings
+7. Update all documentation (CHANGE_IMPACT_REFERENCE.md, RECENT_UPDATES.json, README.md, hardware setup docs) to:
+        - Reflect new protocol, UI, and settings
+        - Reference this section in all related PRs, commits, and agent-managed blocks
+
+---
+
+## IMPACTED FILES/SUBSYSTEMS SUMMARY
+
+| Area                | Files/Subsystems Impacted                                 |
+|---------------------|----------------------------------------------------------|
+| Firmware            | Nano/debug board firmware (external, must be documented) |
+| Serial Protocol     | MAIN_FILE_SINGLE_CAM.py, serial helpers, docs            |
+| Servo Logic         | MAIN_FILE_SINGLE_CAM.py, servo_fix_test.py, presets      |
+| UI/Monitor Panel    | ui_builder.py, layout_manager.py, enhancements           |
+| Settings/Presets    | turret_presets.py, preferred_defaults.json               |
+| Logging             | serial_log_*.txt, logging helpers                        |
+| Documentation       | CHANGE_IMPACT_REFERENCE.md, RECENT_UPDATES.json, README  |
+| Testing             | SERIAL_CONNECTION_TEST.py, servo_fix_test.py             |
+
+---
+
+## AGENT/DEVELOPER CHECKLIST
+
+- [ ] Review this section in full before making any changes.
+- [ ] Confirm hardware/firmware and serial protocol changes.
+- [ ] Update all affected code and documentation as listed above.
+- [ ] Remove all PWM logic for both Pan and Tilt servos.
+- [ ] Confirm per-servo and total current are parsed, displayed, and logged as required.
+- [ ] Reference this section in all PRs, commits, and agent-managed blocks.
+
+---
 # CHANGE_IMPACT_REFERENCE.md
 
 ## AutoTracker System Change Impact Map
@@ -20,7 +96,8 @@ This document serves as the **single authoritative reference** for understanding
 2. **VERIFY** all listed dependencies and cross-effects after modifications
 3. **UPDATE** this document when you discover new dependencies
 4. **ADD** change warnings to sensitive files as specified in Section 10
-5. **LOG** all functional changes in the Change Log (Section 11)
+5. **LOG** all functional changes in RECENT_UPDATES.json (app home tab) and optionally in the Change Log (Section 13)
+6. **DOCUMENTATION WORKFLOW**: For traceability, update RECENT_UPDATES.json for every change. Create .md files only for complex changes (e.g., multi-file refactors). Avoid accumulating .md files by consolidating or archiving old ones quarterly.
 
 ### Critical Principles
 
@@ -1135,6 +1212,7 @@ You **MUST ALSO** check/update:
 | 2025-12-19 | Copilot Agent | Added manual turret control for Sentry Mode | Section 12 |
 | 2025-12-19 | Copilot Agent | Fixed false tilt-safety latch that could suppress tilt on "OK" status messages (host parsing + explicit init) | Sections 5, 6, 13 |
 | 2025-12-20 | Copilot Agent | Documented Hybrid Mode 4/5 thresholds, idle auto-resume/guard defaults, and key Sentry constants/persistence couplings | Sections 3, 9, 12, Appendix A |
+| 2026-01-09 | Copilot Agent | Updated documentation workflow to prevent .md file accumulation - mandate RECENT_UPDATES.json for all changes, .md files only for complex cases | Section 1 |
 
 ---
 

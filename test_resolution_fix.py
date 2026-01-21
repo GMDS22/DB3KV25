@@ -99,23 +99,62 @@ def test_resolution_configuration():
     
     # Test 5: Verify warning comments exist
     print("\n5. Checking for protective warning comments...")
-    
-    warning_sections = [
-        ("Resolution configuration section", 1349, 1380),
-        ("Camera opening section", 12350, 12380),
-        ("Resolution change handler", 12725, 12745),
-        ("update_frame warning section", 14280, 14310)
-    ]
-    
+
+    def _find_line_index(needle: str):
+        for idx, ln in enumerate(lines):
+            if needle in ln:
+                return idx
+        return None
+
+    def _find_regex_index(pattern: str):
+        rx = re.compile(pattern)
+        for idx, ln in enumerate(lines):
+            if rx.search(ln):
+                return idx
+        return None
+
+    def _section_has_warning(start_idx: int, end_idx: int) -> bool:
+        if start_idx is None:
+            return False
+        start_idx = max(0, int(start_idx))
+        end_idx = min(len(lines), int(end_idx))
+        if end_idx <= start_idx:
+            end_idx = min(len(lines), start_idx + 120)
+        section_text = "\n".join(lines[start_idx:end_idx]).upper()
+        return ("DO NOT" in section_text) or ("WARNING" in section_text) or ("CRITICAL" in section_text)
+
+    checks = []
+
+    # 5a) Resolution configuration section (init defaults)
+    idx_res_cfg = _find_line_index("# ⚠️ CRITICAL: TO CHANGE RESOLUTION")
+    checks.append(("Resolution configuration section", idx_res_cfg, (idx_res_cfg + 60) if idx_res_cfg is not None else None))
+
+    # 5b) Camera opening section
+    idx_open_camera = _find_regex_index(r"^\s*def\s+open_camera\(")
+    checks.append(("Camera opening section", idx_open_camera, (idx_open_camera + 220) if idx_open_camera is not None else None))
+
+    # 5c) Resolution change handler (look for the specific comment marker)
+    idx_res_change = _find_line_index("# ⚠️ CRITICAL: Update frame dimensions when resolution changes")
+    if idx_res_change is None:
+        idx_res_change = _find_line_index("# ⚠️ CRITICAL: Update frame_width/height with ACTUAL camera resolution")
+    checks.append(("Resolution change handler", idx_res_change, (idx_res_change + 80) if idx_res_change is not None else None))
+
+    # 5d) update_frame warning section
+    idx_update_frame = _find_regex_index(r"^\s*def\s+update_frame\(self\):")
+    checks.append(("update_frame warning section", idx_update_frame, (idx_update_frame + 120) if idx_update_frame is not None else None))
+
     all_warnings_present = True
-    for section_name, start, end in warning_sections:
-        section_text = '\n'.join(lines[start-1:end])
-        if 'DO NOT' in section_text or 'WARNING' in section_text or 'CRITICAL' in section_text:
+    for section_name, start_idx, end_idx in checks:
+        if start_idx is None:
+            print(f"   ⚠️  {section_name}: Could not locate section")
+            all_warnings_present = False
+            continue
+        if _section_has_warning(start_idx, end_idx):
             print(f"   ✅ {section_name}: Warning comments present")
         else:
             print(f"   ❌ {section_name}: Warning comments MISSING")
             all_warnings_present = False
-    
+
     if not all_warnings_present:
         return False
     

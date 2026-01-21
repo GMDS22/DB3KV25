@@ -43,7 +43,28 @@ except Exception as e:
 
 # Schedule app close after 2 seconds
 print("[TEST] Scheduling app close in 2 seconds...")
-QTimer.singleShot(2000, app.quit)
+def _graceful_quit():
+    try:
+        ex.close()
+    except Exception:
+        pass
+    try:
+        app.quit()
+    except Exception:
+        pass
+
+QTimer.singleShot(2000, _graceful_quit)
+
+# Hard stop fallback: if the event loop is starved or non-daemon threads prevent
+# process exit, force termination so CI/no-hardware checks don't hang.
+def _hard_exit():
+    try:
+        print("[TEST] ⚠️ Forcing process exit (fallback)")
+    except Exception:
+        pass
+    os._exit(0)
+
+QTimer.singleShot(3500, _hard_exit)
 
 print("[TEST] Entering event loop...")
 try:

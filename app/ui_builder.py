@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QDockWidget,
     QDoubleSpinBox,
+    QFormLayout,
     QFrame,
     QGridLayout,
     QGroupBox,
@@ -52,6 +53,10 @@ def build_ui(app: QMainWindow):
     Builds and configures the entire UI for the TrackingApp.
     All widgets are created and attached to the `app` instance.
     """
+    # CHANGE WARNING:
+    # Modifications here affect UI construction, dock layout, and signal wiring.
+    # See CHANGE_IMPACT_REFERENCE.md → Code-Level Change Enforcement.
+    # Last modified: 2026-01-06 by Copilot Agent
     # Authoritative UI builder
     try:
         from db3k_meta import get_app_title
@@ -1601,13 +1606,25 @@ def build_ui(app: QMainWindow):
             if not app._safe_connect("flip_checkbox", "stateChanged", app.save_settings):
                 try:
                     sig = getattr(app.flip_checkbox, "stateChanged", None)
-                    pass
+                    try:
+                        app.enhancer.log_serial_output("[UI] Failed to connect flip_checkbox stateChanged", fire=False)
+                    except Exception:
+                        pass
                 except Exception:
-                    pass
+                    try:
+                        app.enhancer.log_serial_output("[UI] Exception in flip_checkbox connection", fire=False)
+                    except Exception:
+                        pass
+        except Exception:
+            try:
+                app.enhancer.log_serial_output("[UI] Failed to setup flip_checkbox", fire=False)
+            except Exception:
+                pass
+    except Exception:
+        try:
+            app.enhancer.log_serial_output("[UI] Outer exception in flip_checkbox setup", fire=False)
         except Exception:
             pass
-    except Exception:
-        pass
     behavior_layout.addWidget(app.flip_checkbox, br, 0, 1, 2)
     br += 1
 
@@ -1634,7 +1651,7 @@ def build_ui(app: QMainWindow):
         app.relay1_button = QPushButton("LED (Relay1): OFF")
     try:
         app.relay1_button.setCheckable(True)
-        app._safe_connect("relay1_button", "clicked", lambda: app.toggle_relay(1))
+        app._safe_connect("relay1_button", "toggled", lambda checked: app.toggle_relay(1, checked))
     except Exception:
         pass
     accessory_layout.addWidget(app.relay1_button)
@@ -1642,7 +1659,7 @@ def build_ui(app: QMainWindow):
         app.relay2_button = QPushButton("LASER (Relay2): OFF")
     try:
         app.relay2_button.setCheckable(True)
-        app._safe_connect("relay2_button", "clicked", lambda: app.toggle_relay(2))
+        app._safe_connect("relay2_button", "toggled", lambda checked: app.toggle_relay(2, checked))
     except Exception:
         pass
     accessory_layout.addWidget(app.relay2_button)
@@ -1773,7 +1790,7 @@ def build_ui(app: QMainWindow):
     # position label
     pos_layout = QHBoxLayout()
     if getattr(app, "position_label", None) is None:
-        app.position_label = QLabel("PAN: 90° TILT: 80°")
+        app.position_label = QLabel("Pan: 90° | Tilt: 40°")
     try:
         try:
             app.position_label.setAlignment(cast(Any, getattr(Qt, "AlignCenter", 0)))
@@ -1841,6 +1858,68 @@ def build_ui(app: QMainWindow):
     serial_output_layout.addWidget(app.serial_output)
     serial_output_group.setLayout(serial_output_layout)
 
+    # Current monitor (Pan/Tilt/Total mA)
+    current_group = QGroupBox("Current Monitor")
+    current_layout = QFormLayout()
+    if getattr(app, "pan_current_label", None) is None:
+        app.pan_current_label = QLabel("—")
+    if getattr(app, "tilt_current_label", None) is None:
+        app.tilt_current_label = QLabel("—")
+    if getattr(app, "total_current_label", None) is None:
+        app.total_current_label = QLabel("—")
+    current_layout.addRow(QLabel("Pan (mA):"), app.pan_current_label)
+    current_layout.addRow(QLabel("Tilt (mA):"), app.tilt_current_label)
+    current_layout.addRow(QLabel("Total (mA):"), app.total_current_label)
+    current_group.setLayout(current_layout)
+
+    def _update_current_monitor_labels():
+        try:
+            pan = getattr(app, "pan_current_mA", None)
+            tilt = getattr(app, "tilt_current_mA", None)
+            total = getattr(app, "total_current_mA", None)
+
+            try:
+                app.pan_current_label.setText("—" if pan is None else f"{int(pan)}")
+            except Exception:
+                pass
+            try:
+                app.tilt_current_label.setText("—" if tilt is None else f"{int(tilt)}")
+            except Exception:
+                pass
+            try:
+                app.total_current_label.setText("—" if total is None else f"{int(total)}")
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    try:
+        if getattr(app, "current_monitor_timer", None) is None:
+            app.current_monitor_timer = QTimer(app)
+        # Best-effort safe connect (connect once)
+        try:
+            if not bool(getattr(app, "_current_monitor_timer_connected", False)):
+                if hasattr(app, "_safe_connect"):
+                    app._safe_connect(
+                        "current_monitor_timer", "timeout", _update_current_monitor_labels
+                    )
+                else:
+                    app.current_monitor_timer.timeout.connect(_update_current_monitor_labels)
+                app._current_monitor_timer_connected = True
+        except Exception:
+            try:
+                if not bool(getattr(app, "_current_monitor_timer_connected", False)):
+                    app.current_monitor_timer.timeout.connect(_update_current_monitor_labels)
+                    app._current_monitor_timer_connected = True
+            except Exception:
+                pass
+        try:
+            app.current_monitor_timer.start(200)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
     # System status group
     status_group = QGroupBox("System")
     status_layout = QVBoxLayout()
@@ -1885,6 +1964,7 @@ def build_ui(app: QMainWindow):
         app.add_dock("YOLO Settings", app.yolo_settings_group, "right")
         app.add_dock("Tracking Behavior", behavior_scroll, "right")
         app.add_dock("Manual Movement & Firing", manual_scroll, "right")
+        app.add_dock("Current Monitor", current_group, "right")
         app.add_dock("Serial / Log Output", serial_output_group, "right")
         app.add_dock("System", status_group, "right")
         try:
@@ -1979,9 +2059,10 @@ def build_ui(app: QMainWindow):
             )
 
             def _dump_logs():
-                # Ask for a default filename in the working dir
+                # Ask for a default filename in the repo root (stable location)
                 try:
-                    fname = os.path.join(os.getcwd(), "state_log.txt")
+                    repo_root = os.path.dirname(app.SETTINGS_FILE)
+                    fname = os.path.join(repo_root, "state_log.txt")
                     app.state_logger.dump_to_file(fname, append=False)
                     try:
                         app.enhancer.log_serial_output(

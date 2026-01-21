@@ -222,21 +222,21 @@ class YoloDetector:
                         ) >= getattr(self, "_detect_sound_debounce", 0.6):
                             try:
                                 enh.play_detect()
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                print(f"[YOLO] Audio play failed: {e}")
                             self._last_detect_sound_time = now
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[YOLO] Debounce check failed: {e}")
             else:
                 # reset the rising-edge logic when no detections are present
                 try:
                     self._last_detect_sound_time = getattr(
                         self, "_last_detect_sound_time", 0.0
                     )
-                except Exception:
-                    pass
-        except Exception:
-            pass
+                except Exception as e:
+                    print(f"[YOLO] Reset detect time failed: {e}")
+        except Exception as e:
+            print(f"[YOLO] Detection audio handling failed: {e}")
 
         if return_class_names:
             return detections, class_names_detected

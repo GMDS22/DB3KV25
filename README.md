@@ -111,6 +111,14 @@ or you prefer not to use it, switch to:
 
 These modes work without ultralytics/torch and are suitable for many use cases.
 
+## Serial Bus Servo Upgrade (2026): Current Telemetry
+
+If your Arduino/MCU firmware emits current telemetry lines, the app will parse and display them in the **Current Monitor** dock.
+
+- **Expected telemetry (MCU → Host):** `CUR PmA=<pan_mA> TmA=<tilt_mA> TOTmA=<total_mA>`
+- **Units:** milliamps (mA)
+- **UI:** Pan/Tilt/Total show “—” until telemetry is received
+
 ## Presets (minimal UI workflow)
 
 Factory presets (from `app/turret_presets.py`) can be applied from two places:

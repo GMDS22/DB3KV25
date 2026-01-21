@@ -32,6 +32,7 @@ import random  # For guard mode random positions
 import os
 from pathlib import Path
 import math  # For NaN/Inf checks in serial validation
+import re
 from datetime import datetime
 
 try:
@@ -510,6 +511,37 @@ class AutotrackingStateManager:
         
         new_state = self.get_current_state()
         self.log_transition("firing_stop", old_state, new_state, reason)
+        return True
+    
+    def _sync_tracking_flags(self, tracking_enabled, aiming_enabled=None):
+        """Atomically set tracking and aiming flags to prevent desynchronization.
+        
+        BULLETPROOF FIX: Ensures tracking_active=True implies aiming_active=True.
+        If aiming_enabled is None, it defaults to tracking_enabled.
+        """
+        if aiming_enabled is None:
+            aiming_enabled = tracking_enabled
+        
+        # Validate invariant
+        if tracking_enabled and not aiming_enabled:
+            raise ValueError("Cannot enable tracking without aiming")
+        
+        old_tracking = getattr(self, "tracking_active", False)
+        old_aiming = getattr(self, "aiming_active", False)
+        
+        self.tracking_active = tracking_enabled
+        self.aiming_active = aiming_enabled
+        
+        # Log if changed
+        if old_tracking != tracking_enabled or old_aiming != aiming_enabled:
+            try:
+                if hasattr(self, "enhancer"):
+                    self.enhancer.log_serial_output(
+                        f"[FLAG_SYNC] tracking={tracking_enabled} aiming={aiming_enabled}", fire=False
+                    )
+            except Exception:
+                pass
+        
         return True
     
     def export_transaction_log(self, filepath=None):
@@ -1593,6 +1625,38 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Host-side MCU tilt safety latch (only affects command encoding). Defaults to False;
         # gets updated from MCU responses in send_serial_command().
         self._mcu_tilt_safety_locked = False
+
+        # ========== CURRENT PROTECTION (Pan/Tilt/Total) ==========
+        # Safety protocol for overcurrent protection.
+        # IMPORTANT: This must NOT change tracking math/state; it only gates OUTPUTS
+        # (firing and optionally motion) when a fault is active.
+        # Defaults are conservative (disabled) until calibrated.
+        self.current_protection_enabled = False
+        self.current_block_fire = True
+        self.current_block_motion = True
+        self.current_fault_latch = False  # if True, requires manual clear (future UI hook)
+
+        # Trip thresholds (mA). 0 disables that threshold.
+        self.current_trip_pan_mA = 0
+        self.current_trip_tilt_mA = 0
+        self.current_trip_total_mA = 0
+        # Debounce/clear timing
+        self.current_trip_hold_ms = 250
+        self.current_clear_hold_ms = 750
+        self.current_hysteresis_mA = 250
+
+        # Latest telemetry values (mA)
+        self.pan_current_mA = None
+        self.tilt_current_mA = None
+        self.total_current_mA = None
+        self.last_current_telemetry_time = 0.0
+
+        # Fault state
+        self.current_fault_active = False
+        self.current_fault_reason = ""
+        self._current_trip_start_mono = None
+        self._current_clear_start_mono = None
+        self._current_fault_last_log_mono = 0.0
         # Auto-fire flag (controlled by the Auto-Fire checkbox)
         self.auto_fire_enabled = False
         # Whether tracking loop is actively controlling targeting
@@ -1629,10 +1693,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.idle_modes = None
         self.idle_settings_window = None
         self.home_screen_timer = None
-        # DEC14: DISABLED idle_modes initialization - causes recursion error during startup
-        # TODO: Re-enable after fixing recursion issue in IdleModes class
-        # if IdleModes is not None:
-        #     self.idle_modes = IdleModes()
+        # Re-enabled after fixing recursion issue
+        if IdleModes is not None:
+            self.idle_modes = IdleModes()
         
         # Home screen auto-hide timer (for Rest Mode)
         self._home_screen_hide_timer = None
@@ -3564,10 +3627,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.idle_behavior_combo.setCurrentIndex(idx)
                 except Exception:
                     pass
-                # NOTE: Signal connection removed (11-12-2025)
-                # We use polling in update_frame() instead to avoid conflicts
-                # between signal-driven changes and polling-driven changes.
-                # This prevents race conditions when button and combo both try to change mode.
+                # Connect to signal to activate mode on change
+                try:
+                    self._safe_connect("idle_behavior_combo", "currentIndexChanged", self._on_idle_behavior_changed)
+                except Exception:
+                    pass
             except Exception:
                 pass
             home_layout.addWidget(self.idle_behavior_combo, 5, 1, 1, 2)
@@ -5647,7 +5711,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.relay1_button = QPushButton("LED (Relay1): OFF")
         try:
             self.relay1_button.setCheckable(True)
-            self._safe_connect("relay1_button", "clicked", lambda: self.toggle_relay(1))
+            self._safe_connect("relay1_button", "toggled", lambda checked: self.toggle_relay(1, checked))
         except Exception:
             pass
         accessory_layout.addWidget(self.relay1_button)
@@ -5655,7 +5719,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.relay2_button = QPushButton("LASER (Relay2): OFF")
         try:
             self.relay2_button.setCheckable(True)
-            self._safe_connect("relay2_button", "clicked", lambda: self.toggle_relay(2))
+            self._safe_connect("relay2_button", "toggled", lambda checked: self.toggle_relay(2, checked))
         except Exception:
             pass
         accessory_layout.addWidget(self.relay2_button)
@@ -6504,6 +6568,23 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 manual_action.triggered.connect(self.open_manual_window)
                             except Exception:
                                 pass
+
+                    # Help -> Change Impact Reference (read-only dock panel with search)
+                    try:
+                        impact_action = help_menu.addAction("Change Impact Reference")
+                        conn_i = getattr(impact_action, "triggered", None)
+                        if conn_i is not None:
+                            try:
+                                c_i = getattr(conn_i, "connect", None)
+                                if callable(c_i):
+                                    c_i(self.open_change_impact_panel)
+                            except Exception:
+                                try:
+                                    impact_action.triggered.connect(self.open_change_impact_panel)
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
                 except Exception:
                     pass
 
@@ -6567,21 +6648,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     pass
                 
-                # Idle Settings
-                idle_settings_action = tools_menu.addAction("⚙️ Idle Settings")
-                try:
-                    def open_idle_settings():
-                        try:
-                            if not hasattr(self, '_idle_settings_window') or self._idle_settings_window is None:
-                                self._idle_settings_window = IdleSettingsWindow(self, self.idle_modes)
-                            self._idle_settings_window.show()
-                            self._idle_settings_window.raise_()
-                            self._idle_settings_window.activateWindow()
-                        except Exception as e:
-                            print(f"Error opening idle settings: {e}")
-                    idle_settings_action.triggered.connect(open_idle_settings)
-                except Exception:
-                    pass
+                # Idle Settings is added later (with safe_connect + enhancer logging)
+                # to avoid duplicate menu entries.
                 
                 # Keyboard Shortcuts
                 keyboard_action = tools_menu.addAction("⌨️ Keyboard Shortcuts")
@@ -7502,6 +7570,303 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self._safe_append_log(f"Failed to open manual dialog: {e}")
             except Exception:
                 pass
+
+    def open_change_impact_panel(self):
+        """Open a dockable, read-only panel showing CHANGE_IMPACT_REFERENCE.md with search."""
+        # CHANGE WARNING (2026-01-06): This adds a persistent dock widget and loads a repo-root doc.
+        try:
+            from PyQt5.QtWidgets import (
+                QDockWidget,
+                QWidget,
+                QVBoxLayout,
+                QTextBrowser,
+                QToolBar,
+                QToolButton,
+                QLineEdit,
+                QLabel,
+                QCheckBox,
+                QTextEdit,
+            )
+            from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor
+            from PyQt5.QtCore import Qt
+            from pathlib import Path
+            import os, re
+
+            # Reuse existing dock if present
+            dock = getattr(self, "change_impact_dock", None)
+            if dock is not None:
+                try:
+                    dock.show()
+                    dock.raise_()
+                except Exception:
+                    try:
+                        dock.setVisible(True)
+                    except Exception:
+                        pass
+                return
+
+            dock = QDockWidget("Change Impact Reference", self)
+            try:
+                dock.setObjectName("change_impact_reference_dock")
+                dock.setAllowedAreas(
+                    Qt.LeftDockWidgetArea
+                    | Qt.RightDockWidgetArea
+                    | Qt.BottomDockWidgetArea
+                    | Qt.TopDockWidgetArea
+                )
+                dock.setFeatures(
+                    QDockWidget.DockWidgetMovable
+                    | QDockWidget.DockWidgetClosable
+                    | QDockWidget.DockWidgetFloatable
+                )
+            except Exception:
+                pass
+
+            container = QWidget(dock)
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(6, 6, 6, 6)
+
+            # Toolbar and search controls (same UX as User Manual)
+            toolbar = QToolBar()
+            search_box = QLineEdit()
+            search_box.setPlaceholderText("Search (Enter = next)")
+            prev_btn = QToolButton(); prev_btn.setText("◀")
+            next_btn = QToolButton(); next_btn.setText("▶")
+            case_cb = QCheckBox("Case")
+            whole_cb = QCheckBox("Whole")
+            highlight_cb = QCheckBox("Highlight All"); highlight_cb.setChecked(True)
+            match_label = QLabel("")
+
+            try:
+                toolbar.addWidget(QLabel("Find:"))
+                toolbar.addWidget(search_box)
+                toolbar.addWidget(prev_btn)
+                toolbar.addWidget(next_btn)
+                toolbar.addWidget(match_label)
+                toolbar.addSeparator()
+                toolbar.addWidget(case_cb)
+                toolbar.addWidget(whole_cb)
+                toolbar.addWidget(highlight_cb)
+            except Exception:
+                pass
+            layout.addWidget(toolbar)
+
+            viewer = QTextBrowser()
+            try:
+                viewer.setReadOnly(True)
+            except Exception:
+                pass
+            try:
+                viewer.setOpenExternalLinks(True)
+            except Exception:
+                pass
+
+            content = ""
+            try:
+                base = Path(__file__).resolve().parent
+                possible_paths = [
+                    str((base.parent / "CHANGE_IMPACT_REFERENCE.md").resolve()),
+                    str((Path(os.getcwd()) / "CHANGE_IMPACT_REFERENCE.md").resolve()),
+                ]
+                path = None
+                for p in possible_paths:
+                    if os.path.exists(p):
+                        path = p
+                        break
+                if path and os.path.exists(path):
+                    with open(path, "r", encoding="utf-8") as f:
+                        content = f.read()
+            except Exception:
+                content = ""
+
+            # Convert Markdown to HTML (reuse manual's approach)
+            try:
+                try:
+                    import markdown
+                    html_content = markdown.markdown(content, extensions=['tables', 'fenced_code'])
+                except ImportError:
+                    html_content = content
+                    html_content = re.sub(r'^### (.+)$', r'<h3>\\1</h3>', html_content, flags=re.MULTILINE)
+                    html_content = re.sub(r'^## (.+)$', r'<h2>\\1</h2>', html_content, flags=re.MULTILINE)
+                    html_content = re.sub(r'^# (.+)$', r'<h1>\\1</h1>', html_content, flags=re.MULTILINE)
+                    html_content = re.sub(r'\\*\\*(.+?)\\*\\*', r'<b>\\1</b>', html_content)
+                    html_content = re.sub(r'\\*(.+?)\\*', r'<i>\\1</i>', html_content)
+                    html_content = re.sub(r'_(.+?)_', r'<i>\\1</i>', html_content)
+                    html_content = re.sub(r'```(.+?)```', r'<pre><code>\\1</code></pre>', html_content, flags=re.DOTALL)
+                    html_content = re.sub(r'`(.+?)`', r'<code>\\1</code>', html_content)
+                    html_content = re.sub(r'\\[(.+?)\\]\\((.+?)\\)', r'<a href="\\2">\\1</a>', html_content)
+                    html_content = re.sub(r'^- (.+)$', r'<li>\\1</li>', html_content, flags=re.MULTILINE)
+                    html_content = re.sub(r'(<li>.+</li>)', r'<ul>\\1</ul>', html_content, flags=re.DOTALL)
+                    html_content = html_content.replace('\n', '<br>')
+                viewer.setHtml(html_content)
+            except Exception:
+                try:
+                    viewer.setPlainText(content)
+                except Exception:
+                    pass
+
+            layout.addWidget(viewer)
+            container.setLayout(layout)
+            dock.setWidget(container)
+
+            # Search state
+            dock.viewer = viewer
+            dock.search_box = search_box
+            dock.case_cb = case_cb
+            dock.whole_cb = whole_cb
+            dock.highlight_cb = highlight_cb
+            dock.match_label = match_label
+            dock.matches = []
+            dock.current_index = -1
+
+            def _clear_highlights():
+                try:
+                    viewer.setExtraSelections([])
+                except Exception:
+                    pass
+
+            def _update_highlights():
+                try:
+                    extra = []
+                    fmt_all = QTextCharFormat()
+                    fmt_cur = QTextCharFormat()
+                    if dock.highlight_cb.isChecked():
+                        fmt_all.setBackground(QColor("#ffff88"))
+                    fmt_cur.setBackground(QColor("#ffcc66"))
+                    doc = viewer.document()
+                    if not dock.matches:
+                        viewer.setExtraSelections([])
+                        return
+                    if not dock.highlight_cb.isChecked():
+                        idx = dock.current_index if 0 <= dock.current_index < len(dock.matches) else 0
+                        s, e = dock.matches[idx]
+                        sel = QTextEdit.ExtraSelection()
+                        cur = QTextCursor(doc)
+                        cur.setPosition(s)
+                        cur.setPosition(e, QTextCursor.KeepAnchor)
+                        sel.cursor = cur
+                        sel.format = fmt_cur
+                        extra.append(sel)
+                        viewer.setExtraSelections(extra)
+                        return
+                    for i, (s, e) in enumerate(dock.matches):
+                        sel = QTextEdit.ExtraSelection()
+                        cur = QTextCursor(doc)
+                        cur.setPosition(s)
+                        cur.setPosition(e, QTextCursor.KeepAnchor)
+                        sel.cursor = cur
+                        sel.format = fmt_cur if i == dock.current_index else fmt_all
+                        extra.append(sel)
+                    viewer.setExtraSelections(extra)
+                except Exception:
+                    pass
+
+            def _go_to_current():
+                try:
+                    if not dock.matches:
+                        return
+                    if dock.current_index < 0:
+                        dock.current_index = 0
+                    s, e = dock.matches[dock.current_index]
+                    c = viewer.textCursor()
+                    c.setPosition(s)
+                    c.setPosition(e, QTextCursor.KeepAnchor)
+                    viewer.setTextCursor(c)
+                    try:
+                        viewer.ensureCursorVisible()
+                    except Exception:
+                        pass
+                    try:
+                        dock.match_label.setText(f"{dock.current_index+1}/{len(dock.matches)}")
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
+            def _find_matches():
+                try:
+                    q = search_box.text()
+                    text = viewer.toPlainText() or ""
+                    if not q:
+                        dock.matches = []
+                        dock.current_index = -1
+                        dock.match_label.setText("0/0")
+                        _clear_highlights()
+                        return
+                    flags = 0
+                    if not case_cb.isChecked():
+                        flags = re.IGNORECASE
+                    pattern = re.escape(q)
+                    if whole_cb.isChecked():
+                        pattern = r"\\b" + pattern + r"\\b"
+                    matches = []
+                    for m in re.finditer(pattern, text, flags):
+                        matches.append((m.start(), m.end()))
+                    dock.matches = matches
+                    if not matches:
+                        dock.current_index = -1
+                        dock.match_label.setText("0/0")
+                        _clear_highlights()
+                        return
+                    if dock.current_index < 0 or dock.current_index >= len(matches):
+                        dock.current_index = 0
+                    dock.match_label.setText(f"{dock.current_index+1}/{len(matches)}")
+                    _update_highlights()
+                    _go_to_current()
+                except Exception:
+                    pass
+
+            def _next():
+                try:
+                    if not dock.matches:
+                        return
+                    dock.current_index = (dock.current_index + 1) % len(dock.matches)
+                    _update_highlights()
+                    _go_to_current()
+                except Exception:
+                    pass
+
+            def _prev():
+                try:
+                    if not dock.matches:
+                        return
+                    dock.current_index = (dock.current_index - 1) % len(dock.matches)
+                    _update_highlights()
+                    _go_to_current()
+                except Exception:
+                    pass
+
+            try:
+                search_box.textChanged.connect(lambda _=None: _find_matches())
+                search_box.returnPressed.connect(lambda: _next())
+                next_btn.clicked.connect(lambda: _next())
+                prev_btn.clicked.connect(lambda: _prev())
+                case_cb.toggled.connect(lambda _=None: _find_matches())
+                whole_cb.toggled.connect(lambda _=None: _find_matches())
+                highlight_cb.toggled.connect(lambda _=None: _update_highlights())
+            except Exception:
+                pass
+
+            try:
+                self.addDockWidget(Qt.RightDockWidgetArea, dock)
+            except Exception:
+                try:
+                    self.addDockWidget(Qt.LeftDockWidgetArea, dock)
+                except Exception:
+                    pass
+
+            self.change_impact_dock = dock
+            try:
+                dock.show()
+                dock.raise_()
+            except Exception:
+                pass
+        except Exception as e:
+            try:
+                if getattr(self, "enhancer", None):
+                    self.enhancer.log_serial_output(f"Failed to open Change Impact panel: {e}", fire=False)
+            except Exception:
+                pass
     def eventFilter(self, a0, a1):
         """Capture Close events from the sniper dock so we can remember when
         the user explicitly closed it and avoid re-showing it automatically.
@@ -7568,7 +7933,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
         except Exception:
-            pass
+            return False
+
+        # IMPORTANT: Qt requires eventFilter to return a bool.
+        # Returning None can trigger sipBadCatcherResult() TypeErrors at runtime.
+        return False
 
         # Return False so normal event processing continues.
         return False
@@ -8242,8 +8611,20 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
         try:
-            # Save settings (this might still be useful for manual calls)
-            self.save_settings()
+            # Activate the mode if idle_modes is available
+            idle_modes = getattr(self, "idle_modes", None)
+            if idle_modes is not None:
+                new_mode = str(text).strip().lower()
+                old_mode = idle_modes.get_mode()
+                idle_modes.set_mode(new_mode)
+                try:
+                    if getattr(self, "enhancer", None):
+                        self.enhancer.log_serial_output(
+                            f"[IDLE] Activated {new_mode.upper()} mode via combo selection", 
+                            fire=False
+                        )
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -9154,35 +9535,44 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     def on_yolo_model_changed(self, idx):
         model_name = self.yolo_model_combo.currentText()
         if model_name:
-            try:
-                self.yolo_detector.load_model(model_name)
-                if hasattr(self, "enhancer"):
-                    self.enhancer.log_serial_output(f"Loaded YOLO model: {model_name}")
+            # Load model in background to prevent UI freeze
+            import threading
+            def _load_model_bg():
                 try:
-                    if getattr(self, "state_logger", None):
-                        self.state_logger.log(f">>> YOLO model loaded: {model_name}")
-                except Exception:
-                    pass
-                
-                # CRITICAL FIX: Set target classes immediately after loading model
-                # This ensures custom models (Rat, Cat, Dog) work with their classes
-                try:
-                    classes = (
-                        self._safe_widget_method_return(
-                            "yolo_classes_input", "text", "person"
-                        )
-                        or "person"
-                    )
-                    self.yolo_detector.set_target_classes(classes)
-                    if hasattr(self, "enhancer"):
-                        self.enhancer.log_serial_output(f"YOLO target classes: {classes}")
-                except Exception:
-                    pass
-            except Exception as e:
-                if hasattr(self, "enhancer"):
-                    self.enhancer.log_serial_output(
-                        f"Failed to load YOLO model {model_name}: {e}"
-                    )
+                    success = self.yolo_detector.load_model(model_name)
+                    # Callback to UI thread
+                    def _on_loaded():
+                        if success:
+                            if hasattr(self, "enhancer"):
+                                self.enhancer.log_serial_output(f"Loaded YOLO model: {model_name}")
+                            try:
+                                if getattr(self, "state_logger", None):
+                                    self.state_logger.log(f">>> YOLO model loaded: {model_name}")
+                            except Exception:
+                                pass
+                            
+                            # CRITICAL FIX: Set target classes immediately after loading model
+                            # This ensures custom models (Rat, Cat, Dog) work with their classes
+                            try:
+                                classes = (
+                                    self._safe_widget_method_return(
+                                        "yolo_classes_input", "text", "person"
+                                    )
+                                    or "person"
+                                )
+                                self.yolo_detector.set_target_classes(classes)
+                                if hasattr(self, "enhancer"):
+                                    self.enhancer.log_serial_output(f"YOLO target classes: {classes}")
+                            except Exception:
+                                pass
+                    QTimer.singleShot(0, _on_loaded)
+                except Exception as e:
+                    def _on_error():
+                        if hasattr(self, "enhancer"):
+                            self.enhancer.log_serial_output(f"Failed to load YOLO model {model_name}: {e}")
+                    QTimer.singleShot(0, _on_error)
+            
+            threading.Thread(target=_load_model_bg, daemon=True).start()
 
     def browse_yolo_model(self):
         """Open a file dialog to pick a YOLO model file (allows browsing outside models dir)."""
@@ -10154,6 +10544,53 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 settings.get("trigger_cooldown", 1.5),
             )
 
+            # --- Current Protection (telemetry + safety gating) ---
+            # NOTE: Only gates outputs; does not alter tracking math.
+            try:
+                self.current_protection_enabled = bool(
+                    settings.get("current_protection_enabled", False)
+                )
+            except Exception:
+                self.current_protection_enabled = False
+            try:
+                self.current_block_fire = bool(settings.get("current_block_fire", True))
+            except Exception:
+                self.current_block_fire = True
+            try:
+                self.current_block_motion = bool(settings.get("current_block_motion", True))
+            except Exception:
+                self.current_block_motion = True
+            try:
+                self.current_fault_latch = bool(settings.get("current_fault_latch", False))
+            except Exception:
+                self.current_fault_latch = False
+
+            try:
+                self.current_trip_pan_mA = int(settings.get("current_trip_pan_mA", 0) or 0)
+            except Exception:
+                self.current_trip_pan_mA = 0
+            try:
+                self.current_trip_tilt_mA = int(settings.get("current_trip_tilt_mA", 0) or 0)
+            except Exception:
+                self.current_trip_tilt_mA = 0
+            try:
+                self.current_trip_total_mA = int(settings.get("current_trip_total_mA", 0) or 0)
+            except Exception:
+                self.current_trip_total_mA = 0
+
+            try:
+                self.current_trip_hold_ms = int(settings.get("current_trip_hold_ms", 250) or 250)
+            except Exception:
+                self.current_trip_hold_ms = 250
+            try:
+                self.current_clear_hold_ms = int(settings.get("current_clear_hold_ms", 750) or 750)
+            except Exception:
+                self.current_clear_hold_ms = 750
+            try:
+                self.current_hysteresis_mA = int(settings.get("current_hysteresis_mA", 250) or 250)
+            except Exception:
+                self.current_hysteresis_mA = 250
+
             self.auto_tracking_enabled = settings.get("auto_tracking", False)
             self.detection_enabled = settings.get("detection_enabled", False)
 
@@ -11105,6 +11542,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "rapid_fire_rate_hz": val("rapid_fire_rate_spin", getattr(self, "rapid_fire_rate_hz", 1)),
                 "rapid_fire_enabled": val("rapid_fire_enable_checkbox", getattr(self, "rapid_fire_enabled", False), "checked"),
                 "rapid_fire_duty_percent": val("rapid_fire_duty_slider", int(getattr(self, "rapid_fire_duty", 0.5) * 100)),
+
+                # Current Protection (servo currents + total current)
+                "current_protection_enabled": bool(getattr(self, "current_protection_enabled", False)),
+                "current_block_fire": bool(getattr(self, "current_block_fire", True)),
+                "current_block_motion": bool(getattr(self, "current_block_motion", True)),
+                "current_fault_latch": bool(getattr(self, "current_fault_latch", False)),
+                "current_trip_pan_mA": int(getattr(self, "current_trip_pan_mA", 0) or 0),
+                "current_trip_tilt_mA": int(getattr(self, "current_trip_tilt_mA", 0) or 0),
+                "current_trip_total_mA": int(getattr(self, "current_trip_total_mA", 0) or 0),
+                "current_trip_hold_ms": int(getattr(self, "current_trip_hold_ms", 250) or 250),
+                "current_clear_hold_ms": int(getattr(self, "current_clear_hold_ms", 750) or 750),
+                "current_hysteresis_mA": int(getattr(self, "current_hysteresis_mA", 250) or 250),
                 "home_move_suspend_seconds": val(
                     "home_return_suspend_input",
                     getattr(self, "home_move_suspend_seconds", 2.0),
@@ -13484,9 +13933,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             print(f"[DEBUG] handle_connect_sound error: {e}")  # DEBUG
             pass
 
-    def toggle_relay(self, relay_number):
+    def toggle_relay(self, relay_number, checked=None):
+        if checked is not None:
+            new_state = 1 if checked else 0
+        else:
+            new_state = None  # Will flip below
+        
         if relay_number == 1:
-            self.relay1_state = 1 - self.relay1_state
+            if new_state is not None:
+                self.relay1_state = new_state
+            else:
+                self.relay1_state = 1 - self.relay1_state
             text = "LED (Relay1): ON" if self.relay1_state else "LED (Relay1): OFF"
             self.relay1_button.setText(text)  #
             self.enhancer.log_serial_output(
@@ -13494,7 +13951,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 fire=False,
             )
         elif relay_number == 2:
-            self.relay2_state = 1 - self.relay2_state
+            if new_state is not None:
+                self.relay2_state = new_state
+            else:
+                self.relay2_state = 1 - self.relay2_state
             text = "LASER (Relay2): ON" if self.relay2_state else "LASER (Relay2): OFF"
             self.relay2_button.setText(text)  #
             self.enhancer.log_serial_output(
@@ -15013,6 +15473,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     def update_frame(self):
         # NOTE: Idle button now uses direct click detection (ClickDetectButton class)
         # No need for polling - direct mouse events work reliably
+
+        # ⚠️ CRITICAL: DO NOT modify self.frame_width/self.frame_height in update_frame().
+        # Resolution is set only at init / camera-open / resolution-change to prevent drift bugs.
         
         # ========== RESOLUTION POLLING - REMOVED (Dec 2024) ==========\n        # Camera resolution selector removed from UI\n        # Camera now uses fixed 1280x720 resolution set in __init__\n        # No polling or dynamic resolution changes occur\n        \n        # POLLING: Check idle behavior combo state changes (bypass Qt signals)
         # This detects when user changes the idle behavior dropdown without clicking the button
@@ -18595,6 +19058,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
 
+            # Ensure segment index is always initialized before filename generation
+            try:
+                self._record_segment_index = int(getattr(self, "_record_segment_index", 0) or 0)
+            except Exception:
+                self._record_segment_index = 0
+
             if desired and self.recording_writer is None:
                 if getattr(self, "_test_recording_active", False) and getattr(self, "_test_recording_filepath", None):
                     filepath = self._test_recording_filepath
@@ -19039,7 +19508,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Modifications here affect servo movement, serial protocol encoding,
         # redundant-command filtering, and safety interlocks.
         # See CHANGE_IMPACT_REFERENCE.md → Sections 5 and 6.
-        # Last modified: 2025-12-19 by Copilot Agent
+        # Last modified: 2026-01-06 by Copilot Agent
         # ========== SENTRY MODE BLOCK ==========
         # When sentry mode is active, sentry controls the turret - block main app commands
         # EXCEPTION: Manual override bypasses this block (user pressing direction buttons)
@@ -19277,6 +19746,23 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
 
+        # ========== CURRENT PROTECTION OUTPUT GATING ==========
+        # CHANGE WARNING:
+        # This block must NOT change autotracking math/state; it only gates OUTPUT commands.
+        try:
+            pan_angle, tilt_angle, fire_token, safety_token = self._apply_current_protection_overrides(
+                pan_angle, tilt_angle, fire_token, safety_token
+            )
+        except Exception as e:
+            try:
+                if hasattr(self, "enhancer"):
+                    self.enhancer.log_serial_output(
+                        f"[CURRENT PROTECTION] Error applying overrides: {e}",
+                        fire=False,
+                    )
+            except Exception:
+                pass
+
         # Build the final command string AFTER any pan/tilt overrides.
         command = f"P{pan_angle}T{tilt_angle}F{fire_token}L{led_token}R{laser_token}G{acc3_token}S{safety_token}M{mode_token}\n"
 
@@ -19370,6 +19856,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.trigger_fired = False
             except Exception:
                 pass
+
+            # Still drain incoming serial lines (telemetry/status) so current monitoring
+            # and safety/encoder parsing doesn't stall when output commands are unchanged.
+            try:
+                self._drain_serial_input(max_lines=8, debug_on=debug_on)
+            except Exception:
+                pass
             return  # Skip sending - command is identical to last time
 
         if self.ser is not None and getattr(self.ser, "is_open", False):
@@ -19403,6 +19896,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     pass
                     except Exception:
                         pass
+
+                    # Still drain incoming lines (telemetry/status) while TX is paused.
+                    try:
+                        self._drain_serial_input(max_lines=8, debug_on=debug_on)
+                    except Exception:
+                        pass
                 else:
                     self.ser.write(command.encode("utf-8"))
                     # update last_sent_* only when we actually wrote to serial
@@ -19415,96 +19914,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.prev_pan_angle = float(pan_angle)  # Use what was ACTUALLY sent to MCU
                     self.prev_tilt_angle = float(tilt_angle)
 
-                    # read a possible response
+                    # Drain incoming lines (telemetry + status + encoder)
                     try:
-                        if self.ser.in_waiting > 0:
-                            response = self.ser.readline().decode("utf-8").strip()
-                            if response:
-                                # use enhancer if attached to color logs
-                                try:
-                                    is_fire = "FIRE" in response.upper()
-                                    if hasattr(self, "enhancer"):
-                                        self.enhancer.log_serial_output(
-                                            f"ARDUINO: {response}", fire=is_fire
-                                        )
-                                    else:
-                                        try:
-                                            self._safe_append_log(f"ARDUINO: {response}")
-                                        except Exception:
-                                            pass
-                                    # --- Host-side parsing of MCU safety messages ---
-                                    try:
-                                        uresp = response.upper()
-                                        # If the MCU reports a tilt safety trigger, remember it so the
-                                        # host can avoid sending tilt commands and entering a fight
-                                        # with the firmware's safety override.
-                                        # IMPORTANT: Avoid locking on generic status lines like "TILT SAFETY: OK".
-                                        # OPTIONAL HARDWARE: only respect these messages when the tilt-safety hardware is installed AND enabled.
-                                        if (
-                                            getattr(self, "tilt_safety_hardware_installed", False)
-                                            and getattr(self, "tilt_safety_switch_enabled", False)
-                                        ):
-                                            try:
-                                                tilt_safety_trigger = (
-                                                    "TILT SAFETY SWITCH TRIGGERED" in uresp
-                                                    or ("TILT SAFETY" in uresp and "TRIGGERED" in uresp)
-                                                    or ("TILT" in uresp and "SAFETY" in uresp and "LOCKED" in uresp)
-                                                )
-                                                tilt_safety_clear = (
-                                                    "TILT SAFETY SWITCH RESET" in uresp
-                                                    or ("TILT SAFETY" in uresp and ("RESET" in uresp or "CLEARED" in uresp or "OK" in uresp))
-                                                    or "TILT SAFETY HANDLER DISABLED" in uresp
-                                                    or "TILT SAFETY SWITCH ENABLED" in uresp
-                                                )
-
-                                                # Prefer clearing if both match (defensive against ambiguous firmware strings)
-                                                if tilt_safety_clear:
-                                                    self._mcu_tilt_safety_locked = False
-                                                    if hasattr(self, "enhancer"):
-                                                        self.enhancer.log_serial_output(
-                                                            "[HOST] MCU reports tilt safety CLEARED",
-                                                            fire=False,
-                                                        )
-                                                    else:
-                                                        try:
-                                                            self._safe_append_log("[HOST] MCU reports tilt safety CLEARED")
-                                                        except Exception:
-                                                            pass
-                                                elif tilt_safety_trigger:
-                                                    self._mcu_tilt_safety_locked = True
-                                                    if hasattr(self, "enhancer"):
-                                                        self.enhancer.log_serial_output(
-                                                            "[HOST] MCU reports tilt safety LOCKED — suppressing tilt commands",
-                                                            fire=False,
-                                                        )
-                                                    else:
-                                                        try:
-                                                            self._safe_append_log("[HOST] MCU reports tilt safety LOCKED — suppressing tilt commands")
-                                                        except Exception:
-                                                            pass
-                                            except Exception:
-                                                pass
-                                    except Exception:
-                                        pass
-                                    
-                                    # --- Parse encoder feedback from MCU ---
-                                    try:
-                                        if "ENCODER_TILT" in response:
-                                            self.parse_encoder_response(response)
-                                    except Exception:
-                                        pass
-                                    
-                                    # extend the UI pulse when MCU confirms a fire
-                                    if is_fire:
-                                        try:
-                                            self._pulse_fire_indicator(confirmed=True)
-                                        except Exception:
-                                            pass
-                                except Exception:
-                                    try:
-                                        self._safe_append_log(f"ARDUINO: {response}")
-                                    except Exception:
-                                        pass
+                        self._drain_serial_input(max_lines=8, debug_on=debug_on)
                     except Exception:
                         pass
             except Exception as e:
@@ -19590,6 +20002,370 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         # ensure we reset trigger_fired
         self.trigger_fired = False
+
+    def _drain_serial_input(self, *, max_lines: int = 8, debug_on: bool = False):
+        """Drain and parse a few incoming serial lines.
+
+        Keeps telemetry/status parsing responsive even when outbound commands are
+        skipped (redundant-command filter) or TX is paused.
+        """
+        try:
+            if self.ser is None or not getattr(self.ser, "is_open", False):
+                return 0
+
+            reads_left = int(max_lines) if max_lines is not None else 0
+            if reads_left <= 0:
+                return 0
+
+            read_count = 0
+            while getattr(self.ser, "in_waiting", 0) > 0 and reads_left > 0:
+                reads_left -= 1
+                response = (
+                    self.ser.readline()
+                    .decode("utf-8", errors="replace")
+                    .strip()
+                )
+                if not response:
+                    continue
+                read_count += 1
+
+                # Log line
+                try:
+                    is_fire = "FIRE" in response.upper()
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(f"ARDUINO: {response}", fire=is_fire)
+                    else:
+                        try:
+                            self._safe_append_log(f"ARDUINO: {response}")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+                # --- Host-side parsing of MCU safety messages ---
+                try:
+                    uresp = response.upper()
+                    if (
+                        getattr(self, "tilt_safety_hardware_installed", False)
+                        and getattr(self, "tilt_safety_switch_enabled", False)
+                    ):
+                        tilt_safety_trigger = (
+                            "TILT SAFETY SWITCH TRIGGERED" in uresp
+                            or ("TILT SAFETY" in uresp and "TRIGGERED" in uresp)
+                            or ("TILT" in uresp and "SAFETY" in uresp and "LOCKED" in uresp)
+                        )
+                        tilt_safety_clear = (
+                            "TILT SAFETY SWITCH RESET" in uresp
+                            or (
+                                "TILT SAFETY" in uresp
+                                and (
+                                    "RESET" in uresp
+                                    or "CLEARED" in uresp
+                                    or "OK" in uresp
+                                )
+                            )
+                            or "TILT SAFETY HANDLER DISABLED" in uresp
+                            or "TILT SAFETY SWITCH ENABLED" in uresp
+                        )
+
+                        if tilt_safety_clear:
+                            self._mcu_tilt_safety_locked = False
+                            try:
+                                if hasattr(self, "enhancer"):
+                                    self.enhancer.log_serial_output(
+                                        "[HOST] MCU reports tilt safety CLEARED",
+                                        fire=False,
+                                    )
+                            except Exception:
+                                pass
+                        elif tilt_safety_trigger:
+                            self._mcu_tilt_safety_locked = True
+                            try:
+                                if hasattr(self, "enhancer"):
+                                    self.enhancer.log_serial_output(
+                                        "[HOST] MCU reports tilt safety LOCKED — suppressing tilt commands",
+                                        fire=False,
+                                    )
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+                # --- Parse current telemetry from MCU ---
+                try:
+                    cur = self._parse_current_telemetry_line(response)
+                    if cur is not None:
+                        if "pan" in cur:
+                            self.pan_current_mA = cur.get("pan")
+                        if "tilt" in cur:
+                            self.tilt_current_mA = cur.get("tilt")
+                        if "total" in cur:
+                            self.total_current_mA = cur.get("total")
+                        self.last_current_telemetry_time = time.time()
+                        try:
+                            self._update_current_protection_state(
+                                pan_mA=self.pan_current_mA,
+                                tilt_mA=self.tilt_current_mA,
+                                total_mA=self.total_current_mA,
+                            )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+                # --- Parse encoder feedback from MCU ---
+                try:
+                    if "ENCODER_TILT" in response:
+                        self.parse_encoder_response(response)
+                except Exception:
+                    pass
+
+                # Extend UI pulse if fire confirmed
+                try:
+                    if "FIRE" in response.upper():
+                        self._pulse_fire_indicator(confirmed=True)
+                except Exception:
+                    pass
+
+            return read_count
+        except Exception:
+            return 0
+
+    def _parse_current_telemetry_line(self, line: str):
+        """Parse current telemetry lines.
+
+        Expected examples:
+          CUR PmA=123 TmA=456 TOTmA=789
+          CUR,PmA=123,TmA=456,TOTmA=789
+
+        Returns dict with keys: pan/tilt/total (ints mA) or None if not a current line.
+        """
+        # CHANGE WARNING (2026-01-06): Serial telemetry parser is safety-adjacent.
+        # Keep it resilient/non-throwing and backward-compatible.
+        try:
+            if not line:
+                return None
+            u = line.strip().upper()
+
+            # Backward compatibility: older firmware may report total current as:
+            #   STAT I=<milliamps>
+            # Support this by mapping it to total mA.
+            if u.startswith("STAT") and "I=" in u:
+                try:
+                    m = re.search(r"\bI\s*=\s*(-?\d+)", u)
+                    if not m:
+                        return None
+                    mv = int(m.group(1))
+                    if mv < 0:
+                        mv = 0
+                    return {"total": mv}
+                except Exception:
+                    return None
+
+            if not (u.startswith("CUR") or "PMA=" in u or "TMA=" in u or "TOTMA=" in u):
+                return None
+
+            # Accept flexible separators
+            # Capture e.g. PMA=123
+            pairs = re.findall(r"(PMA|TMA|TOTMA)\s*=\s*(-?\d+)", u)
+            if not pairs:
+                return None
+
+            out = {}
+            for k, v in pairs:
+                try:
+                    mv = int(v)
+                except Exception:
+                    continue
+                if mv < 0:
+                    mv = 0
+                if k == "PMA":
+                    out["pan"] = mv
+                elif k == "TMA":
+                    out["tilt"] = mv
+                elif k == "TOTMA":
+                    out["total"] = mv
+            return out if out else None
+        except Exception:
+            return None
+
+    def _update_current_protection_state(self, *, pan_mA=None, tilt_mA=None, total_mA=None):
+        """Update debounced overcurrent protection state.
+
+        This MUST NOT change tracking behavior; only updates fault flags.
+        """
+        try:
+            now_mono = time.monotonic()
+
+            enabled = bool(getattr(self, "current_protection_enabled", False))
+            if not enabled:
+                # If disabled, clear non-latched fault state and timers.
+                self._current_trip_start_mono = None
+                self._current_clear_start_mono = None
+                if not bool(getattr(self, "current_fault_latch", False)):
+                    self.current_fault_active = False
+                    self.current_fault_reason = ""
+                return
+
+            # Thresholds (0 disables)
+            pan_trip = int(getattr(self, "current_trip_pan_mA", 0) or 0)
+            tilt_trip = int(getattr(self, "current_trip_tilt_mA", 0) or 0)
+            total_trip = int(getattr(self, "current_trip_total_mA", 0) or 0)
+            hyst = int(getattr(self, "current_hysteresis_mA", 0) or 0)
+            trip_hold_s = max(0.0, float(int(getattr(self, "current_trip_hold_ms", 250) or 250)) / 1000.0)
+            clear_hold_s = max(0.0, float(int(getattr(self, "current_clear_hold_ms", 750) or 750)) / 1000.0)
+
+            def exceeded(val, trip):
+                if trip <= 0 or val is None:
+                    return False
+                try:
+                    return int(val) > int(trip)
+                except Exception:
+                    return False
+
+            ex_pan = exceeded(pan_mA, pan_trip)
+            ex_tilt = exceeded(tilt_mA, tilt_trip)
+            ex_total = exceeded(total_mA, total_trip)
+            any_exceeded = bool(ex_pan or ex_tilt or ex_total)
+
+            reasons = []
+            if ex_pan:
+                reasons.append(f"PAN>{pan_trip}mA")
+            if ex_tilt:
+                reasons.append(f"TILT>{tilt_trip}mA")
+            if ex_total:
+                reasons.append(f"TOTAL>{total_trip}mA")
+            reason_text = ", ".join(reasons)
+
+            latched = bool(getattr(self, "current_fault_latch", False))
+            if bool(getattr(self, "current_fault_active", False)):
+                if latched:
+                    # latched faults require manual clear (future UI hook)
+                    self.current_fault_reason = self.current_fault_reason or reason_text
+                    return
+
+                # Auto-clear: require all values to drop below (trip - hyst) for clear_hold
+                def below_clear(val, trip):
+                    if trip <= 0 or val is None:
+                        return True
+                    try:
+                        return int(val) <= max(0, int(trip) - int(hyst))
+                    except Exception:
+                        return False
+
+                ok_pan = below_clear(pan_mA, pan_trip)
+                ok_tilt = below_clear(tilt_mA, tilt_trip)
+                ok_total = below_clear(total_mA, total_trip)
+                all_clear = bool(ok_pan and ok_tilt and ok_total)
+
+                if all_clear:
+                    if self._current_clear_start_mono is None:
+                        self._current_clear_start_mono = now_mono
+                    elif (now_mono - self._current_clear_start_mono) >= clear_hold_s:
+                        self.current_fault_active = False
+                        self.current_fault_reason = ""
+                        self._current_trip_start_mono = None
+                        self._current_clear_start_mono = None
+                        try:
+                            if hasattr(self, "enhancer"):
+                                self.enhancer.log_serial_output(
+                                    "[CURRENT PROTECTION] ✅ Current normalized — fault cleared",
+                                    fire=False,
+                                )
+                        except Exception:
+                            pass
+                else:
+                    self._current_clear_start_mono = None
+                return
+
+            # Not currently faulted
+            self._current_clear_start_mono = None
+            if any_exceeded:
+                if self._current_trip_start_mono is None:
+                    self._current_trip_start_mono = now_mono
+                elif (now_mono - self._current_trip_start_mono) >= trip_hold_s:
+                    self.current_fault_active = True
+                    self.current_fault_reason = reason_text or "OVERCURRENT"
+                    self._current_trip_start_mono = None
+                    self._current_clear_start_mono = None
+                    try:
+                        if hasattr(self, "enhancer"):
+                            self.enhancer.log_serial_output(
+                                f"[CURRENT PROTECTION] ⚠️ Fault ACTIVE: {self.current_fault_reason}",
+                                fire=False,
+                            )
+                    except Exception:
+                        pass
+            else:
+                self._current_trip_start_mono = None
+        except Exception:
+            # Never raise into tracking loop
+            return
+
+    def _apply_current_protection_overrides(self, pan_angle, tilt_angle, fire_token, safety_token):
+        """Apply command-level output gating during an overcurrent fault.
+
+        Guarantees:
+        - Does NOT modify tracking state/targets.
+        - Only changes the outgoing command tokens/angles.
+        """
+        try:
+            if not bool(getattr(self, "current_protection_enabled", False)):
+                return pan_angle, tilt_angle, fire_token, safety_token
+            if not bool(getattr(self, "current_fault_active", False)):
+                return pan_angle, tilt_angle, fire_token, safety_token
+
+            # Force SAFE token so firmware can also enforce safety.
+            safety_token = 1
+
+            # Block firing if configured.
+            if bool(getattr(self, "current_block_fire", True)):
+                fire_token = 0
+                # Ensure MOSFET hold can't keep trying to stay on during fault.
+                try:
+                    self.mosfet_hold_active = False
+                except Exception:
+                    pass
+                try:
+                    self.trigger_fired = False
+                except Exception:
+                    pass
+
+            # Optionally freeze motion output (but do NOT stop tracking calculations).
+            if bool(getattr(self, "current_block_motion", True)):
+                try:
+                    last_pan = int(getattr(self, "last_sent_pan", self.HOME_PAN))
+                    last_tilt = int(getattr(self, "last_sent_tilt", self.HOME_TILT))
+                except Exception:
+                    last_pan = int(getattr(self, "HOME_PAN", 90))
+                    last_tilt = int(getattr(self, "HOME_TILT", 40))
+
+                # If sentinel values are still present, fall back to home.
+                if last_pan <= -9000:
+                    last_pan = int(getattr(self, "HOME_PAN", 90))
+                if last_tilt <= -9000:
+                    last_tilt = int(getattr(self, "HOME_TILT", 40))
+
+                pan_angle = int(np.clip(last_pan, self.PAN_MIN, self.PAN_MAX))
+                tilt_angle = int(np.clip(last_tilt, self.TILT_MIN, self.TILT_MAX))
+
+            # Throttle repeated logs
+            try:
+                now_mono = time.monotonic()
+                if (now_mono - float(getattr(self, "_current_fault_last_log_mono", 0.0))) > 1.0:
+                    self._current_fault_last_log_mono = now_mono
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            f"[CURRENT PROTECTION] Output gated ({getattr(self,'current_fault_reason','')}): "
+                            f"fire=OFF motion={'HOLD' if bool(getattr(self,'current_block_motion',True)) else 'ON'}",
+                            fire=False,
+                        )
+            except Exception:
+                pass
+
+            return pan_angle, tilt_angle, fire_token, safety_token
+        except Exception:
+            return pan_angle, tilt_angle, fire_token, safety_token
 
     # ========== TILT ENCODER FEEDBACK FUNCTIONS ==========
     
@@ -20416,13 +21192,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # Save to settings.json
             try:
                 existing_settings = {}
-                if os.path.exists("settings.json"):
-                    with open("settings.json", 'r') as f:
+                settings_path = self.SETTINGS_FILE
+                if os.path.exists(settings_path):
+                    with open(settings_path, 'r') as f:
                         existing_settings = json.load(f)
                 
                 existing_settings["serial_settings"] = settings
                 
-                with open("settings.json", 'w') as f:
+                with open(settings_path, 'w') as f:
                     json.dump(existing_settings, f, indent=4)
                 
                 if getattr(self, "enhancer", None):
@@ -20509,198 +21286,255 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 )
 
     def apply_recording_settings(self):
-        """Apply and save recording configuration settings."""
+        """Apply recording configuration settings.
+
+        NOTE: Actual persistence is handled by save_settings(); this method
+        mirrors widget values to runtime attributes and then saves.
+        """
+        # CHANGE WARNING (2026-01-06): Recording settings impact disk usage and UI.
         try:
-            # Collect recording settings from widgets
-            settings = {}
-            
-            # Recording enabled
-            if getattr(self, "recording_enabled_checkbox", None):
-                settings["recording_enabled"] = self.recording_enabled_checkbox.isChecked()
-            
-            # Auto-record on tracking start
-            if getattr(self, "autorecord_checkbox", None):
-                settings["autorecord"] = self.autorecord_checkbox.isChecked()
-            
-            # Video format
-            if getattr(self, "video_format_combo", None):
-                settings["video_format"] = self.video_format_combo.currentText()
-            
-            # FPS (parse numeric value from display text like '30 FPS')
-            if getattr(self, "fps_combo", None):
-                try:
-                    import re
-                    txt = str(self.fps_combo.currentText())
+            # Mirror widget values to runtime attributes (used by update_frame recording manager)
+            try:
+                if getattr(self, "video_format_combo", None):
+                    self.recording_format = str(self.video_format_combo.currentText() or self.recording_format)
+            except Exception:
+                pass
+
+            try:
+                fps_setting = None
+                if getattr(self, "fps_combo", None):
+                    txt = str(self.fps_combo.currentText() or "")
                     m = re.search(r"\d+", txt)
-                    settings["fps"] = int(m.group()) if m else 30
-                except Exception:
-                    try:
-                        settings["fps"] = int(self.fps_combo.currentText())
-                    except Exception:
-                        settings["fps"] = 30
-            
-            # Quality
-            if getattr(self, "quality_combo", None):
-                settings["quality"] = self.quality_combo.currentText()
-            
-            # Recording directory
-            if getattr(self, "recording_dir_input", None):
-                settings["recording_dir"] = self.recording_dir_input.text()
-            
-            # Storage limit in GB
-            if getattr(self, "storage_limit_spinbox", None):
-                settings["storage_limit_gb"] = self.storage_limit_spinbox.value()
-            
-            # Auto-cleanup enabled
-            if getattr(self, "autocleanup_checkbox", None):
-                settings["autocleanup"] = self.autocleanup_checkbox.isChecked()
-            
-            # Segment length (minutes)
-            if getattr(self, "record_segment_spinbox", None):
-                settings["segment_length_min"] = int(self.record_segment_spinbox.value())
-
-            # Mirror important values to runtime attributes
-            try:
-                self.recording_segment_minutes = int(settings.get("segment_length_min", 0))
-                self.recording_segment_seconds = self.recording_segment_minutes * 60
+                    fps_setting = int(m.group()) if m else None
+                if fps_setting:
+                    self.recording_fps = int(fps_setting)
             except Exception:
-                self.recording_segment_minutes = 0
-                self.recording_segment_seconds = 0
+                pass
 
             try:
-                self.storage_limit_gb = float(settings.get("storage_limit_gb", self.storage_limit_gb))
+                if getattr(self, "recording_dir_input", None):
+                    v = str(self.recording_dir_input.text() or "").strip()
+                    if v:
+                        self.recording_dir = v
+            except Exception:
+                pass
+
+            try:
+                if getattr(self, "storage_limit_spinbox", None):
+                    self.storage_limit_gb = float(self.storage_limit_spinbox.value())
+            except Exception:
+                pass
+
+            try:
+                if getattr(self, "autocleanup_checkbox", None):
+                    self.autocleanup_enabled = bool(self.autocleanup_checkbox.isChecked())
+            except Exception:
+                pass
+
+            try:
+                if getattr(self, "record_segment_spinbox", None):
+                    self.recording_segment_minutes = int(self.record_segment_spinbox.value())
+                    self.recording_segment_seconds = int(self.recording_segment_minutes * 60)
+            except Exception:
+                self.recording_segment_minutes = int(getattr(self, "recording_segment_minutes", 0) or 0)
+                self.recording_segment_seconds = int(getattr(self, "recording_segment_seconds", 0) or 0)
+
+            # Persist via canonical path
+            try:
+                self.save_settings()
+            except Exception:
+                pass
+
+            # Refresh usage label and enforce storage cap immediately
+            try:
+                self._update_recording_storage_usage_label()
             except Exception:
                 pass
             try:
-                self.autocleanup_enabled = bool(settings.get("autocleanup", self.autocleanup_enabled))
+                self._enforce_storage_limit()
+                self._update_recording_storage_usage_label()
             except Exception:
                 pass
-            
-            # Save to settings.json
+
             try:
-                existing_settings = {}
-                if os.path.exists("settings.json"):
-                    with open("settings.json", 'r') as f:
-                        existing_settings = json.load(f)
-                
-                existing_settings["recording_settings"] = settings
-                
-                with open("settings.json", 'w') as f:
-                    json.dump(existing_settings, f, indent=4)
-                
                 if getattr(self, "enhancer", None):
-                    self.enhancer.log_serial_output(
-                        "[RECORDING] Settings applied and saved"
-                    )
-            except Exception as e:
-                if getattr(self, "enhancer", None):
-                    self.enhancer.log_serial_output(
-                        f"[RECORDING] Failed to save settings: {e}"
-                    )
+                    self.enhancer.log_serial_output("[RECORDING] Settings applied", fire=False)
+            except Exception:
+                pass
         except Exception as e:
-            print(f"[ERROR] apply_recording_settings: {e}")
+            try:
+                print(f"[ERROR] apply_recording_settings: {e}")
+            except Exception:
+                pass
 
-        # ===== RECORDING HELPERS =====
-        def _get_extension_for_format(self, fmt):
-            ext_map = {
-                "MP4 (H.264)": ".mp4",
-                "AVI (MJPEG)": ".avi",
-                "MOV (H.264)": ".mov",
-            }
-            return ext_map.get(fmt, ".mp4")
+    # ===== RECORDING HELPERS =====
+    def _get_extension_for_format(self, fmt):
+        ext_map = {
+            "MP4 (H.264)": ".mp4",
+            "AVI (MJPEG)": ".avi",
+            "MOV (H.264)": ".mov",
+        }
+        return ext_map.get(fmt, ".mp4")
 
-        def _fourcc_for_format(self, fmt):
-            if fmt and fmt.startswith("MP4"):
-                return cv2.VideoWriter_fourcc(*"mp4v")
-            if fmt and ("MJPEG" in fmt or fmt.startswith("AVI")):
-                return cv2.VideoWriter_fourcc(*"MJPG")
+    def _fourcc_for_format(self, fmt):
+        if fmt and str(fmt).startswith("MP4"):
             return cv2.VideoWriter_fourcc(*"mp4v")
+        if fmt and ("MJPEG" in str(fmt) or str(fmt).startswith("AVI")):
+            return cv2.VideoWriter_fourcc(*"MJPG")
+        return cv2.VideoWriter_fourcc(*"mp4v")
 
-        def _start_recording(self, filepath, fmt=None, fps=None):
-            try:
-                if fmt:
-                    self.recording_format = fmt
-                if fps:
-                    self.recording_fps = int(fps)
-                Path(os.path.dirname(filepath)).mkdir(parents=True, exist_ok=True)
-                fourcc = self._fourcc_for_format(self.recording_format)
-                width = int(getattr(self, "frame_width", 1280))
-                height = int(getattr(self, "frame_height", 720))
-                writer = cv2.VideoWriter(filepath, fourcc, float(self.recording_fps), (width, height))
-                if not writer or writer.isOpened() is False:
-                    writer = cv2.VideoWriter(filepath, cv2.VideoWriter_fourcc(*"XVID"), float(self.recording_fps), (width, height))
-                self.recording_writer = writer
-                self._recording_current_filepath = filepath
-                self._recording_segment_start = time.time()
-                if getattr(self, "enhancer", None):
-                    self.enhancer.log_serial_output(f"[RECORDING] Started: {os.path.basename(filepath)}")
-            except Exception as e:
-                self.recording_writer = None
-                if getattr(self, "enhancer", None):
-                    self.enhancer.log_serial_output(f"[RECORDING] Failed to start recording: {e}")
+    def _start_recording(self, filepath, fmt=None, fps=None):
+        try:
+            if fmt:
+                self.recording_format = fmt
+            if fps:
+                self.recording_fps = int(fps)
 
-        def _stop_recording(self):
             try:
-                if self.recording_writer is not None:
-                    try:
-                        self.recording_writer.release()
-                    except Exception:
-                        pass
-                if getattr(self, "enhancer", None) and self._recording_current_filepath:
-                    self.enhancer.log_serial_output(f"[RECORDING] Saved: {os.path.basename(self._recording_current_filepath)}")
-                self.recording_writer = None
+                if not hasattr(self, "_record_segment_index"):
+                    self._record_segment_index = 0
+            except Exception:
+                pass
+
+            Path(os.path.dirname(filepath)).mkdir(parents=True, exist_ok=True)
+            fourcc = self._fourcc_for_format(self.recording_format)
+            width = int(getattr(self, "frame_width", 1280))
+            height = int(getattr(self, "frame_height", 720))
+            writer = cv2.VideoWriter(filepath, fourcc, float(self.recording_fps), (width, height))
+            if (not writer) or (getattr(writer, "isOpened", lambda: False)() is False):
+                writer = cv2.VideoWriter(filepath, cv2.VideoWriter_fourcc(*"XVID"), float(self.recording_fps), (width, height))
+
+            if (not writer) or (getattr(writer, "isOpened", lambda: False)() is False):
+                raise RuntimeError("VideoWriter failed to open")
+
+            self.recording_writer = writer
+            self._recording_current_filepath = filepath
+            self._recording_segment_start = time.time()
+
+            try:
+                self._update_recording_storage_usage_label()
+            except Exception:
+                pass
+
+            if getattr(self, "enhancer", None):
+                self.enhancer.log_serial_output(f"[RECORDING] Started: {os.path.basename(filepath)}")
+        except Exception as e:
+            self.recording_writer = None
+            try:
                 self._recording_current_filepath = None
-                self._recording_segment_start = 0.0
-                # === HIDE RECORDING INDICATOR ===
+            except Exception:
+                pass
+            if getattr(self, "enhancer", None):
+                self.enhancer.log_serial_output(f"[RECORDING] Failed to start recording: {e}")
+
+    def _stop_recording(self):
+        try:
+            if getattr(self, "recording_writer", None) is not None:
                 try:
-                    if hasattr(self, 'recording_indicator_label'):
-                        self.recording_indicator_label.hide()
-                        self.recording_indicator_label.setText("")
+                    self.recording_writer.release()
                 except Exception:
                     pass
-                # === END HIDE RECORDING INDICATOR ===
-            except Exception as e:
-                if getattr(self, "enhancer", None):
-                    self.enhancer.log_serial_output(f"[RECORDING] Stop error: {e}")
 
-        def _get_recording_files_sorted(self):
+            if getattr(self, "enhancer", None) and getattr(self, "_recording_current_filepath", None):
+                self.enhancer.log_serial_output(
+                    f"[RECORDING] Saved: {os.path.basename(self._recording_current_filepath)}"
+                )
+
+            self.recording_writer = None
+            self._recording_current_filepath = None
+            self._recording_segment_start = 0.0
+
+            # Hide indicator
             try:
-                out_dir = Path(getattr(self, "recording_dir", self.recording_dir))
-                if not out_dir.exists():
-                    return []
-                exts = {".mp4", ".avi", ".mov"}
-                files = [f for f in out_dir.iterdir() if f.is_file() and f.suffix.lower() in exts]
-                files.sort(key=lambda p: p.stat().st_mtime)
-                return files
+                if hasattr(self, "recording_indicator_label"):
+                    self.recording_indicator_label.hide()
+                    self.recording_indicator_label.setText("")
             except Exception:
-                return []
+                pass
 
-        def _enforce_storage_limit(self):
             try:
-                if not getattr(self, "autocleanup_enabled", True):
-                    return
-                limit_gb = float(getattr(self, "storage_limit_gb", self.storage_limit_gb) or 0.0)
-                if limit_gb <= 0.0:
-                    return
-                limit_bytes = limit_gb * 1024 ** 3
-                files = self._get_recording_files_sorted()
-                total = sum(f.stat().st_size for f in files)
-                idx = 0
-                while total > limit_bytes and idx < len(files):
-                    f = files[idx]
-                    try:
-                        size = f.stat().st_size
-                        f.unlink()
-                        total -= size
-                        if getattr(self, "enhancer", None):
-                            self.enhancer.log_serial_output(f"[RECORDING] Auto-deleted: {f.name}")
-                    except Exception as e:
-                        if getattr(self, "enhancer", None):
-                            self.enhancer.log_serial_output(f"[RECORDING] Failed to delete {f.name}: {e}")
-                    idx += 1
-            except Exception as e:
-                if getattr(self, "enhancer", None):
-                    self.enhancer.log_serial_output(f"[RECORDING] Cleanup error: {e}")
+                self._update_recording_storage_usage_label()
+            except Exception:
+                pass
+        except Exception as e:
+            if getattr(self, "enhancer", None):
+                self.enhancer.log_serial_output(f"[RECORDING] Stop error: {e}")
+
+    def _get_recording_files_sorted(self):
+        try:
+            out_dir = Path(getattr(self, "recording_dir", str(Path.home() / "Videos" / "Turret")))
+            if not out_dir.exists():
+                return []
+            exts = {".mp4", ".avi", ".mov"}
+            files = [f for f in out_dir.iterdir() if f.is_file() and f.suffix.lower() in exts]
+            files.sort(key=lambda p: p.stat().st_mtime)
+            return files
+        except Exception:
+            return []
+
+    def _enforce_storage_limit(self):
+        """Auto-delete oldest recordings when storage limit is exceeded."""
+        try:
+            if not bool(getattr(self, "autocleanup_enabled", True)):
+                return
+            limit_gb = float(getattr(self, "storage_limit_gb", 0.0) or 0.0)
+            if limit_gb <= 0.0:
+                return
+            limit_bytes = int(limit_gb * 1024 ** 3)
+            files = self._get_recording_files_sorted()
+            total = 0
+            try:
+                total = sum(int(f.stat().st_size) for f in files)
+            except Exception:
+                total = 0
+
+            idx = 0
+            while total > limit_bytes and idx < len(files):
+                f = files[idx]
+                try:
+                    size = int(f.stat().st_size)
+                except Exception:
+                    size = 0
+                try:
+                    f.unlink()
+                    total -= size
+                    if getattr(self, "enhancer", None):
+                        self.enhancer.log_serial_output(f"[RECORDING] Auto-deleted: {f.name}")
+                except Exception as e:
+                    if getattr(self, "enhancer", None):
+                        self.enhancer.log_serial_output(f"[RECORDING] Failed to delete {f.name}: {e}")
+                idx += 1
+        except Exception as e:
+            if getattr(self, "enhancer", None):
+                self.enhancer.log_serial_output(f"[RECORDING] Cleanup error: {e}")
+
+    def _update_recording_storage_usage_label(self):
+        try:
+            lab = getattr(self, "storage_usage_label", None)
+            if lab is None:
+                return
+            out_dir = Path(getattr(self, "recording_dir", str(Path.home() / "Videos" / "Turret")))
+            used_bytes = 0
+            try:
+                exts = {".mp4", ".avi", ".mov"}
+                if out_dir.exists():
+                    for f in out_dir.iterdir():
+                        try:
+                            if f.is_file() and f.suffix.lower() in exts:
+                                used_bytes += int(f.stat().st_size)
+                        except Exception:
+                            pass
+            except Exception:
+                used_bytes = 0
+
+            used_gb = used_bytes / float(1024 ** 3)
+            limit_gb = float(getattr(self, "storage_limit_gb", 0.0) or 0.0)
+            if limit_gb > 0:
+                lab.setText(f"{used_gb:.2f} GB used / {limit_gb:.2f} GB limit")
+            else:
+                lab.setText(f"{used_gb:.2f} GB used")
+        except Exception:
+            pass
 
     def test_recording(self):
         """Start/stop test recording for verification."""
@@ -21191,50 +22025,103 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
     def closeEvent(self, a0):
         """Ensure cleanup of resources and auto-save notes when the window is closed."""
-        # Close all floating windows before app exit
+        # CHANGE WARNING (2026-01-06): closeEvent must be non-throwing.
+        # Do not perform heavy/fragile work directly in this Qt virtual handler.
+        event = a0
+
+        # Stop runtime loops immediately so update_frame doesn't race shutdown.
         try:
-            scope_window = getattr(self, 'scope_settings_window', None)
-            if scope_window is not None:
-                try:
-                    scope_window.close()
-                except Exception:
-                    pass
+            self.tracking_active = False
         except Exception:
             pass
-        
-        # BULLETPROOF FIX: Save notes on close
         try:
-            self.save_notes()
+            self.running = False
         except Exception:
             pass
-        
-        self.save_settings()  # V4 Save on close
 
-        self.tracking_active = False
-        self.running = False
-
-        cap_obj = getattr(self, "cap", None)
-        if cap_obj is not None:
+        def _deferred_cleanup():
             try:
-                cap_obj.release()
-            except Exception:
-                pass
-
-        ser_obj = getattr(self, "ser", None)
-        if ser_obj is not None and getattr(ser_obj, "is_open", False):
-            try:
-                safe_cmd = f"P{getattr(self, 'prev_pan_angle', 90)}T{getattr(self, 'prev_tilt_angle', 40)}F0L0R0G0S1M0\n"
+                # Close floating windows before app exit
                 try:
-                    ser_obj.write(safe_cmd.encode("utf-8"))
+                    scope_window = getattr(self, "scope_settings_window", None)
+                    if scope_window is not None:
+                        try:
+                            scope_window.close()
+                        except Exception:
+                            pass
                 except Exception:
                     pass
-                time.sleep(0.1)
+
+                # Save notes/settings on close (best-effort)
                 try:
-                    ser_obj.close()
+                    self.save_notes()
                 except Exception:
                     pass
-            except Exception:
-                pass
+                try:
+                    self.save_settings()
+                except Exception as e:
+                    try:
+                        print(f"[CLOSE] save_settings failed (ignored): {e}")
+                    except Exception:
+                        pass
+
+                # Release camera
+                try:
+                    cap_obj = getattr(self, "cap", None)
+                    if cap_obj is not None:
+                        cap_obj.release()
+                except Exception:
+                    pass
+
+                # Close serial safely
+                try:
+                    ser_obj = getattr(self, "ser", None)
+                    if ser_obj is not None and getattr(ser_obj, "is_open", False):
+                        try:
+                            safe_cmd = (
+                                f"P{getattr(self, 'prev_pan_angle', 90)}"
+                                f"T{getattr(self, 'prev_tilt_angle', 40)}"
+                                "F0L0R0G0S1M0\n"
+                            )
+                            try:
+                                ser_obj.write(safe_cmd.encode("utf-8"))
+                            except Exception:
+                                pass
+                            try:
+                                import time as _time
+                                _time.sleep(0.1)
+                            except Exception:
+                                pass
+                            try:
+                                ser_obj.close()
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+            except Exception as e:
+                try:
+                    print(f"[CLOSE] deferred cleanup error (ignored): {e}")
+                except Exception:
+                    pass
+
+        # Accept + hand control back to Qt immediately.
+        try:
+            if event is not None and hasattr(event, "accept"):
+                event.accept()
+        except Exception:
+            pass
+        try:
+            super().closeEvent(event)
+        except Exception:
+            pass
+        try:
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(0, _deferred_cleanup)
+        except Exception:
+            # If timers are unavailable during teardown, cleanup best-effort now.
+            _deferred_cleanup()
         
         # BULLETPROOF FIX: Accept close event properly
         a0.accept()
