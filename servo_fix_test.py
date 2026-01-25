@@ -119,30 +119,30 @@ def test_flag_synchronization():
     print("\n[TEST 1] Enable tracking - should enable both flags")
     result = app._sync_tracking_flags(tracking_enabled=True)
     if result["tracking_active"] and result["aiming_active"]:
-        print("✓ PASS: Both flags enabled")
+        print("PASS: Both flags enabled")
         tests_passed += 1
     else:
-        print(f"✗ FAIL: Expected both True, got tracking={result['tracking_active']}, aiming={result['aiming_active']}")
+        print(f"FAIL: Expected both True, got tracking={result['tracking_active']}, aiming={result['aiming_active']}")
         tests_failed += 1
     
     # Test 2: Try to disable aiming while tracking - should prevent it
     print("\n[TEST 2] Disable aiming while tracking - should prevent it")
     result = app._sync_tracking_flags(tracking_enabled=True, aiming_enabled=False)
     if result["tracking_active"] and result["aiming_active"]:
-        print("✓ PASS: Aiming re-enabled despite user attempting to disable it")
+        print("PASS: Aiming re-enabled despite user attempting to disable it")
         tests_passed += 1
     else:
-        print(f"✗ FAIL: Expected tracking=True, aiming=True, got {result}")
+        print(f"FAIL: Expected tracking=True, aiming=True, got {result}")
         tests_failed += 1
     
     # Test 3: Disable tracking should disable both
     print("\n[TEST 3] Disable tracking - should disable both flags")
     result = app._sync_tracking_flags(tracking_enabled=False)
     if not result["tracking_active"] and not result["aiming_active"]:
-        print("✓ PASS: Both flags disabled")
+        print("PASS: Both flags disabled")
         tests_passed += 1
     else:
-        print(f"✗ FAIL: Expected both False, got tracking={result['tracking_active']}, aiming={result['aiming_active']}")
+        print(f"FAIL: Expected both False, got tracking={result['tracking_active']}, aiming={result['aiming_active']}")
         tests_failed += 1
     
     # Test 4: Enable aiming alone (without tracking) - should enable only aiming
@@ -151,10 +151,10 @@ def test_flag_synchronization():
     app.aiming_active = False
     result = app._sync_tracking_flags(tracking_enabled=False, aiming_enabled=True)
     if not result["tracking_active"] and result["aiming_active"]:
-        print("✓ PASS: Only aiming enabled (tracking stayed off)")
+        print("PASS: Only aiming enabled (tracking stayed off)")
         tests_passed += 1
     else:
-        print(f"✗ FAIL: Expected tracking=False, aiming=True, got {result}")
+        print(f"FAIL: Expected tracking=False, aiming=True, got {result}")
         tests_failed += 1
     
     # Test 5: Enable tracking from mixed state
@@ -163,10 +163,10 @@ def test_flag_synchronization():
     app.aiming_active = True
     result = app._sync_tracking_flags(tracking_enabled=True)
     if result["tracking_active"] and result["aiming_active"]:
-        print("✓ PASS: Both flags enabled from mixed state")
+        print("PASS: Both flags enabled from mixed state")
         tests_passed += 1
     else:
-        print(f"✗ FAIL: Expected both True, got {result}")
+        print(f"FAIL: Expected both True, got {result}")
         tests_failed += 1
     
     # Test 6: Verify invariant - tracking implies aiming
@@ -176,10 +176,10 @@ def test_flag_synchronization():
     result = app._sync_tracking_flags(tracking_enabled=True)
     invariant_holds = not (result["tracking_active"] and not result["aiming_active"])
     if invariant_holds:
-        print("✓ PASS: Invariant holds (no state where tracking=True but aiming=False)")
+        print("PASS: Invariant holds (no state where tracking=True but aiming=False)")
         tests_passed += 1
     else:
-        print(f"✗ FAIL: Invariant violated! tracking={result['tracking_active']}, aiming={result['aiming_active']}")
+        print(f"FAIL: Invariant violated! tracking={result['tracking_active']}, aiming={result['aiming_active']}")
         tests_failed += 1
     
     # Summary
@@ -188,10 +188,10 @@ def test_flag_synchronization():
     print("="*70)
     
     if tests_failed == 0:
-        print("\n✓ ALL TESTS PASSED - Servo flag synchronization is working correctly!")
+        print("\nALL TESTS PASSED - Servo flag synchronization is working correctly!")
         return 0
     else:
-        print(f"\n✗ {tests_failed} TEST(S) FAILED - There are issues to fix")
+        print(f"\n{tests_failed} TEST(S) FAILED - There are issues to fix")
         return 1
 
 

@@ -23,9 +23,9 @@ from MAIN_FILE_SINGLE_CAM import TrackingApp
 print("[TEST] Creating TrackingApp instance...")
 try:
     ex = TrackingApp()
-    print("[TEST] ✓ TrackingApp created successfully")
+    print("[TEST] PASS: TrackingApp created successfully")
 except Exception as e:
-    print(f"[TEST] ✗ Failed to create TrackingApp: {e}")
+    print(f"[TEST] FAIL: Failed to create TrackingApp: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)
@@ -34,9 +34,9 @@ print("[TEST] Showing window...")
 try:
     if not ex.isMaximized():
         ex.show()
-    print("[TEST] ✓ Window shown")
+    print("[TEST] PASS: Window shown")
 except Exception as e:
-    print(f"[TEST] ✗ Failed to show window: {e}")
+    print(f"[TEST] FAIL: Failed to show window: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)
@@ -70,7 +70,7 @@ print("[TEST] Entering event loop...")
 try:
     sys.exit(app.exec_())
 except Exception as e:
-    print(f"[TEST] ✗ Event loop error: {e}")
+    print(f"[TEST] FAIL: Event loop error: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)

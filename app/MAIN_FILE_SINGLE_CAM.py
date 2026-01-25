@@ -77,6 +77,7 @@ from PyQt5.QtWidgets import (
     QDockWidget,
     QDoubleSpinBox,
     QFileDialog,
+    QFormLayout,
     QFrame,
     QGridLayout,
     QGroupBox,
@@ -95,6 +96,16 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+try:
+    from helpers.graph_widget import HealthGraphWidget
+except ImportError:
+    print("[WARN] Could not import HealthGraphWidget. Using dummy.")
+    class HealthGraphWidget(QWidget):  # type: ignore
+        def __init__(self, max_val=100, label=""):
+             super().__init__()
+        def push_data(self, val):
+             pass
 
 # State logger for debugging and diagnostics (optional)
 try:
@@ -171,34 +182,22 @@ except Exception as e:
     SENTRY_MODE_AVAILABLE = False
 
 # Try to register QTextCursor as a Qt metatype to avoid queued-argument warnings
-# Use guarded lookup since some PyQt5 builds may not expose qRegisterMetaType directly
+# Use a single guarded attempt to avoid duplicate registrations.
 try:
     import PyQt5.QtCore as _QtCore
-    _qr = getattr(_QtCore, 'qRegisterMetaType', None)
+    _qr = getattr(_QtCore, "qRegisterMetaType", None)
     if callable(_qr):
         try:
-            _qr(QTextCursor, 'QTextCursor')
-        except Exception:
+            _qr("QTextCursor")
+        except Exception as e1:
             try:
-                _qr('QTextCursor')
-            except Exception:
-                pass
-except Exception:
-    pass
-
-# Additional robust attempts to register the QTextCursor meta-type.
-# Some PyQt builds require the type name string; others accept the Python type.
-try:
-    from PyQt5.QtCore import qRegisterMetaType
-    try:
-        qRegisterMetaType('QTextCursor')
-    except Exception:
-        try:
-            qRegisterMetaType(QTextCursor, 'QTextCursor')
-        except Exception:
-            pass
-except Exception:
-    pass
+                _qr(QTextCursor, "QTextCursor")
+            except Exception as e2:
+                print(f"[Qt] QTextCursor meta-type registration failed: {e1}; {e2}")
+    else:
+        print("[Qt] qRegisterMetaType not available; skipping QTextCursor registration")
+except Exception as e:
+    print(f"[Qt] QTextCursor meta-type registration error: {e}")
 
 # Idle modes system
 try:
@@ -400,6 +399,15 @@ class AutotrackingStateManager:
         # Keep log from growing unbounded
         if len(self.transaction_log) > self.max_log_entries:
             self.transaction_log = self.transaction_log[-500:]
+
+    def _log_state_issue(self, message: str):
+        try:
+            if hasattr(self.app, "enhancer") and self.app.enhancer:
+                self.app.enhancer.log_serial_output(f"[STATE] {message}", fire=False)
+            else:
+                print(f"[STATE] {message}")
+        except Exception as e:
+            print(f"[STATE] {message} (log error: {e})")
     
     def get_current_state(self):
         """Snapshot the current system state"""
@@ -426,36 +434,30 @@ class AutotrackingStateManager:
         go_home = getattr(self.app, "_in_go_home", False)
         manual = getattr(self.app, "manual_override", False)
         
-        # BULLETPROOF RULE 1: If tracking enabled, aiming should also be enabled
+        # RULE 1: If tracking enabled, aiming should also be enabled
         if tracking and not aiming:
-            problems.append("CORRUPTION: tracking=ON but aiming=OFF")
-            self.app.aiming_active = True
+            problems.append("tracking=ON but aiming=OFF")
         
-        # BULLETPROOF RULE 2: If firing, must have tracking or manual override
+        # RULE 2: If firing, must have tracking or manual override
         if firing and not (tracking or manual):
-            problems.append("CORRUPTION: firing=ON but tracking=OFF and manual=OFF")
-            self.app.trigger_fired = False
+            problems.append("firing=ON but tracking=OFF and manual=OFF")
         
-        # BULLETPROOF RULE 3: If go_home is active, tracking should be off
+        # RULE 3: If go_home is active, tracking should be off
         if go_home and tracking:
-            problems.append("CORRUPTION: go_home=ON but tracking=ON")
-            self.app.tracking_active = False
-            self.app.aiming_active = False
+            problems.append("go_home=ON but tracking=ON")
         
         # BULLETPROOF RULE 4: Detection must ALWAYS be running (suppression is deprecated/removed)
         # This prevents the "detection loss" bug from returning.
         # Legacy suppression code has been deprecated - detection should never be suppressed.
         suppress_until = getattr(self.app, "_suppress_detection_until", 0.0)
         if suppress_until > time.time():
-            problems.append("CRITICAL: Detection suppression detected! (Should be fully removed)")
-            self.app._suppress_detection_until = 0.0  # Force clear legacy suppression
+            problems.append("detection suppression detected (deprecated)")
         
         # BULLETPROOF RULE 5: Manual override should timeout properly
         # If manual_override is True but suppression window expired, clear it
         manual_suppress_until = getattr(self.app, "_manual_override_until", 0.0)
         if manual and manual_suppress_until < time.time():
-            problems.append("CORRUPTION: manual_override=ON but suppression window expired")
-            self.app.manual_override = False
+            problems.append("manual_override=ON but suppression window expired")
         
         # BULLETPROOF RULE 6: Aiming without tracking is unusual (should only happen during re-acquisition)
         # Track it but don't auto-fix (might be intentional re-acquisition state)
@@ -463,6 +465,9 @@ class AutotrackingStateManager:
             # Log but don't corrupt - might be valid re-acquisition in progress
             pass
         
+        if problems:
+            for issue in problems:
+                self._log_state_issue(issue)
         return (len(problems) == 0, problems)
     
     def ensure_tracking_active(self, reason=""):
@@ -506,8 +511,8 @@ class AutotrackingStateManager:
         if hasattr(self.app, "stop_firing"):
             try:
                 self.app.stop_firing()
-            except Exception:
-                pass
+            except Exception as e:
+                self._log_state_issue(f"stop_firing failed: {e}")
         
         new_state = self.get_current_state()
         self.log_transition("firing_stop", old_state, new_state, reason)
@@ -564,54 +569,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     # Signal to carry serial connection results from background thread
     serial_connect_result = pyqtSignal(object)
     def _apply_tooltip_styles_and_texts(self):
-        from PyQt5.QtWidgets import QToolTip
-        from PyQt5.QtGui import QFont, QPalette, QColor
-        from PyQt5.QtWidgets import QApplication
-        from PyQt5.QtCore import QObject, QEvent, QTimer
-        from PyQt5.QtWidgets import QLabel
-        from PyQt5.QtCore import Qt as _Qt
-        try:
-            QToolTip.setFont(QFont("Segoe UI", 9))
-            pal = QPalette()
-            pal.setColor(QPalette.ToolTipBase, QColor("#fffacd"))
-            pal.setColor(QPalette.ToolTipText, QColor("#000000"))
-            QToolTip.setPalette(pal)
-        except Exception:
-            pass
-
-        # Ensure an application-level stylesheet enforces readable tooltip colors
-        try:
-            app = QApplication.instance()
-            if app is not None:
-                current = app.styleSheet() or ""
-                # Append a QToolTip rule to override widget-level styles
-                tip_rule = (
-                    "QToolTip { background-color: #FFFACD; color: #000000; "
-                    "border: 1px solid #666; border-radius: 4px; padding: 3px 6px; "
-                    "font-size: 10pt; font-family: 'Segoe UI'; }"
-                )
-                if "QToolTip" not in current:
-                    app.setStyleSheet(current + "\n" + tip_rule)
-        except Exception:
-            pass
-
-        # Debug dump: write effective styles and palette colors to help diagnose overrides
-        try:
-            p = QPalette()
-            if app is not None:
-                p = app.palette()
-            debug = {
-                "styleSheet_contains_QToolTip": ("QToolTip" in (app.styleSheet() or "")),
-                "styleSheet_length": len(app.styleSheet() or ""),
-                "toolTipBase": p.color(QPalette.ToolTipBase).name(),
-                "toolTipText": p.color(QPalette.ToolTipText).name(),
-            }
-            with open("tooltip_debug.txt", "w", encoding="utf-8") as df:
-                df.write(str(debug))
-                df.write("\n---styleSheet---\n")
-                df.write((app.styleSheet() or "")[:10000])
-        except Exception:
-            pass
+        # Custom tooltip/event-filter system temporarily disabled.
+        # Use standard setToolTip() only to avoid Qt event-flow interference.
+        if getattr(self, "_disable_custom_tooltips", False):
+            try:
+                if getattr(self, "enhancer", None):
+                    self.enhancer.log_serial_output("[TOOLTIPS] Custom tooltip styling disabled", fire=False)
+            except Exception as e:
+                print(f"[TOOLTIPS] log error: {e}")
 
         tips = {
             "connect_button": "Open or close the selected serial port connection.",
@@ -646,51 +611,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 w = getattr(self, attr, None)
                 if w is not None and hasattr(w, "setToolTip"):
                     w.setToolTip(text)
-                    # Install a lightweight custom tooltip filter so the tooltip
-                    # appearance is controlled regardless of platform/theme.
-                    try:
-                        class _TooltipFilter(QObject):
-                            def __init__(self, widget, tip_text):
-                                super().__init__(widget)
-                                self._w = widget
-                                self._text = tip_text
-                                self._label = None
-
-                            def eventFilter(self, obj, ev):
-                                if ev.type() == QEvent.ToolTip or ev.type() == QEvent.Enter:
-                                    try:
-                                        if self._label is None:
-                                            self._label = QLabel(self._text)
-                                            self._label.setWindowFlags(_Qt.ToolTip)
-                                            self._label.setAttribute(_Qt.WA_TransparentForMouseEvents)
-                                            self._label.setStyleSheet(
-                                                "QLabel { background-color: #FFFACD; color: #000000; "
-                                                "border: 1px solid #666; padding: 4px; border-radius: 4px; }"
-                                            )
-                                        pos = self._w.mapToGlobal(self._w.rect().bottomLeft())
-                                        self._label.move(pos)
-                                        self._label.show()
-                                        QTimer.singleShot(4000, lambda: self._label.hide())
-                                    except Exception:
-                                        pass
-                                    return True
-                                if ev.type() == QEvent.Leave:
-                                    try:
-                                        if self._label is not None:
-                                            self._label.hide()
-                                    except Exception:
-                                        pass
-                                return False
-                        f = _TooltipFilter(w, text)
-                        w.installEventFilter(f)
-                        # Keep a reference so it isn't garbage-collected
-                        if not hasattr(self, "_tooltip_filters"):
-                            self._tooltip_filters = []
-                        self._tooltip_filters.append(f)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[TOOLTIPS] Failed to apply tooltip for {attr}: {e}")
 
     def _create_precision_diagnostics(self):
         """Create a small dock showing precision diagnostics for live tuning."""
@@ -1492,7 +1414,28 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     # (static-analysis helpers removed) - avoid reassigning imported Qt widget names
 
     def __init__(self):
+        # CHANGE WARNING:
+        # Modifications here affect initialization order and runtime state ownership.
+        # See CHANGE_IMPACT_REFERENCE.md → Code-Level Change Enforcement.
+        # Last modified: 2026-01-25 by Copilot Agent
         super().__init__()
+        # ---- Early runtime state initialization (before timers/signals/threads) ----
+        self.ser = None
+        self.cap = None
+        self.tracking_active = False
+        self.aiming_active = False
+        self.manual_override = False
+        self.trigger_fired = False
+        self.tracking_was_active = False
+        self._manual_override_until = 0.0
+        self._manual_override_active = False
+        self.auto_fire_enabled = False
+        # Feature disable toggles for stabilization
+        self._disable_idle_modes = True
+        self._disable_sentry_hooks = True
+        self._disable_auto_fire = True
+        self._disable_recording = True
+        self._disable_custom_tooltips = True
         # Flag to track if UI initialization failed due to Qt errors
         self._ui_init_failed = False
         # Explicit typed widget attributes to help static analysis and IDEs
@@ -1530,8 +1473,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.save_defaults_btn: QPushButton
         self.target_locked = False
         # Hardware / runtime handles
-        self.ser = None
-        self.cap = None
         self._camera_open_needed = False  # Flag to trigger camera re-opening when resolution changes
         self._serial_connection_in_progress = False  # FIX DEC15: Prevent concurrent connection attempts
 
@@ -1569,7 +1510,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Without these, manual_override=True case skips position restoration entirely
         self.last_known_pan = float(self.HOME_PAN)
         self.last_known_tilt = float(self.HOME_TILT)
-        self.trigger_fired = False
         # Latched MOSFET ON/OFF state (manual override). Kept separate from trigger_fired so
         # one-shot fire requests cannot become "sticky" across redundant-command skips.
         self.mosfet_hold_active = False
@@ -1651,6 +1591,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.total_current_mA = None
         self.last_current_telemetry_time = 0.0
 
+        # Current sensor installation flags
+        # These default to False so the app never assumes sensors exist.
+        # - per-servo (pan/tilt) sensors are optional
+        # - total current sensor is optional and can be toggled when installed
+        self.per_servo_current_sensors_enabled = False
+        self.total_current_sensor_enabled = False
+
         # Fault state
         self.current_fault_active = False
         self.current_fault_reason = ""
@@ -1658,13 +1605,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self._current_clear_start_mono = None
         self._current_fault_last_log_mono = 0.0
         # Auto-fire flag (controlled by the Auto-Fire checkbox)
-        self.auto_fire_enabled = False
-        # Whether tracking loop is actively controlling targeting
-        self.tracking_active = False
-        # Whether servos are allowed to move (aiming enabled)
-        self.aiming_active = False
-        # Whether tracking was active before a manual override (used to resume)
-        self.tracking_was_active = False
+        # NOTE: initialized early; maintained here for clarity only.
         # Infinite hold toggle (when True, never timeout hold)
         self.hold_infinite = False
         
@@ -1684,9 +1625,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.idle_behavior = "rest"
 
         # Manual control and overrides
-        self.manual_override = False
-        self._manual_override_until = 0.0
-        self._manual_override_active = False
         self._pressed_keys = set()  # For tracking keyboard input
         
         # Idle modes system
@@ -1694,8 +1632,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.idle_settings_window = None
         self.home_screen_timer = None
         # Re-enabled after fixing recursion issue
-        if IdleModes is not None:
+        if IdleModes is not None and not getattr(self, "_disable_idle_modes", False):
             self.idle_modes = IdleModes()
+        elif IdleModes is not None and getattr(self, "_disable_idle_modes", False):
+            try:
+                if getattr(self, "enhancer", None):
+                    self.enhancer.log_serial_output("[IDLE] Idle modes disabled for stabilization", fire=False)
+            except Exception as e:
+                print(f"[IDLE] log error: {e}")
         
         # Home screen auto-hide timer (for Rest Mode)
         self._home_screen_hide_timer = None
@@ -3195,29 +3139,55 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             pass
         settings_layout.addWidget(self.baud_rate_input, 1, 1)
 
-        # Factory preset quick-access (keeps UI usable even if Behavior dock is hidden)
-        # NOTE: This is a separate combo box from any behavior-panel preset widget.
-        # Qt widgets cannot have multiple parents.
-        settings_layout.addWidget(QLabel("Factory Preset:"), 2, 0)
-        if getattr(self, "connection_preset_combo", None) is None:
-            self.connection_preset_combo = QComboBox()
+        # Serial device type (ASCII Nano protocol vs Direct Debug Board bus-servo vs Dual Port)
+        settings_layout.addWidget(QLabel("Serial Device:"), 1, 2)
+        if getattr(self, "serial_device_type_combo", None) is None:
+            self.serial_device_type_combo = QComboBox()
             try:
-                self.connection_preset_combo.setToolTip(
-                    "Quick-apply a factory preset without opening the Behavior panel."
+                self.serial_device_type_combo.addItems(
+                    [
+                        "Arduino/Nano (DB3000 ASCII)",
+                        "Debug Board (Bus Servo Direct)",
+                        "Dual Port (Nano IO + Debug Board Pan/Tilt)",
+                    ]
+                )
+                self.serial_device_type_combo.setToolTip(
+                    "Select how the app talks to the selected COM port.\n"
+                    "- Arduino/Nano: sends text commands like P90T40F0...\n"
+                    "- Debug Board: sends binary bus-servo packets for PAN/TILT only.\n"
+                    "- Dual Port: Nano handles IO (fire/relays/safety), Debug Board COM handles PAN/TILT."
                 )
             except Exception:
                 pass
+        settings_layout.addWidget(self.serial_device_type_combo, 1, 3)
+
+        # Dual-port fields (Debug Board COM for bus-servo direct)
+        settings_layout.addWidget(QLabel("Debug Board COM:"), 2, 2)
+        if getattr(self, "debug_board_com_port_input", None) is None:
+            self.debug_board_com_port_input = QLineEdit()
         try:
-            # Keep items in the same order that apply_preset() expects
-            if getattr(self, "connection_preset_combo", None) is not None:
-                if self.connection_preset_combo.count() == 0:
-                    self.connection_preset_combo.addItems(list(PRESETS.keys()))
-                self._safe_connect(
-                    "connection_preset_combo", "currentIndexChanged", self.apply_preset
-                )
+            if not getattr(self.debug_board_com_port_input, "text", lambda: "")():
+                self.debug_board_com_port_input.setText("COM9")
         except Exception:
             pass
-        settings_layout.addWidget(self.connection_preset_combo, 2, 1)
+        settings_layout.addWidget(self.debug_board_com_port_input, 2, 3)
+
+        settings_layout.addWidget(QLabel("Debug Board Baud:"), 3, 2)
+        if getattr(self, "debug_board_baud_rate_input", None) is None:
+            self.debug_board_baud_rate_input = QSpinBox()
+        try:
+            self._safe_widget_call(
+                "debug_board_baud_rate_input", "setRange", 2400, 115200
+            )
+            self._safe_widget_call(
+                "debug_board_baud_rate_input", "setValue", 115200
+            )
+        except Exception:
+            pass
+        settings_layout.addWidget(self.debug_board_baud_rate_input, 3, 3)
+
+        # Factory Preset removed from Connection Panel to prevent conflict/duplication
+        # (User Request: "Remove the one in connection panel")
 
         if getattr(self, "connect_button", None) is None:
             self.connect_button = QPushButton("Connect")
@@ -6315,6 +6285,114 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     pass
             self.add_dock("System", status_group, "left")
+
+            # === HEALTH MONITOR DOCK (FIXED) ===
+            try:
+                health_group = QGroupBox("System Health Monitor")
+                health_layout = QFormLayout()
+                
+                if getattr(self, "total_current_label", None) is None:
+                    self.total_current_label = QLabel("—")
+
+                if getattr(self, "total_current_sensor_checkbox", None) is None:
+                    self.total_current_sensor_checkbox = QCheckBox("Total current sensor installed")
+                    if hasattr(self, "_safe_connect"):
+                        self._safe_connect("total_current_sensor_checkbox", "toggled", self.set_total_current_sensor_enabled)
+
+                health_layout.addRow(self.total_current_sensor_checkbox)
+                health_layout.addRow(QLabel("Total (mA):"), self.total_current_label)
+
+                if getattr(self, "health_graph", None) is None:
+                    self.health_graph = HealthGraphWidget()
+                health_layout.addRow(self.health_graph)
+
+                health_layout.addRow(QLabel("FPS:"))
+                if getattr(self, "fps_graph", None) is None:
+                    self.fps_graph = HealthGraphWidget(max_val=60)
+                    self.fps_graph.setMinimumHeight(60)
+                health_layout.addRow(self.fps_graph)
+
+                # Separator
+                line = QFrame()
+                line.setFrameShape(QFrame.HLine)
+                line.setFrameShadow(QFrame.Sunken)
+                health_layout.addRow(line)
+
+                # Pan Stats
+                health_layout.addRow(QLabel("Pan Load (Torque):"))
+                if getattr(self, "pan_load_graph", None) is None:
+                     self.pan_load_graph = HealthGraphWidget(max_val=1000)
+                     self.pan_load_graph.setMinimumHeight(50)
+                health_layout.addRow(self.pan_load_graph)
+
+                health_layout.addRow(QLabel("Pan Current (mA):"))
+                if getattr(self, "pan_current_graph", None) is None:
+                     self.pan_current_graph = HealthGraphWidget(max_val=2500)
+                     self.pan_current_graph.setMinimumHeight(50)
+                health_layout.addRow(self.pan_current_graph)
+
+                # Separator
+                line2 = QFrame()
+                line2.setFrameShape(QFrame.HLine)
+                line2.setFrameShadow(QFrame.Sunken)
+                health_layout.addRow(line2)
+
+                # Tilt Stats
+                health_layout.addRow(QLabel("Tilt Load (Torque):"))
+                if getattr(self, "tilt_load_graph", None) is None:
+                     self.tilt_load_graph = HealthGraphWidget(max_val=1000)
+                     self.tilt_load_graph.setMinimumHeight(50)
+                health_layout.addRow(self.tilt_load_graph)
+
+                health_layout.addRow(QLabel("Tilt Current (mA):"))
+                if getattr(self, "tilt_current_graph", None) is None:
+                     self.tilt_current_graph = HealthGraphWidget(max_val=2500)
+                     self.tilt_current_graph.setMinimumHeight(50)
+                health_layout.addRow(self.tilt_current_graph)
+                
+                health_group.setLayout(health_layout)
+                self.add_dock("System Health Monitor", health_group, "right")
+
+                # Timer for updating graphs
+                self.health_timer = QTimer(self)
+                def _update_health_graphs():
+                    try:
+                        # Total Current
+                        tot = getattr(self, "total_current_mA", None)
+                        if hasattr(self, "health_graph"): 
+                           self.health_graph.push_data(tot if tot is not None else 0)
+                        
+                        # FPS
+                        fps_val = getattr(self, "measured_fps_val", 0)
+                        if hasattr(self, "fps_graph"):
+                            self.fps_graph.push_data(fps_val)
+
+                        # Pan Data
+                        pload = getattr(self, "pan_load_val", 0) or 0
+                        pcurr = getattr(self, "pan_current_mA", 0) or 0
+                        if hasattr(self, "pan_load_graph"):
+                             self.pan_load_graph.push_data(pload)
+                        if hasattr(self, "pan_current_graph"):
+                             self.pan_current_graph.push_data(pcurr)
+
+                        # Tilt Data
+                        tload = getattr(self, "tilt_load_val", 0) or 0
+                        tcurr = getattr(self, "tilt_current_mA", 0) or 0
+                        if hasattr(self, "tilt_load_graph"):
+                             self.tilt_load_graph.push_data(tload)
+                        if hasattr(self, "tilt_current_graph"):
+                             self.tilt_current_graph.push_data(tcurr)
+
+                    except Exception:
+                        pass
+                
+                self.health_timer.timeout.connect(_update_health_graphs)
+                self.health_timer.start(200)
+
+            except Exception as e:
+                print(f"Health Monitor Init Error: {e}")
+            # === END HEALTH MONITOR ===
+
             try:
                 # add sniper dock to right as a dock widget (avoid duplicates)
                 if getattr(self, "sniper_dock", None) is not None:
@@ -6585,6 +6663,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     pass
                     except Exception:
                         pass
+                    
+                    # Help -> Pin Assignments
+                    try:
+                        pin_action = help_menu.addAction("Arduino Nano Pin Assignments")
+                        pin_action.triggered.connect(self.open_pin_assignment_window)
+                    except Exception:
+                        pass
+
                 except Exception:
                     pass
 
@@ -7013,6 +7099,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         # Widgets menu: quick open/restore of any docked widget and a persistent
         # bottom 'Workspace' dock that is empty by default (user can dock into it).
+        # Define workspace_container if not already defined to prevent collision in widget_items list
+        if locals().get("workspace_container") is None:
+             w_grp = QGroupBox("Workspace")
+             w_grp.setLayout(QVBoxLayout())
+             workspace_container = w_grp
+             self.add_dock("Workspace", workspace_container, "bottom")
+
         try:
             try:
                 widgets_menu = menubar.addMenu("Widgets")
@@ -7041,6 +7134,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     ("Manual Movement & Firing", manual_group),
                     ("Serial / Log Output", serial_output_group),
                     ("System", status_group),
+                    ("System Health Monitor", None),
                     ("Sniper Scope", getattr(self, "sniper_dock", None)),
                     ("Workspace", workspace_container),
                 ]
@@ -7275,6 +7369,39 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     action.setChecked(False)
             except Exception:
                 pass
+
+    def open_pin_assignment_window(self):
+        """Open a simple dialog showing Nano pin assignments."""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView
+        try:
+            dlg = QDialog(self)
+            dlg.setWindowTitle("Arduino Nano Pin Assignments (Dual Port Mode)")
+            dlg.resize(400, 300)
+            layout = QVBoxLayout(dlg)
+            
+            table = QTableWidget(7, 3)
+            table.setHorizontalHeaderLabels(["Pin", "Function", "Mode"])
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            
+            data = [
+                ("D3", "Trigger Servo", "PWM (Projectile)"),
+                ("D4", "Trigger MOSFET", "Digital Out (Water/Fast)"),
+                ("D5", "LED Relay", "Digital Out"),
+                ("D6", "Laser Relay", "Digital Out"),
+                ("D9", "Unused", "-"),
+                ("A2", "Total Current", "Analog In"),
+                ("A7", "Tilt Safety", "Analog/Dig (Optional)"),
+            ]
+            
+            for r, (pin, func, mode) in enumerate(data):
+                table.setItem(r, 0, QTableWidgetItem(pin))
+                table.setItem(r, 1, QTableWidgetItem(func))
+                table.setItem(r, 2, QTableWidgetItem(mode))
+                
+            layout.addWidget(table)
+            dlg.exec_()
+        except Exception as e:
+            print(f"Error opening pin window: {e}")
 
     def open_manual_window(self):
         """Open a non-modal dialog that displays the Markdown user manual with
@@ -8841,6 +8968,324 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # No success
         return None
 
+    def _serial_device_type_index(self) -> int:
+        """0 = Nano ASCII, 1 = Debug Board bus-servo."""
+        try:
+            idx = self._safe_widget_method_return(
+                "serial_device_type_combo", "currentIndex", 0
+            )
+            return int(idx)
+        except Exception:
+            return 0
+
+    def _serial_is_debug_board_bus(self) -> bool:
+        try:
+            return int(self._serial_device_type_index()) == 1
+        except Exception:
+            return False
+
+    def _serial_is_dual_port(self) -> bool:
+        try:
+            return int(self._serial_device_type_index()) == 2
+        except Exception:
+            return False
+
+    def _serial_is_nano_ascii(self) -> bool:
+        try:
+            return int(self._serial_device_type_index()) == 0
+        except Exception:
+            return True
+
+    def _bus_servo_deg_to_ticks(self, deg: float) -> int:
+        """Map degrees to bus-servo ticks (0..4095 over 0..270 degrees)."""
+        try:
+            d = float(deg)
+        except Exception:
+            d = 0.0
+        try:
+            d = float(np.clip(d, 0.0, 270.0))
+        except Exception:
+            if d < 0.0:
+                d = 0.0
+            if d > 270.0:
+                d = 270.0
+        # 0..270deg => 0..4095 ticks
+        ticks = int(round((d / 270.0) * 4095.0))
+        if ticks < 0:
+            ticks = 0
+        if ticks > 4095:
+            ticks = 4095
+        return ticks
+
+    def _bus_servo_checksum(self, payload: bytes) -> int:
+        """Checksum used by Yahboom-style bus servos.
+
+        This project historically used: 0xFF - (sum(payload) & 0xFF).
+        Some DS_v4 tooling variants use: 0xFF ^ (sum(payload) & 0xFF).
+        Keep an auto-detected mode to prevent protocol drift.
+        """
+        try:
+            s = sum(payload) & 0xFF
+            mode = str(getattr(self, "_bus_servo_checksum_mode", "sub") or "sub").lower()
+            if mode == "xor":
+                return (0xFF ^ s) & 0xFF
+            return (0xFF - s) & 0xFF
+        except Exception:
+            return 0
+
+    def _bus_servo_build_ping_packet(self, servo_id: int) -> bytes:
+        """Build a PING packet (instruction 0x01, length 0x02)."""
+        sid = int(servo_id) & 0xFF
+        length = 0x02
+        instruction = 0x01
+        payload = bytes([sid, length, instruction])
+        chk = self._bus_servo_checksum(payload)
+        return b"\xFF\xFF" + payload + bytes([chk])
+
+    def _bus_servo_try_ping(self, active_ser, servo_id: int, *, timeout_s: float = 0.15) -> bytes:
+        """Best-effort ping: returns raw bytes read (may be empty)."""
+        try:
+            if active_ser is None or not getattr(active_ser, "is_open", False):
+                return b""
+            try:
+                if hasattr(active_ser, "reset_input_buffer"):
+                    active_ser.reset_input_buffer()
+            except Exception:
+                pass
+
+            pkt = self._bus_servo_build_ping_packet(servo_id)
+            active_ser.write(pkt)
+            try:
+                if hasattr(active_ser, "flush"):
+                    active_ser.flush()
+            except Exception:
+                pass
+
+            end = time.time() + float(timeout_s)
+            buf = bytearray()
+            while time.time() < end and len(buf) < 64:
+                try:
+                    chunk = active_ser.read(64)
+                except Exception:
+                    chunk = b""
+                if chunk:
+                    buf.extend(chunk)
+                    if len(buf) >= 4:
+                        break
+                else:
+                    time.sleep(0.01)
+            return bytes(buf)
+        except Exception:
+            return b""
+
+    def _bus_servo_build_write_pos_packet(self, servo_id: int, pos_ticks: int, time_ms: int = 200) -> bytes:
+        """Build a write-position packet for the bus servo (reg 0x2A)."""
+        sid = int(servo_id) & 0xFF
+        pos = int(pos_ticks)
+        if pos < 0:
+            pos = 0
+        if pos > 4095:
+            pos = 4095
+        t = int(time_ms)
+        if t < 0:
+            t = 0
+        if t > 30000:
+            t = 30000
+
+        addr = 0x2A
+        length = 0x07
+        instruction = 0x03
+        pos_h = (pos >> 8) & 0xFF
+        pos_l = pos & 0xFF
+        time_h = (t >> 8) & 0xFF
+        time_l = t & 0xFF
+
+        payload = bytes([sid, length, instruction, addr, pos_h, pos_l, time_h, time_l])
+        chk = self._bus_servo_checksum(payload)
+        return b"\xFF\xFF" + payload + bytes([chk])
+
+    def _bus_servo_write_pos(self, *, servo_id: int, deg: float, time_ms: int = 200) -> bool:
+        """Send a position command to a bus servo via the currently-open serial port."""
+        try:
+            # Prefer bus_ser when present (Dual Port), otherwise fall back to self.ser (Debug Board single-port)
+            active_ser = getattr(self, "bus_ser", None) if self._serial_is_dual_port() else self.ser
+            if active_ser is None or not getattr(active_ser, "is_open", False):
+                return False
+            ticks = self._bus_servo_deg_to_ticks(deg)
+            mode = str(getattr(self, "_bus_servo_checksum_mode", "sub") or "sub").lower()
+
+            if mode == "auto":
+                for m in ("sub", "xor"):
+                    try:
+                        self._bus_servo_checksum_mode = m
+                        pkt = self._bus_servo_build_write_pos_packet(servo_id, ticks, time_ms=time_ms)
+                        active_ser.write(pkt)
+                        if hasattr(active_ser, "flush"):
+                            active_ser.flush()
+                        time.sleep(0.002)
+                    except Exception:
+                        pass
+                self._bus_servo_checksum_mode = "auto"
+                return True
+
+            pkt = self._bus_servo_build_write_pos_packet(servo_id, ticks, time_ms=time_ms)
+            active_ser.write(pkt)
+            try:
+                if hasattr(active_ser, "flush"):
+                    active_ser.flush()
+            except Exception:
+                pass
+            return True
+        except Exception:
+            return False
+
+    def _bus_servo_send_pan_tilt(self, pan_deg: float, tilt_deg: float) -> bool:
+        """Send PAN/TILT to bus servos (IDs default to 1 and 2)."""
+        try:
+            pan_id = int(getattr(self, "bus_pan_servo_id", 1))
+            tilt_id = int(getattr(self, "bus_tilt_servo_id", 2))
+        except Exception:
+            pan_id, tilt_id = 1, 2
+
+        # Use a speed that's responsive but safe
+        # UPDATED (Agent): Reduced default from 200ms to 20ms for vastly improved tracking latency.
+        # This allows the software PID/smoothing to control the feel, rather than hardware lag.
+        default_time = 20
+        # If specifically overridden by a "bus_servo_time_ms" attribute (e.g. for slow pans), use that.
+        time_ms = int(getattr(self, "bus_servo_time_ms", default_time) or default_time)
+        
+        ok1 = self._bus_servo_write_pos(servo_id=pan_id, deg=float(pan_deg), time_ms=time_ms)
+        ok2 = self._bus_servo_write_pos(servo_id=tilt_id, deg=float(tilt_deg), time_ms=time_ms)
+        
+        # Poll polls stats directly now to ensure they are updated even if send logic changes
+        self._poll_bus_servo_stats()
+
+        return bool(ok1 and ok2)
+
+    def _poll_bus_servo_stats(self):
+        """Poll bus servo load/current stats periodically."""
+        try:
+            now = time.time()
+            if not hasattr(self, "_last_bus_load_poll"):
+                self._last_bus_load_poll = 0
+            
+            # Poll every 200ms (faster updates)
+            if now - self._last_bus_load_poll > 0.2:
+                try:
+                    pan_id = int(getattr(self, "bus_pan_servo_id", 1))
+                    tilt_id = int(getattr(self, "bus_tilt_servo_id", 2))
+                except:
+                    pan_id, tilt_id = 1, 2
+
+                # Read Pan Load (0x3C=Current/Load)
+                # Bus servo usually returns ~ 0-1000 range for load.
+                pload = self._bus_servo_read_addr(pan_id, 0x3C, 2, signed=True)
+                self.pan_load_val = pload
+                
+                # Approximate current from load if no sensor (1 unit ~ 1-2mA typically? pure guess, but visualizes activity)
+                # If pan_current_mA is NOT coming from the main board (None or 0), pop it
+                if getattr(self, "pan_current_mA", None) is None or self.pan_current_mA == 0:
+                     self.pan_current_mA = pload 
+
+                # Read Tilt Load
+                tload = self._bus_servo_read_addr(tilt_id, 0x3C, 2, signed=True)
+                self.tilt_load_val = tload
+                
+                if getattr(self, "tilt_current_mA", None) is None or self.tilt_current_mA == 0:
+                     self.tilt_current_mA = tload
+
+                self._last_bus_load_poll = now
+        except Exception:
+            pass
+
+    def _bus_servo_read_addr(self, servo_id, addr, length, signed=False):
+        """Read a register from the bus servo (blocking, short timeout)."""
+        try:
+             # Prefer bus_ser when present (Dual Port), otherwise fall back to self.ser
+            active_ser = getattr(self, "bus_ser", None) if self._serial_is_dual_port() else self.ser
+            if active_ser is None or not getattr(active_ser, "is_open", False):
+                return 0
+
+            # Build Read Packet: FF FF ID 04 02 ADDR LEN CHK
+            # Checksum = ~sum(ID+LEN+INST+ADDR+LEN) & 0xFF
+            sid = int(servo_id)
+            inst = 0x02 # Read
+            pkt_len = 4
+            
+            payload = [sid, pkt_len, inst, addr, length]
+            s = sum(payload)
+            chk = (~s) & 0xFF
+            packet = bytes([0xFF, 0xFF] + payload + [chk])
+            
+            # Flush input to clear old trash
+            try:
+                if hasattr(active_ser, "reset_input_buffer"):
+                    active_ser.reset_input_buffer()
+            except:
+                pass
+                
+            active_ser.write(packet)
+            
+            # Read response: FF FF ID LEN ERR P1... CHK
+            # Response len = 6 + length - 1? 
+            # Header(2) + ID(1) + Len(1) + Err(1) + Params(length) + Chk(1)
+            # Total = 6 + length  Wait: Standard is Header(2) + ID(1) + Len(1) + Err(1) + Params(N) + Checksum(1) = 6+N
+            expected = 6 + length
+            
+            # Use small timeout to avoid lag
+            active_ser.timeout = 0.05 
+            resp = active_ser.read(expected)
+            
+            if len(resp) >= expected:
+                 # Check header
+                 if resp[0] == 0xFF and resp[1] == 0xFF:
+                     # Params start at index 5
+                     params = resp[5 : 5+length]
+                     val = 0
+                     if length == 1:
+                         val = params[0]
+                     elif length == 2:
+                         # Little endian vs Big endian? 
+                         # WaveShare / STS servos usually LOW byte first? No, actually:
+                         # standard protocol uses LOW byte first for 16-bit values in params.
+                         # BUT the logic below assumed HIGH first.
+                         # Let's try correct bus servo order: LOW byte at index 0, HIGH byte at index 1?
+                         # Or usually: DataL, DataH in the packet order.
+                         # Let's assume standard [LB, HB] order if it was behaving oddly.
+                         # Actually most bus servos (STS/SCS) send Low Byte first.
+                         # Let's check typical implementations. 
+                         # If params[0] is Low, params[1] is High:
+                         # val = (params[1] << 8) | params[0]
+                         # My previous code was: val = (params[0] << 8) | params[1] (Big Endian)
+                         # Many serial protocols are Little Endian. Swapping this might fix it.
+                         val = (params[1] << 8) | params[0]
+                         
+                     if signed and length == 2:
+                         if val > 32767:
+                             val -= 65536
+                     
+                     # Also update currents if this is load read
+                     if addr == 0x3C:
+                         # Load ~ Current roughly. 
+                         # If it's the Pan ID, update pan_current_mA as a fallback
+                         # Map roughly 1 unit = 1mA? Or just display raw load.
+                         pass
+                         
+                     return abs(val) # Return absolute load
+            
+            # Fallback/Debug: Print if read failed but bytes came
+            # if resp: print(f"Bus Read Fail: {resp.hex()}")
+        except Exception:
+            pass
+        return 0
+
+    def _serial_active_is_bus_mode(self) -> bool:
+        """True when pan/tilt are driven via bus packets (Debug Board or Dual Port)."""
+        try:
+            return bool(self._serial_is_debug_board_bus() or self._serial_is_dual_port())
+        except Exception:
+            return False
+
     def _ensure_frame(self, frame, default_shape=(480, 640, 3)):
         """Ensure returned object is an ndarray image. If frame is None or invalid,
         return a zero-filled ndarray of default_shape. This helps static analysis
@@ -9510,21 +9955,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     getattr(self, "_manual_override_until", 0) > time.time()
                 ):
                     try:
-                        self.manual_override = False
-                        self._manual_override_until = 0.0
-                        if getattr(self, "tracking_was_active", False):
-                            self.tracking_active = True
-                            self.tracking_was_active = False
-                        try:
-                            if hasattr(self, "enhancer"):
-                                self.enhancer.log_serial_output(
-                                    "Manual override cleared due to detection mode change",
-                                    fire=False,
-                                )
-                        except Exception:
-                            pass
-                    except Exception:
-                        pass
+                        if hasattr(self, "enhancer"):
+                            self.enhancer.log_serial_output(
+                                "[STATE] manual_override active during detection mode change (no auto-clear)",
+                                fire=False,
+                            )
+                    except Exception as e:
+                        print(f"[STATE] manual_override change log failed: {e}")
         except Exception as e:
             # fallback: log error
             if hasattr(self, "enhancer"):
@@ -10591,6 +11028,28 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 self.current_hysteresis_mA = 250
 
+            # Current sensor installation flags (defaults to False)
+            # Total sensor can be toggled when installed; per-servo sensors are optional.
+            try:
+                self.total_current_sensor_enabled = bool(
+                    settings.get("total_current_sensor_enabled", False)
+                )
+            except Exception:
+                self.total_current_sensor_enabled = False
+            try:
+                self.per_servo_current_sensors_enabled = bool(
+                    settings.get("per_servo_current_sensors_enabled", False)
+                )
+            except Exception:
+                self.per_servo_current_sensors_enabled = False
+            try:
+                if getattr(self, "total_current_sensor_checkbox", None) is not None:
+                    self.total_current_sensor_checkbox.setChecked(
+                        bool(getattr(self, "total_current_sensor_enabled", False))
+                    )
+            except Exception:
+                pass
+
             self.auto_tracking_enabled = settings.get("auto_tracking", False)
             self.detection_enabled = settings.get("detection_enabled", False)
 
@@ -10717,6 +11176,31 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self._safe_widget_call(
                 "baud_rate_input", "setValue", settings.get("baud_rate", 115200)
             )
+            try:
+                self._safe_widget_call(
+                    "serial_device_type_combo",
+                    "setCurrentIndex",
+                    int(settings.get("serial_device_type_index", 0)),
+                )
+            except Exception:
+                pass
+
+            try:
+                self._safe_widget_call(
+                    "debug_board_com_port_input",
+                    "setText",
+                    settings.get("debug_board_com_port", "COM9"),
+                )
+            except Exception:
+                pass
+            try:
+                self._safe_widget_call(
+                    "debug_board_baud_rate_input",
+                    "setValue",
+                    int(settings.get("debug_board_baud_rate", 115200)),
+                )
+            except Exception:
+                pass
             self._safe_widget_call(
                 "smoothing_input", "setValue", settings.get("smoothing_factor", 0.5)
             )
@@ -11449,6 +11933,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 # Old parameters from existing code, merged
                 "com_port": val("com_port_input", "COM3", "text"),
                 "baud_rate": val("baud_rate_input", 115200),
+                "serial_device_type_index": val(
+                    "serial_device_type_combo", 0, "index"
+                ),
+                "debug_board_com_port": val(
+                    "debug_board_com_port_input", "COM9", "text"
+                ),
+                "debug_board_baud_rate": val(
+                    "debug_board_baud_rate_input", 115200
+                ),
                 "smoothing_factor": val("smoothing_input", 0.5),
                 "movement_sensitivity": val("movement_sensitivity_slider", 50),
                 "detection_mode_index": val("detection_mode_combo", 0, "index"),
@@ -11554,6 +12047,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "current_trip_hold_ms": int(getattr(self, "current_trip_hold_ms", 250) or 250),
                 "current_clear_hold_ms": int(getattr(self, "current_clear_hold_ms", 750) or 750),
                 "current_hysteresis_mA": int(getattr(self, "current_hysteresis_mA", 250) or 250),
+                # Current sensor installation flags
+                "total_current_sensor_enabled": bool(getattr(self, "total_current_sensor_enabled", False)),
+                "per_servo_current_sensors_enabled": bool(getattr(self, "per_servo_current_sensors_enabled", False)),
                 "home_move_suspend_seconds": val(
                     "home_return_suspend_input",
                     getattr(self, "home_move_suspend_seconds", 2.0),
@@ -13561,11 +14057,183 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         bg_thread = threading.Thread(target=_do_connect, daemon=True, name="SerialConnect")
         bg_thread.start()
 
+    def _connect_bus_serial_async(self, port, baud):
+        """Background worker for debug-board bus serial connection.
+
+        This is separate from the main `self.ser` connection so Dual Port mode can
+        open Nano (ASCII) and Debug Board (bus servo) concurrently.
+        """
+        import threading
+        import time
+
+        def _do_connect():
+            CONNECT_TIMEOUT = 5.0
+            start_time = time.time()
+            result = {
+                "success": False,
+                "port": port,
+                "baud": baud,
+                "error": None,
+                "ser": None,
+                "elapsed_time": 0,
+            }
+            try:
+                result["ser"] = self._safe_open_serial(
+                    port, baud, timeout=0.1, write_timeout=1
+                )
+                result["success"] = (result["ser"] is not None)
+                if not result["success"]:
+                    result["error"] = "Failed to open port"
+            except Exception as e:
+                result["success"] = False
+                result["error"] = f"Connection error: {str(e)}"
+                result["ser"] = None
+
+            elapsed = time.time() - start_time
+            result["elapsed_time"] = elapsed
+            if elapsed > CONNECT_TIMEOUT:
+                result["success"] = False
+                result["error"] = f"Connection timeout (took {elapsed:.1f}s)"
+                if result["ser"] is not None:
+                    try:
+                        result["ser"].close()
+                    except Exception:
+                        pass
+                    result["ser"] = None
+
+            try:
+                self.serial_connect_result.emit({"_bus": True, **result})
+            except Exception:
+                try:
+                    from PyQt5.QtCore import QTimer
+
+                    QTimer.singleShot(0, lambda: self._handle_bus_serial_connection_result(result))
+                except Exception:
+                    self._handle_bus_serial_connection_result(result)
+
+        bg_thread = threading.Thread(target=_do_connect, daemon=True, name="BusSerialConnect")
+        bg_thread.start()
+
+    def _handle_bus_serial_connection_result(self, result):
+        """Handle debug-board bus serial connection result on main thread."""
+        try:
+            if result.get("success") and result.get("ser") is not None:
+                self.bus_ser = result["ser"]
+                self._bus_servo_checksum_mode = "auto"
+                self._bus_servo_ping_ok = False
+                try:
+                    self._safe_enhancer_log(
+                        f"✓ Debug Board connected to {result.get('port')} @ {result.get('baud')} baud"
+                    )
+                except Exception:
+                    pass
+
+                # Best-effort protocol/servo presence probe (non-blocking):
+                # try PING using both checksum modes and keep the mode that replies.
+                try:
+                    import threading
+
+                    def _probe():
+                        try:
+                            active_ser = getattr(self, "bus_ser", None)
+                            if active_ser is None or not getattr(active_ser, "is_open", False):
+                                return
+
+                            pan_id = int(getattr(self, "bus_pan_servo_id", 1) or 1)
+                            tilt_id = int(getattr(self, "bus_tilt_servo_id", 2) or 2)
+
+                            def _hx(b: bytes) -> str:
+                                return " ".join(f"{x:02X}" for x in (b or b""))
+
+                            # Try subtract mode
+                            self._bus_servo_checksum_mode = "sub"
+                            r1 = self._bus_servo_try_ping(active_ser, pan_id)
+                            r2 = self._bus_servo_try_ping(active_ser, tilt_id)
+                            sub_ok = bool(r1 or r2)
+
+                            # Try xor mode
+                            self._bus_servo_checksum_mode = "xor"
+                            r3 = self._bus_servo_try_ping(active_ser, pan_id)
+                            r4 = self._bus_servo_try_ping(active_ser, tilt_id)
+                            xor_ok = bool(r3 or r4)
+
+                            # Decide
+                            if xor_ok and not sub_ok:
+                                chosen = "xor"
+                            elif sub_ok and not xor_ok:
+                                chosen = "sub"
+                            elif xor_ok and sub_ok:
+                                # Prefer historical default to avoid changing behavior without need.
+                                chosen = "sub"
+                            else:
+                                chosen = "auto"
+
+                            self._bus_servo_checksum_mode = chosen
+                            self._bus_servo_ping_ok = bool(sub_ok or xor_ok)
+
+                            msg = (
+                                f"[BUS PROBE] checksum_mode={chosen} "
+                                f"sub(rx pan={_hx(r1)} tilt={_hx(r2)}) "
+                                f"xor(rx pan={_hx(r3)} tilt={_hx(r4)})"
+                            )
+                            try:
+                                print(msg)
+                            except Exception:
+                                pass
+                            if self._bus_servo_ping_ok:
+                                try:
+                                    if self._serial_is_dual_port() and self.ser is not None and getattr(self.ser, "is_open", False):
+                                        self.ser.write(b"PTEN0\n")
+                                except Exception:
+                                    pass
+                            try:
+                                from PyQt5.QtCore import QTimer
+
+                                QTimer.singleShot(0, lambda: self._safe_enhancer_log(msg, fire=False))
+                            except Exception:
+                                try:
+                                    self._safe_enhancer_log(msg, fire=False)
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+
+                    threading.Thread(target=_probe, daemon=True, name="BusServoProbe").start()
+                except Exception:
+                    pass
+            else:
+                # Ensure handle not left open
+                if result.get("ser") is not None:
+                    try:
+                        result["ser"].close()
+                    except Exception:
+                        pass
+                self.bus_ser = None
+                try:
+                    self._safe_enhancer_log(
+                        f"✗ Debug Board connection FAILED: {result.get('error','Unknown error')}"
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            self.bus_ser = None
+
     def _handle_serial_connection_result(self, result):
         """Handle serial connection result from background thread.
         Runs on main Qt thread so it's safe to update GUI.
         Provides clear error messages and status feedback.
         """
+        print(f"[DEBUG] _handle_serial_connection_result called: success={result.get('success')}, error={result.get('error')}")  # DEBUG
+        # Bus-serial results may be multiplexed through the same signal.
+        try:
+            if isinstance(result, dict) and result.get("_bus"):
+                r2 = dict(result)
+                r2.pop("_bus", None)
+                self._handle_bus_serial_connection_result(r2)
+                return
+        except Exception:
+            pass
+
         print(f"[DEBUG] _handle_serial_connection_result called: success={result.get('success')}, error={result.get('error')}")  # DEBUG
         self._serial_connection_in_progress = False
         
@@ -13575,6 +14243,75 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.ser = result['ser']
             elapsed = result.get('elapsed_time', 0)
             self._safe_enhancer_log(f"✓ Connected to {result['port']} @ {result['baud']} baud (took {elapsed:.2f}s)")
+
+            # If running Debug Board Direct mode, probe checksum mode on the primary serial.
+            try:
+                if self._serial_is_debug_board_bus():
+                    self._bus_servo_checksum_mode = "auto"
+                    self._bus_servo_ping_ok = False
+
+                    import threading
+
+                    def _probe_primary_bus():
+                        try:
+                            active_ser = getattr(self, "ser", None)
+                            if active_ser is None or not getattr(active_ser, "is_open", False):
+                                return
+
+                            pan_id = int(getattr(self, "bus_pan_servo_id", 1) or 1)
+                            tilt_id = int(getattr(self, "bus_tilt_servo_id", 2) or 2)
+
+                            def _hx(b: bytes) -> str:
+                                return " ".join(f"{x:02X}" for x in (b or b""))
+
+                            # Try subtract mode
+                            self._bus_servo_checksum_mode = "sub"
+                            r1 = self._bus_servo_try_ping(active_ser, pan_id)
+                            r2 = self._bus_servo_try_ping(active_ser, tilt_id)
+                            sub_ok = bool(r1 or r2)
+
+                            # Try xor mode
+                            self._bus_servo_checksum_mode = "xor"
+                            r3 = self._bus_servo_try_ping(active_ser, pan_id)
+                            r4 = self._bus_servo_try_ping(active_ser, tilt_id)
+                            xor_ok = bool(r3 or r4)
+
+                            # Decide
+                            if xor_ok and not sub_ok:
+                                chosen = "xor"
+                            elif sub_ok and not xor_ok:
+                                chosen = "sub"
+                            elif xor_ok and sub_ok:
+                                chosen = "sub"
+                            else:
+                                chosen = "auto"
+
+                            self._bus_servo_checksum_mode = chosen
+                            self._bus_servo_ping_ok = bool(sub_ok or xor_ok)
+
+                            msg = (
+                                f"[BUS PROBE] checksum_mode={chosen} "
+                                f"sub(rx pan={_hx(r1)} tilt={_hx(r2)}) "
+                                f"xor(rx pan={_hx(r3)} tilt={_hx(r4)})"
+                            )
+                            try:
+                                print(msg)
+                            except Exception:
+                                pass
+                            try:
+                                from PyQt5.QtCore import QTimer
+                                QTimer.singleShot(0, lambda: self._safe_enhancer_log(msg, fire=False))
+                            except Exception:
+                                try:
+                                    self._safe_enhancer_log(msg, fire=False)
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+
+                    threading.Thread(target=_probe_primary_bus, daemon=True, name="BusServoProbePrimary").start()
+            except Exception:
+                pass
             
             # Play connection sound on success
             try:
@@ -13664,35 +14401,81 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         """
         print("[DEBUG] connect_serial() called")  # DEBUG
 
-        if self.ser is None or not getattr(self.ser, "is_open", False):
-            # Connection mode
+        # Determine desired mode
+        dual_mode = bool(self._serial_is_dual_port())
+        debug_board_mode = bool(self._serial_is_debug_board_bus())
+
+        primary_open = bool(self.ser is not None and getattr(self.ser, "is_open", False))
+        bus_open = bool(
+            getattr(self, "bus_ser", None) is not None
+            and getattr(self.bus_ser, "is_open", False)
+        )
+
+        if (not primary_open) and (not bus_open):
+            # Connection mode (nothing is open)
             print("[DEBUG] Attempting to connect...")  # DEBUG
-            # Check if connection is already in progress
-            if getattr(self, '_serial_connection_in_progress', False):
-                self._safe_enhancer_log("Connection attempt already in progress, please wait...")
+
+            if getattr(self, "_serial_connection_in_progress", False):
+                self._safe_enhancer_log(
+                    "Connection attempt already in progress, please wait..."
+                )
                 return False
-            
+
             port = self._safe_widget_method_return("com_port_input", "text", "")
             baud = self._safe_int_widget_value("baud_rate_input", 115200)
-            print(f"[DEBUG] Port={port}, Baud={baud}")  # DEBUG
-            
-            # Validate port is not empty
-            if not port or port.strip() == "":
-                self._safe_enhancer_log("COM port not specified. Please select a valid port.")
-                try:
-                    if hasattr(self, 'connection_status_label'):
-                        self.connection_status_label.setText("✗ No COM port specified")
-                        self.connection_status_label.setStyleSheet("color: #FF6666; background-color: #2d2d2d; padding: 4px; border-radius: 3px;")
-                except Exception:
-                    pass
-                return False
-            
-            # Mark connection as in progress
+            dbg_port = self._safe_widget_method_return(
+                "debug_board_com_port_input", "text", ""
+            )
+            dbg_baud = self._safe_int_widget_value(
+                "debug_board_baud_rate_input", 115200
+            )
+            selected_port = dbg_port if debug_board_mode else port
+            selected_baud = dbg_baud if debug_board_mode else baud
+            print(
+                f"[DEBUG] Port={port}, Baud={baud}, Dual={dual_mode}, DBG_Port={dbg_port}, DBG_Baud={dbg_baud}"
+            )  # DEBUG
+
+            # Validate required ports
+            if dual_mode:
+                if (not port or port.strip() == "") or (
+                    not dbg_port or dbg_port.strip() == ""
+                ):
+                    self._safe_enhancer_log(
+                        "Dual Port mode requires BOTH COM ports (Nano + Debug Board)."
+                    )
+                    try:
+                        if hasattr(self, "connection_status_label"):
+                            self.connection_status_label.setText(
+                                "✗ Dual Port requires both COM ports"
+                            )
+                            self.connection_status_label.setStyleSheet(
+                                "color: #FF6666; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                            )
+                    except Exception:
+                        pass
+                    return False
+            else:
+                if not selected_port or selected_port.strip() == "":
+                    self._safe_enhancer_log(
+                        "COM port not specified. Please select a valid port."
+                    )
+                    try:
+                        if hasattr(self, "connection_status_label"):
+                            self.connection_status_label.setText(
+                                "✗ No COM port specified"
+                            )
+                            self.connection_status_label.setStyleSheet(
+                                "color: #FF6666; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                            )
+                    except Exception:
+                        pass
+                    return False
+
             self._serial_connection_in_progress = True
-            
+
             # Update UI to show connecting state
             try:
-                if hasattr(self, 'connect_button') and self.connect_button is not None:
+                if hasattr(self, "connect_button") and self.connect_button is not None:
                     self.connect_button.setText("Connecting...")
                     self.connect_button.setEnabled(False)
                 else:
@@ -13700,102 +14483,130 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self._safe_widget_call("connect_button", "setEnabled", False)
             except Exception:
                 pass
-            
+
             try:
-                if hasattr(self, 'connection_status_label'):
-                    self.connection_status_label.setText(f"Connecting to {port} @ {baud}...")
-                    self.connection_status_label.setStyleSheet("color: #FFFF00; background-color: #2d2d2d; padding: 4px; border-radius: 3px;")
+                if hasattr(self, "connection_status_label"):
+                    if dual_mode:
+                        self.connection_status_label.setText(
+                            f"Connecting: Nano={port} and DebugBoard={dbg_port}..."
+                        )
+                    else:
+                        if debug_board_mode:
+                            self.connection_status_label.setText(
+                                f"Connecting: DebugBoard={selected_port} @ {selected_baud}..."
+                            )
+                        else:
+                            self.connection_status_label.setText(
+                                f"Connecting to {selected_port} @ {selected_baud}..."
+                            )
+                    self.connection_status_label.setStyleSheet(
+                        "color: #FFFF00; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                    )
             except Exception:
                 pass
-            
+
             # Close old connection if it exists but is not open
-            if self.ser and not self.ser.is_open:
+            try:
+                if self.ser and not getattr(self.ser, "is_open", False):
+                    try:
+                        if getattr(self, "enhancer", None):
+                            self.enhancer.update_serial_status(False)
+                        self.ser.close()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # Start async connection in background thread
+            if dual_mode:
+                self._connect_serial_async(port, baud)
+                self._connect_bus_serial_async(dbg_port, dbg_baud)
+            else:
+                self._connect_serial_async(selected_port, selected_baud)
+            return
+
+        # Disconnect mode: close any open serial handles (primary + bus)
+        ok = True
+        try:
+            if getattr(self, "enhancer", None):
+                self.enhancer.update_serial_status(False)
+        except Exception:
+            pass
+
+        try:
+            if self.ser is not None:
                 try:
-                    if getattr(self, "enhancer", None):
-                        self.enhancer.update_serial_status(False)
                     self.ser.close()
                 except Exception:
-                    pass
-            
-            # Start async connection in background thread
-            # This prevents the GUI from freezing during the potentially long serial open
-            self._connect_serial_async(port, baud)
-            return  # Don't block, callback will handle the rest
+                    ok = False
+        except Exception:
+            ok = False
+        self.ser = None
 
-        else:
-            try:
-                if getattr(self, "enhancer", None):
-                    self.enhancer.update_serial_status(False)
-                self.ser.close()
-                return True  # Disconnected successfully
-            except Exception as e:
-                self._safe_enhancer_log(f"Error during disconnect: {e}")
-                return False  # Error during disconnect
-            finally:
-                self.ser = None
-                self._safe_enhancer_log("Disconnected.")
-                if getattr(self, "enhancer", None):
-                    self.enhancer.update_serial_status(False)
+        try:
+            if getattr(self, "bus_ser", None) is not None:
                 try:
-                    self.connect_button.setText("Connect")
+                    self.bus_ser.close()
+                except Exception:
+                    ok = False
+        except Exception:
+            ok = False
+        self.bus_ser = None
+
+        try:
+            self._safe_enhancer_log("Disconnected.")
+        except Exception:
+            pass
+        try:
+            self.connect_button.setText("Connect")
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "connection_status_label"):
+                self.connection_status_label.setText("Disconnected")
+                self.connection_status_label.setStyleSheet(
+                    "color: #999999; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                )
+        except Exception:
+            pass
+
+        # Close camera on disconnect (existing behavior)
+        try:
+            if (
+                getattr(self, "cap", None) is not None
+                and getattr(self.cap, "isOpened", lambda: False)()
+            ):
+                try:
+                    self._cap_release()
                 except Exception:
                     pass
-                # Update connection status label
                 try:
-                    if hasattr(self, 'connection_status_label'):
-                        self.connection_status_label.setText("Disconnected")
-                        self.connection_status_label.setStyleSheet("color: #999999; background-color: #2d2d2d; padding: 4px; border-radius: 3px;")
+                    self.cap = None
+                except Exception:
+                    self.cap = None
+                try:
+                    self.video_label.clear()
+                    self.video_label.setText("Camera Feed")
                 except Exception:
                     pass
-                # Close camera on disconnect
                 try:
-                    if (
-                        getattr(self, "cap", None) is not None
-                        and getattr(self.cap, "isOpened", lambda: False)()
-                    ):
-                        try:
-                            # use safe helper to release the capture
-                            self._cap_release()
-                        except Exception:
-                            pass
-                        # Clear references and update UI
-                        try:
-                            self.cap = None
-                        except Exception:
-                            self.cap = None
-                        try:
-                            self.video_label.clear()
-                            self.video_label.setText("Camera Feed")
-                        except Exception:
-                            pass
-                        # BULLETPROOF FIX: Disable buttons on disconnect, but ensure clean state
-                        try:
-                            if getattr(self, "tracking_btn", None) is not None:
-                                self.tracking_btn.setEnabled(False)
-                                self.tracking_btn.setChecked(False)
-                                self.tracking_btn.setText("Start Tracking")
-                        except Exception:
-                            pass
-                        try:
-                            if getattr(self, "aiming_btn", None) is not None:
-                                self.aiming_btn.setEnabled(False)
-                                self.aiming_btn.setChecked(False)
-                                self.aiming_btn.setText("Start Aiming")
-                        except Exception:
-                            pass
-                        try:
-                            self._safe_enhancer_log(
-                                "Camera closed (auto on disconnect)."
-                            )
-                        except Exception:
-                            pass
-                        try:
-                            if getattr(self, "state_logger", None):
-                                self.state_logger.log("Camera feed stopped")
-                        except Exception:
-                            pass
+                    if getattr(self, "tracking_btn", None) is not None:
+                        self.tracking_btn.setEnabled(False)
+                        self.tracking_btn.setChecked(False)
+                        self.tracking_btn.setText("Start Tracking")
                 except Exception:
                     pass
+                try:
+                    if getattr(self, "aiming_btn", None) is not None:
+                        self.aiming_btn.setEnabled(False)
+                        self.aiming_btn.setChecked(False)
+                        self.aiming_btn.setText("Start Aiming")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        return ok
 
     def set_trigger_mode(self, index):
         self.trigger_mode_bb = index == 1
@@ -13806,6 +14617,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.save_settings()  # V4 Save
 
     def open_camera(self, indices=None):
+        # CHANGE WARNING:
+        # Sensitive camera function: affects resolution correctness and overlays.
+        # See CHANGE_IMPACT_REFERENCE.md → Camera & Video Capture Pipeline.
         """Attempt to open a camera. If the user selected a preferred camera in the UI
         it will be tried first, otherwise the method will try indices 0..4.
         Returns an opened cv2.VideoCapture or None."""
@@ -13838,17 +14652,33 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             else:
                 try_indices = list(range(0, 5))
 
+        backend_order = [
+            (cv2.CAP_DSHOW, "DSHOW"),
+            (cv2.CAP_MSMF, "MSMF"),
+            (cv2.CAP_ANY, "AUTO"),
+        ]
+
         for idx in try_indices:
-            try:
-                # Simple, proven camera opening logic
-                # Open camera with default backend
-                cap = cv2.VideoCapture(int(idx))
-                
-                time.sleep(0.05)
-                
-                if cap.isOpened():
-                    print(f"[CAMERA] Successfully opened camera {idx}")
-                    
+            for backend, backend_name in backend_order:
+                try:
+                    cap = cv2.VideoCapture(int(idx), backend)
+
+                    # Allow device a moment to initialize before querying properties
+                    # Increased to 1.0s to ensure consistent DSHOW initialization on all webcams
+                    time.sleep(1.0)
+
+                    if not cap.isOpened():
+                        cap.release()
+                        continue
+
+                    print(f"[CAMERA] Trying index {idx} via {backend_name}")
+
+                    # Critical for latency + fresh frames
+                    try:
+                        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                    except Exception:
+                        pass
+
                     # Get target resolution
                     if hasattr(self, "frame_ratio_options") and hasattr(self, "frame_ratio_setting"):
                         width, height = self.frame_ratio_options.get(
@@ -13856,52 +14686,71 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         )
                     else:
                         width, height = 1280, 720
-                    
-                    # Set resolution
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-                    time.sleep(0.05)
-                    
-                    # Get actual resolution from camera
+
+                    # Request resolution
+                    try:
+                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+                    except Exception:
+                        pass
+
+                    # FIX: Increased sleep safely from 0.05 to 0.5 to allow 
+                    # camera firmware time to switch resolution before we probe it.
+                    time.sleep(0.5)
+
                     actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                     actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                    
-                    print(f"[CAMERA] Resolution: {actual_w}x{actual_h}")
-                    
+
+                    # Prefer delivered frame size to avoid partial-frame rendering
+                    try:
+                        ret_probe, frame_probe = cap.read()
+                        if ret_probe and frame_probe is not None and hasattr(frame_probe, "shape"):
+                            delivered_h, delivered_w = frame_probe.shape[:2]
+                            if delivered_w > 0 and delivered_h > 0:
+                                actual_w = int(delivered_w)
+                                actual_h = int(delivered_h)
+                    except Exception:
+                        pass
+
+                    print(
+                        f"[CAMERA] idx={idx} backend={backend_name} requested={width}x{height} delivered={actual_w}x{actual_h}"
+                    )
+
                     try:
                         self.enhancer.log_serial_output(
-                            f"[CAMERA] Opened camera {idx}: {actual_w}x{actual_h}",
-                            fire=False
+                            (
+                                f"[CAMERA] Opened camera {idx} ({backend_name}): "
+                                f"requested {width}x{height} → {actual_w}x{actual_h}"
+                            ),
+                            fire=False,
                         )
                     except Exception:
                         pass
-                    
+
                     # ⚠️ CRITICAL: Update frame_width/height with ACTUAL camera resolution
                     # This is the ONLY place (other than __init__) where these values should be modified.
-                    # The actual resolution may differ from requested if camera doesn't support it.
-                    # These values become the SOURCE OF TRUTH for all frame calculations.
-                    # DO NOT modify frame_width/height anywhere else (especially not in update_frame).
                     self.frame_width = actual_w if actual_w > 0 else width
                     self.frame_height = actual_h if actual_h > 0 else height
-                    
+
                     try:
                         if getattr(self, "state_logger", None):
-                            self.state_logger.log("Camera feed started")
+                            self.state_logger.log(
+                                f"Camera feed started ({self.frame_width}x{self.frame_height} on {backend_name})"
+                            )
                     except Exception:
                         pass
-                    
+
                     return cap
-                else:
-                    cap.release()
-            
-            except Exception as e:
-                last_err = e
-                try:
-                    self.enhancer.log_serial_output(
-                        f"open_camera: error opening index {idx}: {e}", fire=False
-                    )
-                except Exception:
-                    pass
+
+                except Exception as e:
+                    last_err = e
+                    try:
+                        self.enhancer.log_serial_output(
+                            f"open_camera: index {idx} backend {backend_name} failed: {e}",
+                            fire=False,
+                        )
+                    except Exception:
+                        pass
 
         # All attempts failed
         try:
@@ -14024,6 +14873,19 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         """Handler for manual-mode auto-fire checkbox state change.
         Plays an armed sound when enabled (checked).
         """
+        if getattr(self, "_disable_auto_fire", False):
+            try:
+                self.auto_fire_enabled = False
+                if getattr(self, "auto_fire_checkbox", None) is not None:
+                    try:
+                        self.auto_fire_checkbox.setChecked(False)
+                    except Exception:
+                        pass
+                if hasattr(self, "enhancer"):
+                    self.enhancer.log_serial_output("[AUTO-FIRE] Disabled for stabilization", fire=False)
+            except Exception as e:
+                print(f"[AUTO-FIRE] toggle ignored: {e}")
+            return
         try:
             checked = (
                 (state == Qt.CheckState.Checked)
@@ -14757,8 +15619,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Send an immediate serial update so manual controls feel responsive
         try:
             self.send_serial_command()
-        except Exception:
-            pass
+        except Exception as e:
+            try:
+                if hasattr(self, "enhancer"):
+                    self.enhancer.log_serial_output(f"[SERIAL] send_serial_command failed: {e}", fire=False)
+            except Exception as log_err:
+                print(f"[SERIAL] send_serial_command failed: {e} (log error: {log_err})")
 
     def pan_left(self):
         """Pan turret left by step size."""
@@ -15213,14 +16079,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         try:
             if self.ser and getattr(self.ser, "is_open", False):
-                cmd = f"LIMITS P{self.PAN_MIN}X{self.PAN_MAX}Y{self.TILT_MIN}Z{self.TILT_MAX}\n"
-                try:
-                    self.ser.write(cmd.encode("utf-8"))
-                    self.enhancer.log_serial_output(f"SENT: {cmd.strip()}", fire=False)
-                except Exception as e:
-                    self.enhancer.log_serial_output(
-                        f"Error sending limits: {e}", fire=False
-                    )
+                if not self._serial_is_debug_board_bus():
+                    cmd = f"LIMITS P{self.PAN_MIN}X{self.PAN_MAX}Y{self.TILT_MIN}Z{self.TILT_MAX}\n"
+                    try:
+                        self.ser.write(cmd.encode("utf-8"))
+                        self.enhancer.log_serial_output(f"SENT: {cmd.strip()}", fire=False)
+                    except Exception as e:
+                        self.enhancer.log_serial_output(
+                            f"Error sending limits: {e}", fire=False
+                        )
         except Exception:
             pass
 
@@ -15471,6 +16338,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             return frame
 
     def update_frame(self):
+        # Calculate FPS for Health Monitor
+        try:
+            now_t = time.time()
+            if hasattr(self, "_last_frame_perf_time"):
+                dt = now_t - self._last_frame_perf_time
+                if dt > 0:
+                    self.measured_fps_val = 1.0 / dt
+            self._last_frame_perf_time = now_t
+        except Exception:
+            pass
+
+        # CHANGE WARNING:
+        # Modifications here affect frame processing, tracking flow, and runtime state.
+        # See CHANGE_IMPACT_REFERENCE.md → Camera & Video Capture Pipeline.
+        # Last modified: 2026-01-25 by Copilot Agent
         # NOTE: Idle button now uses direct click detection (ClickDetectButton class)
         # No need for polling - direct mouse events work reliably
 
@@ -15672,22 +16554,32 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             aiming = getattr(self, "aiming_active", False)
             # If tracking active but aiming not, sync them
             if tracking and not aiming:
-                self.aiming_active = True  # Auto-enable aiming when tracking starts
-                try:
-                    if hasattr(self, "aiming_btn"):
-                        self.aiming_btn.setChecked(True)
-                except Exception:
-                    pass
                 try:
                     if hasattr(self, "enhancer"):
                         self.enhancer.log_serial_output(
-                            "[AUTO-SYNC] Aiming auto-enabled with tracking",
+                            "[STATE] tracking_active=True while aiming_active=False (no auto-correct)",
                             fire=False
                         )
                 except Exception:
                     pass
         except Exception:
-            pass
+            try:
+                if getattr(self, "enhancer", None):
+                    self.enhancer.log_serial_output("[STATE] tracking/aiming sync check failed", fire=False)
+            except Exception as e:
+                print(f"[STATE] tracking/aiming sync check failed: {e}")
+
+        # Disable auto-fire logic for stabilization (visibility-only)
+        try:
+            if getattr(self, "_disable_auto_fire", False) and getattr(self, "auto_fire_enabled", False):
+                self.auto_fire_enabled = False
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output("[AUTO-FIRE] Disabled for stabilization", fire=False)
+                except Exception as log_err:
+                    print(f"[AUTO-FIRE] log error: {log_err}")
+        except Exception as e:
+            print(f"[AUTO-FIRE] disable failed: {e}")
         
         # Local initializations to help static analysis and ensure defined locals
         frame1 = None
@@ -15923,30 +16815,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         else:
             # suppression expired
             self._manual_override_active = False
-            # ========== FIXED: CLEAR manual_override FLAG UNCONDITIONALLY ==========
-            # Previously only cleared if tracking_was_active, causing users to get stuck
-            # in manual override mode. Now always clear when timeout expires.
+            # Manual override timers should not mutate runtime flags directly.
             if getattr(self, "manual_override", False):
                 try:
-                    self.manual_override = False
-                    if getattr(self, "tracking_was_active", False):
-                        self.tracking_active = True
-                        # FIX: Always clear tracking_was_active flag after resume to prevent double-resume attempts
-                        self.tracking_was_active = False
-                        try:
-                            if hasattr(self, "enhancer"):
-                                self.enhancer.log_serial_output(
-                                    "Resumed tracking after manual override timeout",
-                                    fire=False,
-                                )
-                        except Exception:
-                            pass
-                except Exception:
-                    # Ensure manual_override is cleared in case of unexpected errors
-                    try:
-                        self.manual_override = False
-                    except Exception:
-                        pass
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            "[STATE] manual_override timeout expired (no auto-clear)",
+                            fire=False,
+                        )
+                except Exception as e:
+                    print(f"[STATE] manual_override timeout log failed: {e}")
 
                 # BULLETPROOF FIX: No wait for suppression - immediately clear go_home when done
                 # This allows detection to resume immediately
@@ -17373,75 +18251,26 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
                 self.target_locked = True
 
-                # ========== CRITICAL IDLE MODE AUTO-TRACKING FIX ==========
-                # When in idle modes (guard/watch/search) AND auto_tracking_enabled:
-                # FORCE enable both tracking and aiming to exit idle and track target
+                # ========== STATE OWNERSHIP: NO AUTO-MUTATION ==========
+                # Do not mutate tracking/aiming here. Log only for visibility.
                 try:
-                    # FIX DEC8: Check ACTUAL idle mode state, not just dropdown selection
-                    # idle_modes.get_mode() returns None (OFF) or mode name (ON)
-                    # self.idle_behavior always has a value (just the dropdown selection)
                     idle_modes = getattr(self, "idle_modes", None)
                     actual_idle_mode = None
                     if idle_modes is not None:
-                        actual_idle_mode = idle_modes.get_mode()  # None=OFF, "guard"/etc=ON
-                    
+                        actual_idle_mode = idle_modes.get_mode()
                     auto_track_enabled = getattr(self, "auto_tracking_enabled", False)
-                    
-                    # FORCE tracking/aiming ON ONLY if idle mode is actually OFF
-                    # (actual_idle_mode is None means idle is not active)
-                    if actual_idle_mode is None and auto_track_enabled:
-                        # BULLETPROOF: Force enable both flags immediately
-                        if not getattr(self, "tracking_active", False):
-                            self.tracking_active = True
-                            try:
-                                if getattr(self, "tracking_btn", None) is not None:
-                                    self.tracking_btn.setChecked(True)
-                                    self.tracking_btn.setText("Stop Tracking")
-                            except Exception:
-                                pass
-                            try:
-                                self.enhancer.log_serial_output(
-                                    "🎯 AUTO-TRACKING ACTIVATED (idle mode disabled, detection found)", 
-                                    fire=False
-                                )
-                            except Exception:
-                                pass
-                        
-                        if not getattr(self, "aiming_active", False):
-                            self.aiming_active = True
-                            try:
-                                if getattr(self, "aiming_btn", None) is not None:
-                                    self.aiming_btn.setChecked(True)
-                                    self.aiming_btn.setText("Stop Aiming")
-                            except Exception:
-                                pass
-                            try:
-                                self.enhancer.log_serial_output(
-                                    "✓ Auto-aiming ENABLED (auto-tracking detected target)", 
-                                    fire=False
-                                )
-                            except Exception:
-                                pass
-                    
-                    # STANDARD PATH: Re-acquisition when tracking already active
-                    elif getattr(self, "tracking_active", False) and not getattr(self, "aiming_active", False):
-                        # Tracking is on but aiming is off - auto-enable aiming to let servos move
-                        self.aiming_active = True
-                        try:
-                            if getattr(self, "aiming_btn", None) is not None:
-                                self.aiming_btn.setChecked(True)
-                                self.aiming_btn.setText("Stop Aiming")
-                        except Exception:
-                            pass
-                        try:
-                            self.enhancer.log_serial_output("✓ Auto-aiming enabled (re-acquisition after loss)", fire=False)
-                        except Exception:
-                            pass
+                    if actual_idle_mode is None and auto_track_enabled and not getattr(self, "tracking_active", False):
+                        self.enhancer.log_serial_output(
+                            "[STATE] auto-tracking eligible but tracking is OFF (no auto-enable)",
+                            fire=False,
+                        )
+                    if getattr(self, "tracking_active", False) and not getattr(self, "aiming_active", False):
+                        self.enhancer.log_serial_output(
+                            "[STATE] tracking ON but aiming OFF during detection (no auto-enable)",
+                            fire=False,
+                        )
                 except Exception as e:
-                    try:
-                        self.enhancer.log_serial_output(f"[WARN] Idle mode auto-tracking error: {e}", fire=False)
-                    except Exception:
-                        pass
+                    print(f"[STATE] auto-tracking visibility error: {e}")
                 
                 # DEBUG: Log when detection finds a box
                 try:
@@ -17672,6 +18501,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         err_x = 0.0
                         err_y = 0.0
                         gain = 0.0
+                else:
+                    try:
+                        if not getattr(self, "_manual_override_skip_logged", False):
+                            self._manual_override_skip_logged = True
+                            self.enhancer.log_serial_output(
+                                "[STATE] manual_override active - tracking updates suppressed",
+                                fire=False,
+                            )
+                    except Exception as e:
+                        print(f"[STATE] manual_override log failed: {e}")
 
                 # ========== QUICK STRIKE MOVEMENT LOGIC ==========
                 # When quick_strike_active, bypass normal tracking and move at max speed to target
@@ -18023,7 +18862,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             if abs(err_x) <= threshold_for_adaptive or abs(err_y) <= threshold_for_adaptive:
                                 # FIX DEC8: Use consistent smoothing regardless of aiming state
                                 # Different smoothing on aiming toggle causes 1-2 frame stick artifact near deadzone
-                                adaptive_smoothing = 0.05  # Consistent regardless of aiming state
+                                # UPDATED (Agent): Changed 0.05 (too slow/stuck) to 0.6 to actually fulfill "snappy response" comment.
+                                # Previous value of 0.05 (sample weight) meant 95% old value, causing lag entry to deadzone.
+                                adaptive_smoothing = 0.6  # Consistent and snappy near center
                             
                             # Smooth (IIR) blend between previous and new with adaptive filter
                             # When target is approaching the deadzone, blend smoothly to avoid jitter
@@ -18162,6 +19003,24 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     self._last_precision_time = now
                             except Exception:
                                 pass
+
+                        # Ensure a minimum visible movement when outside deadzone
+                        try:
+                            track_speed_val = float(
+                                self._safe_int_widget_value("tracking_speed_slider", 50)
+                            )
+                            min_step_deg = 1.0 + (track_speed_val / 100.0) * 1.0
+                            min_step_deg = float(np.clip(min_step_deg, 0.75, 2.5))
+                            if abs(err_x) > deadzone_px:
+                                pan_delta = float(target_pan_val - prev_pan)
+                                if abs(pan_delta) < min_step_deg:
+                                    target_pan_val = prev_pan + (min_step_deg if pan_delta >= 0 else -min_step_deg)
+                            if abs(err_y) > deadzone_px:
+                                tilt_delta = float(target_tilt_val - prev_tilt)
+                                if abs(tilt_delta) < min_step_deg:
+                                    target_tilt_val = prev_tilt + (min_step_deg if tilt_delta >= 0 else -min_step_deg)
+                        except Exception as e:
+                            print(f"[TRACKING] min-step guard failed: {e}")
 
                         # Keep the running target as float so small fractional updates
                         # accumulate across frames (then we int() only when sending to hardware).
@@ -18896,6 +19755,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 delta = current_time - self.prev_frame_time
                 self.prev_frame_time = current_time
                 if delta > 0:
+                    self.measured_fps_val = 1.0 / delta
+                else:
+                    self.measured_fps_val = 0.0
+                if delta > 0:
                     self.enhancer.update_fps(1.0 / delta)
 
         except Exception:
@@ -19035,6 +19898,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     _dbg_lines.append(f"err_x={int(err_x)}")
                 if "err_y" in locals():
                     _dbg_lines.append(f"err_y={int(err_y)}")
+                try:
+                    if "frame1" in locals() and frame1 is not None and hasattr(frame1, "shape"):
+                        _h, _w = frame1.shape[:2]
+                        _dbg_lines.append(f"frame={int(_w)}x{int(_h)}")
+                except Exception:
+                    pass
                 _dbg_lines.append(f"pan={int(self.hud_data['pan'])}")
                 _dbg_lines.append(f"tilt={int(self.hud_data['tilt'])}")
         except:
@@ -19050,110 +19919,116 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Add crosshair and HUD overlay (SCOPE VISUALS - NOT SNIPER DOCK)
         rgb = self._add_crosshair_and_scope(rgb)
         # --- Recording management: start/stop writer, segment rotation, storage cleanup ---
-        try:
-            desired = bool(getattr(self, "_test_recording_active", False))
+        if getattr(self, "_disable_recording", False):
             try:
-                if getattr(self, "recording_enabled_checkbox", None) and getattr(self, "autorecord_checkbox", None):
-                    desired = desired or (self.recording_enabled_checkbox.isChecked() and self.autorecord_checkbox.isChecked() and bool(getattr(self, "tracking_active", False)))
-            except Exception:
-                pass
-
-            # Ensure segment index is always initialized before filename generation
+                self.hud_data['recording'] = False
+            except Exception as e:
+                print(f"[RECORDING] hud update failed: {e}")
+        else:
             try:
-                self._record_segment_index = int(getattr(self, "_record_segment_index", 0) or 0)
-            except Exception:
-                self._record_segment_index = 0
-
-            if desired and self.recording_writer is None:
-                if getattr(self, "_test_recording_active", False) and getattr(self, "_test_recording_filepath", None):
-                    filepath = self._test_recording_filepath
-                    fmt = getattr(self, "_test_recording_format", self.recording_format)
-                else:
-                    ts = time.strftime("%Y%m%d_%H%M%S")
-                    ext = self._get_extension_for_format(self.recording_format)
-                    base_dir = Path(getattr(self, "recording_dir", self.recording_dir))
-                    filepath = str(base_dir / f"recording_{ts}_{self._record_segment_index}{ext}")
-                    fmt = self.recording_format
-                    self._record_segment_index += 1
-
+                desired = bool(getattr(self, "_test_recording_active", False))
                 try:
-                    self._enforce_storage_limit()
-                except Exception:
-                    pass
-
-                fps_setting = None
-                try:
-                    if getattr(self, "fps_combo", None):
-                        fps_text = self.fps_combo.currentText().strip()
-                        if fps_text.endswith("FPS"):
-                            fps_setting = int(fps_text.split()[0])
-                except Exception:
-                    fps_setting = getattr(self, "recording_fps", 30)
-
-                self._start_recording(filepath, fmt=fmt, fps=fps_setting)
-
-            if not desired and self.recording_writer is not None:
-                self._stop_recording()
-
-            if self.recording_writer is not None and getattr(self.recording_writer, 'isOpened', lambda: True)():
-                try:
-                    to_write = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-                except Exception:
-                    to_write = rgb
-                try:
-                    self.recording_writer.write(to_write)
+                    if getattr(self, "recording_enabled_checkbox", None) and getattr(self, "autorecord_checkbox", None):
+                        desired = desired or (self.recording_enabled_checkbox.isChecked() and self.autorecord_checkbox.isChecked() and bool(getattr(self, "tracking_active", False)))
                 except Exception as e:
-                    if getattr(self, "enhancer", None):
-                        self.enhancer.log_serial_output(f"[RECORDING] Write error: {e}")
+                    print(f"[RECORDING] desired eval error: {e}")
 
-                elapsed = time.time() - float(self._recording_segment_start or time.time())
+                # Ensure segment index is always initialized before filename generation
                 try:
-                    if not hasattr(self, 'hud_data'):
-                        self.hud_data = {}
-                    self.hud_data['recording'] = True
-                    self.hud_data['recording_time'] = int(elapsed)
-                    if self._recording_current_filepath:
-                        self.hud_data['recording_filename'] = os.path.basename(self._recording_current_filepath)
-                    else:
-                        self.hud_data['recording_filename'] = ''
-                    # === RECORDING UI INDICATOR UPDATE ===
-                    try:
-                        if hasattr(self, 'recording_indicator_label'):
-                            mins = int(elapsed) // 60
-                            secs = int(elapsed) % 60
-                            blink = "🔴" if (int(time.time() * 2) % 2 == 0) else "⚫"
-                            self.recording_indicator_label.setText(f"{blink} REC {mins:02d}:{secs:02d}")
-                            self.recording_indicator_label.show()
-                    except Exception:
-                        pass
-                    # === END RECORDING UI INDICATOR ===
+                    self._record_segment_index = int(getattr(self, "_record_segment_index", 0) or 0)
                 except Exception:
-                    pass
+                    self._record_segment_index = 0
 
-                seg_sec = int(getattr(self, "recording_segment_seconds", getattr(self, "recording_segment_minutes", 0) * 60) or 0)
-                if seg_sec > 0 and elapsed >= seg_sec:
-                    old_path = self._recording_current_filepath
-                    self._stop_recording()
-                    try:
-                        self._enforce_storage_limit()
-                    except Exception:
-                        pass
-                    if not getattr(self, "_test_recording_active", False):
+                if desired and self.recording_writer is None:
+                    if getattr(self, "_test_recording_active", False) and getattr(self, "_test_recording_filepath", None):
+                        filepath = self._test_recording_filepath
+                        fmt = getattr(self, "_test_recording_format", self.recording_format)
+                    else:
                         ts = time.strftime("%Y%m%d_%H%M%S")
                         ext = self._get_extension_for_format(self.recording_format)
                         base_dir = Path(getattr(self, "recording_dir", self.recording_dir))
-                        new_path = str(base_dir / f"recording_{ts}_{self._record_segment_index}{ext}")
+                        filepath = str(base_dir / f"recording_{ts}_{self._record_segment_index}{ext}")
+                        fmt = self.recording_format
                         self._record_segment_index += 1
+
+                    try:
+                        self._enforce_storage_limit()
+                    except Exception as e:
+                        print(f"[RECORDING] storage limit error: {e}")
+
+                    fps_setting = None
+                    try:
+                        if getattr(self, "fps_combo", None):
+                            fps_text = self.fps_combo.currentText().strip()
+                            if fps_text.endswith("FPS"):
+                                fps_setting = int(fps_text.split()[0])
+                    except Exception:
+                        fps_setting = getattr(self, "recording_fps", 30)
+
+                    self._start_recording(filepath, fmt=fmt, fps=fps_setting)
+
+                if not desired and self.recording_writer is not None:
+                    self._stop_recording()
+
+                if self.recording_writer is not None and getattr(self.recording_writer, 'isOpened', lambda: True)():
+                    try:
+                        to_write = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                    except Exception:
+                        to_write = rgb
+                    try:
+                        self.recording_writer.write(to_write)
+                    except Exception as e:
+                        if getattr(self, "enhancer", None):
+                            self.enhancer.log_serial_output(f"[RECORDING] Write error: {e}")
+
+                    elapsed = time.time() - float(self._recording_segment_start or time.time())
+                    try:
+                        if not hasattr(self, 'hud_data'):
+                            self.hud_data = {}
+                        self.hud_data['recording'] = True
+                        self.hud_data['recording_time'] = int(elapsed)
+                        if self._recording_current_filepath:
+                            self.hud_data['recording_filename'] = os.path.basename(self._recording_current_filepath)
+                        else:
+                            self.hud_data['recording_filename'] = ''
+                        # === RECORDING UI INDICATOR UPDATE ===
                         try:
-                            self._start_recording(new_path, fmt=self.recording_format, fps=self.recording_fps)
+                            if hasattr(self, 'recording_indicator_label'):
+                                mins = int(elapsed) // 60
+                                secs = int(elapsed) % 60
+                                blink = "🔴" if (int(time.time() * 2) % 2 == 0) else "⚫"
+                                self.recording_indicator_label.setText(f"{blink} REC {mins:02d}:{secs:02d}")
+                                self.recording_indicator_label.show()
                         except Exception:
                             pass
-        except Exception:
-            try:
-                if getattr(self, "enhancer", None):
-                    self.enhancer.log_serial_output("[RECORDING] Management error", fire=False)
+                        # === END RECORDING UI INDICATOR ===
+                    except Exception:
+                        pass
+
+                    seg_sec = int(getattr(self, "recording_segment_seconds", getattr(self, "recording_segment_minutes", 0) * 60) or 0)
+                    if seg_sec > 0 and elapsed >= seg_sec:
+                        old_path = self._recording_current_filepath
+                        self._stop_recording()
+                        try:
+                            self._enforce_storage_limit()
+                        except Exception:
+                            pass
+                        if not getattr(self, "_test_recording_active", False):
+                            ts = time.strftime("%Y%m%d_%H%M%S")
+                            ext = self._get_extension_for_format(self.recording_format)
+                            base_dir = Path(getattr(self, "recording_dir", self.recording_dir))
+                            new_path = str(base_dir / f"recording_{ts}_{self._record_segment_index}{ext}")
+                            self._record_segment_index += 1
+                            try:
+                                self._start_recording(new_path, fmt=self.recording_format, fps=self.recording_fps)
+                            except Exception:
+                                pass
             except Exception:
-                pass
+                try:
+                    if getattr(self, "enhancer", None):
+                        self.enhancer.log_serial_output("[RECORDING] Management error", fire=False)
+                except Exception:
+                    pass
         
         # NOTE: All HUD elements (opacity info, status, etc.) are now drawn
         # in _add_crosshair_and_scope() using grid-based layout
@@ -19162,7 +20037,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         rgb = np.ascontiguousarray(rgb)
 
         h, w, ch = rgb.shape
-        bytes_per_line = w * ch  # MUST be width * channels
+        try:
+            bytes_per_line = int(getattr(rgb, "strides", [w * ch])[0])
+        except Exception:
+            bytes_per_line = w * ch  # MUST be width * channels
 
         qimg = QImage(
             rgb.data,
@@ -19174,20 +20052,45 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         pixmap = QPixmap.fromImage(qimg)
 
-        self.video_label.setPixmap(
-            pixmap.scaled(
-                self.video_label.size(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
-        )
+        try:
+            target_size = None
+            try:
+                target_rect = self.video_label.contentsRect()
+                target_size = target_rect.size() if target_rect is not None else None
+            except Exception:
+                target_size = None
+            if target_size is None or target_size.width() <= 0 or target_size.height() <= 0:
+                target_size = self.video_label.size()
+            if target_size is not None and target_size.width() > 0 and target_size.height() > 0:
+                self.video_label.setPixmap(
+                    pixmap.scaled(
+                        target_size,
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation,
+                    )
+                )
+            else:
+                self.video_label.setPixmap(pixmap)
+        except Exception:
+            try:
+                self.video_label.setPixmap(pixmap)
+            except Exception:
+                pass
 
         # ========== SENTRY MODE FRAME UPDATE ==========
         # AGENT-MANAGED: Sentry integration (Dec 2024)
         # If sentry mode tab is active, pass frame and detections to sentry controller
         # This happens EVERY FRAME regardless of enable state so video shows in sentry tab
         try:
-            if getattr(self, "sentry_mode_active", False) and getattr(self, "sentry_tab", None) is not None:
+            if getattr(self, "_disable_sentry_hooks", False):
+                if not getattr(self, "_sentry_disabled_logged", False):
+                    self._sentry_disabled_logged = True
+                    try:
+                        if hasattr(self, "enhancer"):
+                            self.enhancer.log_serial_output("[SENTRY] Hooks disabled for stabilization", fire=False)
+                    except Exception as log_err:
+                        print(f"[SENTRY] log error: {log_err}")
+            elif getattr(self, "sentry_mode_active", False) and getattr(self, "sentry_tab", None) is not None:
                 # Pass the original frame (before RGB conversion) and current detections
                 # boxes variable contains YOLO detections in (x, y, w, h, score, class) format
                 sentry_boxes = []
@@ -19199,11 +20102,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 x, y, w, h, score = box[:5]
                                 sentry_boxes.append((int(x), int(y), int(w), int(h), float(score)))
                 except Exception as box_err:
-                    pass
+                    print(f"[SENTRY] Box conversion error: {box_err}")
                 # Pass frame to sentry - frame1 is BGR, sentry expects BGR
                 self._update_sentry_frame(frame1, sentry_boxes)
         except Exception as e:
-            pass  # Silent fail - sentry is non-critical
+            print(f"[SENTRY] update error: {e}")
         # ========== END SENTRY MODE FRAME UPDATE ==========
 
         # ========== CRITICAL FIX (DEC10): UNCONDITIONAL SERIAL COMMAND ==========
@@ -19238,6 +20141,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         BULLETPROOF FIX (DEC4): Properly disengage idle mode when tracking becomes active
         to prevent state corruption and ensure clean transitions.
         """
+        if getattr(self, "_disable_idle_modes", False):
+            try:
+                if not getattr(self, "_idle_disabled_logged", False):
+                    self._idle_disabled_logged = True
+                    if getattr(self, "enhancer", None):
+                        self.enhancer.log_serial_output("[IDLE] Idle mode updates suppressed", fire=False)
+            except Exception as e:
+                print(f"[IDLE] disable log error: {e}")
+            return
         try:
             # BULLETPROOF: Check if tracking/manual override became active
             # If so, properly disengage idle mode to prevent state corruption
@@ -19508,21 +20420,25 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Modifications here affect servo movement, serial protocol encoding,
         # redundant-command filtering, and safety interlocks.
         # See CHANGE_IMPACT_REFERENCE.md → Sections 5 and 6.
-        # Last modified: 2026-01-06 by Copilot Agent
+        # Last modified: 2026-01-25 by Copilot Agent
         # ========== SENTRY MODE BLOCK ==========
         # When sentry mode is active, sentry controls the turret - block main app commands
         # EXCEPTION: Manual override bypasses this block (user pressing direction buttons)
         # AGENT-MANAGED: Sentry integration (Dec 2024)
         # See CHANGE_IMPACT_REFERENCE.md Section 12 for sentry signal flow
         try:
-            if getattr(self, "sentry_mode_active", False) and getattr(self, "sentry_tab", None) is not None:
+            if (not getattr(self, "_disable_sentry_hooks", False)) and getattr(self, "sentry_mode_active", False) and getattr(self, "sentry_tab", None) is not None:
                 if self.sentry_tab.is_enabled():
                     # Allow manual override to bypass sentry block
                     if not getattr(self, "manual_override", False):
                         return  # Let sentry handle turret commands
                     # Manual override is active - allow command through
-        except Exception:
-            pass
+        except Exception as e:
+            try:
+                if hasattr(self, "enhancer"):
+                    self.enhancer.log_serial_output(f"[SENTRY] send_serial_command guard error: {e}", fire=False)
+            except Exception as log_err:
+                print(f"[SENTRY] send_serial_command guard error: {e} (log error: {log_err})")
         # ========== END SENTRY MODE BLOCK ==========
         
         # ========== QUICK TARGET LOCK OVERRIDE ==========
@@ -19594,8 +20510,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Update idle mode positions before sending (if no manual/tracking override)
         try:
             self._update_idle_mode_positions()
-        except Exception:
-            pass
+        except Exception as e:
+            try:
+                if hasattr(self, "enhancer"):
+                    self.enhancer.log_serial_output(f"[IDLE] update failed: {e}", fire=False)
+            except Exception as log_err:
+                print(f"[IDLE] update failed: {e} (log error: {log_err})")
         
         # Use target_pan/tilt as intended, but only update last_sent_* when writing to serial.
         target_pan_raw = getattr(self, "target_pan", 90)
@@ -19865,7 +20785,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 pass
             return  # Skip sending - command is identical to last time
 
-        if self.ser is not None and getattr(self.ser, "is_open", False):
+        # Determine which handles are available
+        primary_open = bool(self.ser is not None and getattr(self.ser, "is_open", False))
+        bus_open = bool(getattr(self, "bus_ser", None) is not None and getattr(self.bus_ser, "is_open", False))
+
+        if primary_open or bus_open:
             try:
                 # Optionally suppress actual hardware writes when operator toggles Pause TX
                 if getattr(self, "serial_tx_paused", False):
@@ -19903,7 +20827,54 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     except Exception:
                         pass
                 else:
-                    self.ser.write(command.encode("utf-8"))
+                    # 1) Pan/Tilt
+                    if self._serial_active_is_bus_mode():
+                        if debug_on:
+                            try:
+                                bus_port = getattr(getattr(self, "bus_ser", None), "port", None)
+                                self.enhancer.log_serial_output(
+                                    f"[BUS MODE] bus_open={bus_open} port={bus_port} checksum_mode={getattr(self,'_bus_servo_checksum_mode','sub')}",
+                                    fire=False,
+                                )
+                            except Exception:
+                                pass
+                        ok = self._bus_servo_send_pan_tilt(pan_angle, tilt_angle)
+                        if not ok:
+                            try:
+                                if hasattr(self, "enhancer"):
+                                    self.enhancer.log_serial_output(
+                                        "[BUS SERVO] Write failed (check Debug Board COM/baud and mode)",
+                                        fire=False,
+                                    )
+                            except Exception:
+                                pass
+                    else:
+                        # Nano ASCII mode: pan/tilt + IO over primary serial
+                        if primary_open:
+                            self.ser.write(command.encode("utf-8"))
+
+                    # 2) IO tokens in Dual Port mode (Nano primary serial)
+                    if self._serial_is_dual_port():
+                        # In dual mode, Nano is used for IO (fire/relays/safety/mode).
+                        # Pan/Tilt are driven via Debug Board if bus probe succeeded; otherwise
+                        # fall back to full P/T command to keep motion responsive.
+                        if primary_open:
+                            if bool(getattr(self, "_bus_servo_ping_ok", False)):
+                                io_cmd = f"F{fire_token}L{led_token}R{laser_token}G{acc3_token}S{safety_token}M{mode_token}\n"
+                                try:
+                                    self.ser.write(io_cmd.encode("utf-8"))
+                                except Exception:
+                                    pass
+                            else:
+                                try:
+                                    self.ser.write(command.encode("utf-8"))
+                                    if debug_on:
+                                        self.enhancer.log_serial_output(
+                                            "[DUAL FALLBACK] Bus ping not confirmed; sending full P/T to Nano",
+                                            fire=False,
+                                        )
+                                except Exception:
+                                    pass
                     # update last_sent_* only when we actually wrote to serial
                     self.last_sent_pan = pan_angle
                     self.last_sent_tilt = tilt_angle
@@ -19915,10 +20886,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.prev_tilt_angle = float(tilt_angle)
 
                     # Drain incoming lines (telemetry + status + encoder)
-                    try:
-                        self._drain_serial_input(max_lines=8, debug_on=debug_on)
-                    except Exception:
-                        pass
+                    # In any bus mode, inbound bytes are binary and should not be decoded as UTF-8 lines.
+                    if not self._serial_active_is_bus_mode():
+                        try:
+                            self._drain_serial_input(max_lines=8, debug_on=debug_on)
+                        except Exception:
+                            pass
             except Exception as e:
                 try:
                     if hasattr(self, "enhancer"):
@@ -19938,6 +20911,29 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.ser.close()
                 except Exception:
                     pass
+
+        # ========== HARD LIMIT GUARD (EXPLICIT) ==========
+        # Ensure pan/tilt are clamped before sending to hardware.
+        try:
+            pre_guard_pan = int(pan_angle)
+            pre_guard_tilt = int(tilt_angle)
+            pan_angle = max(self.PAN_MIN, min(self.PAN_MAX, int(pan_angle)))
+            tilt_angle = max(self.TILT_MIN, min(self.TILT_MAX, int(tilt_angle)))
+            if (pre_guard_pan != pan_angle) or (pre_guard_tilt != tilt_angle):
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            f"[CLAMP] pan={pre_guard_pan}->{pan_angle} tilt={pre_guard_tilt}->{tilt_angle}",
+                            fire=False,
+                        )
+                except Exception:
+                    pass
+        except Exception as e:
+            try:
+                if hasattr(self, "enhancer"):
+                    self.enhancer.log_serial_output(f"[CLAMP] guard failed: {e}", fire=False)
+            except Exception as log_err:
+                print(f"[CLAMP] guard failed: {e} (log error: {log_err})")
                 self.ser = None
                 try:
                     self.connect_button.setText("Connect")
@@ -20010,6 +21006,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         skipped (redundant-command filter) or TX is paused.
         """
         try:
+            if self._serial_active_is_bus_mode():
+                return 0
             if self.ser is None or not getattr(self.ser, "is_open", False):
                 return 0
 
@@ -20095,12 +21093,28 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 try:
                     cur = self._parse_current_telemetry_line(response)
                     if cur is not None:
-                        if "pan" in cur:
-                            self.pan_current_mA = cur.get("pan")
-                        if "tilt" in cur:
-                            self.tilt_current_mA = cur.get("tilt")
-                        if "total" in cur:
-                            self.total_current_mA = cur.get("total")
+                        per_servo_enabled = bool(
+                            getattr(self, "per_servo_current_sensors_enabled", False)
+                        )
+                        total_enabled = bool(
+                            getattr(self, "total_current_sensor_enabled", False)
+                        )
+
+                        # If sensors aren't installed, don't keep stale values.
+                        if not per_servo_enabled:
+                            self.pan_current_mA = None
+                            self.tilt_current_mA = None
+                        if not total_enabled:
+                            self.total_current_mA = None
+
+                        if per_servo_enabled:
+                            if "pan" in cur:
+                                self.pan_current_mA = cur.get("pan")
+                            if "tilt" in cur:
+                                self.tilt_current_mA = cur.get("tilt")
+                        if total_enabled:
+                            if "total" in cur:
+                                self.total_current_mA = cur.get("total")
                         self.last_current_telemetry_time = time.time()
                         try:
                             self._update_current_protection_state(
@@ -20189,6 +21203,57 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             return None
 
+    def _any_current_sensors_enabled(self) -> bool:
+        try:
+            return bool(getattr(self, "total_current_sensor_enabled", False)) or bool(
+                getattr(self, "per_servo_current_sensors_enabled", False)
+            )
+        except Exception:
+            return False
+
+    def _current_protection_effectively_enabled(self) -> bool:
+        try:
+            return bool(getattr(self, "current_protection_enabled", False)) and bool(
+                self._any_current_sensors_enabled()
+            )
+        except Exception:
+            return False
+
+    def set_total_current_sensor_enabled(self, checked: bool):
+        """Enable/disable total current sensing.
+
+        When disabled, total current is treated as not installed and protection is
+        effectively off (fault state is cleared).
+        """
+        try:
+            self.total_current_sensor_enabled = bool(checked)
+        except Exception:
+            self.total_current_sensor_enabled = False
+
+        if not bool(getattr(self, "total_current_sensor_enabled", False)):
+            try:
+                self.total_current_mA = None
+                self.last_current_telemetry_time = 0.0
+            except Exception:
+                pass
+
+        # Re-evaluate/clear protection state (safe even if disabled)
+        try:
+            self._update_current_protection_state(
+                pan_mA=getattr(self, "pan_current_mA", None),
+                tilt_mA=getattr(self, "tilt_current_mA", None),
+                total_mA=getattr(self, "total_current_mA", None),
+            )
+        except Exception:
+            pass
+
+        # Persist immediately to avoid config drift.
+        try:
+            if hasattr(self, "save_settings"):
+                self.save_settings()
+        except Exception:
+            pass
+
     def _update_current_protection_state(self, *, pan_mA=None, tilt_mA=None, total_mA=None):
         """Update debounced overcurrent protection state.
 
@@ -20197,7 +21262,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         try:
             now_mono = time.monotonic()
 
-            enabled = bool(getattr(self, "current_protection_enabled", False))
+            enabled = bool(self._current_protection_effectively_enabled())
             if not enabled:
                 # If disabled, clear non-latched fault state and timers.
                 self._current_trip_start_mono = None
@@ -20310,7 +21375,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         - Only changes the outgoing command tokens/angles.
         """
         try:
-            if not bool(getattr(self, "current_protection_enabled", False)):
+            if not bool(self._current_protection_effectively_enabled()):
                 return pan_angle, tilt_angle, fire_token, safety_token
             if not bool(getattr(self, "current_fault_active", False)):
                 return pan_angle, tilt_angle, fire_token, safety_token
@@ -20373,6 +21438,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         """Request current tilt encoder position from Arduino."""
         try:
             if self.ser is not None and getattr(self.ser, "is_open", False):
+                if self._serial_active_is_bus_mode():
+                    return False
                 self.ser.write(b"GET_ENCODER\n")
                 return True
         except Exception:
@@ -20544,6 +21611,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.home_speed_percent = speed_percent
             
             if self.ser is not None and getattr(self.ser, "is_open", False):
+                if self._serial_active_is_bus_mode():
+                    return False
                 command = f"HOMESPEED_S{speed_percent}\n"
                 self.ser.write(command.encode("utf-8"))
                 self.enhancer.log_serial_output(
@@ -20629,6 +21698,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
     def start_tracking(self):
         """Enable tracking process."""
+        # CHANGE WARNING:
+        # Modifications here affect tracking/aiming state ownership and command flow.
+        # See CHANGE_IMPACT_REFERENCE.md → Code-Level Change Enforcement.
+        # Last modified: 2026-01-25 by Copilot Agent
         # CRITICAL FIX DEC14: Don't block main thread opening camera!
         # Instead, set flag and let update_frame() open it in background via threading
         # This prevents GUI freeze when camera is slow/unavailable
@@ -20641,6 +21714,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             )
         except Exception:
             cap_ok = False
+
+        # Reset manual override when tracking starts (single ownership)
+        try:
+            self.manual_override = False
+            self._manual_override_until = 0.0
+            self._manual_override_active = False
+            if hasattr(self, "enhancer"):
+                self.enhancer.log_serial_output("[STATE] manual_override cleared on tracking start", fire=False)
+        except Exception as e:
+            print(f"[STATE] manual_override reset failed: {e}")
 
         # Enable tracking IMMEDIATELY - don't wait for camera!
         # If camera not open, it will be opened asynchronously without blocking UI
@@ -20656,8 +21739,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 )
             except Exception:
                 pass
-        # CRITICAL FIX: Auto-enable aiming when tracking starts (was missing!)
-        # This ensures servos move when targets are detected
+        # Auto-enable aiming when tracking starts
         self.aiming_active = True
         
         # Auto-switch to Video tab when tracking starts so user sees camera feed
@@ -21871,19 +22953,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.target_pan = pan
             self.target_tilt = tilt
             
-            # Send command immediately
+            # Send command immediately (respects current serial backend)
             try:
-                if hasattr(self, "ser") and self.ser and getattr(self.ser, "is_open", False):
-                    # Build command string matching main app format
-                    fire_val = 1 if getattr(self, "mosfet_hold_active", False) else 0
-                    led_val = int(getattr(self, "relay1_state", 0))
-                    laser_val = int(getattr(self, "relay2_state", 0))
-                    safety_val = int(getattr(self, "safety_state", 1))
-                    
-                    cmd = f"P{int(pan)}T{int(tilt)}F{fire_val}L{led_val}R{laser_val}G0S{safety_val}M0\n"
-                    self.ser.write(cmd.encode("utf-8"))
-            except Exception as e:
-                print(f"[SENTRY] Serial write error: {e}")
+                self.send_serial_command()
+            except Exception:
+                pass
                 
         except Exception as e:
             print(f"[SENTRY] Turret move error: {e}")
@@ -21921,7 +22995,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             
             # Fire burst
             try:
-                if hasattr(self, "ser") and self.ser and getattr(self.ser, "is_open", False):
+                if (
+                    hasattr(self, "ser")
+                    and self.ser
+                    and getattr(self.ser, "is_open", False)
+                    and (not self._serial_is_debug_board_bus())
+                ):
                     pan = int(getattr(self, "target_pan", 90))
                     tilt = int(getattr(self, "target_tilt", 40))
                     led_val = int(getattr(self, "relay1_state", 0))

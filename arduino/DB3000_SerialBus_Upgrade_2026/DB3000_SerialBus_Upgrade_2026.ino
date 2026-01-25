@@ -1,3 +1,9 @@
+// Forward declarations for Arduino's auto-generated function prototypes.
+// The Arduino build pipeline injects prototypes after #include lines; if a
+// prototype references a struct declared later in the file, compilation fails.
+struct CurrentCal;
+struct HostCommand;
+
 /*
   DB3000 Serial Bus Servo Upgrade (2026)
   -------------------------------------
@@ -10,7 +16,10 @@
   - Mode token:   M1 = Projectile (BB Servo trigger), M0 = Water (MOSFET trigger)
 
   Telemetry (MCU -> Host):
-    CUR PmA=<pan_mA> TmA=<tilt_mA> TOTmA=<total_mA>\n
+    - If per-servo sensors are installed:
+        CUR PmA=<pan_mA> TmA=<tilt_mA> TOTmA=<total_mA>\n
+    - If only a TOTAL current sensor is installed:
+        STAT I=<milliamps>\n
   IMPORTANT INVARIANT:
   - Trigger actuator remains separate from Pan/Tilt.
     * Water mode: MOSFET output pin.
@@ -29,10 +38,18 @@
 // ---------------------------
 
 // Serial bus (to debug board)
-// IMPORTANT: Many debug boards expect a UART. These pins assume separate RX/TX.
-// If your board uses half-duplex single-wire, see notes in setBusServoAngle().
+// IMPORTANT: Many debug boards expect a UART.
+// Set BUS_HALF_DUPLEX=1 if your board uses a single-wire data line (RX/TX tied).
+#define BUS_HALF_DUPLEX 0
+
+#if BUS_HALF_DUPLEX
+static const uint8_t PIN_BUS_IO = 11; // single-wire data line
+static const uint8_t PIN_BUS_RX = PIN_BUS_IO; // Nano RX  <- Debug board TX (shared)
+static const uint8_t PIN_BUS_TX = PIN_BUS_IO; // Nano TX  -> Debug board RX (shared)
+#else
 static const uint8_t PIN_BUS_RX = 10; // Nano RX  <- Debug board TX
 static const uint8_t PIN_BUS_TX = 11; // Nano TX  -> Debug board RX
+#endif
 
 // Trigger outputs (must remain supported)
 static const uint8_t PIN_TRIGGER_MOSFET = 4; // Water mode output (via MOSFET driver)
@@ -43,18 +60,27 @@ static const uint8_t PIN_LED_RELAY   = 5; // LED relay/MOSFET driver
 static const uint8_t PIN_LASER_RELAY = 6; // Laser relay/MOSFET driver
 
 // Current sensing (analog)
-// Assumption: debug board exposes analog current sense for pan & tilt;
-// total current comes from a dedicated sensor.
+// IMPORTANT: Sensors are OPTIONAL.
+// If sensors are not installed, disable them here to avoid floating ADC noise.
+// - per-servo (pan/tilt) sensors are typically on the debug board
+// - total current is typically a dedicated sensor installed on the power feed
+#define ENABLE_PAN_TILT_CURRENT_SENSORS 0
+#define ENABLE_TOTAL_CURRENT_SENSOR 0
+
+#if ENABLE_PAN_TILT_CURRENT_SENSORS
 static const uint8_t PIN_CURR_PAN_A   = A0;
 static const uint8_t PIN_CURR_TILT_A  = A1;
+#endif
+#if ENABLE_TOTAL_CURRENT_SENSOR
 static const uint8_t PIN_CURR_TOTAL_A = A2;
+#endif
 
 // ---------------------------
 // Serial configuration
 // ---------------------------
 
 static const uint32_t HOST_BAUD = 115200;
-static const uint32_t BUS_BAUD  = 115200; // adjust if your bus servos require different rate
+static const uint32_t BUS_BAUD  = 57600; // lowered for SoftwareSerial reliability on Nano
 
 SoftwareSerial busSerial(PIN_BUS_RX, PIN_BUS_TX); // RX, TX
 
@@ -77,6 +103,14 @@ static const int PAN_MIN_DEG  = 0;
 static const int PAN_MAX_DEG  = 220;
 static const int TILT_MIN_DEG = 0;
 static const int TILT_MAX_DEG = 70;
+
+// Serial-bus servo position units (ticks)
+// Yahboom YB-SD35M debug tool uses 0..4095 with center at 2048.
+// Map host degrees (PAN/TILT ranges above) onto these endpoints.
+static const uint16_t PAN_TICKS_MIN  = 0;
+static const uint16_t PAN_TICKS_MAX  = 4095;
+static const uint16_t TILT_TICKS_MIN = 0;
+static const uint16_t TILT_TICKS_MAX = 4095;
 
 // Direction invert (set true if axis moves opposite)
 static const bool INVERT_PAN  = false;
@@ -142,6 +176,10 @@ struct HostCommand {
 
 static HostCommand cmd;
 
+// Dual-port support: allow host to disable pan/tilt bus output so Nano can be
+// used for IO-only (trigger/relays/safety) while a PC drives pan/tilt directly.
+static bool enablePanTiltOutput = true;
+
 static int lastFireToken = 0;
 static uint32_t lastFireMs = 0;
 
@@ -164,6 +202,41 @@ static inline int applyInvertAndClamp(int deg, int minDeg, int maxDeg, bool inve
   return minDeg + (span - rel);
 }
 
+static inline uint16_t mapDegToTicks(int deg, int minDeg, int maxDeg, uint16_t ticksMin, uint16_t ticksMax) {
+  deg = clampInt(deg, minDeg, maxDeg);
+  const int degSpan = maxDeg - minDeg;
+  if (degSpan <= 0) return ticksMin;
+
+  const long ticksSpan = (long)ticksMax - (long)ticksMin;
+  const long relDeg = (long)(deg - minDeg);
+  long ticks = (long)ticksMin + (relDeg * ticksSpan) / (long)degSpan;
+
+  const long lo = (ticksMin < ticksMax) ? ticksMin : ticksMax;
+  const long hi = (ticksMin < ticksMax) ? ticksMax : ticksMin;
+  if (ticks < lo) ticks = lo;
+  if (ticks > hi) ticks = hi;
+  return (uint16_t)ticks;
+}
+
+static inline uint8_t checksum_ff_minus_sum(const uint8_t *pkt, uint8_t startIdx, uint8_t endIdxInclusive) {
+  uint16_t sum = 0;
+  for (uint8_t i = startIdx; i <= endIdxInclusive; i++) {
+    sum += pkt[i];
+  }
+  return (uint8_t)(0xFF - (sum & 0xFF));
+}
+
+static inline void busWrite(const uint8_t *data, size_t len) {
+#if BUS_HALF_DUPLEX
+  pinMode(PIN_BUS_TX, OUTPUT);
+#endif
+  busSerial.write(data, len);
+  busSerial.flush();
+#if BUS_HALF_DUPLEX
+  pinMode(PIN_BUS_RX, INPUT);
+#endif
+}
+
 // ---------------------------
 // Serial-bus servo protocol adapter
 // ---------------------------
@@ -177,23 +250,98 @@ static inline int applyInvertAndClamp(int deg, int minDeg, int maxDeg, bool inve
   - Feetech/STS/SC series: different packet framing
   - Debug board may already abstract to a simple ASCII protocol (e.g., "#1P1500T50")
 
-  This sketch currently assumes an ASCII adapter protocol supported by your debug board:
-    SB,<id>,<deg>,<time_ms>\n
-  Example:
-    SB,1,90,60
+  This sketch now implements the protocol observed in Yahboom's Windows debug tool
+  ("Servo debugging platform v2.1" / DS_v4_* functions extracted from servo.exe):
 
-  If your debug board uses a different protocol, replace the body of this function.
+  Write position (ADDR=0x2A):
+    FF FF ID 07 03 2A POS_H POS_L TIME_H TIME_L CHK
+
+  Read present position (ADDR=0x38, LEN=2):
+    FF FF ID 04 02 38 02 CHK
+
+  Checksum matches the tool exactly:
+    CHK = 0xFF ^ (sum(bytes[2..(N-3)]) & 0xFF)
+  i.e. it excludes the last parameter byte and the checksum byte.
 */
 static void setBusServoAngle(uint8_t id, int deg, uint16_t moveTimeMs) {
-  // Use a simple ASCII framing to keep this sketch self-contained.
-  // Replace with your real bus-servo packets.
-  busSerial.print(F("SB,"));
-  busSerial.print(id);
-  busSerial.print(F(","));
-  busSerial.print(deg);
-  busSerial.print(F(","));
-  busSerial.print(moveTimeMs);
-  busSerial.print('\n');
+  uint16_t ticksMin = 0;
+  uint16_t ticksMax = 4095;
+  int minDeg = 0;
+  int maxDeg = 270;
+
+  if (id == BUS_ID_PAN) {
+    ticksMin = PAN_TICKS_MIN;
+    ticksMax = PAN_TICKS_MAX;
+    minDeg = PAN_MIN_DEG;
+    maxDeg = PAN_MAX_DEG;
+  } else if (id == BUS_ID_TILT) {
+    ticksMin = TILT_TICKS_MIN;
+    ticksMax = TILT_TICKS_MAX;
+    minDeg = TILT_MIN_DEG;
+    maxDeg = TILT_MAX_DEG;
+  }
+
+  const uint16_t posTicks = mapDegToTicks(deg, minDeg, maxDeg, ticksMin, ticksMax);
+  const uint8_t posH = (uint8_t)((posTicks >> 8) & 0xFF);
+  const uint8_t posL = (uint8_t)(posTicks & 0xFF);
+  const uint8_t timeH = (uint8_t)((moveTimeMs >> 8) & 0xFF);
+  const uint8_t timeL = (uint8_t)(moveTimeMs & 0xFF);
+
+  uint8_t pkt[11];
+  pkt[0] = 0xFF;
+  pkt[1] = 0xFF;
+  pkt[2] = id;
+  pkt[3] = 0x07; // length
+  pkt[4] = 0x03; // WRITE
+  pkt[5] = 0x2A; // goal position register
+  pkt[6] = posH;
+  pkt[7] = posL;
+  pkt[8] = timeH;
+  pkt[9] = timeL;
+
+  // Checksum observed from the vendor debug tool packets:
+  //   chk = 0xFF - (sum(pkt[2..9]) % 256)
+  pkt[10] = checksum_ff_minus_sum(pkt, 2, 9);
+
+  busWrite(pkt, sizeof(pkt));
+}
+
+static bool busPing(uint8_t id, uint16_t timeoutMs) {
+  // Ping packet from debug tool:
+  //   FF FF ID 02 01 CHK
+  uint8_t pkt[6];
+  pkt[0] = 0xFF;
+  pkt[1] = 0xFF;
+  pkt[2] = id;
+  pkt[3] = 0x02;
+  pkt[4] = 0x01;
+  pkt[5] = checksum_ff_minus_sum(pkt, 2, 4);
+
+  // Clear any stale RX bytes
+  while (busSerial.available() > 0) {
+    (void)busSerial.read();
+  }
+
+  busWrite(pkt, sizeof(pkt));
+
+  const uint32_t start = millis();
+  uint8_t buf[32];
+  uint8_t n = 0;
+  while ((millis() - start) < timeoutMs && n < sizeof(buf)) {
+    if (busSerial.available() > 0) {
+      buf[n++] = (uint8_t)busSerial.read();
+      // Typical response observed: FF F5 ID 02 00 CHK
+      // We'll declare success if we see the ID and at least one 0xFF.
+      if (n >= 3) {
+        for (uint8_t i = 0; i + 2 < n; i++) {
+          if (buf[i] == 0xFF && buf[i + 2] == id) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
 }
 
 static void applyPanTilt() {
@@ -273,14 +421,30 @@ static void sendTelemetryIfDue() {
   const uint32_t interval = (TELEMETRY_HZ == 0) ? 1000 : (1000UL / TELEMETRY_HZ);
   if (now - lastTelemetryMs < interval) return;
 
+  // If no sensors are installed/enabled, do not emit current telemetry.
+  // Host will treat missing telemetry as "not available".
+  if (!ENABLE_PAN_TILT_CURRENT_SENSORS && !ENABLE_TOTAL_CURRENT_SENSOR) {
+    lastTelemetryMs = now;
+    return;
+  }
+
+  int panmA = 0;
+  int tiltmA = 0;
+  int totmA = 0;
+
+#if ENABLE_PAN_TILT_CURRENT_SENSORS
   const int panAdc = analogRead(PIN_CURR_PAN_A);
   const int tiltAdc = analogRead(PIN_CURR_TILT_A);
+  panmA = adcToMilliAmps(panAdc, CAL_PAN);
+  tiltmA = adcToMilliAmps(tiltAdc, CAL_TILT);
+#endif
+
+#if ENABLE_TOTAL_CURRENT_SENSOR
   const int totAdc = analogRead(PIN_CURR_TOTAL_A);
+  totmA = adcToMilliAmps(totAdc, CAL_TOTAL);
+#endif
 
-  const int panmA = adcToMilliAmps(panAdc, CAL_PAN);
-  const int tiltmA = adcToMilliAmps(tiltAdc, CAL_TILT);
-  const int totmA = adcToMilliAmps(totAdc, CAL_TOTAL);
-
+#if ENABLE_PAN_TILT_CURRENT_SENSORS
   Serial.print(F("CUR PmA="));
   Serial.print(panmA);
   Serial.print(F(" TmA="));
@@ -288,6 +452,12 @@ static void sendTelemetryIfDue() {
   Serial.print(F(" TOTmA="));
   Serial.print(totmA);
   Serial.print('\n');
+#else
+  // Total-only format (backward-compatible with host parser)
+  Serial.print(F("STAT I="));
+  Serial.print(totmA);
+  Serial.print('\n');
+#endif
 
   lastTelemetryMs = now;
 }
@@ -310,10 +480,13 @@ static bool parsePackedCommand(const char *line, HostCommand &out) {
   };
 
   HostCommand c = out;
-  bool ok = true;
 
-  ok = findTok('P', c.panDeg) && ok;
-  ok = findTok('T', c.tiltDeg) && ok;
+  // IO tokens must exist; P/T are optional so host can send IO-only lines.
+  bool ok = true;
+  // Optional P/T
+  (void)findTok('P', c.panDeg);
+  (void)findTok('T', c.tiltDeg);
+  // Required IO tokens
   ok = findTok('F', c.fire) && ok;
   ok = findTok('L', c.led) && ok;
   ok = findTok('R', c.laser) && ok;
@@ -369,6 +542,10 @@ void setup() {
   Serial.begin(HOST_BAUD);
   busSerial.begin(BUS_BAUD);
 
+#if BUS_HALF_DUPLEX
+  pinMode(PIN_BUS_RX, INPUT);
+#endif
+
   pinMode(PIN_TRIGGER_MOSFET, OUTPUT);
   pinMode(PIN_LED_RELAY, OUTPUT);
   pinMode(PIN_LASER_RELAY, OUTPUT);
@@ -395,13 +572,58 @@ void loop() {
     if (line[0] == 0) {
       // ignore empty
     } else {
+      // Diagnostics: confirm bus wiring + servo presence.
+      // Send from host as: "BUSPING" (pings IDs 1 and 2)
+      // or "BUSPING 2" (pings a specific ID)
+      if (strncmp(line, "BUSPING", 7) == 0) {
+        int id = 0;
+        if (strlen(line) > 7) {
+          id = atoi(line + 7);
+        }
+
+        if (id <= 0) {
+          const bool ok1 = busPing(BUS_ID_PAN, 80);
+          const bool ok2 = busPing(BUS_ID_TILT, 80);
+          Serial.print(F("BUSPING PAN(id="));
+          Serial.print(BUS_ID_PAN);
+          Serial.print(F(")="));
+          Serial.print(ok1 ? F("OK") : F("FAIL"));
+          Serial.print(F(" TILT(id="));
+          Serial.print(BUS_ID_TILT);
+          Serial.print(F(")="));
+          Serial.println(ok2 ? F("OK") : F("FAIL"));
+        } else {
+          const bool ok = busPing((uint8_t)id, 80);
+          Serial.print(F("BUSPING id="));
+          Serial.print(id);
+          Serial.print(F("="));
+          Serial.println(ok ? F("OK") : F("FAIL"));
+        }
+        return;
+      }
+
+      // Dual-port support: PTEN 0/1 disables/enables pan/tilt output.
+      // Use this when a PC directly drives servos via the debug board.
+      if (strncmp(line, "PTEN", 4) == 0) {
+        int v = 1;
+        if (strlen(line) > 4) {
+          v = atoi(line + 4);
+        }
+        enablePanTiltOutput = (v != 0);
+        Serial.print(F("PTEN="));
+        Serial.println(enablePanTiltOutput ? F("1") : F("0"));
+        return;
+      }
+
       HostCommand next = cmd;
       if (parsePackedCommand(line, next)) {
         cmd = next;
 
         // Apply outputs immediately
         applyAccessories();
-        applyPanTilt();
+        if (enablePanTiltOutput) {
+          applyPanTilt();
+        }
         applyTrigger();
 
       } else {

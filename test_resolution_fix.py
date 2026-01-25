@@ -47,13 +47,13 @@ def test_resolution_configuration():
     expected_count = 3
     
     if len(frame_width_assignments) == expected_count:
-        print(f"   ✅ frame_width: {len(frame_width_assignments)} assignments (expected {expected_count})")
+        print(f"   PASS frame_width: {len(frame_width_assignments)} assignments (expected {expected_count})")
     else:
         print(f"   ❌ frame_width: {len(frame_width_assignments)} assignments (expected {expected_count})")
         return False
     
     if len(frame_height_assignments) == expected_count:
-        print(f"   ✅ frame_height: {len(frame_height_assignments)} assignments (expected {expected_count})")
+        print(f"   PASS frame_height: {len(frame_height_assignments)} assignments (expected {expected_count})")
     else:
         print(f"   ❌ frame_height: {len(frame_height_assignments)} assignments (expected {expected_count})")
         return False
@@ -95,7 +95,7 @@ def test_resolution_configuration():
             print(f"      Line {line_num}: {line_text[:80]}")
         return False
     else:
-        print("   ✅ No illegal assignments found in update_frame")
+        print("   PASS No illegal assignments found in update_frame")
     
     # Test 5: Verify warning comments exist
     print("\n5. Checking for protective warning comments...")
@@ -150,7 +150,7 @@ def test_resolution_configuration():
             all_warnings_present = False
             continue
         if _section_has_warning(start_idx, end_idx):
-            print(f"   ✅ {section_name}: Warning comments present")
+            print(f"   PASS {section_name}: Warning comments present")
         else:
             print(f"   ❌ {section_name}: Warning comments MISSING")
             all_warnings_present = False
@@ -160,7 +160,7 @@ def test_resolution_configuration():
     
     # All tests passed
     print("\n" + "=" * 70)
-    print("✅ ALL TESTS PASSED")
+    print("ALL TESTS PASSED")
     print("=" * 70)
     print("\nResolution configuration is properly implemented:")
     print("  • Exactly 3 assignments to frame_width/height (init, camera open, resolution change)")

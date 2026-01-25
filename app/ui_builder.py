@@ -35,6 +35,7 @@ from PyQt5.QtWidgets import (
 
 from theme_manager import ThemeManager
 from turret_presets import PRESETS
+from helpers.graph_widget import HealthGraphWidget
 
 # Import centralized logger for error tracking
 try:
@@ -1858,36 +1859,86 @@ def build_ui(app: QMainWindow):
     serial_output_layout.addWidget(app.serial_output)
     serial_output_group.setLayout(serial_output_layout)
 
-    # Current monitor (Pan/Tilt/Total mA)
-    current_group = QGroupBox("Current Monitor")
+    # Current monitor (Total mA)
+    # Pan/Tilt per-servo sensors are optional; keep UI focused on total current.
+    current_group = QGroupBox("System Health Monitor")
     current_layout = QFormLayout()
-    if getattr(app, "pan_current_label", None) is None:
-        app.pan_current_label = QLabel("—")
-    if getattr(app, "tilt_current_label", None) is None:
-        app.tilt_current_label = QLabel("—")
+
+    if getattr(app, "total_current_sensor_checkbox", None) is None:
+        app.total_current_sensor_checkbox = QCheckBox("Total current sensor installed")
+    try:
+        app.total_current_sensor_checkbox.setChecked(
+            bool(getattr(app, "total_current_sensor_enabled", False))
+        )
+    except Exception:
+        pass
+    try:
+        if hasattr(app, "_safe_connect"):
+            app._safe_connect(
+                "total_current_sensor_checkbox",
+                "toggled",
+                getattr(app, "set_total_current_sensor_enabled"),
+            )
+        else:
+            app.total_current_sensor_checkbox.toggled.connect(
+                getattr(app, "set_total_current_sensor_enabled")
+            )
+    except Exception:
+        pass
+
     if getattr(app, "total_current_label", None) is None:
         app.total_current_label = QLabel("—")
-    current_layout.addRow(QLabel("Pan (mA):"), app.pan_current_label)
-    current_layout.addRow(QLabel("Tilt (mA):"), app.tilt_current_label)
+
+    current_layout.addRow(app.total_current_sensor_checkbox)
     current_layout.addRow(QLabel("Total (mA):"), app.total_current_label)
+
+    # Add Health Graph (custom visualizer)
+    if getattr(app, "health_graph", None) is None:
+        app.health_graph = HealthGraphWidget()
+    current_layout.addRow(app.health_graph)
+
+    # Add FPS Graph
+    current_layout.addRow(QLabel("System Performance (FPS):"))
+    if getattr(app, "fps_graph", None) is None:
+        app.fps_graph = HealthGraphWidget(max_val=60)
+    current_layout.addRow(app.fps_graph)
+
+    # Add Servo Load Graph (New)
+    current_layout.addRow(QLabel("Servo Load (Internal):"))
+    if getattr(app, "servo_load_graph", None) is None:
+        # Load is roughly 0-1000 range
+        app.servo_load_graph = HealthGraphWidget(max_val=1000)
+    current_layout.addRow(app.servo_load_graph)
+
     current_group.setLayout(current_layout)
 
     def _update_current_monitor_labels():
         try:
-            pan = getattr(app, "pan_current_mA", None)
-            tilt = getattr(app, "tilt_current_mA", None)
             total = getattr(app, "total_current_mA", None)
+            enabled = bool(getattr(app, "total_current_sensor_enabled", False))
 
             try:
-                app.pan_current_label.setText("—" if pan is None else f"{int(pan)}")
-            except Exception:
-                pass
-            try:
-                app.tilt_current_label.setText("—" if tilt is None else f"{int(tilt)}")
-            except Exception:
-                pass
-            try:
-                app.total_current_label.setText("—" if total is None else f"{int(total)}")
+                if not enabled:
+                    app.total_current_label.setText("Disabled")
+                    if hasattr(app, "health_graph"):
+                         app.health_graph.push_data(0)
+                else:
+                    app.total_current_label.setText("—" if total is None else f"{int(total)}")
+                    if hasattr(app, "health_graph"):
+                         app.health_graph.push_data(0 if total is None else total)
+                
+                # Update FPS Graph
+                if hasattr(app, "fps_graph"):
+                    fps = getattr(app, "measured_fps_val", 0)
+                    app.fps_graph.push_data(fps)
+
+                # Update Servo Load Graph
+                if hasattr(app, "servo_load_graph"):
+                    # Sum of pan and tilt load
+                    pan_load = getattr(app, "pan_load_val", 0) or 0
+                    tilt_load = getattr(app, "tilt_load_val", 0) or 0
+                    app.servo_load_graph.push_data(pan_load + tilt_load)
+
             except Exception:
                 pass
         except Exception:
@@ -1964,7 +2015,7 @@ def build_ui(app: QMainWindow):
         app.add_dock("YOLO Settings", app.yolo_settings_group, "right")
         app.add_dock("Tracking Behavior", behavior_scroll, "right")
         app.add_dock("Manual Movement & Firing", manual_scroll, "right")
-        app.add_dock("Current Monitor", current_group, "right")
+        app.add_dock("System Health Monitor", current_group, "right")
         app.add_dock("Serial / Log Output", serial_output_group, "right")
         app.add_dock("System", status_group, "right")
         try:

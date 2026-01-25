@@ -4,8 +4,59 @@
 ## OVERVIEW
 This section documents the required steps, affected subsystems, and review checklist for the following upgrade:
 - Upgrade both Pan and Tilt servos to serial bus servos (using debug board)
-- Monitor each servo's current consumption separately in the monitor panel
-- Monitor total turret current via a dedicated current sensor
+- Monitor each servo's current consumption separately in the monitor panel (OPTIONAL hardware)
+- Monitor total turret current via a dedicated current sensor (OPTIONAL hardware)
+
+**Update (2026-01-22):** Current sensing is now optional end-to-end. The app can run with no current sensors, and supports total-only telemetry via legacy `STAT I=<mA>` when a total sensor is installed and enabled.
+
+**Update (2026-01-24):** The app supports selectable serial modes:
+- **Arduino/Nano (DB3000 ASCII)**: one COM port to Nano; Nano drives pan/tilt via its debug-board wiring and handles IO.
+- **Debug Board (Bus Servo Direct)**: one COM port to the debug board; app drives PAN/TILT via binary Yahboom-style packets (no Nano IO).
+- **Dual Port (Nano IO + Debug Board Pan/Tilt)**: two COM ports; app sends PAN/TILT directly to debug board while Nano handles IO (firmware supports `PTEN 0/1` to disable Nano pan/tilt output).
+
+---
+
+## NEW SUBSYSTEMS (Added Jan 2026)
+
+### 1. System Health Monitor
+A new dock widget that visualizes real-time system metrics.
+
+**Responsibility**:
+- Graphically display hardware and software performance.
+- Parse telemetry streams from multiple serial sources (Nano + Debug Board).
+
+**Primary Files**:
+- `app/ui_builder.py`: Panel construction (`health_graph`).
+- `app/helpers/graph_widget.py`: Custom graphing widget `HealthGraphWidget`.
+- `app/MAIN_FILE_SINGLE_CAM.py`: Data feed logic (`update_frame`, serial polling).
+
+**Metrics Tracked**:
+- **Total Current (mA)**: Analog value from Nano (pin A2), parsed from `STAT I=...` or `CUR ...` telemetry.
+- **System FPS**: Calculated in `update_frame`.
+- **Servo Load**: Internal torque/current from Pan/Tilt servos. Requires **active polling** over the servo bus (Debug Board).
+
+**Impact on Serial Bandwidth**:
+- Enabling the "Servo Load" graph triggers a ~2Hz polling cycle (every 500ms).
+- This sends `READ` commands to the servo bus.
+- **Risk**: Saturation of the servo bus if polling frequency is too high, potentially causing jitter in movement commands.
+- **Mitigation**: Timer-based interleaving in `update_frame`.
+
+### 2. Dual Port Pinout Reference
+A quick-reference help panel for the Dual Port wiring scheme.
+
+**Access**: `Help -> Arduino Nano Pin Assignments`
+**Content**: Hardcoded table in `open_pin_assignment_window` matching the validated 2026 hardware standard.
+
+| Pin | Function | Mode |
+|---|---|---|
+| D3 | Trigger Servo | PWM |
+| D4 | Trigger MOSFET | Digital Out (Fast) |
+| D5 | LED Relay | Digital Out |
+| D6 | Laser Relay | Digital Out |
+| A2 | Total Current | Analog In |
+| A7 | Tilt Safety | Analog In |
+
+---
 
 **Servo information prerequisite (do before firmware/protocol work):**
 Confirm and record the exact Pan/Tilt bus servo model + protocol details (half-duplex vs full-duplex, baud rate, packet framing, voltage/current specs). Reference images present in repo root:
@@ -136,6 +187,13 @@ Captures video frames from USB camera/webcam, configures resolution, and provide
 | `frame_ratio_setting` | MAIN_FILE_SINGLE_CAM.py:1644 | "1280x720" | Settings persistence, preset application |
 | `frame_ratio_options` | MAIN_FILE_SINGLE_CAM.py:1638-1643 | dict | Resolution dropdown, camera configuration |
 | Camera Index | settings.json:`camera_index` | 0 | Camera selection dropdown |
+
+### Common Failure Modes & Fixes
+
+**1. Resolution Locking to Low Quality (640x480)**
+- **Symptom:** App ignores selected resolution and forces 640x480.
+- **Cause:** Probing the camera resolution (`frame.shape`) too quickly after setting it. Many webcams take >200ms to switch firmware modes.
+- **Fix:** Ensure `time.sleep(0.5)` or greater exists in `open_camera` between `cap.set` and `cap.read` (probe).
 
 ### If You Change ANY of the Following
 

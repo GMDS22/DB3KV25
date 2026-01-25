@@ -2,6 +2,7 @@
 
 ## Project Overview
 - This is an automated turret control system with a PyQt5 UI, supporting multiple detection modes (YOLO, frame difference, background subtraction).
+- **Architecture**: Supports Dual-Port operation (Nano for IO/Trigger on COM8, Debug Board for Servos on COM9).
 - Main entry point: `app/MAIN_FILE_SINGLE_CAM.py` (creates UI, loads presets, manages tracking logic).
 - Major components:
   - `turret_enhancements.py`: UI/status bar/sound helpers.
@@ -17,10 +18,11 @@
 - **Run:**
   - Main app: `python app/MAIN_FILE_SINGLE_CAM.py` or use `run.py` for alternate entry.
 - **Testing:**
-  - Test scripts: `test_app_start.py`, `test_resolution_fix.py`, `SERIAL_CONNECTION_TEST.py`, `servo_fix_test.py`.
+  - Test scripts: `test_app_start.py`, `test_resolution_fix.py`, `test_nano_io.py`, `test_bus_servo_read.py`.
 - **Debugging:**
   - Use log files (`serial_log_*.txt`, `tooltip_debug.txt`) and status bars in the UI.
   - For dependency issues, run `python scripts/check_dependencies.py`.
+  - **Health Monitor**: Use the "System Health Monitor" dock (Widgets menu) to view real-time Graphs for FPS, Total Current, and Servo Load.
 
 ## Project-Specific Patterns
 - **Presets:**
@@ -32,17 +34,19 @@
 - **Detection Modes:**
   - YOLO is optional; fallback modes require no torch/ultralytics.
 - **Serial/Hardware:**
-  - Serial communication is abstracted; see `SERIAL_CONNECTION_TEST.py` and related logs for troubleshooting.
+  - Serial communication is abstracted; `MAIN_FILE_SINGLE_CAM.py` handles Dual Port logic (`_serial_is_dual_port()`).
+  - **Trigger Modes**: `Water Mode` (MOSFET, allows Rapid Fire) vs `Projectile Mode` (Servo).
 
 ## Integration & Dependencies
 - Core: PyQt5, numpy, opencv-python, pyserial, ultralytics (YOLO, optional torch/pygame).
 - Optional: torch, cx-Freeze (for packaging).
-- Hardware: Arduino firmware must support rapid ON/OFF trigger commands for rapid-fire mode (see README for details).
+- Hardware: Arduino Nano (IO) + Debug Board (Servos).
 
 ## Conventions
 - Do not copy logic between files; use helpers and enhancements.
 - UI layout and logic are modularized for maintainability.
 - Use the `sounds/` folder for all audio cues (referenced in `turret_enhancements.py`).
+- **Widgets Menu**: All Dock Panels (including System Health Monitor) are toggled via the main `Widgets` menu.
 
 ## Change Safety Workflow (Required)
 

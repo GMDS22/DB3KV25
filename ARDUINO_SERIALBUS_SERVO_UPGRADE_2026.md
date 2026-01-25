@@ -48,7 +48,7 @@ Populate and keep this section accurate — firmware transport and wiring depend
 
 - **Servo family / exact model name:** Yahboom **YB-SD35M** (35kg serial bus servo) *(based on the provided product link and description)*
 - **Vendor / series:** Yahboom SD-series bus servo (YB-SD35M)
-- **Control protocol:** Serial bus (TTL UART bus) *(details below still must be confirmed)*
+- **Control protocol:** Serial bus (TTL UART) with `0xFF 0xFF` header framing (observed in Yahboom debug tool)
 - **Rotation range:** **0–270°**
 - **Mechanical notes:** Power output shaft + auxiliary fixed shaft; stainless steel gears + bearings; built-in high-precision potentiometer(s)
 - **Connectors:** **3 × HY2.0-3Pin** interfaces (multiple wiring angles)
@@ -56,8 +56,7 @@ Populate and keep this section accurate — firmware transport and wiring depend
 - **Servo IDs used (project plan):** Pan = 1, Tilt = 2 (confirm)
 
 Items still required to confirm (do not guess):
-- **Half-duplex vs full-duplex:** TBD (determines wiring/driver)
-- **Bus baud rate(s):** TBD
+- **Half-duplex vs full-duplex:** **Full-duplex TTL UART** (confirmed: debug board has separate **TX** and **RX** pins)
 - **Voltage range:** TBD (do not assume Nano 5V)
 - **Stall current / peak current:** TBD (needed for current thresholds + PSU sizing)
 - **Torque rating details:** “35kg” stated; confirm whether kg·cm and at what voltage
@@ -65,7 +64,100 @@ Items still required to confirm (do not guess):
 - **Feedback support:** Description mentions “high-precision potentiometers / encoder”; confirm what feedback is exposed over bus (position/temp/voltage/current)
 - **Connector pinout order:** TBD (V+, GND, DATA ordering)
 
-If you paste the text/specs from the product page (or a datasheet link), this section can be fully filled in and the Arduino `setBusServoAngle()` implementation can be made correct for the exact protocol.
+Wiring implication of full-duplex TX/RX:
+- Nano **TX** -> Debug board **RX**, Nano **RX** <- Debug board **TX**, and **GND must be common**.
+- Use the debug board's **5V** only as a logic reference (if required by that board); do **not** power the bus servos from the Nano 5V rail.
+
+Confirmed from the Windows debug tool + `servo.exe` static analysis:
+- **PC/debug baud rate:** **115200**
+- **Position units:** **0–4095** (center **2048**)
+- **Broadcast ID:** **254** (`0xFE`)
+- **Observed write-position packet:** `FF FF ID 07 03 2A POS_H POS_L TIME_H TIME_L CHK`
+- **Observed read-position packet:** `FF FF ID 04 02 38 02 CHK`
+- **Checksum behavior (matches tool):** `CHK = 0xFF ^ (sum(bytes[2..(N-3)]) & 0xFF)`
+
+## Servo Setup (what to set, and how)
+
+### 1) Use the Windows debug tool (recommended)
+
+Do this **before** uploading the Arduino sketch, so IDs and limits are correct.
+
+- **Connect** the debug board to your PC, open the Yahboom debug tool.
+- **Serial settings:** `115200`, 8N1.
+- **Plug in ONE servo at a time** while setting IDs (prevents accidentally programming both at once).
+
+**Set these values:**
+
+- **Baud:** `115200` (must match `BUS_BAUD` in the Arduino sketch).
+- **Servo IDs:**
+  - Pan = `1`
+  - Tilt = `2`
+  - (Broadcast ID used by some operations is `254` / `0xFE` — avoid using 254 as a real servo ID.)
+- **Position mode/units:** tool uses **0..4095** ticks (center **2048**).
+- **Min/Max position limits (critical):**
+  - Slowly jog the servo in the tool to find **mechanically safe endpoints**.
+  - Set **MinPos**/**MaxPos** in ticks to those safe endpoints.
+  - Re-test by commanding near-min and near-max.
+
+Optional (good practice, but values depend on your turret mechanics):
+
+- **Pos offset / trim:** use this to center the turret without re-mounting horns.
+- **Protect time / OCP time:** set so the servo faults quickly if jammed (start conservative).
+- **Max torque / max power:** reduce if you’re stripping gears or the mount flexes.
+
+### 1b) Automatic ID assignment (if the Windows tool won’t write)
+
+If the Windows debug software “Write ID” button appears to do nothing, you can assign IDs directly using the included Python tool.
+
+Before running:
+
+- Close the vendor GUI and any Serial Monitor first (only one program can open the COM port).
+- Power the servo from an external supply (USB alone is often not enough).
+- Connect **ONLY ONE** bus servo while running the command.
+
+Commands (example assumes debug board is `COM5`):
+
+- Set the currently connected servo to **Pan ID = 1**:
+  - `python tools/auto_assign_bus_servo_id.py --port COM5 --new-id 1 --confirm --verify`
+
+- Then connect the second servo and set it to **Tilt ID = 2**:
+  - `python tools/auto_assign_bus_servo_id.py --port COM5 --new-id 2 --confirm --verify`
+
+Notes:
+
+- `--verify` attempts a ping and a small center move. If you get no response, check power, wiring orientation, COM port, and baud.
+- `--from-settings` exists, but your app’s `settings.json` `com_port` usually points to the **Arduino**, not the **debug board**.
+
+### 2) Is the Arduino sketch ready to upload?
+
+Yes — with these preflight checks:
+
+- IDs in firmware match your configured servos: `BUS_ID_PAN = 1`, `BUS_ID_TILT = 2`.
+- Bus baud matches your tool/servos: `BUS_BAUD = 115200`.
+- Power is correct: servos on a dedicated supply, common ground with Nano + debug board.
+
+Upload: [arduino/DB3000_SerialBus_Upgrade_2026/DB3000_SerialBus_Upgrade_2026.ino](arduino/DB3000_SerialBus_Upgrade_2026/DB3000_SerialBus_Upgrade_2026.ino)
+
+### 3) Quick smoke test (no Python app needed)
+
+After upload, open Arduino Serial Monitor at `115200` and send a command line like:
+
+`P90T40F0L0R0G0S1M0`
+
+- Start with `S1` (**SAFE**) so the trigger stays off.
+- Change only pan/tilt first.
+
+If motion is backwards, flip these in the sketch:
+- `INVERT_PAN`
+- `INVERT_TILT`
+
+### 4) Important Nano note (SoftwareSerial at 115200)
+
+The sketch uses `SoftwareSerial` at `115200`. This can work, but it can also be flaky on an Arduino Nano depending on wiring/noise.
+
+If you see jitter, random jumps, or missed commands:
+- Keep wires short and twisted with GND.
+- Consider moving to a board with a spare hardware UART (e.g., Mega: `Serial1`) or a better soft-serial library.
 
 ---
 

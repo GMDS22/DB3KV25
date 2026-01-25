@@ -81,6 +81,25 @@ static const int TILT_MIN_DEG = 0;
 static const int TILT_MAX_DEG = 70;
 
 // -----------------------
+// Host command structure
+//
+// NOTE (Arduino IDE build quirk): .ino files/tabs may be concatenated and
+// prototypes auto-generated. Keep this type definition above any function that
+// returns/accepts Cmd to avoid "Cmd does not name a type" compile errors.
+// -----------------------
+struct Cmd {
+  int panDeg;
+  int tiltDeg;
+  int fire;
+  int led;
+  int laser;
+  int acc;
+  int safety;
+  int mode;
+  bool valid;
+};
+
+// -----------------------
 // Home defaults + EEPROM
 // Existing logs show firmware prints "Loaded home Pan=90 Tilt=60".
 // Keep defaults aligned with observed behavior unless you want otherwise.
@@ -287,18 +306,6 @@ static void panBusWriteDeg(int panDeg) {
 // -----------------------
 // Command parsing
 // -----------------------
-
-struct Cmd {
-  int panDeg;
-  int tiltDeg;
-  int fire;
-  int led;
-  int laser;
-  int acc;
-  int safety;
-  int mode;
-  bool valid;
-};
 
 static int parseTokenInt(const char* s, char token, int defaultVal) {
   const char* p = strchr(s, token);
