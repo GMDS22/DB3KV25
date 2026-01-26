@@ -12,7 +12,17 @@ This section documents the required steps, affected subsystems, and review check
 **Update (2026-01-24):** The app supports selectable serial modes:
 - **Arduino/Nano (DB3000 ASCII)**: one COM port to Nano; Nano drives pan/tilt via its debug-board wiring and handles IO.
 - **Debug Board (Bus Servo Direct)**: one COM port to the debug board; app drives PAN/TILT via binary Yahboom-style packets (no Nano IO).
-- **Dual Port (Nano IO + Debug Board Pan/Tilt)**: two COM ports; app sends PAN/TILT directly to debug board while Nano handles IO (firmware supports `PTEN 0/1` to disable Nano pan/tilt output).
+- **Dual Port (Nano IO + Debug Board Pan/Tilt)**: two COM ports; app sends PAN/TILT directly to Debug Board while Nano handles IO.
+
+**Update (2026-01-26): Dual Port wiring/topology clarification (IMPORTANT)**
+- Dual Port assumes the **Debug Board is connected directly to the PC as its own USB serial device** (e.g., COM9).
+- The **Nano is also connected directly to the PC** as its own USB serial device (e.g., COM8).
+- The Debug Board is **NOT required to be physically connected/"chained" to the Nano** for Dual Port operation.
+
+**Critical invariants (do not regress):**
+- Debug Board bus traffic is **binary** (must never be decoded as UTF-8 lines).
+- Nano traffic is **ASCII** telemetry/status (must be drained/parsed in Dual Port even though pan/tilt are bus-driven).
+- In Dual Port, do **NOT** "fallback" to sending full `P{pan}T{tilt}...` commands to the Nano when the bus write fails (prevents split-control when the boards are not chained).
 
 ---
 
@@ -41,7 +51,58 @@ A new dock widget that visualizes real-time system metrics.
 - **Risk**: Saturation of the servo bus if polling frequency is too high, potentially causing jitter in movement commands.
 - **Mitigation**: Timer-based interleaving in `update_frame`.
 
-### 2. Dual Port Pinout Reference
+### 2. Detection Pause Feature
+A tracking behavior control that pauses detection updates when target enters scope.
+
+**Responsibility**:
+- Temporarily halt detection updates to allow precise aiming convergence.
+- Prevent detection jitter from moving target away during final approach.
+
+**Primary Files**:
+- `app/ui_builder.py`: UI slider construction (Detection Pause slider, lines ~1150-1200).
+- `app/MAIN_FILE_SINGLE_CAM.py`: Detection pause logic (~18480-18520), load/save (~11685, 12050).
+- `settings.json`: Persistence of `detection_pause_ms` value.
+
+**UI Location**:
+- **Dock Panel:** "Tracking Behavior" (right side)
+- **Control:** Slider labeled "Detection Pause (ms)"
+- **Range:** 0-2000 milliseconds
+- **Default:** 1000ms (1 second)
+
+**Behavioral Details**:
+- Triggers when target **enters** big scope circle (edge detection)
+- Pauses detection updates for configured duration
+- **Video continues playing** (NOT frozen)
+- Pan/tilt continue aiming to last known target position
+- After pause expires, detection resumes normally
+
+**State Variables**:
+- `self.detection_pause_ms` (int) - Configured pause duration in milliseconds
+- `self._detection_pause_until` (float) - Timestamp when pause expires
+- `self._was_in_scope` (bool) - Tracks scope entry for edge detection
+
+**Integration Points**:
+- Works with all detection modes (0-9)
+- Applies to Sentry Mode predictive tracking
+- Disabled during manual override
+- Persists across app restarts via settings.json
+
+**Critical Invariants**:
+- Pause must use edge detection (entering scope), NOT continuous while in scope
+- Video frame processing must continue (only detection update paused)
+- last_target_center must remain frozen during pause
+- Manual override always takes priority (bypasses pause)
+
+**Impact on Other Subsystems**:
+- **Tracking Loop:** Detection update conditional on pause state check
+- **Servo Control:** Continues using frozen target coordinates during pause
+- **UI Settings:** Load/save must include detection_pause_ms
+- **Recording:** Unaffected (continues normally)
+
+**Documentation**:
+- See `DETECTION_PAUSE_UI_LOCATION.md` for detailed UI guide and troubleshooting
+
+### 3. Dual Port Pinout Reference
 A quick-reference help panel for the Dual Port wiring scheme.
 
 **Access**: `Help -> Arduino Nano Pin Assignments`
@@ -107,8 +168,9 @@ Whenever you see the instruction "INITIATE SERVO UPGRADE", you MUST review this 
 | Firmware            | Nano/debug board firmware (external, must be documented) |
 | Serial Protocol     | MAIN_FILE_SINGLE_CAM.py, serial helpers, docs            |
 | Servo Logic         | MAIN_FILE_SINGLE_CAM.py, servo_fix_test.py, presets      |
+| Tracking Behavior   | MAIN_FILE_SINGLE_CAM.py (detection pause), ui_builder.py |
 | UI/Monitor Panel    | ui_builder.py, layout_manager.py, enhancements           |
-| Settings/Presets    | turret_presets.py, preferred_defaults.json               |
+| Settings/Presets    | turret_presets.py, preferred_defaults.json, settings.json|
 | Logging             | serial_log_*.txt, logging helpers                        |
 | Documentation       | CHANGE_IMPACT_REFERENCE.md, RECENT_UPDATES.json, README  |
 | Testing             | SERIAL_CONNECTION_TEST.py, servo_fix_test.py             |
@@ -340,6 +402,7 @@ You **MUST ALSO** check/update:
 3. **YOLO class names are case-sensitive**: "Person" ≠ "person"
 4. **Color detection HSV vs BGR**: OpenCV uses BGR, color presets expect HSV
 5. **Hybrid mode order**: Some modes AND results, others OR - affects sensitivity
+6. **SmartTracker centroid**: Main app now uses `tracking_enhancements.SmartTracker` to smooth and persist centroid aiming. If removed or bypassed, the yellow-dot will drift and targeting will jump between detections.
 
 ### Common Failure Modes
 
@@ -707,6 +770,33 @@ Manages serial port connection to Arduino/MCU and sends control commands.
 | [app/helpers/serial_ui_helpers.py](app/helpers/serial_ui_helpers.py) | Serial UI utilities |
 | [SERIAL_CONNECTION_TEST.py](SERIAL_CONNECTION_TEST.py) | Standalone serial testing |
 
+### Serial Device Modes (UI: "Serial Device" dropdown)
+
+These modes change **which COM port(s)** are opened and **how bytes are encoded/decoded**.
+
+1) **Arduino/Nano (DB3000 ASCII)**
+- Uses primary COM only (settings: `com_port` / `baud_rate`).
+- Host sends packed ASCII commands: `P..T..F..L..R..G..S..M..`.
+- Host expects ASCII telemetry/status back and drains via `_drain_serial_input()`.
+
+2) **Debug Board (Bus Servo Direct)**
+- Uses Debug Board COM only (settings: `debug_board_com_port` / `debug_board_baud`).
+- Host sends **binary** bus-servo packets for PAN/TILT.
+- Host must **not** call `_drain_serial_input()` because inbound bytes are not line-oriented UTF-8.
+- IO features (fire/relays) are not available unless a Nano is also connected (use Dual Port).
+
+3) **Dual Port (Nano IO + Debug Board Pan/Tilt)**
+- Uses both ports: primary COM = Nano (IO + telemetry), debug COM = Debug Board (PAN/TILT bus packets).
+- Host sends PAN/TILT only to Debug Board; host sends IO-only tokens to Nano.
+- Host must still drain Nano ASCII input in Dual Port (telemetry/safety/current parsing).
+
+**Sensitive functions / regression hotspots:**
+- `connect_serial()` (mode selection, which port is opened)
+- `_connect_serial_async()` / `_connect_bus_serial_async()` (threading + port roles)
+- `send_serial_command()` (routing PAN/TILT vs IO-only)
+- `_drain_serial_input()` (must not decode bus bytes; must decode Nano bytes in Dual Port)
+- `_serial_active_is_bus_mode()` (used as a gate for decoding logic)
+
 ### Direct Dependencies
 
 | Parameter | Location | Default | Affects |
@@ -753,6 +843,8 @@ You **MUST ALSO** check/update:
 - [ ] Auto-fire enable flag
 - [ ] Rapid-fire duty cycle
 - [ ] Safety interlock checks
+- [ ] Dual Port IO path: Nano must still receive IO tokens even if bus pan/tilt fails
+- [ ] Startup load: auto-fire must re-sync to Safety (ARM) state
 
 ### Hidden or Non-Obvious Dependencies
 
@@ -761,6 +853,8 @@ You **MUST ALSO** check/update:
 3. **TX pause feature**: `serial_tx_paused` stops sending without disconnecting
 4. **Fire timeout**: `_max_firing_duration` prevents stuck trigger (default 3s)
 5. **Tilt safety interlock**: MCU can report tilt locked - host must respect
+6. **Dual Port IO tokens**: In Dual Port, always send `S`/`M` and `F/L/R/G` tokens to Nano; do not rely on packed command parsing.
+7. **Auto-fire state**: On settings load, `auto_fire_enabled` must follow Safety (ARM) unless explicitly disabled.
 
 ### Common Failure Modes
 
@@ -771,6 +865,11 @@ You **MUST ALSO** check/update:
 | Servo twitches on connection | First command sends immediately (sentinel values) |
 | Fire doesn't stop | Fire timeout not enforced, or flag stuck |
 | Commands appear in log but servo doesn't move | TX paused, or redundant filter blocking |
+| Auto-fire never triggers while ARMED | `auto_fire_enabled` not re-synced to Safety on load |
+| Dual Port: Trigger does not fire | IO tokens not sent to Nano when bus ping/pt fails, or packed token parsing ignores `S/M` |
+| Dual Port: Nano telemetry/current never updates | Nano input not drained due to bus-mode decode gating |
+| Dual Port: pan/tilt moves stop when bus write fails | Incorrect fallback to Nano P/T when boards are not chained |
+| Debug Board mode: random decode/traceback spam | Attempting to decode bus bytes as UTF-8 lines |
 
 ### Required Verification Steps
 
@@ -779,6 +878,10 @@ You **MUST ALSO** check/update:
 3. Toggle ARM and verify Arduino responds
 4. Fire trigger and verify it stops after timeout
 5. Disconnect and verify clean state reset
+
+**Dual Port minimum verification (recommended scripts):**
+- `python test_nano_io.py` (validates COM8 IO path)
+- `python test_bus_servo_read.py COM9` (validates Debug Board bus path)
 
 ---
 
@@ -798,7 +901,7 @@ Manages frame update timing, FPS calculation, and performance monitoring.
 | Timer | Interval | Purpose |
 |-------|----------|---------|
 | `main_timer` | 33ms (~30fps) | Frame update loop |
-| `serial_timer` | 50ms (20Hz) | Serial command send |
+| `serial_timer` | 20ms (50Hz) | Serial command send (bus servos benefit from higher update rate) |
 | `rapid_fire_timer` | variable | Burst fire pulses |
 | `_notes_autosave_timer` | 5000ms | Notes auto-save |
 

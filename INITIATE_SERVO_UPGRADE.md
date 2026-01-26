@@ -114,6 +114,13 @@ Best outcome for safety and backwards compatibility:
 - The MCU (Nano + debug board) converts requested `pan_angle`/`tilt_angle` into serial bus servo commands.
 - Trigger remains controlled exactly as before using the same `F`/mode semantics.
 
+**Note (2026-01): the codebase now supports multiple host connection topologies.**
+- You can still run the original “host → Nano → servos” architecture (Arduino/Nano ASCII mode).
+- You can also run “host → Debug Board” for PAN/TILT directly (Debug Board bus-servo mode).
+- For best of both worlds (PAN/TILT direct + Nano IO), use **Dual Port** mode (two COM ports).
+
+This matters because future changes must preserve correct routing/decoding rules (binary bus vs ASCII Nano). See `CHANGE_IMPACT_REFERENCE.md` → **Serial Communication / Arduino Interface**.
+
 Why this is preferred:
 - It minimizes change surface in app/MAIN_FILE_SINGLE_CAM.py where many safety and anti-jitter protections exist.
 - It avoids breaking sentry mode tools and any external scripts that emit the same packed command.

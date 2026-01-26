@@ -65,7 +65,7 @@ static const uint8_t PIN_LASER_RELAY = 6; // Laser relay/MOSFET driver
 // - per-servo (pan/tilt) sensors are typically on the debug board
 // - total current is typically a dedicated sensor installed on the power feed
 #define ENABLE_PAN_TILT_CURRENT_SENSORS 0
-#define ENABLE_TOTAL_CURRENT_SENSOR 0
+#define ENABLE_TOTAL_CURRENT_SENSOR 1
 
 #if ENABLE_PAN_TILT_CURRENT_SENSORS
 static const uint8_t PIN_CURR_PAN_A   = A0;
@@ -116,8 +116,21 @@ static const uint16_t TILT_TICKS_MAX = 4095;
 static const bool INVERT_PAN  = false;
 static const bool INVERT_TILT = false;
 
-// Optional speed/accel mapping (placeholder)
-static const uint16_t DEFAULT_MOVE_TIME_MS = 60; // servo-side move time; tune for smoothness
+// Serial-bus servos accept a "move time" parameter (ms) per command.
+// If this is too large, tracking will feel slow no matter how fast the host updates.
+// Use a fast, delta-based profile: big moves -> very small time (fast), small moves -> slightly larger.
+static const uint16_t MOVE_TIME_BIG_MS   = 10;
+static const uint16_t MOVE_TIME_MED_MS   = 14;
+static const uint16_t MOVE_TIME_SMALL_MS = 18;
+static const uint16_t MOVE_TIME_TINY_MS  = 22;
+
+static inline uint16_t computeMoveTimeMs(int deltaDegAbs) {
+  if (deltaDegAbs < 0) deltaDegAbs = -deltaDegAbs;
+  if (deltaDegAbs >= 30) return MOVE_TIME_BIG_MS;
+  if (deltaDegAbs >= 15) return MOVE_TIME_MED_MS;
+  if (deltaDegAbs >= 7)  return MOVE_TIME_SMALL_MS;
+  return MOVE_TIME_TINY_MS;
+}
 
 // ---------------------------
 // Trigger config
@@ -175,6 +188,10 @@ struct HostCommand {
 };
 
 static HostCommand cmd;
+
+// Keep last applied positions (post-invert) so we can compute delta-based move times.
+static int lastAppliedPanDeg = 90;
+static int lastAppliedTiltDeg = 40;
 
 // Dual-port support: allow host to disable pan/tilt bus output so Nano can be
 // used for IO-only (trigger/relays/safety) while a PC drives pan/tilt directly.
@@ -348,8 +365,14 @@ static void applyPanTilt() {
   const int pan = applyInvertAndClamp(cmd.panDeg, PAN_MIN_DEG, PAN_MAX_DEG, INVERT_PAN);
   const int tilt = applyInvertAndClamp(cmd.tiltDeg, TILT_MIN_DEG, TILT_MAX_DEG, INVERT_TILT);
 
-  setBusServoAngle(BUS_ID_PAN, pan, DEFAULT_MOVE_TIME_MS);
-  setBusServoAngle(BUS_ID_TILT, tilt, DEFAULT_MOVE_TIME_MS);
+  const uint16_t panTime = computeMoveTimeMs(pan - lastAppliedPanDeg);
+  const uint16_t tiltTime = computeMoveTimeMs(tilt - lastAppliedTiltDeg);
+
+  setBusServoAngle(BUS_ID_PAN, pan, panTime);
+  setBusServoAngle(BUS_ID_TILT, tilt, tiltTime);
+
+  lastAppliedPanDeg = pan;
+  lastAppliedTiltDeg = tilt;
 }
 
 // ---------------------------
@@ -562,6 +585,18 @@ void setup() {
 
   // Startup banner
   Serial.println(F("DB3000 SerialBus Upgrade 2026: READY"));
+
+  // Make current telemetry configuration explicit (avoids silent flatline graphs).
+  Serial.print(F("[CUR] ENABLE_PAN_TILT_CURRENT_SENSORS="));
+  Serial.print((int)ENABLE_PAN_TILT_CURRENT_SENSORS);
+  Serial.print(F(" ENABLE_TOTAL_CURRENT_SENSOR="));
+  Serial.println((int)ENABLE_TOTAL_CURRENT_SENSOR);
+
+#if ENABLE_TOTAL_CURRENT_SENSOR
+  Serial.println(F("[CUR] Total current sensor pin: A2 (PIN_CURR_TOTAL_A)"));
+#else
+  Serial.println(F("[CUR] Total current telemetry DISABLED (set ENABLE_TOTAL_CURRENT_SENSOR=1)"));
+#endif
 }
 
 void loop() {

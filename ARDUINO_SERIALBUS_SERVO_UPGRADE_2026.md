@@ -10,13 +10,13 @@ This document provides:
 ---
 
 ## Assumptions (confirm before wiring)
-Because “serial bus servo” and “debug board” can vary by vendor, this document assumes:
+Because "serial bus servo" and "debug board" can vary by vendor, this document assumes:
 - The **debug board exposes a TTL UART interface** (RX/TX) to the Arduino Nano.
 - The debug board drives the **servo bus** (power and data distribution to Pan and Tilt servos).
 - The debug board provides **analog current sense outputs** for Pan and Tilt (optional but supported by the sketch).
 - A dedicated current sensor provides **total turret current** as an analog output.
 
-If your debug board provides current via serial (instead of analog), the sketch’s current-reading block must be adapted (still straightforward).
+If your debug board provides current via serial (instead of analog), the sketch's current-reading block must be adapted (still straightforward).
 
 ---
 
@@ -28,7 +28,7 @@ Reference images (as provided):
 
 ![Servo Image 2](1efe7e1c372359451be7058f9abeda0e.jpg_2200x2200q80.jpg)
 
-Enhanced “read the label/spec” helpers (auto-generated crops):
+Enhanced "read the label/spec" helpers (auto-generated crops):
 
 - Image 1 enhanced full:
   ![Image 1 Enhanced Full](artifacts/servo_label_crops_img1/full_enhanced_1p5x.png)
@@ -59,9 +59,9 @@ Items still required to confirm (do not guess):
 - **Half-duplex vs full-duplex:** **Full-duplex TTL UART** (confirmed: debug board has separate **TX** and **RX** pins)
 - **Voltage range:** TBD (do not assume Nano 5V)
 - **Stall current / peak current:** TBD (needed for current thresholds + PSU sizing)
-- **Torque rating details:** “35kg” stated; confirm whether kg·cm and at what voltage
+- **Torque rating details:** "35kg" stated; confirm whether kg·cm and at what voltage
 - **Speed spec:** TBD
-- **Feedback support:** Description mentions “high-precision potentiometers / encoder”; confirm what feedback is exposed over bus (position/temp/voltage/current)
+- **Feedback support:** Description mentions "high-precision potentiometers / encoder"; confirm what feedback is exposed over bus (position/temp/voltage/current)
 - **Connector pinout order:** TBD (V+, GND, DATA ordering)
 
 Wiring implication of full-duplex TX/RX:
@@ -103,11 +103,11 @@ Optional (good practice, but values depend on your turret mechanics):
 
 - **Pos offset / trim:** use this to center the turret without re-mounting horns.
 - **Protect time / OCP time:** set so the servo faults quickly if jammed (start conservative).
-- **Max torque / max power:** reduce if you’re stripping gears or the mount flexes.
+- **Max torque / max power:** reduce if you're stripping gears or the mount flexes.
 
-### 1b) Automatic ID assignment (if the Windows tool won’t write)
+### 1b) Automatic ID assignment (if the Windows tool won't write)
 
-If the Windows debug software “Write ID” button appears to do nothing, you can assign IDs directly using the included Python tool.
+If the Windows debug software "Write ID" button appears to do nothing, you can assign IDs directly using the included Python tool.
 
 Before running:
 
@@ -126,7 +126,7 @@ Commands (example assumes debug board is `COM5`):
 Notes:
 
 - `--verify` attempts a ping and a small center move. If you get no response, check power, wiring orientation, COM port, and baud.
-- `--from-settings` exists, but your app’s `settings.json` `com_port` usually points to the **Arduino**, not the **debug board**.
+- `--from-settings` exists, but your app's `settings.json` `com_port` usually points to the **Arduino**, not the **debug board**.
 
 ### 2) Is the Arduino sketch ready to upload?
 
@@ -136,7 +136,15 @@ Yes — with these preflight checks:
 - Bus baud matches your tool/servos: `BUS_BAUD = 115200`.
 - Power is correct: servos on a dedicated supply, common ground with Nano + debug board.
 
-Upload: [arduino/DB3000_SerialBus_Upgrade_2026/DB3000_SerialBus_Upgrade_2026.ino](arduino/DB3000_SerialBus_Upgrade_2026/DB3000_SerialBus_Upgrade_2026.ino)
+Upload (one-port topology: Nano drives PAN/TILT bus via debug board):
+
+- [arduino/DB3000_SerialBus_Upgrade_2026/DB3000_SerialBus_Upgrade_2026.ino](arduino/DB3000_SerialBus_Upgrade_2026/DB3000_SerialBus_Upgrade_2026.ino)
+
+Dual Port note (your setup: Nano COM8 + Debug Board COM9):
+
+- The Debug Board is connected directly to the PC and does not get flashed.
+- Upload this Nano-only IO + Total Current telemetry sketch instead:
+  - [arduino/DB3000_Nano_IO_Telemetry_2026/DB3000_Nano_IO_Telemetry_2026.ino](arduino/DB3000_Nano_IO_Telemetry_2026/DB3000_Nano_IO_Telemetry_2026.ino)
 
 ### 3) Quick smoke test (no Python app needed)
 

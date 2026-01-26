@@ -29,6 +29,10 @@
 import base64
 import json
 import random  # For guard mode random positions
+try:
+    from tracking_enhancements import SmartTracker
+except Exception:
+    SmartTracker = None
 import os
 from pathlib import Path
 import math  # For NaN/Inf checks in serial validation
@@ -1417,7 +1421,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # CHANGE WARNING:
         # Modifications here affect initialization order and runtime state ownership.
         # See CHANGE_IMPACT_REFERENCE.md → Code-Level Change Enforcement.
-        # Last modified: 2026-01-25 by Copilot Agent
+        # Last modified: 2026-01-26 by Copilot
         super().__init__()
         # ---- Early runtime state initialization (before timers/signals/threads) ----
         self.ser = None
@@ -1431,11 +1435,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self._manual_override_active = False
         self.auto_fire_enabled = False
         # Feature disable toggles for stabilization
+        # NOTE: Sentry Mode relies on its hooks being enabled to receive frames
+        # and to take ownership of turret control when the Sentry tab is active.
         self._disable_idle_modes = True
-        self._disable_sentry_hooks = True
-        self._disable_auto_fire = True
+        self._disable_sentry_hooks = False
+        self._disable_auto_fire = False
         self._disable_recording = True
         self._disable_custom_tooltips = True
+        # Smart tracker (centroid persistence + smoothing). Optional.
+        self.smart_tracker = None
         # Flag to track if UI initialization failed due to Qt errors
         self._ui_init_failed = False
         # Explicit typed widget attributes to help static analysis and IDEs
@@ -1503,6 +1511,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Sentinel values force comparison to fail on first cycle, guaranteeing servo gets activated
         self.last_sent_pan = -9999  # Sentinel: no servo position has been sent yet
         self.last_sent_tilt = -9999  # Sentinel: no servo position has been sent yet
+        # Bus-servo modes (Debug Board / Dual Port): track last-sent high-resolution targets.
+        # These are used by the redundant-command filter so sub-degree corrections are not skipped.
+        self._last_sent_bus_pan_ticks = None
+        self._last_sent_bus_tilt_ticks = None
+        self._last_sent_bus_pan_deg = None
+        self._last_sent_bus_tilt_deg = None
         # CRITICAL FIX DEC8: Initialize last_known values for detection loss fallback chain
         # FIX DEC8b: Keep as FLOAT not INT to preserve sub-degree precision
         # Truncating to int causes 3-5° cumulative drift per 10 frames
@@ -1618,6 +1632,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.target_lock_start_time = None     # When lock was initiated (for timeout)
         self.target_lock_timeout = 5.0         # Max seconds to spend moving to target
         self.target_lock_tolerance = 3.0       # Within ±3 degrees = arrived at target
+        # Optional hold window for "single strike" style moves (used by aggressive auto-strike).
+        # When set, the lock remains active until this monotonic timestamp, regardless of last_sent_*.
+        self.target_lock_hold_until_mono = None
+
+        # ========== AUTO STRIKE (AGGRESSIVE PRESET) ==========
+        # Goal: one decisive move to the computed target, then hold briefly (avoid many micro-steps).
+        self.auto_strike_enabled = False
+        self.auto_strike_hold_ms = 300
+        self.auto_strike_cooldown_ms = 250
+        self.auto_strike_min_error_deg = 2.0
+        self._auto_strike_cooldown_until_mono = 0.0
 
         # ========== FIXED: INITIALIZE MISSING idle_behavior ATTRIBUTE ==========
         # This attribute was being set in polling but never initialized
@@ -1668,6 +1693,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.quick_strike_start_time = 0.0  # When quick strike started (for timeout)
         self.quick_strike_fired = False  # Has the quick strike already fired?
         self.last_target_center = None  # (x, y) pixel coords of last detected target center
+        self.detection_pause_ms = 1000  # Milliseconds to pause detection when target enters scope
+        self._detection_pause_until = 0.0  # Timestamp when detection pause expires
+        self._was_in_scope = False  # Track scope entry for edge detection
         
         # ========== HUD COLOR PALETTE (Unified - Dec 2024) ==========
         # All HUD elements use these colors - no ad-hoc BGR values
@@ -1904,6 +1932,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.last_detections: list[tuple[int, int, int, int]] = []
         # Diagnostic frame counter for throttled per-frame logs
         self._frame_diag_counter = 0
+
+        # Initialize smart tracker (if available). This provides persistent centroid aiming.
+        try:
+            if SmartTracker is not None:
+                self.smart_tracker = SmartTracker()
+        except Exception:
+            self.smart_tracker = None
 
         # Wire up the top ARM button to the main safety toggle function
         # NOTE: avoid calling _safe_connect_path here because the enhancer
@@ -2486,6 +2521,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         self.serial_timer = QTimer(self)
         try:
+            # More stable cadence helps serial-bus aiming smoothness.
+            self.serial_timer.setTimerType(Qt.PreciseTimer)
+        except Exception:
+            pass
+        try:
             self._safe_connect("serial_timer", "timeout", self.send_serial_command)
         except Exception:
             try:
@@ -2616,7 +2656,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             assert self.com_port_input is not None
         if hasattr(self, "baud_rate_input"):
             assert self.baud_rate_input is not None
-        self.serial_timer.start(50)
+        # Faster output loop benefits serial-bus servos: smoother and more responsive.
+        # Use the serial timer as the primary output cadence (update_frame no longer needs to force-send).
+        self.serial_timer.start(20)
         # ==========================================
         # POLISHED GLOBAL UI THEME
         # ==========================================
@@ -3154,8 +3196,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self.serial_device_type_combo.setToolTip(
                     "Select how the app talks to the selected COM port.\n"
                     "- Arduino/Nano: sends text commands like P90T40F0...\n"
-                    "- Debug Board: sends binary bus-servo packets for PAN/TILT only.\n"
-                    "- Dual Port: Nano handles IO (fire/relays/safety), Debug Board COM handles PAN/TILT."
+                    "- Debug Board: sends binary bus-servo packets for PAN/TILT only (no IO/fire/relays in this mode).\n"
+                    "- Dual Port: uses TWO independent USB serial ports (Nano + Debug Board).\n"
+                    "  Nano handles IO/telemetry (fire/relays/safety), Debug Board COM handles PAN/TILT.\n"
+                    "  Note: Dual Port does NOT require the Debug Board to be chained to the Nano."
                 )
             except Exception:
                 pass
@@ -4890,7 +4934,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.precision_mode_checkbox = QCheckBox("Enable Precision Mode")
         try:
             self.precision_mode_checkbox.setChecked(False)
-            self._safe_connect("precision_mode_checkbox", "stateChanged", self.save_settings)
+            # Checkable widgets should use toggled(bool); handler also persists settings.
+            self._safe_connect(
+                "precision_mode_checkbox", "toggled", self._on_precision_mode_toggled
+            )
         except Exception:
             pass
         precision_box.addWidget(self.precision_mode_checkbox)
@@ -5042,6 +5089,58 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         deadzone_row.addWidget(self.deadzone_slider)
         deadzone_row.addWidget(self.deadzone_label)
         behavior_layout.addLayout(deadzone_row, br, 1)
+        br += 1
+
+        # Detection Pause (ms): pause detection updates when target enters scope circle
+        behavior_layout.addWidget(QLabel("Detection Pause (ms)"), br, 0)
+        detection_pause_row = QHBoxLayout()
+        if getattr(self, "detection_pause_slider", None) is None:
+            self.detection_pause_slider = QSlider()
+            try:
+                try:
+                    self.detection_pause_slider.setOrientation(
+                        cast(Any, self._qt_enum("Horizontal", 1))
+                    )
+                except Exception:
+                    pass
+            except Exception:
+                pass
+        try:
+            try:
+                self._safe_widget_call("detection_pause_slider", "setRange", 0, 2000)
+                self._safe_widget_call("detection_pause_slider", "setValue", 1000)
+                self._safe_connect("detection_pause_slider", "valueChanged", self.save_settings)
+            except Exception:
+                pass
+        except Exception:
+            pass
+        if getattr(self, "detection_pause_label", None) is None:
+            try:
+                ms = self._safe_int_widget_value("detection_pause_slider", 1000)
+            except Exception:
+                ms = 1000
+            self.detection_pause_label = QLabel(str(ms))
+        try:
+            try:
+                self.detection_pause_label.setFixedWidth(60)
+                self._safe_connect(
+                    "detection_pause_slider",
+                    "valueChanged",
+                    lambda v: self.detection_pause_label.setText(str(v)),
+                )
+            except Exception:
+                pass
+        except Exception:
+            pass
+        try:
+            self.detection_pause_slider.setToolTip(
+                "When target enters the big scope circle, pause detection updates for this duration. Video continues playing - only detection is paused so pan/tilt can precisely center the target before firing."
+            )
+        except Exception:
+            pass
+        detection_pause_row.addWidget(self.detection_pause_slider)
+        detection_pause_row.addWidget(self.detection_pause_label)
+        behavior_layout.addLayout(detection_pause_row, br, 1)
         br += 1
 
         behavior_layout.addWidget(QLabel("Snap Threshold (px)"), br, 0)
@@ -6308,7 +6407,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
                 health_layout.addRow(QLabel("FPS:"))
                 if getattr(self, "fps_graph", None) is None:
-                    self.fps_graph = HealthGraphWidget(max_val=60)
+                    self.fps_graph = HealthGraphWidget(max_val=60, show_value_text=False)
                     self.fps_graph.setMinimumHeight(60)
                 health_layout.addRow(self.fps_graph)
 
@@ -9139,7 +9238,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             return False
 
-    def _bus_servo_send_pan_tilt(self, pan_deg: float, tilt_deg: float) -> bool:
+    def _bus_servo_send_pan_tilt(self, pan_deg: float, tilt_deg: float, *, time_ms: int | None = None) -> bool:
         """Send PAN/TILT to bus servos (IDs default to 1 and 2)."""
         try:
             pan_id = int(getattr(self, "bus_pan_servo_id", 1))
@@ -9152,7 +9251,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # This allows the software PID/smoothing to control the feel, rather than hardware lag.
         default_time = 20
         # If specifically overridden by a "bus_servo_time_ms" attribute (e.g. for slow pans), use that.
-        time_ms = int(getattr(self, "bus_servo_time_ms", default_time) or default_time)
+        if time_ms is None:
+            time_ms = int(getattr(self, "bus_servo_time_ms", default_time) or default_time)
+        time_ms = int(time_ms)
         
         ok1 = self._bus_servo_write_pos(servo_id=pan_id, deg=float(pan_deg), time_ms=time_ms)
         ok2 = self._bus_servo_write_pos(servo_id=tilt_id, deg=float(tilt_deg), time_ms=time_ms)
@@ -9193,6 +9294,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 
                 if getattr(self, "tilt_current_mA", None) is None or self.tilt_current_mA == 0:
                      self.tilt_current_mA = tload
+                
+                try:
+                    if getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked():
+                        print(f"DEBUG: PanLoad={self.pan_load_val} TiltLoad={self.tilt_load_val}")
+                except Exception:
+                    pass
 
                 self._last_bus_load_poll = now
         except Exception:
@@ -9752,6 +9859,94 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         )
         self.save_settings()
 
+    def _on_precision_mode_toggled(self, checked=None):
+        """Reset precision PID + fractional state when Precision Mode is toggled.
+
+        Without this, disabling/re-enabling can leave stale integrator/accumulator
+        values around, which can manifest as sudden jumps or persistent drift.
+        """
+        # If we're applying settings programmatically, don't mutate runtime state.
+        if getattr(self, "_loading_settings", False):
+            return
+
+        try:
+            checked_bool = bool(checked)
+        except Exception:
+            try:
+                checked_bool = bool(
+                    getattr(self, "precision_mode_checkbox", None)
+                    and self.precision_mode_checkbox.isChecked()
+                )
+            except Exception:
+                checked_bool = False
+
+        # Clear precision PID internal state so re-enabling doesn't lunge.
+        try:
+            if hasattr(self, "_precision_pid_pan"):
+                delattr(self, "_precision_pid_pan")
+            if hasattr(self, "_precision_pid_tilt"):
+                delattr(self, "_precision_pid_tilt")
+            if hasattr(self, "_last_precision_time"):
+                delattr(self, "_last_precision_time")
+        except Exception:
+            pass
+
+        # Clear fractional accumulators used by micro-send logic.
+        try:
+            self._pan_frac_accum = 0.0
+            self._tilt_frac_accum = 0.0
+        except Exception:
+            pass
+
+        # Keep state consistent: align targets with the last commanded position.
+        try:
+            current_pan = float(
+                getattr(
+                    self,
+                    "last_sent_pan",
+                    getattr(self, "prev_pan_angle", getattr(self, "HOME_PAN", 90)),
+                )
+            )
+            current_tilt = float(
+                getattr(
+                    self,
+                    "last_sent_tilt",
+                    getattr(self, "prev_tilt_angle", getattr(self, "HOME_TILT", 40)),
+                )
+            )
+
+            # Sentinel safety
+            if current_pan < -1000:
+                current_pan = float(getattr(self, "prev_pan_angle", getattr(self, "HOME_PAN", 90)))
+            if current_tilt < -1000:
+                current_tilt = float(getattr(self, "prev_tilt_angle", getattr(self, "HOME_TILT", 40)))
+
+            current_pan = float(np.clip(current_pan, self.PAN_MIN, self.PAN_MAX))
+            current_tilt = float(np.clip(current_tilt, self.TILT_MIN, self.TILT_MAX))
+
+            self.target_pan = current_pan
+            self.target_tilt = current_tilt
+            self.prev_pan_angle = current_pan
+            self.prev_tilt_angle = current_tilt
+            self.last_known_pan = current_pan
+            self.last_known_tilt = current_tilt
+        except Exception:
+            pass
+
+        # Persist preference and log for visibility.
+        try:
+            self.save_settings()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "enhancer"):
+                self.enhancer.log_serial_output(
+                    f"Precision Mode {'ENABLED' if checked_bool else 'DISABLED'} (state reset)",
+                    fire=False,
+                )
+        except Exception:
+            pass
+
     # === AGENT-MANAGED BLOCK START ===
     # Option C: Basic/Advanced toggle + mode-relevant visibility
     # AgentChangeID: DETECTION_UI_BASIC_ADVANCED_v1
@@ -9948,6 +10143,25 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             self.yolo_model_combo.blockSignals(False)
                         except Exception:
                             pass
+                # If switching to any YOLO-capable mode, ensure a model is loaded
+                # so tracking doesn't silently run with model_loaded=False.
+                try:
+                    if (is_yolo or is_hybrid) and not is_color:
+                        model_loaded = bool(getattr(self.yolo_detector, "model_loaded", False))
+                        if not model_loaded:
+                            try:
+                                model_name = (
+                                    self._safe_widget_method_return(
+                                        "yolo_model_combo", "currentText", ""
+                                    )
+                                    or ""
+                                )
+                            except Exception:
+                                model_name = ""
+                            if model_name:
+                                self.on_yolo_model_changed(self.yolo_model_combo.currentIndex())
+                except Exception:
+                    pass
                 # If user switched detection modes explicitly, clear any lingering
                 # manual override so the newly selected detection mode takes effect
                 # immediately rather than being blocked by a stale manual override.
@@ -10838,6 +11052,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
     def load_settings(self):
         """Load saved settings from JSON file if available."""
+        # CHANGE WARNING:
+        # This function is CWD-sensitive and drives persisted behavior across sessions.
+        # Keep load/save key sets aligned and avoid triggering runtime side-effects while loading.
+        self._loading_settings = True
         # Load servo calibration first (applies pan/tilt limits)
         self.load_servo_calibration()
         
@@ -10861,6 +11079,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     pass
                 self.load_default_settings_to_ui()
+                self._loading_settings = False
                 return
 
         if not os.path.exists(settings_path):
@@ -10886,6 +11105,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.save_settings()
                 except Exception:
                     pass
+            self._loading_settings = False
             return
 
         try:
@@ -11455,7 +11675,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.trigger_mode_bb = settings.get(
                 "trigger_mode_bb", False
             )  # Default to MOSFET
+            # Block signals to prevent triggering set_trigger_mode during load
+            self.trigger_mode_combo.blockSignals(True)
             self.trigger_mode_combo.setCurrentIndex(1 if self.trigger_mode_bb else 0)
+            self.trigger_mode_combo.blockSignals(False)
 
             # Manual-mode auto-fire setting
             manual_auto = settings.get("manual_auto_fire", False)
@@ -11504,6 +11727,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self.safety_state = 0
                 self.safety_button.setText("Safety: ARMED (Can Fire)")
 
+            # Keep auto-fire aligned with Safety state on load.
+            # Auto-fire follows Safety (ARM) unless explicitly disabled.
+            try:
+                if getattr(self, "_disable_auto_fire", False):
+                    self.auto_fire_enabled = False
+                else:
+                    self.auto_fire_enabled = (self.safety_state == 0)
+            except Exception:
+                pass
+
             # ========== FIXED: INITIALIZE TILT_SAFETY_LABEL STATE ==========
             # Match label text to actual tilt safety hardware/enable state
             # (Previously always showed OK even if disabled)
@@ -11545,6 +11778,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.aim_aggression_label.setText(str(self.aim_aggression))
                 if getattr(self, "final_approach_boost_checkbox", None) is not None:
                     self.final_approach_boost_checkbox.setChecked(self.final_approach_boost)
+            except Exception:
+                pass
+
+            # --- Load Detection Pause Setting (Jan 2026) ---
+            try:
+                self.detection_pause_ms = int(settings.get("detection_pause_ms", 1000))
+                if getattr(self, "detection_pause_slider", None) is not None:
+                    self.detection_pause_slider.setValue(self.detection_pause_ms)
+                if getattr(self, "detection_pause_label", None) is not None:
+                    self.detection_pause_label.setText(str(self.detection_pause_ms))
             except Exception:
                 pass
 
@@ -11736,10 +11979,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
             # --- Load YOLO Settings ---
             yolo_model = settings.get("yolo_model")
+            selected_model = ""
             if yolo_model:
-                index = self.yolo_model_combo.findText(yolo_model)
-                if index != -1:
-                    self.yolo_model_combo.setCurrentIndex(index)
+                try:
+                    selected_model = str(yolo_model)
+                except Exception:
+                    selected_model = ""
+                try:
+                    index = self.yolo_model_combo.findText(selected_model)
+                    if index == -1 and selected_model:
+                        self.yolo_model_combo.addItem(selected_model)
+                        index = self.yolo_model_combo.findText(selected_model)
+                    if index != -1:
+                        self.yolo_model_combo.setCurrentIndex(index)
+                except Exception:
+                    pass
             self.yolo_confidence_input.setValue(settings.get("yolo_confidence", 0.5))
             self.yolo_classes_input.setText(settings.get("yolo_classes", "person"))
             # Restore additional YOLO settings if present
@@ -11768,6 +12022,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.yolo_detector.set_target_classes(classes)
                     except Exception:
                         pass
+            except Exception:
+                pass
+            # Ensure YOLO model is loaded when configured (non-blocking)
+            try:
+                if selected_model and getattr(self, "yolo_detector", None) is not None:
+                    model_loaded = bool(getattr(self.yolo_detector, "model_loaded", False))
+                    model_name = str(getattr(self.yolo_detector, "model_name", "") or "")
+                    if not model_loaded or (
+                        model_name
+                        and model_name != selected_model
+                        and os.path.basename(selected_model) != model_name
+                    ):
+                        try:
+                            self.on_yolo_model_changed(self.yolo_model_combo.currentIndex())
+                        except Exception:
+                            pass
             except Exception:
                 pass
 
@@ -11920,6 +12190,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "overshoot_percent": val("overshoot_input", 0),
                 "deadzone": val("deadzone_slider", 40),
                 "tracking_speed": val("tracking_speed_slider", 50),
+                "detection_pause_ms": val("detection_pause_slider", 1000),
                 "trigger_cooldown": val("trigger_cooldown_input", 1.5),
                 "auto_tracking": getattr(self, "auto_tracking_enabled", False),
                 "detection_enabled": getattr(self, "detection_enabled", False),
@@ -12239,6 +12510,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 _do_save()
         except Exception:
             pass
+        finally:
+            self._loading_settings = False
 
     def _refresh_layout_list(self):
         """Populate the Layout list widget from saved profiles in settings.json."""
@@ -12598,6 +12871,24 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.final_approach_boost_checkbox.setChecked(self.final_approach_boost)
                 except Exception as e:
                     if logger: log_exception(e, "Setting final_approach_boost from preset")
+
+            # --- Auto Strike (single decisive movement) ---
+            if 'auto_strike_enabled' in preset:
+                try:
+                    self.auto_strike_enabled = bool(preset['auto_strike_enabled'])
+                except Exception:
+                    pass
+            for k in ('auto_strike_hold_ms', 'auto_strike_cooldown_ms'):
+                if k in preset:
+                    try:
+                        setattr(self, k, int(preset[k]))
+                    except Exception:
+                        pass
+            if 'auto_strike_min_error_deg' in preset:
+                try:
+                    self.auto_strike_min_error_deg = float(preset['auto_strike_min_error_deg'])
+                except Exception:
+                    pass
 
             # --- Precision Aim (presettable) ---
             try:
@@ -14613,6 +14904,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         mode_text = (
             "Projectile (BB/Servo)" if self.trigger_mode_bb else "Water (MOSFET)"
         )
+        # DEBUG: Track who's changing the mode
+        import traceback
+        print(f"\n[TRIGGER_MODE_CHANGE] index={index} -> trigger_mode_bb={self.trigger_mode_bb} ({mode_text})")
+        print("[TRIGGER_MODE_CHANGE] Called from:")
+        for line in traceback.format_stack()[-4:-1]:
+            print("  " + line.strip())
+        print()
         self._safe_enhancer_log(f"Trigger mode set to: {mode_text}", fire=False)
         self.save_settings()  # V4 Save
 
@@ -14799,6 +15097,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 f"LED (Relay 1) set to: {'ON' if self.relay1_state else 'OFF'}",
                 fire=False,
             )
+            # DEBUG: Print state change
+            print(f"[RELAY_DEBUG] LED toggled: relay1_state={self.relay1_state}")
         elif relay_number == 2:
             if new_state is not None:
                 self.relay2_state = new_state
@@ -14810,9 +15110,30 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 f"LASER (Relay 2) set to: {'ON' if self.relay2_state else 'OFF'}",
                 fire=False,
             )
+            # DEBUG: Print state change
+            print(f"[RELAY_DEBUG] LASER toggled: relay2_state={self.relay2_state}")
+        # Send command immediately to update hardware
+        # FIX 2026-01-26: Send relay commands as single tokens for reliability
+        try:
+            if primary_open := bool(self.ser is not None and getattr(self.ser, "is_open", False)):
+                if relay_number == 1:
+                    cmd = f"L{self.relay1_state}\n"
+                    print(f"[RELAY_DEBUG] Sending: {cmd.strip()}")
+                    self.ser.write(cmd.encode("utf-8"))
+                elif relay_number == 2:
+                    cmd = f"R{self.relay2_state}\n"
+                    print(f"[RELAY_DEBUG] Sending: {cmd.strip()}")
+                    self.ser.write(cmd.encode("utf-8"))
+            else:
+                print(f"[RELAY_DEBUG] Serial not open, cannot send relay command")
+        except Exception as e:
+            print(f"[RELAY_DEBUG] Error sending relay command: {e}")
         self.save_settings()  # V4 Save
 
     def toggle_safety(self, checked=None):
+        # CHANGE WARNING:
+        # Modifications here affect safety/arming behavior and auto-fire gating.
+        # See CHANGE_IMPACT_REFERENCE.md → Trigger Modes / Safety.
         """Toggle the safety state. safety_state: 1 = locked (no fire), 0 = unlocked (allow firing).
         Button appearance: Unchecked = LOCKED (safe), Checked = ARMED (unsafe)."""
         # If called from a button, 'checked' will be provided
@@ -14827,10 +15148,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.safety_button.setText("Safety: LOCKED (No Fire)")
             self.safety_button.setChecked(False)  # Button appears unpressed when safe
             self.enhancer.arm_toggle_btn.setChecked(False)  # Sync top bar
+            # Auto-fire is disabled when safety is locked
+            self.auto_fire_enabled = False
         else:  # ARMED/UNSAFE
             self.safety_button.setText("Safety: ARMED (Can Fire)")
             self.safety_button.setChecked(True)  # Button appears pressed when armed
             self.enhancer.arm_toggle_btn.setChecked(True)  # Sync top bar
+            # Auto-fire follows arming when no explicit disable is set
+            if not getattr(self, "_disable_auto_fire", False):
+                self.auto_fire_enabled = True
 
         self.enhancer.log_serial_output(
             f"Safety state set to: {'LOCKED' if self.safety_state==1 else 'ARMED'}",
@@ -14926,6 +15252,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self.enhancer.log_serial_output(
                     "MANUAL FIRE: BLOCKED BY SAFETY", fire=False
                 )
+                # Still send command to ensure state is synced
+                try:
+                    self.send_serial_command()
+                except Exception:
+                    pass
         else:
             self.trigger_fired = False
             try:
@@ -15258,6 +15589,100 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
             dist = float(((tx - cx) ** 2 + (ty - cy) ** 2) ** 0.5)
             return dist <= deadzone_val
+        except Exception:
+            return False
+
+    def _request_trigger_pulse(self, reason: str = "", hold_ms=None) -> bool:
+        """Fire a single non-blocking pulse (F1 then F0).
+
+        Intended for auto-fire in deadzone and strike completion.
+        Respects safety + cooldown. Uses QTimer for the release so the UI thread never blocks.
+        """
+        # CHANGE WARNING:
+        # Modifications here affect firing reliability, cooldown gating, and safety interlocks.
+        # See CHANGE_IMPACT_REFERENCE.md → Trigger Modes / Safety.
+        try:
+            # Safety must be ARMED for any fire action.
+            if getattr(self, "safety_state", 1) != 0:
+                # Avoid spamming the log every frame.
+                now = time.time()
+                last = float(getattr(self, "_last_fire_skip_log_time", 0.0) or 0.0)
+                if now - last >= 1.0:
+                    self._last_fire_skip_log_time = now
+                    try:
+                        if hasattr(self, "enhancer"):
+                            self.enhancer.log_serial_output(
+                                "[AUTO-FIRE] Suppressed: Safety is LOCKED.",
+                                fire=False,
+                            )
+                    except Exception:
+                        pass
+                return False
+
+            cooldown = float(self._safe_float_widget_value("trigger_cooldown_input", 1.5))
+            now = time.time()
+            if (now - float(getattr(self, "last_trigger_time", 0.0) or 0.0)) < cooldown:
+                return False
+
+            # Default hold times:
+            # - BB servo needs a visible press/release
+            # - MOSFET auto-fire should be a short pulse (continuous output is via MOSFET Hold / Rapid-Fire)
+            if hold_ms is None:
+                hold_ms = 220 if bool(getattr(self, "trigger_mode_bb", False)) else 80
+            hold_ms = int(max(10, min(1000, int(hold_ms))))
+
+            self.last_trigger_time = now
+
+            # Fire ON
+            self.trigger_fired = True
+            try:
+                # Ensure the one-shot flag change is transmitted even if pan/tilt are unchanged.
+                self._force_send_next_command = True
+            except Exception:
+                pass
+            try:
+                self.send_serial_command()
+            except Exception:
+                pass
+            try:
+                if reason and hasattr(self, "enhancer"):
+                    self.enhancer.log_serial_output(reason, fire=True)
+            except Exception:
+                pass
+            try:
+                self._pulse_fire_indicator()
+            except Exception:
+                pass
+
+            # Schedule release (F0). Do not fight MOSFET Hold or Rapid-Fire timer.
+            def _release() -> None:
+                try:
+                    if bool(getattr(self, "mosfet_hold_active", False)):
+                        return
+                    if bool(getattr(self, "rapid_fire_timer_active", False)):
+                        return
+                    self.trigger_fired = False
+                    try:
+                        self._force_send_next_command = True
+                    except Exception:
+                        pass
+                    try:
+                        self.send_serial_command()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
+            try:
+                QTimer.singleShot(int(hold_ms), _release)
+            except Exception:
+                # If QTimer isn't available for any reason, fail safe by dropping the state.
+                try:
+                    self.trigger_fired = False
+                except Exception:
+                    pass
+
+            return True
         except Exception:
             return False
 
@@ -16159,7 +16584,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             def draw_text_with_bg(text, pos, font_style, color, align='left'):
                 scale = font_style['scale']
                 thickness = font_style['thickness']
-                text_size = cv2.getTextSize(text, HUD_FONT, scale, thickness)[0]
+                try:
+                    text_size = cv2.getTextSize(text, HUD_FONT, scale, thickness)[0]
+                except Exception:
+                    return # Text size calc failed
                 
                 if align == 'center':
                     x = pos[0] - text_size[0] // 2
@@ -16169,16 +16597,27 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     x = pos[0]
                 y = pos[1]
                 
-                if bg_opacity > 0:
-                    overlay = frame.copy()
-                    cv2.rectangle(overlay,
-                                  (x - HUD_PADDING, y - text_size[1] - HUD_PADDING),
-                                  (x + text_size[0] + HUD_PADDING, y + HUD_PADDING),
-                                  HUD_BLACK, -1)
-                    cv2.addWeighted(overlay, bg_opacity, frame, 1 - bg_opacity, 0, frame)
+                try:
+                    if bg_opacity > 0 and frame is not None:
+                        # Safe copy with error handling
+                        try:
+                            overlay = frame.copy()
+                            cv2.rectangle(overlay,
+                                          (x - HUD_PADDING, y - text_size[1] - HUD_PADDING),
+                                          (x + text_size[0] + HUD_PADDING, y + HUD_PADDING),
+                                          HUD_BLACK, -1)
+                            cv2.addWeighted(overlay, bg_opacity, frame, 1 - bg_opacity, 0, frame)
+                        except Exception:
+                            # Fallback if transparency fails: just draw solid debug box or nothing
+                            pass
+                except Exception:
+                    pass
                 
-                cv2.putText(frame, text, (x, y), HUD_FONT, scale, HUD_BLACK, thickness + 1, cv2.LINE_AA)
-                cv2.putText(frame, text, (x, y), HUD_FONT, scale, color, thickness, cv2.LINE_AA)
+                try:
+                    cv2.putText(frame, text, (x, y), HUD_FONT, scale, HUD_BLACK, thickness + 1, cv2.LINE_AA)
+                    cv2.putText(frame, text, (x, y), HUD_FONT, scale, color, thickness, cv2.LINE_AA)
+                except Exception:
+                    pass
             
             # ========== CROSSHAIR DRAWING ==========
             if aiming and has_target:
@@ -16219,14 +16658,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             scope_radius = int(min(h, w) * scope_radius_pct)
             cv2.circle(frame, (center_x, center_y), scope_radius, (100, 100, 100), 3)
             
-            # Vignette
+            # Vignette (ENSURE NEW ARRAY TO PREVENT CORRUPTION)
             mask = np.zeros((h, w, 3), dtype=np.uint8)
             cv2.circle(mask, (center_x, center_y), scope_radius, (255, 255, 255), -1)
             vignette = mask.astype(float) / 255.0
             vignette_slider = getattr(self, 'vignette_opacity_slider_scope', None)
             darkness = vignette_slider.value() / 100.0 if vignette_slider else 0.7
             min_brightness = 1.0 - darkness
-            frame = (frame.astype(float) * (min_brightness + (1.0 - min_brightness) * vignette)).astype(np.uint8)
+            # CRITICAL FIX: Create new array, do not mutate input frame
+            frame = np.clip(frame.astype(float) * (min_brightness + (1.0 - min_brightness) * vignette), 0, 255).astype(np.uint8)
             
             # Corner markers
             corners = [(corner_size, corner_size), (w - corner_size, corner_size),
@@ -16352,7 +16792,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # CHANGE WARNING:
         # Modifications here affect frame processing, tracking flow, and runtime state.
         # See CHANGE_IMPACT_REFERENCE.md → Camera & Video Capture Pipeline.
-        # Last modified: 2026-01-25 by Copilot Agent
+        # Last modified: 2026-01-26 by Copilot Agent
         # NOTE: Idle button now uses direct click detection (ClickDetectButton class)
         # No need for polling - direct mouse events work reliably
 
@@ -16549,17 +16989,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # ========== FIXED: ADD tracking_active/aiming_active SYNC CHECK ==========
         # Prevent inconsistent state where tracking is active but aiming is not
         # (would cause turret to detect target but not move servos)
+        # FIX JAN 2026: Actually sync the states instead of just logging
         try:
             tracking = getattr(self, "tracking_active", False)
             aiming = getattr(self, "aiming_active", False)
-            # If tracking active but aiming not, sync them
+            # If tracking active but aiming not, AUTO-SYNC them
             if tracking and not aiming:
+                self.aiming_active = True
                 try:
                     if hasattr(self, "enhancer"):
                         self.enhancer.log_serial_output(
-                            "[STATE] tracking_active=True while aiming_active=False (no auto-correct)",
+                            "[STATE] tracking_active=True while aiming_active=False - AUTO-SYNCED aiming to True",
                             fire=False
                         )
+                    # Update UI button state
+                    self._safe_widget_call("aiming_btn", "setChecked", True)
                 except Exception:
                     pass
         except Exception:
@@ -16670,60 +17114,20 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 pass
             return
 
-        if not self.cap or not getattr(self.cap, "isOpened", lambda: False)():
-            try:
-                # read home inputs (integers) but store as floats for accumulation
-                self.target_pan = float(
-                    self._safe_int_widget_value("home_pan_input", self.HOME_PAN)
-                )
-            except Exception:
-                # fall back to class defaults if widget access fails
-                try:
-                    self.target_pan = float(getattr(self, "HOME_PAN", 90))
-                except Exception:
-                    self.target_pan = 90.0
-            try:
-                self.target_tilt = float(
-                    self._safe_int_widget_value("home_tilt_input", self.HOME_TILT)
-                )
-            except Exception:
-                try:
-                    self.target_tilt = float(getattr(self, "HOME_TILT", 40))
-                except Exception:
-                    self.target_tilt = 40.0
-            self.trigger_fired = False
-            # create a placeholder blank frame so downstream drawing code
-            # can always assume `frame1` is an image (reduces analyzer and
-            # runtime None issues). Use a conservative default size.
-            try:
-                frame1 = np.zeros((480, 640, 3), dtype=np.uint8)
-                frame2 = frame1.copy()
-            except Exception:
-                frame1 = None
-                frame2 = None
-            # continue to drawing/convert for display
-        else:
-            # Read the latest camera frame (frame1) before running detection
-            try:
-                ret1, frame1 = self._cap_read()
-            except Exception:
-                ret1, frame1 = False, None
-            if not ret1 or frame1 is None:
-                return
-            # help static analyzer: cast frame to ndarray type when available
-            try:
-                frame1 = cast(np.ndarray, frame1)
-            except Exception:
-                pass
-            try:
-                if (
-                    frame1 is not None
-                    and getattr(self, "flip_checkbox", None)
-                    and self.flip_checkbox.isChecked()
-                ):
-                    frame1 = cv2.flip(frame1, 1)
-            except Exception:
-                pass
+        # Camera is effectively open and frame1 is valid - proceed with processing
+        try:
+            frame1 = cast(np.ndarray, frame1)
+        except Exception:
+            pass
+        try:
+            if (
+                frame1 is not None
+                and getattr(self, "flip_checkbox", None)
+                and self.flip_checkbox.isChecked()
+            ):
+                frame1 = cv2.flip(frame1, 1)
+        except Exception:
+            pass
 
         # Normalize frame1 to ndarray to prevent passing None to cv2 calls
         try:
@@ -16907,28 +17311,24 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
 
-        # Decide whether we should run detection even if tracking is stopped
-        manual_auto = False
-        try:
-            manual_auto = bool(
-                getattr(self, "manual_auto_fire_checkbox", None)
-                and self.manual_auto_fire_checkbox.isChecked()
-            )
-        except Exception:
-            manual_auto = False
-
-        if not (self.tracking_active or manual_auto):
-            # No detection running (fully stopped)
-            self.last_detections = []
-            self.trigger_fired = False
-        else:
-            # ========== CRITICAL FIX: CAMERA FALLBACK RETRY LOGIC ==========
-            # If camera read fails, retry up to 3 times before suppressing detection
-            # This prevents turret locking if camera is briefly unavailable
-            ret2, frame2 = False, None
-            camera_retry_count = 0
-            max_camera_retries = 3
-            while not ret2 and camera_retry_count < max_camera_retries:
+        # FIX: Always acquire frame2 to run detection, even if tracking is OFF.
+        # This fixes "Ignores object" when tracking is disabled but user expects to see boxes.
+        # if not (self.tracking_active or manual_auto):
+        #    # No detection running (fully stopped)
+        #    self.last_detections = []
+        #    self.trigger_fired = False
+        # else:
+        
+        # ========== CRITICAL FIX: CAMERA FALLBACK RETRY LOGIC ==========
+        # If camera read fails, retry up to 3 times before suppressing detection
+        # This prevents turret locking if camera is briefly unavailable
+        ret2, frame2 = False, None
+        camera_retry_count = 0
+        max_camera_retries = 3
+        
+        # Only attempt to read frame2 if we successfully read frame1
+        if frame1 is not None:
+             while not ret2 and camera_retry_count < max_camera_retries:
                 try:
                     ret2, frame2 = self._cap_read()
                     if ret2 and frame2 is not None:
@@ -16936,44 +17336,50 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     camera_retry_count += 1
                 except Exception:
                     camera_retry_count += 1
-            
-            if not ret2 or frame2 is None:
-                return
-            try:
-                if (
-                    getattr(self, "flip_checkbox", None)
-                    and self.flip_checkbox.isChecked()
-                ):
-                    frame2 = cv2.flip(frame2, 1)
-            except Exception:
-                pass
-            try:
-                frame2 = cast(np.ndarray, frame2)
-            except Exception:
-                pass
-
-            try:
-                frame2 = self._ensure_frame(frame2)
-            except Exception:
+        
+        # If frame2 read failed (or wasn't attempted), ensure it's a valid shape for cv2 operations
+        # Use frame1 as fallback (diff will be 0, so no motion detected, but preventing crash)
+        if not ret2 or frame2 is None:
+            if frame1 is not None and getattr(frame1, 'shape', None):
+                frame2 = frame1.copy()
+            else:
                 frame2 = np.zeros((480, 640, 3), dtype=np.uint8)
 
-            # Ensure numeric defaults for pan/tilt blending variables
-            try:
-                new_pan = (
-                    float(new_pan)
-                    if new_pan is not None
-                    else float(getattr(self, "prev_pan_angle", 90))
-                )
-            except Exception:
-                new_pan = float(getattr(self, "prev_pan_angle", 90))
-            try:
-                new_tilt = (
-                    float(new_tilt)
-                    if new_tilt is not None
-                    else float(getattr(self, "prev_tilt_angle", 40))
-                )
-            except Exception:
-                new_tilt = float(getattr(self, "prev_tilt_angle", 40))
+        try:
+            if (
+                getattr(self, "flip_checkbox", None)
+                and self.flip_checkbox.isChecked()
+            ):
+                frame2 = cv2.flip(frame2, 1)
+        except Exception:
+            pass
+        try:
+            frame2 = cast(np.ndarray, frame2)
+        except Exception:
+            pass
+
+        try:
+            frame2 = self._ensure_frame(frame2)
+        except Exception:
+            frame2 = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        # Ensure numeric defaults for pan/tilt blending variables
+        try:
+            new_pan = (
+                float(new_pan)
+                if new_pan is not None
+                else float(getattr(self, "prev_pan_angle", 90))
+            )
+        except Exception:
+            new_pan = float(getattr(self, "prev_pan_angle", 90))
+        try:
+            new_tilt = (
+                float(new_tilt)
+                if new_tilt is not None
+                else float(getattr(self, "prev_tilt_angle", 40))
+            )
+        except Exception:
+            new_tilt = float(getattr(self, "prev_tilt_angle", 40))
 
         # --- Detection Mode Logic ---
         detection_mode = int(self._safe_current_index("detection_mode_combo", 0) or 0)
@@ -18179,15 +18585,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     try:
                         # Normalize tuples to int values
                         boxes = [tuple(int(v) for v in d) for d in self.last_detections]
+                        # Mark strictly as REUSED so we don't extend the hold window below
+                        self._boxes_are_reused = True
                     except Exception:
                         try:
                             boxes = list(self.last_detections)
+                            self._boxes_are_reused = True
                         except Exception:
                             boxes = []
+                            self._boxes_are_reused = False
+                else:
+                    self._boxes_are_reused = False
 
         except Exception:
             # Fall through to the unified handling below
-            pass
+            self._boxes_are_reused = False
 
         try:
             # Update small detect status label if present so operator sees current counts
@@ -18235,8 +18647,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         del self._sweep_dir
                     if hasattr(self, "_guard_center_pan"):
                         del self._guard_center_pan
+                
+                # Check directly if this detection is real or reused
                 # If we were in a hold window, forcibly reset the last_seen_time so we don't hold position
-                self.last_seen_time = time.time()
+                if not getattr(self, "_boxes_are_reused", False):
+                    self.last_seen_time = time.time()
+                
                 # Play detect sound once when first locking on
                 if not getattr(self, "target_locked", False):
                     try:
@@ -18251,26 +18667,48 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
                 self.target_locked = True
 
-                # ========== STATE OWNERSHIP: NO AUTO-MUTATION ==========
-                # Do not mutate tracking/aiming here. Log only for visibility.
+                # ========== AUTO-TRACKING: Enable tracking when detection occurs ==========
+                # FIX JAN 2026: When auto_tracking_enabled=True, automatically enable tracking/aiming
+                # when a detection occurs. This makes the turret responsive without manual button press.
+                # NOTE: If Sentry tab is active, auto-tracking must NOT re-enable main tracking.
                 try:
-                    idle_modes = getattr(self, "idle_modes", None)
-                    actual_idle_mode = None
-                    if idle_modes is not None:
-                        actual_idle_mode = idle_modes.get_mode()
-                    auto_track_enabled = getattr(self, "auto_tracking_enabled", False)
-                    if actual_idle_mode is None and auto_track_enabled and not getattr(self, "tracking_active", False):
-                        self.enhancer.log_serial_output(
-                            "[STATE] auto-tracking eligible but tracking is OFF (no auto-enable)",
-                            fire=False,
-                        )
-                    if getattr(self, "tracking_active", False) and not getattr(self, "aiming_active", False):
-                        self.enhancer.log_serial_output(
-                            "[STATE] tracking ON but aiming OFF during detection (no auto-enable)",
-                            fire=False,
-                        )
+                    if not getattr(self, "sentry_mode_active", False):
+                        idle_modes = getattr(self, "idle_modes", None)
+                        actual_idle_mode = None
+                        if idle_modes is not None:
+                            actual_idle_mode = idle_modes.get_mode()
+                        auto_track_enabled = getattr(self, "auto_tracking_enabled", False)
+                        
+                        # AUTO-ENABLE TRACKING: If auto_tracking is enabled and no idle mode is active,
+                        # automatically enable tracking and aiming when detection occurs
+                        if actual_idle_mode is None and auto_track_enabled and not getattr(self, "tracking_active", False):
+                            self.tracking_active = True
+                            self.aiming_active = True
+                            self.enhancer.log_serial_output(
+                                "[AUTO-TRACK] Detection found - auto-enabling tracking and aiming",
+                                fire=False,
+                            )
+                            # Update UI buttons to reflect state change
+                            try:
+                                self._safe_widget_call("tracking_btn", "setChecked", True)
+                                self._safe_widget_call("tracking_btn", "setText", "Stop Tracking")
+                                self._safe_widget_call("aiming_btn", "setChecked", True)
+                            except Exception:
+                                pass
+                        
+                        # SYNC AIMING: If tracking is active but aiming is not, sync them
+                        if getattr(self, "tracking_active", False) and not getattr(self, "aiming_active", False):
+                            self.aiming_active = True
+                            self.enhancer.log_serial_output(
+                                "[STATE] tracking ON but aiming OFF - auto-syncing aiming to ON",
+                                fire=False,
+                            )
+                            try:
+                                self._safe_widget_call("aiming_btn", "setChecked", True)
+                            except Exception:
+                                pass
                 except Exception as e:
-                    print(f"[STATE] auto-tracking visibility error: {e}")
+                    print(f"[STATE] auto-tracking error: {e}")
                 
                 # DEBUG: Log when detection finds a box
                 try:
@@ -18282,9 +18720,29 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     pass
 
-                # Select the largest box by area (w * h)
+                # Select a persistent target using SmartTracker (centroid smoothing + continuity).
+                # Fallback to largest box if tracker is unavailable.
+                smoothed_boxes = None
                 try:
-                    x, y, w, h = max(boxes, key=lambda box: box[2] * box[3])
+                    tracker = getattr(self, "smart_tracker", None)
+                    if tracker is not None:
+                        # Sync tracker smoothing with UI smoothing (lower = more responsive).
+                        try:
+                            smooth_val = float(getattr(self, "smoothing_input", None).value())
+                            tracker.smoothing_factor = float(np.clip(smooth_val, 0.05, 0.90))
+                        except Exception:
+                            pass
+                        smoothed_boxes, _ = tracker.update_detections(
+                            boxes,
+                            frame_width=int(getattr(self, "frame_width", 640)),
+                            frame_height=int(getattr(self, "frame_height", 480)),
+                        )
+                except Exception:
+                    smoothed_boxes = None
+
+                try:
+                    candidate_boxes = smoothed_boxes if smoothed_boxes else boxes
+                    x, y, w, h = max(candidate_boxes, key=lambda box: box[2] * box[3])
                 except Exception:
                     x = y = w = h = 0
 
@@ -18297,9 +18755,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     pass
 
                 try:
-                    self.last_seen_time = time.time()
+                    if not getattr(self, "_boxes_are_reused", False):
+                        self.last_seen_time = time.time()
                 except Exception:
-                    self.last_seen_time = 0.0
+                    if not getattr(self, "_boxes_are_reused", False):
+                        self.last_seen_time = 0.0
 
                 try:
                     if getattr(self, "state_logger", None):
@@ -18311,45 +18771,59 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     pass
 
+                # === DETECTION PAUSE LOGIC (Jan 2026) ===
+                # When target enters the big scope circle, pause detection updates for configured duration.
+                # This gives pan/tilt time to converge to center before detection jitter moves the target.
+                # Video continues playing - only detection updates are paused.
+                try:
+                    now = time.time()
+                    # Check if target is within scope circle
+                    scope_radius_pct = getattr(self, "scope_radius_pct", 50) / 100.0
+                    scope_radius = min(self.frame_height, self.frame_width) * scope_radius_pct
+                    center_x = self.frame_width / 2.0
+                    center_y = self.frame_height / 2.0
+                    dist_to_center = ((cx - center_x)**2 + (cy - center_y)**2)**0.5
+                    in_scope = dist_to_center <= scope_radius
+                    
+                    # Detect scope entry (entering from outside)
+                    if in_scope and not getattr(self, "_was_in_scope", False):
+                        # Target just entered scope - start pause
+                        pause_ms = getattr(self, "detection_pause_ms", 1000)
+                        self._detection_pause_until = now + (pause_ms / 1000.0)
+                    
+                    self._was_in_scope = in_scope
+                    
+                    # If currently paused, skip detection update (keep using last position)
+                    if now < getattr(self, "_detection_pause_until", 0.0):
+                        # Detection paused - reuse last known target position
+                        # Skip updating last_target_center so pan/tilt continue tracking to last known point
+                        pass  # Don't update last_target_center, aiming continues with frozen target
+                    else:
+                        # Not paused - update normally
+                        pass  # Continue to normal update below
+                except Exception:
+                    pass
+                # === END DETECTION PAUSE LOGIC ===
+
                 # Only update tracking position if not in manual override or manual suppression
+                # AND not in detection pause
                 if not (
                     getattr(self, "manual_override", False)
                     or getattr(self, "_manual_override_active", False)
+                    or (time.time() < getattr(self, "_detection_pause_until", 0.0))
                 ):
                     try:
-                        # FIX DEC8: Use floating point division to preserve sub-pixel precision
-                        # Integer division loses 0.5-0.8 pixels per frame, accumulating 2-3° drift per 1000 frames
-                        # Attempt to compute a contour-based (moment) centroid inside the detected box
-                        # for better sub-pixel accuracy. Fall back to box center if refinement fails.
-                        cx = x + w / 2.0
-                        cy = y + h / 2.0
+                        # Use a stable centroid for aiming (smoothed tracker or box center).
+                        # This avoids ROI centroid drift that can pull the yellow dot off-center.
                         try:
-                            if frame1 is not None and int(w) > 2 and int(h) > 2:
-                                # Extract ROI safely (clip boundaries)
-                                x0 = max(0, int(x))
-                                y0 = max(0, int(y))
-                                x1 = min(int(self.frame_width), int(x + w))
-                                y1 = min(int(self.frame_height), int(y + h))
-                                roi = frame1[y0:y1, x0:x1]
-                                if roi is not None and getattr(roi, 'size', 0) > 0:
-                                    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-                                    # Use Otsu threshold to separate foreground in ROI
-                                    try:
-                                        _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                                    except Exception:
-                                        # Fallback simple threshold if Otsu errors
-                                        _, th = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
-                                    contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                                    if contours:
-                                        c = max(contours, key=cv2.contourArea)
-                                        M = cv2.moments(c)
-                                        if M and M.get('m00', 0) > 1e-5:
-                                            # Centroid relative to ROI
-                                            cx = x0 + (M['m10'] / M['m00'])
-                                            cy = y0 + (M['m01'] / M['m00'])
+                            if getattr(self, "last_target_center", None):
+                                cx, cy = self.last_target_center
+                            else:
+                                cx = x + w / 2.0
+                                cy = y + h / 2.0
                         except Exception:
-                            # On any error, retain box center (safe fallback)
-                            pass
+                            cx = x + w / 2.0
+                            cy = y + h / 2.0
 
                         # Keep last_target_center aligned with the aiming point (yellow dot).
                         # This ensures deadzone checks for firing use the same point the operator sees.
@@ -18370,13 +18844,26 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             # Float division preserves sub-pixel precision: 640/2.0 = 320.0, 641/2.0 = 320.5
                             err_x = cx - frame_w / 2.0
                             err_y = cy - frame_h / 2.0
+                            
+                            # DRIFT DEBUG (only when Debug checkbox is enabled)
+                            try:
+                                if getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked():
+                                    print(
+                                        f"[DRIFT_DEBUG] cx={cx:.1f} cy={cy:.1f} "
+                                        f"frame_center=({frame_w/2.0:.0f},{frame_h/2.0:.0f}) "
+                                        f"err_x={err_x:.1f} err_y={err_y:.1f}"
+                                    )
+                            except Exception:
+                                pass
+                            
                         smoothing = float(
                             self._safe_float_widget_value("smoothing_input", 0.35)
                         )
                         
-                        # FIXED: Clamp smoothing to expanded range
-                        # 0 = instant snap, 1 = no movement. User-configurable range 0.1-0.8
-                        # 0.1-0.3 = aggressive tracking, 0.4-0.6 = balanced, 0.7-0.8 = smooth
+                        # Clamp smoothing to expanded range.
+                        # Semantics: higher = smoother/more damping, lower = snappier.
+                        # User-configurable range 0.1-0.8
+                        # 0.1-0.3 = aggressive/snappy, 0.4-0.6 = balanced, 0.7-0.8 = smooth
                         smoothing = float(np.clip(smoothing, 0.1, 0.8))
                         
                         # FIX DEC8b #4: Apply smoothing parameter changes gradually over 10 frames
@@ -18447,6 +18934,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 aim_aggression = getattr(self, "aim_aggression", 50)
                                 aggression_mult = 0.5 + (aim_aggression / 100.0) * 1.5
                                 gain = gain * aggression_mult
+                                if getattr(self, "aiming_active", False):
+                                    gain = gain * 1.35
                             except Exception:
                                 pass
                             
@@ -18494,6 +18983,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             else:  # Frame Diff or BackSub
                                 # INCREASED cap from 0.02 to 0.04 for faster motion tracking
                                 gain = float(np.clip(gain, 0.0001, 0.04))
+                            # Extra cap headroom when aiming is active (applies to all modes)
+                            try:
+                                if bool(getattr(self, "aiming_active", False)):
+                                    gain = float(np.clip(gain, 0.0001, 0.10))
+                            except Exception:
+                                pass
                         except Exception:
                             gain = 0.0025
                     except Exception:
@@ -18554,17 +19049,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     )
                                     
                                     if should_fire:
-                                        self.trigger_fired = True
-                                        self.enhancer.log_serial_output(
-                                            f"[⚡ STRIKE] 🎯 TARGET HIT! Fired at Pan={target_pan:.1f}° Tilt={target_tilt:.1f}°",
-                                            fire=True
+                                        msg = (
+                                            f"[⚡ STRIKE] 🎯 TARGET HIT! Fired at Pan={target_pan:.1f}° Tilt={target_tilt:.1f}°"
                                         )
+                                        self._request_trigger_pulse(msg)
                                         try:
                                             self.enhancer.play_fire()
-                                        except Exception:
-                                            pass
-                                        try:
-                                            self.send_serial_command()
                                         except Exception:
                                             pass
                                     else:
@@ -18639,6 +19129,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     # These should reflect the ACTUAL last position sent to hardware
                     prev_pan = float(getattr(self, "last_sent_pan", getattr(self, "prev_pan_angle", 90)))
                     prev_tilt = float(getattr(self, "last_sent_tilt", getattr(self, "prev_tilt_angle", 40)))
+
+                    # Sentinel safety: never allow invalid last_sent_* into the control loop.
+                    if prev_pan < -1000:
+                        prev_pan = float(getattr(self, "prev_pan_angle", getattr(self, "target_pan", 90)))
+                    if prev_tilt < -1000:
+                        prev_tilt = float(getattr(self, "prev_tilt_angle", getattr(self, "target_tilt", 40)))
                     
                     # SAFE: Ensure prev positions are within limits (defensive)
                     prev_pan = float(np.clip(prev_pan, self.PAN_MIN, self.PAN_MAX))
@@ -18655,6 +19151,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     # Note: tilt typically inverts (higher Y error = lower tilt), so we subtract
                     new_pan = prev_pan + (err_x * gain) * pan_dir
                     new_tilt = prev_tilt - (err_y * gain) * tilt_dir
+                    
+                    # DRIFT DEBUG (only when Debug checkbox is enabled)
+                    try:
+                        if getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked():
+                            print(
+                                f"[SERVO_CALC] prev_pan={prev_pan:.1f} err_x={err_x:.1f} "
+                                f"gain={gain:.4f} pan_dir={pan_dir} -> new_pan={new_pan:.1f}"
+                            )
+                    except Exception:
+                        pass
                     
                     # ========== COMPREHENSIVE TILT DIAGNOSTICS ==========
                     # Log detailed calculation steps to verify tilt is calculated correctly
@@ -18816,6 +19322,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     # When aiming_active=True, force aggressive movement toward deadzone
                     # This overrides the normal "deadzone hold" logic to ensure target entry
                     aiming_active = getattr(self, "aiming_active", False)
+                    if aiming_active:
+                        deadzone_px = max(2, int(deadzone_px * 0.6))
                     
                     # If target is inside deadzone AND aiming is NOT active, hold current position (no aiming)
                     if abs(err_x) <= deadzone_px and abs(err_y) <= deadzone_px and not aiming_active:
@@ -18833,9 +19341,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             # Problem: Double rate-limiting caused oscillation - snap decision THEN per-frame cap
                             # Solution: Apply rate limit once, immediately after snap decision, with proper direction
                             # This prevents undershooting the target (which causes oscillation on next frame)
-                            # DEC 2024: Increased from 5° to 8° for more aggressive tracking
-                            max_pan_step = 8.0  # degrees per frame (increased for aggressive tracking)
-                            max_tilt_step = 8.0
+                            # Serial-bus upgrade: allow higher speed when requested via tracking_speed.
+                            # Keep a sane clamp to avoid violent jumps.
+                            try:
+                                _ts = float(self._safe_int_widget_value("tracking_speed_slider", 50))
+                            except Exception:
+                                _ts = 50.0
+                            if aiming_active:
+                                _ts = min(100.0, _ts + 20.0)
+                            max_pan_step = float(np.clip(4.0 + (_ts / 100.0) * 10.0, 3.0, 14.0))
+                            max_tilt_step = float(np.clip(4.0 + (_ts / 100.0) * 10.0, 3.0, 14.0))
                             # Single consolidated check - no double-limiting
                             pan_delta = target_pan_val - prev_pan
                             tilt_delta = target_tilt_val - prev_tilt
@@ -18851,25 +19366,59 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             target_pan_val = new_pan
                             target_tilt_val = new_tilt
                         else:
-                            # ========== ADAPTIVE SMOOTHING FOR DEADZONE PRECISION ==========
-                            # When target is very close to deadzone (within 2.5x radius when aiming,
-                            # or 3x when passive), reduce smoothing for aggressive final push into deadzone.
-                            # Otherwise use configured smoothing for stable tracking.
-                            adaptive_smoothing = smoothing
-                            # Adaptive smoothing: reduce smoothing near deadzone for snappy response
-                            threshold_for_adaptive = deadzone_px * 1.5
-                            
-                            if abs(err_x) <= threshold_for_adaptive or abs(err_y) <= threshold_for_adaptive:
-                                # FIX DEC8: Use consistent smoothing regardless of aiming state
-                                # Different smoothing on aiming toggle causes 1-2 frame stick artifact near deadzone
-                                # UPDATED (Agent): Changed 0.05 (too slow/stuck) to 0.6 to actually fulfill "snappy response" comment.
-                                # Previous value of 0.05 (sample weight) meant 95% old value, causing lag entry to deadzone.
-                                adaptive_smoothing = 0.6  # Consistent and snappy near center
-                            
-                            # Smooth (IIR) blend between previous and new with adaptive filter
-                            # When target is approaching the deadzone, blend smoothly to avoid jitter
-                            target_pan_val = (1 - adaptive_smoothing) * prev_pan + adaptive_smoothing * new_pan
-                            target_tilt_val = (1 - adaptive_smoothing) * prev_tilt + adaptive_smoothing * new_tilt
+                            # ========== EASED MOTION (FAST FAR / DAMP NEAR) ==========
+                            # User expectation:
+                            # - quick aiming when far away
+                            # - gradual increase/decrease (ease-in/out) so it doesn't overshoot
+                            # Smoothing slider semantics here: higher = smoother (more damping / inertia).
+                            adaptive_smoothing = float(smoothing)
+                            if aiming_active:
+                                adaptive_smoothing = min(adaptive_smoothing, 0.12)
+
+                            # Compute a 0..1 proximity factor based on pixel error.
+                            # 0 = at center, 1 = at/above snap threshold.
+                            try:
+                                total_err_px = float((abs(err_x) ** 2 + abs(err_y) ** 2) ** 0.5)
+                            except Exception:
+                                total_err_px = 0.0
+                            t = float(np.clip(total_err_px / max(1.0, float(snap_px)), 0.0, 1.0))
+                            # smoothstep(t): 3t^2 - 2t^3
+                            ease = (t * t) * (3.0 - 2.0 * t)
+
+                            # Desired delta from proportional controller
+                            desired_pan_delta = float(new_pan - prev_pan)
+                            desired_tilt_delta = float(new_tilt - prev_tilt)
+
+                            # Ease-out near center (reduce delta as we approach target)
+                            # Keep a small floor so we don't stall just outside deadzone.
+                            ease_scale = 0.20 + 0.80 * float(ease)
+                            desired_pan_delta *= ease_scale
+                            desired_tilt_delta *= ease_scale
+
+                            # Velocity smoothing: treat delta as a "velocity" and low-pass it.
+                            # Higher adaptive_smoothing => more inertia (smoother) => less overshoot.
+                            if not hasattr(self, "_track_pan_vel"):
+                                self._track_pan_vel = 0.0
+                            if not hasattr(self, "_track_tilt_vel"):
+                                self._track_tilt_vel = 0.0
+                            self._track_pan_vel = float(self._track_pan_vel) * adaptive_smoothing + desired_pan_delta * (1.0 - adaptive_smoothing)
+                            self._track_tilt_vel = float(self._track_tilt_vel) * adaptive_smoothing + desired_tilt_delta * (1.0 - adaptive_smoothing)
+
+                            # Clamp per-frame move to avoid violent jumps.
+                            try:
+                                _ts = float(self._safe_int_widget_value("tracking_speed_slider", 50))
+                            except Exception:
+                                _ts = 50.0
+                            if aiming_active:
+                                _ts = min(100.0, _ts + 20.0)
+                            max_pan_step = float(np.clip(3.0 + (_ts / 100.0) * 10.0, 2.0, 14.0))
+                            max_tilt_step = float(np.clip(3.0 + (_ts / 100.0) * 10.0, 2.0, 14.0))
+                            self._track_pan_vel = float(np.clip(self._track_pan_vel, -max_pan_step, max_pan_step))
+                            self._track_tilt_vel = float(np.clip(self._track_tilt_vel, -max_tilt_step, max_tilt_step))
+
+                            # Apply smoothed velocity
+                            target_pan_val = prev_pan + float(self._track_pan_vel)
+                            target_tilt_val = prev_tilt + float(self._track_tilt_vel)
                             
                             # ========== MICRO-ADJUSTMENT FOR PRECISION AIMING ==========
                             # When close to deadzone (within 3x the deadzone radius for aiming,
@@ -18925,6 +19474,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
                     try:
                         # ===== Precision PID refinement (host-side) =====
+                        precision_override_active = False
                         try:
                             precision_enabled = (
                                 getattr(self, "precision_mode_checkbox", None)
@@ -18933,11 +19483,24 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         except Exception:
                             precision_enabled = False
 
+                        # Publish a per-frame flag so output logic can make safe decisions.
+                        # Default false; set true only if precision PID actually drives motion this frame.
+                        try:
+                            self._precision_override_active = False
+                        except Exception:
+                            pass
+
                         if precision_enabled:
                             try:
                                 # Activation: only when close to center (within 3x deadzone)
                                 precision_activation_px = max(3 * deadzone_px, int(self._safe_int_widget_value("precision_roi_input", 48)))
-                                if abs(err_x) <= precision_activation_px and abs(err_y) <= precision_activation_px:
+                                # CRITICAL: do NOT run precision PID inside the deadzone.
+                                # Running PID while centered can integrate camera noise and cause drift.
+                                if (
+                                    abs(err_x) <= precision_activation_px
+                                    and abs(err_y) <= precision_activation_px
+                                    and (abs(err_x) > deadzone_px or abs(err_y) > deadzone_px)
+                                ):
                                     # Convert pixel error to degrees using HFOV
                                     hfov = float(self._safe_float_widget_value("precision_hfov_input", 90.0))
                                     frame_w = float(self.frame_width)
@@ -18999,28 +19562,60 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     target_pan_val = prev_pan + (pan_out * pan_dir)
                                     target_tilt_val = prev_tilt - (tilt_out * tilt_dir)
 
+                                    # Flag that handled precision movement
+                                    precision_override_active = True
+
+                                    # Export for output stage (micro-step gating)
+                                    try:
+                                        self._precision_override_active = True
+                                    except Exception:
+                                        pass
+
                                     # Store last precision timestamp
                                     self._last_precision_time = now
+                                else:
+                                    # If we are inside the deadzone, explicitly bleed off any lingering
+                                    # integrator state to prevent slow drift due to noise.
+                                    if abs(err_x) <= deadzone_px and abs(err_y) <= deadzone_px:
+                                        try:
+                                            if hasattr(self, "_precision_pid_pan"):
+                                                self._precision_pid_pan["i"] = float(self._precision_pid_pan.get("i", 0.0)) * 0.5
+                                                self._precision_pid_pan["last"] = 0.0
+                                            if hasattr(self, "_precision_pid_tilt"):
+                                                self._precision_pid_tilt["i"] = float(self._precision_pid_tilt.get("i", 0.0)) * 0.5
+                                                self._precision_pid_tilt["last"] = 0.0
+                                        except Exception:
+                                            pass
+                                        try:
+                                            # Also clear fractional carry so we don't micro-step while centered.
+                                            self._pan_frac_accum = 0.0
+                                            self._tilt_frac_accum = 0.0
+                                        except Exception:
+                                            pass
                             except Exception:
                                 pass
 
                         # Ensure a minimum visible movement when outside deadzone
-                        try:
-                            track_speed_val = float(
-                                self._safe_int_widget_value("tracking_speed_slider", 50)
-                            )
-                            min_step_deg = 1.0 + (track_speed_val / 100.0) * 1.0
-                            min_step_deg = float(np.clip(min_step_deg, 0.75, 2.5))
-                            if abs(err_x) > deadzone_px:
-                                pan_delta = float(target_pan_val - prev_pan)
-                                if abs(pan_delta) < min_step_deg:
-                                    target_pan_val = prev_pan + (min_step_deg if pan_delta >= 0 else -min_step_deg)
-                            if abs(err_y) > deadzone_px:
-                                tilt_delta = float(target_tilt_val - prev_tilt)
-                                if abs(tilt_delta) < min_step_deg:
-                                    target_tilt_val = prev_tilt + (min_step_deg if tilt_delta >= 0 else -min_step_deg)
-                        except Exception as e:
-                            print(f"[TRACKING] min-step guard failed: {e}")
+                        # SKIP if precision PID is active (since it makes micro-adjustments smaller than min_step)
+                        if not precision_override_active:
+                            try:
+                                track_speed_val = float(
+                                    self._safe_int_widget_value("tracking_speed_slider", 50)
+                                )
+                                # Serial-bus servos are responsive; large forced steps cause overshoot/jitter.
+                                # Keep a small minimum to avoid rounding stiction without destroying precision.
+                                min_step_deg = 0.20 + (track_speed_val / 100.0) * 0.80
+                                min_step_deg = float(np.clip(min_step_deg, 0.15, 1.25))
+                                if abs(err_x) > deadzone_px:
+                                    pan_delta = float(target_pan_val - prev_pan)
+                                    if abs(pan_delta) < min_step_deg:
+                                        target_pan_val = prev_pan + (min_step_deg if pan_delta >= 0 else -min_step_deg)
+                                if abs(err_y) > deadzone_px:
+                                    tilt_delta = float(target_tilt_val - prev_tilt)
+                                    if abs(tilt_delta) < min_step_deg:
+                                        target_tilt_val = prev_tilt + (min_step_deg if tilt_delta >= 0 else -min_step_deg)
+                            except Exception as e:
+                                print(f"[TRACKING] min-step guard failed: {e}")
 
                         # Keep the running target as float so small fractional updates
                         # accumulate across frames (then we int() only when sending to hardware).
@@ -19079,15 +19674,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             dist_to_max = self.TILT_MAX - self.target_tilt
                             min_dist_to_boundary = min(dist_to_min, dist_to_max)
                             
+                            try:
+                                _ts = float(self._safe_int_widget_value("tracking_speed_slider", 50))
+                            except Exception:
+                                _ts = 50.0
+                            base_tilt_step = float(np.clip(4.0 + (_ts / 100.0) * 10.0, 3.0, 14.0))
+
                             if min_dist_to_boundary < 10:
                                 # Very close to boundary - move slowly
-                                max_tilt_step = 2.5
+                                max_tilt_step = min(2.5, base_tilt_step)
                             elif min_dist_to_boundary < 20:
                                 # Approaching boundary - moderate speed
-                                max_tilt_step = 4.0
+                                max_tilt_step = min(4.0, base_tilt_step)
                             else:
                                 # Safe distance from boundaries - aggressive speed
-                                max_tilt_step = 8.0
+                                max_tilt_step = base_tilt_step
                             
                             if tilt_delta > max_tilt_step:
                                 # Step toward target gradually
@@ -19149,17 +19750,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     except Exception:
                         pass
 
-                    # Immediately send serial command for responsive auto-aiming when enabled.
-                    try:
-                        if getattr(self, "tracking_active", False) and getattr(
-                            self, "aiming_active", False
-                        ):
-                            try:
-                                self.send_serial_command()
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
+                    # NOTE: Servo command is transmitted once per frame by the
+                    # end-of-frame unconditional send_serial_command() block.
+                    # Avoid sending here to prevent double-sends per frame that can
+                    # race with later state updates (hold/idle/home logic) and
+                    # manifest as apparent drift.
 
             else:
                 # --- Target Lost: Hold Last Position for a configurable time ---
@@ -19675,6 +20270,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     dist = ((tx - cx) ** 2 + (ty - cy) ** 2) ** 0.5
 
                     in_deadzone = bool(self._is_yellow_dot_in_deadzone())
+                    prev_in_deadzone = bool(getattr(self, "_prev_in_deadzone", False))
+                    entered_deadzone = bool(in_deadzone and (not prev_in_deadzone))
+                    self._prev_in_deadzone = bool(in_deadzone)
 
                     if in_deadzone:
                         color_box = (0, 0, 255)  # red = locked
@@ -19687,33 +20285,49 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         if self.safety_state == 0:
                             # Handle both rapid fire and normal auto-fire
                             if getattr(self, "rapid_fire_enabled", False):
-                                # Check if we should stop firing due to timeout
-                                if self.trigger_fired and (now - self._firing_start_time) > self._max_firing_duration:
-                                    # Firing timeout reached - stop firing
-                                    self.trigger_fired = False
-                                    self.enhancer.log_serial_output(f"[RAPID-FIRE] Firing timeout ({self._max_firing_duration:.1f}s) - stopped", fire=False)
+                                # Projectile (BB Servo) cannot rapid-fire as a latched state.
+                                # Use edge-triggered pulses instead so the servo visibly moves.
+                                if getattr(self, "trigger_mode_bb", False):
                                     msg = None
+                                    if entered_deadzone and (now - self.last_trigger_time >= cooldown):
+                                        msg = f"[RAPID-FIRE] Target locked (BB pulse) (dist={dist:.1f}px)"
+                                        self._request_trigger_pulse(msg)
                                 else:
-                                    # Start or continue firing
-                                    if not self.trigger_fired:
-                                        self._firing_start_time = now  # Record firing start time
-                                    self.trigger_fired = True
-                                    msg = f"[RAPID-FIRE] Target locked & firing (dist={dist:.1f}px)"
-                            elif getattr(self, "auto_fire_enabled", False) and (now - self.last_trigger_time >= cooldown):
-                                self.trigger_fired = True
-                                self.last_trigger_time = now
-                                msg = f"[AUTO-FIRE] Target locked & fired (dist={dist:.1f}px, cooldown={cooldown:.2f}s)"
-                            else:
-                                msg = None
+                                    # MOSFET mode: allow continuous ON while in deadzone (bounded by timeout).
+                                    if self.trigger_fired and (now - self._firing_start_time) > self._max_firing_duration:
+                                        self.trigger_fired = False
+                                        self.enhancer.log_serial_output(
+                                            f"[RAPID-FIRE] Firing timeout ({self._max_firing_duration:.1f}s) - stopped",
+                                            fire=False,
+                                        )
+                                        msg = None
+                                    else:
+                                        if not self.trigger_fired:
+                                            self._firing_start_time = now
+                                        self.trigger_fired = True
+                                        msg = f"[RAPID-FIRE] Target locked & firing (dist={dist:.1f}px)"
 
-                            if msg:
-                                # SEND COMMAND TO ARDUINO (was missing!)
-                                self.send_serial_command()
-                                self.enhancer.log_serial_output(msg, fire=True)
-                                try:
-                                    self._pulse_fire_indicator()
-                                except Exception:
-                                    pass
+                                    if msg:
+                                        self.send_serial_command()
+                                        self.enhancer.log_serial_output(msg, fire=True)
+                                        try:
+                                            self._pulse_fire_indicator()
+                                        except Exception:
+                                            pass
+                            elif getattr(self, "auto_fire_enabled", False) and (now - self.last_trigger_time >= cooldown):
+                                # Fire on deadzone entry, or while aiming if already centered.
+                                # This prevents missed shots when the target starts inside the deadzone.
+                                aiming_active = bool(getattr(self, "aiming_active", False))
+                                if entered_deadzone or (aiming_active and in_deadzone):
+                                    if entered_deadzone:
+                                        msg = (
+                                            f"[AUTO-FIRE] Target centered -> FIRE (dist={dist:.1f}px, cooldown={cooldown:.2f}s)"
+                                        )
+                                    else:
+                                        msg = (
+                                            f"[AUTO-FIRE] Aiming locked -> FIRE (dist={dist:.1f}px, cooldown={cooldown:.2f}s)"
+                                        )
+                                    self._request_trigger_pulse(msg)
                     else:
                         color_box = (0, 255, 255)  # yellow = normal
                         label = f"{int(dist)}px"
@@ -20092,15 +20706,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         print(f"[SENTRY] log error: {log_err}")
             elif getattr(self, "sentry_mode_active", False) and getattr(self, "sentry_tab", None) is not None:
                 # Pass the original frame (before RGB conversion) and current detections
-                # boxes variable contains YOLO detections in (x, y, w, h, score, class) format
+                # boxes can be (x, y, w, h) or (x, y, w, h, score, class)
+                # Sentry expects (x, y, w, h, score); default score=1.0 when absent
                 sentry_boxes = []
                 try:
                     if boxes and len(boxes) > 0:
                         for box in boxes:
-                            if len(box) >= 5:
-                                # Convert to (x, y, w, h, score) tuple
-                                x, y, w, h, score = box[:5]
-                                sentry_boxes.append((int(x), int(y), int(w), int(h), float(score)))
+                            if len(box) >= 4:
+                                x, y, w, h = box[:4]
+                                score = float(box[4]) if len(box) >= 5 else 1.0
+                                sentry_boxes.append((int(x), int(y), int(w), int(h), score))
                 except Exception as box_err:
                     print(f"[SENTRY] Box conversion error: {box_err}")
                 # Pass frame to sentry - frame1 is BGR, sentry expects BGR
@@ -20109,22 +20724,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             print(f"[SENTRY] update error: {e}")
         # ========== END SENTRY MODE FRAME UPDATE ==========
 
-        # ========== CRITICAL FIX (DEC10): UNCONDITIONAL SERIAL COMMAND ==========
-        # MUST send command every frame to MCU, even when no detection occurs.
-        # Without this, when boxes is empty and idle modes don't match, the MCU never
-        # receives target_pan/target_tilt updates, causing servo to stay stuck at last
-        # position or default to minimum (Pan=0°, Tilt=min).
-        #
-        # This ensures:
-        # 1. MCU gets HOME position when detection fails (not MIN position)
-        # 2. Idle mode movements are transmitted to hardware  
-        # 3. Manual control updates reach MCU consistently
-        # 4. send_serial_command() internally guards against unnecessary transmissions
-        #
-        # DO NOT add conditional checks here - the condition guard is in send_serial_command()
-        # which checks MCU connection, safety state, and other factors.
+        # Output cadence:
+        # Prefer the dedicated serial timer (higher Hz, decoupled from camera FPS).
+        # Fall back to per-frame sending only if the timer is unavailable/inactive.
         try:
-            self.send_serial_command()
+            st = getattr(self, "serial_timer", None)
+            if st is None or not getattr(st, "isActive", lambda: False)():
+                self.send_serial_command()
         except Exception:
             pass
 
@@ -20446,51 +21052,81 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # This temporarily overrides detection/tracking until we reach the target or timeout
         try:
             if getattr(self, "target_lock_active", False):
-                current_time = time.time()
-                lock_start = getattr(self, "target_lock_start_time", current_time)
-                lock_timeout = getattr(self, "target_lock_timeout", 5.0)
+                # Optional hold window: keep lock active for a short, fixed time.
+                # This is required for "single strike" behavior because last_sent_* updates immediately.
+                hold_until = getattr(self, "target_lock_hold_until_mono", None)
+                hold_active = False
+                if hold_until is not None:
+                    try:
+                        now_mono = time.monotonic()
+                        if now_mono < float(hold_until):
+                            hold_active = True
+                            self.target_pan = getattr(self, "target_lock_pan", getattr(self, "target_pan", 90))
+                            self.target_tilt = getattr(self, "target_lock_tilt", getattr(self, "target_tilt", 40))
+                        else:
+                            self.target_lock_active = False
+                            self.target_lock_hold_until_mono = None
+                            if getattr(self, "tracking_was_active", False):
+                                self.tracking_active = True
+                            try:
+                                self.enhancer.log_serial_output(
+                                    "[LOCK] ✅ Strike hold complete - resuming autotracking",
+                                    fire=False,
+                                )
+                            except Exception:
+                                pass
+                    except Exception:
+                        hold_active = False
+
+                # While hold window is active, do NOT run timeout/arrival logic.
+                if hold_active:
+                    pass
+                elif getattr(self, "target_lock_active", False):
+                    current_time = time.time()
+                    lock_start = getattr(self, "target_lock_start_time", current_time)
+                    lock_timeout = getattr(self, "target_lock_timeout", 5.0)
                 
-                # Check timeout - if exceeded, cancel lock and resume normal tracking
-                if current_time - lock_start > lock_timeout:
-                    self.target_lock_active = False
-                    self.enhancer.log_serial_output(
-                        "[LOCK] ⏱️ Timeout - resuming autotracking",
-                        fire=False
-                    )
-                    # Let normal tracking resume in the next iteration
-                    # (this iteration will still use the timeout-triggered pan/tilt values)
-                else:
-                    # Lock still active - move toward target
-                    target_pan = getattr(self, "target_lock_pan", 90)
-                    target_tilt = getattr(self, "target_lock_tilt", 40)
-                    current_pan = getattr(self, "last_sent_pan", getattr(self, "prev_pan_angle", 90))
-                    current_tilt = getattr(self, "last_sent_tilt", getattr(self, "prev_tilt_angle", 40))
-                    
-                    # Calculate distance to target
-                    pan_distance = abs(target_pan - current_pan)
-                    tilt_distance = abs(target_tilt - current_tilt)
-                    tolerance = getattr(self, "target_lock_tolerance", 3.0)
-                    
-                    # Check if we've reached the target (within tolerance)
-                    if pan_distance <= tolerance and tilt_distance <= tolerance:
-                        # Arrived at target! Resume normal tracking
+                    # Check timeout - if exceeded, cancel lock and resume normal tracking
+                    if current_time - lock_start > lock_timeout:
                         self.target_lock_active = False
                         self.enhancer.log_serial_output(
-                            f"[LOCK] ✅ Arrived at target (pan={target_pan:.0f}°, tilt={target_tilt:.0f}°)",
+                            "[LOCK] ⏱️ Timeout - resuming autotracking",
                             fire=False
                         )
-                        # Resume normal autotracking if it was active before
-                        if getattr(self, "tracking_was_active", False):
-                            self.tracking_active = True
+                        # Let normal tracking resume in the next iteration
+                        # (this iteration will still use the timeout-triggered pan/tilt values)
+                    else:
+                        # Lock still active - move toward target
+                        target_pan = getattr(self, "target_lock_pan", 90)
+                        target_tilt = getattr(self, "target_lock_tilt", 40)
+                        current_pan = getattr(self, "last_sent_pan", getattr(self, "prev_pan_angle", 90))
+                        current_tilt = getattr(self, "last_sent_tilt", getattr(self, "prev_tilt_angle", 40))
+                        
+                        # Calculate distance to target
+                        pan_distance = abs(target_pan - current_pan)
+                        tilt_distance = abs(target_tilt - current_tilt)
+                        tolerance = getattr(self, "target_lock_tolerance", 3.0)
+                        
+                        # Check if we've reached the target (within tolerance)
+                        if pan_distance <= tolerance and tilt_distance <= tolerance:
+                            # Arrived at target! Resume normal tracking
+                            self.target_lock_active = False
                             self.enhancer.log_serial_output(
-                                "[LOCK] Resuming autotracking",
+                                f"[LOCK] ✅ Arrived at target (pan={target_pan:.0f}°, tilt={target_tilt:.0f}°)",
                                 fire=False
                             )
-                    else:
-                        # Still moving toward target - use target position as servo command
-                        self.target_pan = target_pan
-                        self.target_tilt = target_tilt
-                        # Don't exit send_serial_command() yet - continue below to send the command
+                            # Resume normal autotracking if it was active before
+                            if getattr(self, "tracking_was_active", False):
+                                self.tracking_active = True
+                                self.enhancer.log_serial_output(
+                                    "[LOCK] Resuming autotracking",
+                                    fire=False
+                                )
+                        else:
+                            # Still moving toward target - use target position as servo command
+                            self.target_pan = target_pan
+                            self.target_tilt = target_tilt
+                            # Don't exit send_serial_command() yet - continue below to send the command
         except Exception as e:
             # If lock processing fails, clean up and continue with normal command
             self.target_lock_active = False
@@ -20520,6 +21156,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Use target_pan/tilt as intended, but only update last_sent_* when writing to serial.
         target_pan_raw = getattr(self, "target_pan", 90)
         target_tilt_raw = getattr(self, "target_tilt", 40)
+
+        # Per-frame bus-servo move-time override (used by Auto Strike / Aggressive preset).
+        strike_bus_time_ms = None
         
         # ========== FIXED: VALIDATE PAN/TILT ANGLES BEFORE COMMAND ENCODING ==========
         # Ensure pan/tilt angles are valid numbers (not NaN, not Inf)
@@ -20536,14 +21175,82 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             target_pan_raw = 90
             target_tilt_raw = 40
+
+        # ========== AUTO STRIKE (AGGRESSIVE PRESET) ==========
+        # One decisive movement to the computed target, then short hold to avoid "walking" in.
+        try:
+            if (
+                bool(getattr(self, "auto_strike_enabled", False))
+                and bool(getattr(self, "tracking_active", False))
+                and not bool(getattr(self, "manual_override", False))
+                and not bool(getattr(self, "serial_tx_paused", False))
+                and not bool(getattr(self, "target_lock_active", False))
+            ):
+                now_mono = time.monotonic()
+                cooldown_until = float(getattr(self, "_auto_strike_cooldown_until_mono", 0.0) or 0.0)
+                if now_mono >= cooldown_until:
+                    current_pan_est = float(getattr(self, "prev_pan_angle", getattr(self, "last_sent_pan", self.HOME_PAN)))
+                    current_tilt_est = float(getattr(self, "prev_tilt_angle", getattr(self, "last_sent_tilt", self.HOME_TILT)))
+                    dp = abs(float(target_pan_raw) - current_pan_est)
+                    dt = abs(float(target_tilt_raw) - current_tilt_est)
+                    min_err = float(getattr(self, "auto_strike_min_error_deg", 2.0) or 2.0)
+                    if max(dp, dt) >= min_err:
+                        hold_ms = int(getattr(self, "auto_strike_hold_ms", 300) or 300)
+                        cooldown_ms = int(getattr(self, "auto_strike_cooldown_ms", 250) or 250)
+
+                        # Activate lock immediately for THIS send.
+                        self.target_lock_active = True
+                        self.target_lock_pan = float(target_pan_raw)
+                        self.target_lock_tilt = float(target_tilt_raw)
+                        self.target_lock_start_time = time.time()
+                        self.target_lock_hold_until_mono = now_mono + (max(0, hold_ms) / 1000.0)
+                        self.tracking_was_active = True
+                        self.target_pan = self.target_lock_pan
+                        self.target_tilt = self.target_lock_tilt
+                        # Force one-shot send even if tokens unchanged.
+                        self._force_send_next_command = True
+
+                        # For bus servos, choose a per-strike move time based on delta.
+                        if bool(self._serial_active_is_bus_mode()):
+                            delta = float(max(dp, dt))
+                            strike_bus_time_ms = int(np.clip(10.0 + 3.0 * delta, 15.0, 120.0))
+
+                        # Cooldown prevents rapid re-triggering from noisy detections.
+                        self._auto_strike_cooldown_until_mono = now_mono + (max(0, cooldown_ms) / 1000.0)
+        except Exception:
+            pass
         
-        # ========== CRITICAL FIX: USE ROUNDING FOR FRACTIONAL ANGLES ==========
+        # ========== CRITICAL FIX: USE ROUNDING FOR FRACTIONAL ANGLES ========== 
         # ISSUE: int() truncates: 50.7° becomes 50° (loses 0.7°)
         # RESULT: Tilt appears unresponsive - fractional movements accumulate but never reach MCU
         # SOLUTION: round() properly converts: 50.7° becomes 51° (preserves fractional accuracy)
         # This ensures both pan and tilt respond equally to small tracking corrections
         pan_angle = int(np.round(np.clip(target_pan_raw, self.PAN_MIN, self.PAN_MAX)))
         tilt_angle = int(np.round(np.clip(target_tilt_raw, self.TILT_MIN, self.TILT_MAX)))
+
+        # Bus-servo modes can accept higher resolution than integer degrees.
+        # Preserve sub-degree targets for Debug Board / Dual Port by sending float degrees
+        # (converted to 0..4095 ticks in the bus packet layer).
+        bus_mode_active = bool(self._serial_active_is_bus_mode())
+        bus_pan_deg = None
+        bus_tilt_deg = None
+        bus_pan_ticks = None
+        bus_tilt_ticks = None
+        if bus_mode_active:
+            try:
+                bus_pan_deg = float(np.clip(float(target_pan_raw), self.PAN_MIN, self.PAN_MAX))
+                bus_tilt_deg = float(np.clip(float(target_tilt_raw), self.TILT_MIN, self.TILT_MAX))
+                bus_pan_ticks = int(self._bus_servo_deg_to_ticks(bus_pan_deg))
+                bus_tilt_ticks = int(self._bus_servo_deg_to_ticks(bus_tilt_deg))
+            except Exception:
+                bus_pan_deg = float(pan_angle)
+                bus_tilt_deg = float(tilt_angle)
+                try:
+                    bus_pan_ticks = int(self._bus_servo_deg_to_ticks(bus_pan_deg))
+                    bus_tilt_ticks = int(self._bus_servo_deg_to_ticks(bus_tilt_deg))
+                except Exception:
+                    bus_pan_ticks = None
+                    bus_tilt_ticks = None
         
         # ========== TRANSMISSION DIAGNOSTICS ==========
         # Log rounding impact to verify fractional values are properly converted
@@ -20605,15 +21312,29 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         acc3_token = 0
         safety_token = int(self.safety_state)
         mode_token = 1 if self.trigger_mode_bb else 0
+        
+        # DEBUG: Mode token computation
+        if fire_token == 1:
+            print(f"[MODE_DEBUG] trigger_mode_bb={self.trigger_mode_bb} → mode_token={mode_token} ({'PROJECTILE' if mode_token==1 else 'WATER'})")
 
         # NOTE: command string is built after any pan/tilt overrides below.
         
         # --- Fractional accumulation to allow micro-corrections (prevents "stuck at last integer" issue) ---
         try:
+            # In bus-servo modes we send sub-degree targets directly (ticks), so the
+            # integer micro-step accumulator is unnecessary and can introduce drift.
+            if bus_mode_active:
+                self._pan_frac_accum = 0.0
+                self._tilt_frac_accum = 0.0
+                raise RuntimeError("skip micro-step in bus mode")
             # ensure accumulators exist
             self._pan_frac_accum = getattr(self, "_pan_frac_accum", 0.0)
             self._tilt_frac_accum = getattr(self, "_tilt_frac_accum", 0.0)
-            self._frac_send_threshold = getattr(self, "_frac_send_threshold", 0.25)
+            # FIX: Dynamically read threshold from widget so user adjustments take effect immediately
+            # SAFETY: A 1° micro-step cannot be triggered by tiny (<1°) accumulated noise safely.
+            # Clamp to >= 1.0° to prevent drift/hunting.
+            self._frac_send_threshold = float(self._safe_float_widget_value("precision_frac_threshold_input", 0.25))
+            effective_threshold = max(1.0, float(self._frac_send_threshold))
 
             # Reference last sent integer position (fallback to prev angles if sentinel)
             last_pan_int = int(getattr(self, "last_sent_pan", int(pan_angle)))
@@ -20629,7 +21350,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 and getattr(self.precision_mode_checkbox, "isChecked", lambda: False)()
             )
 
-            if precision_enabled:
+            # Only allow micro-step behavior when precision PID is actively driving this frame.
+            # This prevents slow drift when centered (noise) and avoids overriding normal tracking.
+            precision_pid_driving = bool(getattr(self, "_precision_override_active", False))
+
+            if precision_enabled and precision_pid_driving:
                 # Accumulate fractional deltas
                 self._pan_frac_accum += desired_pan_delta
                 self._tilt_frac_accum += desired_tilt_delta
@@ -20638,12 +21363,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 pan_override = None
                 tilt_override = None
 
-                if abs(self._pan_frac_accum) >= float(self._frac_send_threshold):
+                # Only attempt a micro-step if the rounded command would otherwise be unchanged.
+                if abs(self._pan_frac_accum) >= float(effective_threshold) and int(pan_angle) == int(last_pan_int):
                     step = int(np.sign(self._pan_frac_accum))
                     pan_override = int(last_pan_int + step)
                     self._pan_frac_accum -= step  # consume step
 
-                if abs(self._tilt_frac_accum) >= float(self._frac_send_threshold):
+                if abs(self._tilt_frac_accum) >= float(effective_threshold) and int(tilt_angle) == int(last_tilt_int):
                     step = int(np.sign(self._tilt_frac_accum))
                     tilt_override = int(last_tilt_int + step)
                     self._tilt_frac_accum -= step  # consume step
@@ -20663,6 +21389,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         )
                     except Exception:
                         pass
+            else:
+                # If precision isn't actively driving, keep micro-step state neutral.
+                self._pan_frac_accum = 0.0
+                self._tilt_frac_accum = 0.0
         except Exception:
             pass
 
@@ -20683,6 +21413,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
 
+        # If any output gating/clamping changed the angles, keep bus targets in sync.
+        if bus_mode_active:
+            try:
+                bus_pan_deg = float(np.clip(float(pan_angle), self.PAN_MIN, self.PAN_MAX))
+                bus_tilt_deg = float(np.clip(float(tilt_angle), self.TILT_MIN, self.TILT_MAX))
+                bus_pan_ticks = int(self._bus_servo_deg_to_ticks(bus_pan_deg))
+                bus_tilt_ticks = int(self._bus_servo_deg_to_ticks(bus_tilt_deg))
+            except Exception:
+                pass
+
         # Build the final command string AFTER any pan/tilt overrides.
         command = f"P{pan_angle}T{tilt_angle}F{fire_token}L{led_token}R{laser_token}G{acc3_token}S{safety_token}M{mode_token}\n"
 
@@ -20692,11 +21432,30 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # SOLUTION: Only send command if the ROUNDED integer values actually changed
         # This prevents the servo from receiving duplicate commands while tracking micro-movements
         should_send = True
+        force_send = bool(getattr(self, "_force_send_next_command", False))
         last_pan = int(getattr(self, "last_sent_pan", -9999))
         last_tilt = int(getattr(self, "last_sent_tilt", -9999))
+
+        # In bus-servo modes, use tick-level equality to decide whether pan/tilt changed.
+        # This ensures sub-degree corrections actually transmit.
+        pos_unchanged = False
+        if bus_mode_active and (bus_pan_ticks is not None) and (bus_tilt_ticks is not None):
+            bus_last_pan_ticks = getattr(self, "_last_sent_bus_pan_ticks", None)
+            bus_last_tilt_ticks = getattr(self, "_last_sent_bus_tilt_ticks", None)
+            if (bus_last_pan_ticks is None) or (bus_last_tilt_ticks is None):
+                pos_unchanged = False
+            else:
+                try:
+                    pos_unchanged = (
+                        int(bus_pan_ticks) == int(bus_last_pan_ticks)
+                        and int(bus_tilt_ticks) == int(bus_last_tilt_ticks)
+                    )
+                except Exception:
+                    pos_unchanged = False
+        else:
+            pos_unchanged = (pan_angle == last_pan and tilt_angle == last_tilt)
         
-        if (pan_angle == last_pan and 
-            tilt_angle == last_tilt and 
+        if (not force_send and pos_unchanged and 
             fire_token == int(getattr(self, "_last_fire_token", 0)) and
             led_token == int(getattr(self, "_last_led_token", 0)) and
             laser_token == int(getattr(self, "_last_laser_token", 0)) and
@@ -20707,12 +21466,20 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Diagnostic: when skipping, log reason and current fractional state (debug-only)
         if not should_send and getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked():
             try:
-                msg = (
-                    f"[SKIP] unchanged-rounded-ints | raw=P{target_pan_raw:.4f}°/T{target_tilt_raw:.4f}° -> "
-                    f"rounded=P{pan_angle}°/T{tilt_angle}° | last_sent=P{last_pan}°/T{last_tilt}° | "
-                    f"accum_pan={getattr(self,'_pan_frac_accum',0.0):.3f} accum_tilt={getattr(self,'_tilt_frac_accum',0.0):.3f} "
-                    f"flags: manual_override={getattr(self,'manual_override',False)} serial_tx_paused={getattr(self,'serial_tx_paused',False)} _mcu_tilt_safety_locked={getattr(self,'_mcu_tilt_safety_locked',False)}"
-                )
+                if bus_mode_active and (bus_pan_ticks is not None) and (bus_tilt_ticks is not None):
+                    msg = (
+                        f"[SKIP] unchanged-bus-ticks | raw=P{target_pan_raw:.4f}°/T{target_tilt_raw:.4f}° -> "
+                        f"ticks=P{bus_pan_ticks}/T{bus_tilt_ticks} | last_ticks=P{getattr(self,'_last_sent_bus_pan_ticks',None)}/T{getattr(self,'_last_sent_bus_tilt_ticks',None)} | "
+                        f"rounded=P{pan_angle}°/T{tilt_angle}° | last_sent=P{last_pan}°/T{last_tilt}° | "
+                        f"flags: manual_override={getattr(self,'manual_override',False)} serial_tx_paused={getattr(self,'serial_tx_paused',False)} _mcu_tilt_safety_locked={getattr(self,'_mcu_tilt_safety_locked',False)}"
+                    )
+                else:
+                    msg = (
+                        f"[SKIP] unchanged-rounded-ints | raw=P{target_pan_raw:.4f}°/T{target_tilt_raw:.4f}° -> "
+                        f"rounded=P{pan_angle}°/T{tilt_angle}° | last_sent=P{last_pan}°/T{last_tilt}° | "
+                        f"accum_pan={getattr(self,'_pan_frac_accum',0.0):.3f} accum_tilt={getattr(self,'_tilt_frac_accum',0.0):.3f} "
+                        f"flags: manual_override={getattr(self,'manual_override',False)} serial_tx_paused={getattr(self,'serial_tx_paused',False)} _mcu_tilt_safety_locked={getattr(self,'_mcu_tilt_safety_locked',False)}"
+                    )
                 self.enhancer.log_serial_output(msg, fire=False)
             except Exception:
                 pass
@@ -20732,6 +21499,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # Only log if we're actually sending or debug is on
             if should_send or debug_on:
                 msg = f"WILL SEND: {command.strip()}"
+                if bus_mode_active and (bus_pan_ticks is not None) and (bus_tilt_ticks is not None):
+                    msg = msg + f" [BUS ticks] P{bus_pan_ticks} T{bus_tilt_ticks}"
                 if debug_on:
                     try:
                         st = (
@@ -20774,6 +21543,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             try:
                 if not mosfet_hold_active:
                     self.trigger_fired = False
+                    # Reset deadzone edge state so reacquired targets can fire on first entry
+                    try:
+                        self._prev_in_deadzone = False
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
@@ -20785,9 +21559,31 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 pass
             return  # Skip sending - command is identical to last time
 
+        # One-shot force-send consumed once we've decided to transmit.
+        if force_send:
+            try:
+                self._force_send_next_command = False
+            except Exception:
+                pass
+
         # Determine which handles are available
         primary_open = bool(self.ser is not None and getattr(self.ser, "is_open", False))
         bus_open = bool(getattr(self, "bus_ser", None) is not None and getattr(self.bus_ser, "is_open", False))
+
+        # Extra visibility when a fire command is attempted
+        if fire_token == 1:
+            try:
+                self.enhancer.log_serial_output(
+                    f"[FIRE_TX] fire=1 safety={safety_token} mode_token={mode_token} dual_port={self._serial_is_dual_port()} primary_open={primary_open} bus_open={bus_open}",
+                    fire=False,
+                )
+            except Exception:
+                try:
+                    print(
+                        f"[FIRE_TX] fire=1 safety={safety_token} mode_token={mode_token} dual_port={self._serial_is_dual_port()} primary_open={primary_open} bus_open={bus_open}"
+                    )
+                except Exception:
+                    pass
 
         if primary_open or bus_open:
             try:
@@ -20797,9 +21593,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     # hold/restore logic behaves consistently in simulated or paused-TX modes.
                     self.last_sent_pan = pan_angle
                     self.last_sent_tilt = tilt_angle
-                    # FIX DEC8: Update prev from sent integer values (not fractional target)
-                    self.prev_pan_angle = float(pan_angle)
-                    self.prev_tilt_angle = float(tilt_angle)
+                    # FIX DEC8: Update prev from sent values (not fractional target)
+                    sent_pan_for_prev = float(pan_angle)
+                    sent_tilt_for_prev = float(tilt_angle)
+                    if bus_mode_active and (bus_pan_deg is not None) and (bus_tilt_deg is not None):
+                        sent_pan_for_prev = float(bus_pan_deg)
+                        sent_tilt_for_prev = float(bus_tilt_deg)
+                        self._last_sent_bus_pan_ticks = bus_pan_ticks
+                        self._last_sent_bus_tilt_ticks = bus_tilt_ticks
+                        self._last_sent_bus_pan_deg = bus_pan_deg
+                        self._last_sent_bus_tilt_deg = bus_tilt_deg
+                    self.prev_pan_angle = float(sent_pan_for_prev)
+                    self.prev_tilt_angle = float(sent_tilt_for_prev)
                     # Optionally log the suppression in debug mode
                     try:
                         if debug_on:
@@ -20828,6 +21633,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         pass
                 else:
                     # 1) Pan/Tilt
+                    pan_tilt_params_sent = False
                     if self._serial_active_is_bus_mode():
                         if debug_on:
                             try:
@@ -20838,7 +21644,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 )
                             except Exception:
                                 pass
-                        ok = self._bus_servo_send_pan_tilt(pan_angle, tilt_angle)
+                        send_pan_deg = float(bus_pan_deg) if (bus_pan_deg is not None) else float(pan_angle)
+                        send_tilt_deg = float(bus_tilt_deg) if (bus_tilt_deg is not None) else float(tilt_angle)
+                        ok = self._bus_servo_send_pan_tilt(
+                            send_pan_deg,
+                            send_tilt_deg,
+                            time_ms=(strike_bus_time_ms if strike_bus_time_ms is not None else None),
+                        )
+                        pan_tilt_params_sent = ok
                         if not ok:
                             try:
                                 if hasattr(self, "enhancer"):
@@ -20850,44 +21663,105 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 pass
                     else:
                         # Nano ASCII mode: pan/tilt + IO over primary serial
+                        if fire_token == 1:
+                            print(f"[MODE_DEBUG] NOT DUAL PORT - using Nano ASCII mode")
                         if primary_open:
+                            if fire_token == 1:
+                                print(f"[MODE_DEBUG] ✓ SENDING (Nano ASCII): {command.strip()}")
                             self.ser.write(command.encode("utf-8"))
+                            pan_tilt_params_sent = True
+                        else:
+                            if fire_token == 1:
+                                print(f"[MODE_DEBUG] ✗ PRIMARY PORT NOT OPEN (COM8 disconnected?)")
 
                     # 2) IO tokens in Dual Port mode (Nano primary serial)
                     if self._serial_is_dual_port():
+                        # DEBUG: Dual port mode active
+                        if fire_token == 1:
+                            print(f"[MODE_DEBUG] DUAL PORT MODE: primary_open={primary_open} bus_ping_ok={getattr(self, '_bus_servo_ping_ok', False)} pan_tilt_sent={pan_tilt_params_sent}")
                         # In dual mode, Nano is used for IO (fire/relays/safety/mode).
-                        # Pan/Tilt are driven via Debug Board if bus probe succeeded; otherwise
-                        # fall back to full P/T command to keep motion responsive.
+                        # Pan/Tilt are driven via Debug Board.
+                        # NOTE: Do NOT fall back to sending P/T to the Nano when bus fails.
+                        # This keeps responsibilities split cleanly when the Debug Board is not chained to the Nano.
                         if primary_open:
-                            if bool(getattr(self, "_bus_servo_ping_ok", False)):
-                                io_cmd = f"F{fire_token}L{led_token}R{laser_token}G{acc3_token}S{safety_token}M{mode_token}\n"
+                            # Always send IO tokens to Nano in Dual Port mode when primary is open.
+                            # This allows firing/relays even if bus ping fails, without falling back to
+                            # pan/tilt on the Nano (keeps responsibilities split).
+                            if not bool(getattr(self, "_bus_servo_ping_ok", False)) or not pan_tilt_params_sent:
                                 try:
-                                    self.ser.write(io_cmd.encode("utf-8"))
-                                except Exception:
-                                    pass
-                            else:
-                                try:
-                                    self.ser.write(command.encode("utf-8"))
-                                    if debug_on:
-                                        self.enhancer.log_serial_output(
-                                            "[DUAL FALLBACK] Bus ping not confirmed; sending full P/T to Nano",
-                                            fire=False,
+                                    if fire_token == 1:
+                                        print(
+                                            f"[MODE_DEBUG] IO-only send (bus ping/pt unavailable): S{safety_token} M{mode_token} F{fire_token}L{led_token}R{laser_token}G{acc3_token}"
                                         )
                                 except Exception:
                                     pass
-                    # update last_sent_* only when we actually wrote to serial
-                    self.last_sent_pan = pan_angle
-                    self.last_sent_tilt = tilt_angle
-                    # FIX DEC8: Update prev_pan_angle/prev_tilt_angle from SENT integer values
-                    # NOT from target_pan/target_tilt (which have fractional parts)
-                    # This prevents oscillation from fractional-to-integer rounding mismatches
-                    # The key insight: prev values must match what MCU actually received
-                    self.prev_pan_angle = float(pan_angle)  # Use what was ACTUALLY sent to MCU
-                    self.prev_tilt_angle = float(tilt_angle)
+
+                            # FIX 2026-01-26: Send mode and safety FIRST as separate tokens.
+                            # The Arduino's single-token parser incorrectly matches packed commands
+                            # like "F1L1R0G0S0M1" as just "F1", ignoring mode/safety.
+                            # By sending S/M first, we ensure projectile mode is set before fire.
+                            try:
+                                self.ser.write(f"S{safety_token}\n".encode("utf-8"))
+                                self.ser.write(f"M{mode_token}\n".encode("utf-8"))
+                            except Exception:
+                                pass
+                            io_cmd = f"F{fire_token}L{led_token}R{laser_token}G{acc3_token}\n"
+                            try:
+                                if fire_token == 1:
+                                    print(f"[MODE_DEBUG] ✓ SENDING (dual-port IO): S{safety_token}, M{mode_token}, {io_cmd.strip()}")
+                                self.ser.write(io_cmd.encode("utf-8"))
+                            except Exception as e:
+                                print(f"[MODE_DEBUG] ✗ SEND FAILED: {e}")
+                            else:
+                                # Bus ping failed OR Bus write failed: keep IO working, but do not send pan/tilt to Nano.
+                                try:
+                                    # FIX 2026-01-26: Same fix - send S/M first
+                                    try:
+                                        self.ser.write(f"S{safety_token}\n".encode("utf-8"))
+                                        self.ser.write(f"M{mode_token}\n".encode("utf-8"))
+                                    except Exception:
+                                        pass
+                                    io_cmd = f"F{fire_token}L{led_token}R{laser_token}G{acc3_token}\n"
+                                    if fire_token == 1:
+                                        print(f"[MODE_DEBUG] ✓ SENDING (fallback path): S{safety_token}, M{mode_token}, {io_cmd.strip()}")
+                                    self.ser.write(io_cmd.encode("utf-8"))
+                                    if debug_on and hasattr(self, "enhancer"):
+                                        try:
+                                            self.enhancer.log_serial_output(
+                                                "[DUAL PORT] Bus pan/tilt failed; sent IO-only to Nano (no P/T fallback)",
+                                                fire=False,
+                                            )
+                                        except Exception:
+                                            pass
+                                except Exception:
+                                    pass
+                    
+                    # Update last_sent_* ONLY if we actually successfully wrote to serial (Bus or Nano)
+                    # This fixes the "Frozen Track" bug where a failed write causes the system to think
+                    # it already moved, preventing retries.
+                    if pan_tilt_params_sent:
+                        self.last_sent_pan = pan_angle
+                        self.last_sent_tilt = tilt_angle
+                        # FIX DEC8: Update prev_pan_angle/prev_tilt_angle from SENT integer values
+                        # NOT from target_pan/target_tilt (which have fractional parts)
+                        # This prevents oscillation from fractional-to-integer rounding mismatches
+                        # The key insight: prev values must match what MCU actually received
+                        sent_pan_for_prev = float(pan_angle)
+                        sent_tilt_for_prev = float(tilt_angle)
+                        if bus_mode_active and (bus_pan_deg is not None) and (bus_tilt_deg is not None):
+                            sent_pan_for_prev = float(bus_pan_deg)
+                            sent_tilt_for_prev = float(bus_tilt_deg)
+                            self._last_sent_bus_pan_ticks = bus_pan_ticks
+                            self._last_sent_bus_tilt_ticks = bus_tilt_ticks
+                            self._last_sent_bus_pan_deg = bus_pan_deg
+                            self._last_sent_bus_tilt_deg = bus_tilt_deg
+                        self.prev_pan_angle = float(sent_pan_for_prev)  # Use what was ACTUALLY sent to MCU
+                        self.prev_tilt_angle = float(sent_tilt_for_prev)
 
                     # Drain incoming lines (telemetry + status + encoder)
-                    # In any bus mode, inbound bytes are binary and should not be decoded as UTF-8 lines.
-                    if not self._serial_active_is_bus_mode():
+                    # In Debug Board bus-only mode, inbound bytes are binary and should not be decoded as UTF-8 lines.
+                    # In Dual Port mode, primary serial is Nano ASCII and must be drained.
+                    if (not self._serial_active_is_bus_mode()) or self._serial_is_dual_port():
                         try:
                             self._drain_serial_input(max_lines=8, debug_on=debug_on)
                         except Exception:
@@ -20947,9 +21821,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 # record the intended values as 'last_sent' so hold logic can use them
                 self.last_sent_pan = pan_angle
                 self.last_sent_tilt = tilt_angle
-                # FIX DEC8: Update prev from sent integer values (not fractional target)
-                self.prev_pan_angle = float(pan_angle)
-                self.prev_tilt_angle = float(tilt_angle)
+                # FIX DEC8: Update prev from sent values (not fractional target)
+                sent_pan_for_prev = float(pan_angle)
+                sent_tilt_for_prev = float(tilt_angle)
+                if bus_mode_active and (bus_pan_deg is not None) and (bus_tilt_deg is not None):
+                    sent_pan_for_prev = float(bus_pan_deg)
+                    sent_tilt_for_prev = float(bus_tilt_deg)
+                    self._last_sent_bus_pan_ticks = bus_pan_ticks
+                    self._last_sent_bus_tilt_ticks = bus_tilt_ticks
+                    self._last_sent_bus_pan_deg = bus_pan_deg
+                    self._last_sent_bus_tilt_deg = bus_tilt_deg
+                self.prev_pan_angle = float(sent_pan_for_prev)
+                self.prev_tilt_angle = float(sent_tilt_for_prev)
         except Exception:
             pass
 
@@ -21006,7 +21889,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         skipped (redundant-command filter) or TX is paused.
         """
         try:
-            if self._serial_active_is_bus_mode():
+            # In Debug Board bus-only mode, primary serial bytes are binary.
+            # In Dual Port mode, primary serial is Nano ASCII and must be decoded.
+            if self._serial_active_is_bus_mode() and (not self._serial_is_dual_port()):
                 return 0
             if self.ser is None or not getattr(self.ser, "is_open", False):
                 return 0
@@ -21728,6 +22613,36 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Enable tracking IMMEDIATELY - don't wait for camera!
         # If camera not open, it will be opened asynchronously without blocking UI
         self.tracking_active = True
+
+        # CLEAN START: Clear any stale detections from when tracking was OFF.
+        # This prevents the turret from "lunging" at a ghost or old detection
+        # immediately upon toggle. It must acquire a NEW target.
+        self.last_detections = []
+        self._boxes_are_reused = False
+        try:
+            # FIX: Initialize last_seen_time to NOW.
+            # Rationale: If we set this to 0.0, the "Target Lost" logic immediately thinks
+            # we haven't seen a target in years, and triggers "Return to Home" instantly.
+            # By setting it to NOW, we simulate "Just lost target", which triggers the
+            # "Hold Last Position" logic for the configured duration (5s).
+            # This keeps the turret STATIONARY when tracking starts, giving the user
+            # time to aim or the detector time to find a target.
+            self.last_seen_time = time.time()
+            
+            # Sync target variables to current position to preventing jumping
+            current_pan = float(getattr(self, "last_sent_pan", getattr(self, "prev_pan_angle", 90)))
+            current_tilt = float(getattr(self, "last_sent_tilt", getattr(self, "prev_tilt_angle", 40)))
+            self.target_pan = current_pan
+            self.target_tilt = current_tilt
+            self.prev_pan_angle = current_pan
+            self.prev_tilt_angle = current_tilt
+
+            # Force a one-shot transmit even if rounded values are unchanged.
+            # Do NOT poison last_sent_pan/last_sent_tilt with sentinel values, because
+            # autotracking math uses last_sent_* as the previous position.
+            self._force_send_next_command = True
+        except Exception:
+            pass
         
         if not cap_ok:
             # Flag that we need to open camera, but don't do it on main thread!
@@ -22969,18 +23884,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             if not getattr(self, "sentry_mode_active", False):
                 return
 
-            # Enforce the same automatic firing rule: yellow dot must be inside deadzone.
-            if not bool(self._is_yellow_dot_in_deadzone()):
-                try:
-                    if hasattr(self, "enhancer"):
-                        self.enhancer.log_serial_output(
-                            "[SENTRY] Fire blocked - target not in deadzone",
-                            fire=False
-                        )
-                except Exception:
-                    pass
-                return
-
             # Use main app safety source-of-truth (safety_state: 1=LOCKED, 0=ARMED)
             if int(getattr(self, "safety_state", 1)) != 0:
                 try:
@@ -23089,8 +23992,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 sentry_detections = []
                 if detections:
                     for det in detections:
-                        if len(det) >= 5:
-                            x, y, w, h, score = det[:5]
+                        if len(det) >= 4:
+                            x, y, w, h = det[:4]
+                            score = float(det[4]) if len(det) >= 5 else 1.0
                             sentry_detections.append((x, y, w, h, score))
                 
                 # Process frame through sentry

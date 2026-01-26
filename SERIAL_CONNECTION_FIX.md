@@ -202,6 +202,16 @@ User interaction: Button was always responsive, window always moveable
 
 ---
 
+## Notes for Debug Board / Dual Port modes (2026)
+
+The app supports three serial device modes (Nano ASCII, Debug Board bus-servo, Dual Port). When editing connection/threading code, preserve these invariants:
+
+- Debug Board bus-servo traffic is **binary**; do not drain it using line-oriented UTF-8 decoding.
+- Dual Port uses **two independent COM ports** (Nano + Debug Board). Dual Port assumes the Debug Board may be connected directly to the PC (no daisy-chain to the Nano required).
+- In Dual Port, the Nano port still emits ASCII telemetry/status and must be drained/parsed even though pan/tilt are driven via the Debug Board.
+
+---
+
 ## Comparison: Before vs After
 
 ### BEFORE (Blocking)

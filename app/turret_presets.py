@@ -89,6 +89,11 @@ PRESETS = {
         "snap_threshold": 160,
         "aim_aggression": 75,
         "final_approach_boost": True,
+        # Single-strike aiming: one decisive move then short hold (avoids many micro-steps)
+        "auto_strike_enabled": True,
+        "auto_strike_hold_ms": 320,
+        "auto_strike_cooldown_ms": 260,
+        "auto_strike_min_error_deg": 2.0,
         **PRECISION_DEFAULTS,
     },
 

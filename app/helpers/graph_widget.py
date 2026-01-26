@@ -6,12 +6,23 @@ class HealthGraphWidget(QWidget):
     """
     A simple scrolling line graph to display numerical health data (e.g. current in mA).
     """
-    def __init__(self, parent=None, max_points=100, min_val=0, max_val=2000):
+    def __init__(
+        self,
+        parent=None,
+        max_points=100,
+        min_val=0,
+        max_val=2000,
+        *,
+        unit="mA",
+        show_value_text=True,
+    ):
         super().__init__(parent)
         self.data_points = []
         self.max_points = max_points
         self.min_val = min_val
         self.max_val = max_val
+        self.unit = unit
+        self.show_value_text = bool(show_value_text)
         self.setBackgroundRole(QPalette.NoRole)
         self.setMinimumHeight(100)
         self.setStyleSheet("background-color: #222; border: 1px solid #444;")
@@ -75,11 +86,28 @@ class HealthGraphWidget(QWidget):
             p2 = points[i+1]
             painter.drawLine(int(p1[0]), int(p1[1]), int(p2[0]), int(p2[1]))
             
-        # Draw current value text
-        latest = self.data_points[-1]
-        painter.setPen(QColor("#ffffff"))
-        painter.drawText(5, 15, f"Current: {int(latest)} mA")
-        painter.drawText(5, 30, f"Max: {int(current_max)} mA")
+        # Draw value overlay text (optional)
+        if self.show_value_text:
+            latest = self.data_points[-1]
+            painter.setPen(QColor("#ffffff"))
+
+            unit = "" if self.unit is None else str(self.unit).strip()
+            suffix = f" {unit}" if unit else ""
+
+            # For current-style metrics, integer display is usually clearer.
+            if unit.lower() == "ma":
+                latest_text = str(int(latest))
+                max_text = str(int(current_max))
+            else:
+                try:
+                    latest_text = f"{float(latest):.1f}"
+                    max_text = f"{float(current_max):.1f}"
+                except Exception:
+                    latest_text = str(latest)
+                    max_text = str(current_max)
+
+            painter.drawText(5, 15, f"Current: {latest_text}{suffix}")
+            painter.drawText(5, 30, f"Max: {max_text}{suffix}")
 
     def sizeHint(self):
         return QSize(200, 100)

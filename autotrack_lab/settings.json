@@ -1,0 +1,9 @@
+{
+  "nano_port": "COM8",
+  "bus_port": "COM9",
+  "nano_baud": 115200,
+  "bus_baud": 115200,
+  "preset": "Balanced",
+  "mode": "quick",
+  "camera_index": 1
+}

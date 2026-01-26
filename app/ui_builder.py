@@ -1147,6 +1147,58 @@ def build_ui(app: QMainWindow):
     behavior_layout.addLayout(deadzone_row, br, 1)
     br += 1
 
+    # Detection pause (ms): pause detection updates when target enters scope circle
+    behavior_layout.addWidget(QLabel("Detection Pause (ms)"), br, 0)
+    detection_pause_row = QHBoxLayout()
+    if getattr(app, "detection_pause_slider", None) is None:
+        app.detection_pause_slider = QSlider()
+        try:
+            try:
+                app.detection_pause_slider.setOrientation(
+                    cast(Any, app._qt_enum("Horizontal", 1))
+                )
+            except Exception:
+                pass
+        except Exception:
+            pass
+    try:
+        try:
+            app._safe_widget_call("detection_pause_slider", "setRange", 0, 2000)
+            app._safe_widget_call("detection_pause_slider", "setValue", 1000)
+            app._safe_connect("detection_pause_slider", "valueChanged", app.save_settings)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    if getattr(app, "detection_pause_label", None) is None:
+        try:
+            ms = app._safe_int_widget_value("detection_pause_slider", 1000)
+        except Exception:
+            ms = 1000
+        app.detection_pause_label = QLabel(str(ms))
+    try:
+        try:
+            app.detection_pause_label.setFixedWidth(60)
+            app._safe_connect(
+                "detection_pause_slider",
+                "valueChanged",
+                lambda v: app.detection_pause_label.setText(str(v)),
+            )
+        except Exception:
+            pass
+    except Exception:
+        pass
+    try:
+        app.detection_pause_slider.setToolTip(
+            "When target enters the big scope circle, pause detection updates for this duration. Video continues playing - only detection is paused so pan/tilt can precisely center the target before firing."
+        )
+    except Exception:
+        pass
+    detection_pause_row.addWidget(app.detection_pause_slider)
+    detection_pause_row.addWidget(app.detection_pause_label)
+    behavior_layout.addLayout(detection_pause_row, br, 1)
+    br += 1
+
     behavior_layout.addWidget(QLabel("Snap Threshold (px)"), br, 0)
     snap_row = QHBoxLayout()
     if getattr(app, "snap_threshold_slider", None) is None:
@@ -1900,7 +1952,7 @@ def build_ui(app: QMainWindow):
     # Add FPS Graph
     current_layout.addRow(QLabel("System Performance (FPS):"))
     if getattr(app, "fps_graph", None) is None:
-        app.fps_graph = HealthGraphWidget(max_val=60)
+        app.fps_graph = HealthGraphWidget(max_val=60, show_value_text=False)
     current_layout.addRow(app.fps_graph)
 
     # Add Servo Load Graph (New)
@@ -1914,18 +1966,42 @@ def build_ui(app: QMainWindow):
 
     def _update_current_monitor_labels():
         try:
+            import time
             total = getattr(app, "total_current_mA", None)
             enabled = bool(getattr(app, "total_current_sensor_enabled", False))
+            last_t = float(getattr(app, "last_current_telemetry_time", 0.0) or 0.0)
+
+            # If operator enables total current while not using Nano telemetry, make it obvious.
+            needs_dual = False
+            try:
+                if enabled and hasattr(app, "_serial_is_debug_board_bus") and hasattr(app, "_serial_is_dual_port"):
+                    if bool(app._serial_is_debug_board_bus()) and (not bool(app._serial_is_dual_port())):
+                        needs_dual = True
+            except Exception:
+                needs_dual = False
+
+            stale = False
+            if enabled and (not needs_dual):
+                if last_t <= 0.0:
+                    stale = True
+                else:
+                    stale = (time.time() - last_t) > 2.0
 
             try:
                 if not enabled:
                     app.total_current_label.setText("Disabled")
                     if hasattr(app, "health_graph"):
-                         app.health_graph.push_data(0)
+                        app.health_graph.push_data(0)
+                elif needs_dual:
+                    app.total_current_label.setText("Needs Nano telemetry (Dual Port)")
+                    # Don't push fake zeros; leave graph as-is.
+                elif stale:
+                    app.total_current_label.setText("No telemetry")
+                    # Don't push fake zeros; leave graph as-is.
                 else:
                     app.total_current_label.setText("—" if total is None else f"{int(total)}")
-                    if hasattr(app, "health_graph"):
-                         app.health_graph.push_data(0 if total is None else total)
+                    if hasattr(app, "health_graph") and (total is not None):
+                        app.health_graph.push_data(total)
                 
                 # Update FPS Graph
                 if hasattr(app, "fps_graph"):

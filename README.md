@@ -119,6 +119,26 @@ If your Arduino/MCU firmware emits current telemetry lines, the app will parse a
 - **Units:** milliamps (mA)
 - **UI:** Pan/Tilt/Total show “—” until telemetry is received
 
+## Serial connection modes (Nano vs Debug Board vs Dual Port)
+
+The app supports three serial modes (UI: **Configuration & Connection → Serial Device**). These control which COM port(s) are used and which features are available.
+
+| Mode | What it connects to | COM ports | PAN/TILT | IO (fire/relays/safety) | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Arduino/Nano (DB3000 ASCII) | Arduino Nano | 1 (primary) | via Nano | ✅ | Host sends packed ASCII `P..T..F..L..R..G..S..M..` |
+| Debug Board (Bus Servo Direct) | Debug Board | 1 (Debug Board COM) | ✅ direct | ❌ | Bus packets are binary; no Nano IO in this mode |
+| Dual Port (Nano IO + Debug Board Pan/Tilt) | Nano + Debug Board | 2 (primary + Debug Board COM) | ✅ direct | ✅ | Recommended when Debug Board is connected directly to PC (no daisy-chain needed) |
+
+**Typical Windows mapping (your setup):**
+
+- Nano: **COM8** (IO + telemetry)
+- Debug Board: **COM9** (bus-servo PAN/TILT)
+
+**Quick sanity tests (no camera required):**
+
+- `python test_nano_io.py` (checks COM8 IO)
+- `python test_bus_servo_read.py COM9` (checks COM9 bus-servo comms)
+
 ## Presets (minimal UI workflow)
 
 Factory presets (from `app/turret_presets.py`) can be applied from two places:
@@ -127,6 +147,31 @@ Factory presets (from `app/turret_presets.py`) can be applied from two places:
 - **Tracking Behavior dock**: includes the full behavior/preset controls.
 
 Implementation note for future editors: when launching via `run.py`, the Connection-panel dropdown is created in `app/MAIN_FILE_SINGLE_CAM.py` as `connection_preset_combo` and it calls `apply_preset()`. (There is also a mirrored implementation in `app/ui_builder.py` for alternate UI build paths.)
+
+## Detection Pause Feature (Tracking Behavior)
+
+The **Detection Pause** slider (Tracking Behavior panel, right dock) pauses detection updates when a target enters the big scope circle. This prevents detection jitter from moving the target away during final aiming approach.
+
+**Key Behaviors:**
+- **Trigger:** Target enters scope circle (edge detection)
+- **Effect:** Detection updates pause for configured duration (0-2000ms, default 1000ms)
+- **Video:** Continues playing normally (NOT frozen)
+- **Servos:** Continue aiming to last known target position
+- **Use Case:** Allows precise convergence before firing, eliminates oscillation
+
+**UI Location:**
+```
+Tracking Behavior Panel (Right Dock)
+├── Tracking Speed
+├── Deadzone
+├── Detection Pause (ms) ◄── HERE (slider 0-2000ms)
+├── Trigger Cooldown
+└── ... other settings
+```
+
+**Settings Persistence:** Saved to `settings.json` as `"detection_pause_ms": 1000`
+
+See `DETECTION_PAUSE_UI_LOCATION.md` for detailed usage guide and troubleshooting.
 
 ## Next steps
 

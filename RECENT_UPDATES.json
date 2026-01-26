@@ -2,27 +2,50 @@
   "schema": 1,
   "max_items": 10,
   "items": [
-    {"date": "2026-01-26", "title": "Health Monitor & UI: Added System Health Monitor dock with real-time graphs (FPS, Total Current, Servo Load); implemented sensorless servo polling (Reg 0x3C) for load data on Debug Board; added Pin Assignment Help window; consolidated Dock panels into 'Widgets' menu."},
-    {"date": "2026-01-25", "title": "Camera Fix: Added stabilization delays (1.0s init, 0.5s switch) to open_camera to prevent resolution locking to 640x480 on slow webcams."},
-    {"date": "2026-01-25", "title": "Settings: camera_index set to 1 after test suite showed index 2/3/4 unavailable; improves camera open reliability."},
-    {"date": "2026-01-25", "title": "Video display: use stride-safe QImage bytes_per_line and contentsRect sizing to avoid partial-frame rendering; Tracking: min-step now scales with tracking speed for more responsive autotrack."},
-    {"date": "2026-01-25", "title": "Tracking: start_tracking now clears manual_override to prevent hidden suppression from blocking autotracking movement."},
-    {"date": "2026-01-25", "title": "Tracking: enforce 1° minimum step outside deadzone to overcome bus-servo deadband and ensure visible movement."},
-    {"date": "2026-01-25", "title": "Tracking tuning: lowered deadzone, reduced smoothing, increased movement sensitivity, and disabled precision mode to make autotracking movement more visible."},
-    {"date": "2026-01-25", "title": "Stabilization: disabled idle/sentry hooks, auto-fire, and recording; removed custom tooltip event filters; replaced state auto-corrections with logging; added explicit pan/tilt clamp guard and reduced silent exception swallowing."},
-    {"date": "2026-01-25", "title": "App: Debug Board Direct mode now probes bus-servo checksum (sub vs xor) on primary serial so commands match the debug board protocol."},
-    {"date": "2026-01-25", "title": "App: Debug Board Direct mode now connects using debug-board COM/baud (not Nano port), ensuring UI pan/tilt drives the bus servos."},
-    {"date": "2026-01-25", "title": "Firmware: lowered Nano bus UART baud to 57600 to improve SoftwareSerial reliability for debug-board comms."},
-    {"date": "2026-01-25", "title": "Firmware: added BUS_HALF_DUPLEX option and a guarded single-wire bus write helper for SoftwareSerial to support shared RX/TX debug-board data lines; initializes bus pin to input in half-duplex mode."},
-    {"date": "2026-01-25", "title": "Camera/BusServos: open_camera now prefers delivered frame shape over CAP_PROP to prevent partial-frame rendering; debug-board connect probes checksum mode (subtract vs XOR) and bus writes use auto dual-send fallback when checksum is unknown; Dual Port now falls back to full P/T over Nano when bus probe is unconfirmed, and sends PTEN0 only after a successful bus probe; tools/run_all_tests.py improved to report port-open errors clearly and tries both checksum variants."},
-    {"date": "2026-01-24", "title": "App/Firmware: Added selectable serial modes: Nano ASCII (one-port), Debug Board Direct (one-port bus-servo packets), and Dual Port (Nano for IO + Debug Board for PAN/TILT). Firmware adds PTEN 0/1 to disable Nano pan/tilt output and supports IO-only command lines (P/T optional)"},
-    {"date": "2026-01-22", "title": "Current monitoring: made current sensors optional (no pan/tilt sensors required); added Total Current Sensor toggle in UI + settings; current protection now effectively disables when no sensors are enabled; firmware supports total-only telemetry via legacy 'STAT I=' format"},
-    {"date": "2026-01-22", "title": "Arduino: Implemented Yahboom serial-bus packet protocol (FF FF framing, 115200 baud, 0..4095 ticks) in DB3000_SerialBus_Upgrade_2026.ino with checksum behavior matching vendor debug tool (write pos @0x2A, read pos @0x38)"},
-    {"date": "2026-01-09", "title": "Cleanup: Addressed silent exceptions in UI building and YOLO audio with logging; fixed state log dump to stable repo path; added atomic _sync_tracking_flags helper; moved YOLO loading to background thread; archived old .md files to docs/archive/"},
-    {"date": "2026-01-06", "title": "Servo upgrade prep: Current Monitor dock (Pan/Tilt/Total mA) + hardened telemetry parsing (CUR + legacy STAT I=...) and ensured serial input draining even when redundant-command skips or TX pause occur"},
-    {"date": "2025-12-20", "title": "Servo: fix manual D-pad up/down axis wiring (use tilt helpers) + fix Sentry tab switching so tracking/aiming state stays consistent (prevents 'autotracking no movement' from silent pause)"},
-    {"date": "2025-12-20", "title": "Tools: added non-blocking Pan/Tilt Range Check (Tools menu) with safe pause/restore and best-effort tilt movement confirmation"},
-    {"date": "2025-12-20", "title": "Fix: prevent pan/tilt direction desync (sync internal flip_* flags to invert_* UI/settings; persist invert_tilt changes)"},
-    {"date": "2025-12-20", "title": "Detection UI: Basic/Advanced toggle + mode-relevant visibility (AgentChangeID: DETECTION_UI_BASIC_ADVANCED_v1)"}
+    {
+      "date": "2026-01-26",
+      "title": "AutoTrack Lab: added target/candidate overlays and stabilized blob detection to prevent random scanning."
+    },
+    {
+      "date": "2026-01-26",
+      "title": "AutoTrack Lab: added OpenCV tracker fallback to avoid 'cv2 has no attribute' errors by using detection-only tracking when contrib trackers are unavailable."
+    },
+    {
+      "date": "2026-01-26",
+      "title": "AutoTrack Lab: simplified detection with default blob detector for reliable precision tracking (YOLO optional)."
+    },
+    {
+      "date": "2026-01-26",
+      "title": "AutoTrack Lab: synced pan/tilt limits to main app defaults (PAN 0–220, TILT 0–70)."
+    },
+    {
+      "date": "2026-01-26",
+      "title": "AutoTrack Lab: added camera selection control with live reopen and saved camera index."
+    },
+    {
+      "date": "2026-01-26",
+      "title": "AutoTrack Lab UI: auto-run on launch, single Connect/Disconnect toggle, dark theme styling, and camera debug logging with backend/index fallbacks."
+    },
+    {
+      "date": "2026-01-26",
+      "title": "AutoTrack Lab: added isolated experimental app in autotrack_lab with First-Lock targeting, Follow/Quick Strike modes, YOLO+tracker hybrid pipeline, and Dual Port defaults (COM8 Nano IO + COM9 Debug Board pan/tilt)."
+    },
+    {
+      "date": "2026-01-26",
+      "title": "TRIGGER FIX: Fixed projectile servo not firing in Dual Port mode. Root cause: Arduino single-token parser incorrectly matched packed commands (F1L1R0G0S0M1) as 'F1', ignoring mode token M1. Fix: Python now sends S0/M1 as separate commands before F/L/R/G, ensuring Arduino correctly sets projectile mode before processing fire. Arduino sketch also updated to check line length before treating as single-token."
+    },
+    {
+      "date": "2026-01-26",
+      "title": "Current telemetry + Health Monitor: stop graph flatlining at 0 when telemetry is missing; add explicit 'No telemetry' status and COM-swap warning; added Dual Port Nano IO+telemetry 2026 firmware (STAT I=<mA> on A2); SerialBus Upgrade 2026 firmware now enables total-current telemetry by default (A2)."
+    },
+    {
+      "date": "2026-01-26",
+      "title": "Sentry Mode startup fix: re-enabled sentry hooks by default so the Sentry tab receives the live camera feed and can take control when enabled."
+    }
   ]
 }
+
+    {
+      "date": "2026-01-26",
+      "title": "Aiming stability: main app now uses SmartTracker (centroid smoothing + persistence) and avoids ROI centroid drift so the yellow-dot stays centered on the tracked object." 
+    },
