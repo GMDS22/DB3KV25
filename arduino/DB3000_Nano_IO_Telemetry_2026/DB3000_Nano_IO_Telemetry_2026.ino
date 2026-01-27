@@ -50,7 +50,12 @@ static const uint8_t PIN_CURRENT_SENSOR = A2;
 //  - 30A: 0.066 V/A
 static const float ADC_REF_V = 5.0f;
 static const float SENSOR_ZERO_V = 2.50f;
-static const float SENSOR_SENS_V_PER_A = 0.100f;
+static const float SENSOR_SENS_V_PER_A = 0.185f;
+
+// If you're using an ACS712 5A module, any reading far above 5A is not physically
+// meaningful (the sensor saturates and analog noise can create spikes).
+// This clamp keeps telemetry usable for UI/alerts.
+static const long SENSOR_MAX_MA = 5500; // 5.5A headroom
 
 static const unsigned long CURRENT_REPORT_INTERVAL_MS = 100; // 10 Hz
 static const uint8_t CURRENT_SAMPLES = 16;
@@ -118,6 +123,7 @@ static inline long readCurrentMilliAmps() {
   const float amps = readCurrentAmps();
   long ma = (long)(amps * 1000.0f + 0.5f);
   if (ma < 0) ma = 0;
+  if (ma > SENSOR_MAX_MA) ma = SENSOR_MAX_MA;
   return ma;
 }
 

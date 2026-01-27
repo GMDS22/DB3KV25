@@ -1946,21 +1946,77 @@ def build_ui(app: QMainWindow):
 
     # Add Health Graph (custom visualizer)
     if getattr(app, "health_graph", None) is None:
-        app.health_graph = HealthGraphWidget()
+        # Servo interface spec: 1.2A nominal, 2.0A max -> use 2000mA danger threshold.
+        # Keep fixed scale so spikes don't flatten the visible trend.
+        app.health_graph = HealthGraphWidget(
+            max_val=2500,
+            danger_threshold=2000,
+            danger_fill_max_alpha=50,
+            expand_max=False,
+        )
     current_layout.addRow(app.health_graph)
 
     # Add FPS Graph
     current_layout.addRow(QLabel("System Performance (FPS):"))
     if getattr(app, "fps_graph", None) is None:
-        app.fps_graph = HealthGraphWidget(max_val=60, show_value_text=False)
+        app.fps_graph = HealthGraphWidget(max_val=60, show_value_text=False, expand_max=False)
     current_layout.addRow(app.fps_graph)
 
-    # Add Servo Load Graph (New)
+    # Servo torque/load (bus-servos report an internal load value; roughly 0-1000)
     current_layout.addRow(QLabel("Servo Load (Internal):"))
     if getattr(app, "servo_load_graph", None) is None:
-        # Load is roughly 0-1000 range
-        app.servo_load_graph = HealthGraphWidget(max_val=1000)
+        app.servo_load_graph = HealthGraphWidget(
+            max_val=1000,
+            unit="Load",
+            value_label="Load",
+            expand_max=False,
+        )
     current_layout.addRow(app.servo_load_graph)
+
+    current_layout.addRow(QLabel("Pan Load (Torque):"))
+    if getattr(app, "pan_load_graph", None) is None:
+        app.pan_load_graph = HealthGraphWidget(
+            max_val=1000,
+            unit="Load",
+            value_label="Load",
+            expand_max=False,
+        )
+    current_layout.addRow(app.pan_load_graph)
+
+    current_layout.addRow(QLabel("Tilt Load (Torque):"))
+    if getattr(app, "tilt_load_graph", None) is None:
+        app.tilt_load_graph = HealthGraphWidget(
+            max_val=1000,
+            unit="Load",
+            value_label="Load",
+            expand_max=False,
+        )
+    current_layout.addRow(app.tilt_load_graph)
+
+    # Optional: show estimated per-servo current derived from load if no per-servo current sensors are installed.
+    current_layout.addRow(QLabel("Pan Current (mA, est):"))
+    if getattr(app, "pan_current_est_graph", None) is None:
+        app.pan_current_est_graph = HealthGraphWidget(
+            max_val=2500,
+            danger_threshold=2000,
+            danger_fill_max_alpha=50,
+            unit="mA",
+            value_label="Current (est)",
+            expand_max=False,
+        )
+    current_layout.addRow(app.pan_current_est_graph)
+
+    current_layout.addRow(QLabel("Tilt Current (mA, est):"))
+    if getattr(app, "tilt_current_est_graph", None) is None:
+        app.tilt_current_est_graph = HealthGraphWidget(
+            max_val=2500,
+            danger_threshold=2000,
+            danger_fill_max_alpha=50,
+            unit="mA",
+            value_label="Current (est)",
+            expand_max=False,
+        )
+    current_layout.addRow(app.tilt_current_est_graph)
 
     current_group.setLayout(current_layout)
 
@@ -1968,6 +2024,7 @@ def build_ui(app: QMainWindow):
         try:
             import time
             total = getattr(app, "total_current_mA", None)
+            total_disp = getattr(app, "total_current_mA_display", None)
             enabled = bool(getattr(app, "total_current_sensor_enabled", False))
             last_t = float(getattr(app, "last_current_telemetry_time", 0.0) or 0.0)
 
@@ -1999,21 +2056,45 @@ def build_ui(app: QMainWindow):
                     app.total_current_label.setText("No telemetry")
                     # Don't push fake zeros; leave graph as-is.
                 else:
-                    app.total_current_label.setText("—" if total is None else f"{int(total)}")
-                    if hasattr(app, "health_graph") and (total is not None):
-                        app.health_graph.push_data(total)
+                    shown = total_disp if (total_disp is not None) else total
+                    app.total_current_label.setText("—" if shown is None else f"{int(shown)}")
+                    if hasattr(app, "health_graph") and (shown is not None):
+                        app.health_graph.push_data(shown)
                 
                 # Update FPS Graph
                 if hasattr(app, "fps_graph"):
                     fps = getattr(app, "measured_fps_val", 0)
                     app.fps_graph.push_data(fps)
 
-                # Update Servo Load Graph
+                # Update Servo Load Graphs
+                pan_load = getattr(app, "pan_load_val", 0) or 0
+                tilt_load = getattr(app, "tilt_load_val", 0) or 0
                 if hasattr(app, "servo_load_graph"):
-                    # Sum of pan and tilt load
-                    pan_load = getattr(app, "pan_load_val", 0) or 0
-                    tilt_load = getattr(app, "tilt_load_val", 0) or 0
                     app.servo_load_graph.push_data(pan_load + tilt_load)
+                if hasattr(app, "pan_load_graph"):
+                    app.pan_load_graph.push_data(pan_load)
+                if hasattr(app, "tilt_load_graph"):
+                    app.tilt_load_graph.push_data(tilt_load)
+
+                # Estimated current based on load (0..1000) scaled to ~0..2000mA.
+                # If the main app provides pan_current_mA_est/tilt_current_mA_est, prefer it.
+                pan_est = getattr(app, "pan_current_mA_est", None)
+                tilt_est = getattr(app, "tilt_current_mA_est", None)
+                if pan_est is None:
+                    try:
+                        pan_est = int(round(min(1.0, max(0.0, float(pan_load) / 1000.0)) * 2000.0))
+                    except Exception:
+                        pan_est = 0
+                if tilt_est is None:
+                    try:
+                        tilt_est = int(round(min(1.0, max(0.0, float(tilt_load) / 1000.0)) * 2000.0))
+                    except Exception:
+                        tilt_est = 0
+
+                if hasattr(app, "pan_current_est_graph"):
+                    app.pan_current_est_graph.push_data(pan_est)
+                if hasattr(app, "tilt_current_est_graph"):
+                    app.tilt_current_est_graph.push_data(tilt_est)
 
             except Exception:
                 pass

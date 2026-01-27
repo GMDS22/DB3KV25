@@ -1468,6 +1468,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.yolo_model_combo: QComboBox
         self.yolo_confidence_input: QDoubleSpinBox
         self.yolo_classes_input: QLineEdit
+        self.yolo_max_area_input: QSpinBox
         self.open_trainer_btn: QPushButton
         self.lost_hold_input: QDoubleSpinBox
         self.hold_infinite_checkbox: QCheckBox
@@ -2795,6 +2796,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         )
 
     def init_ui(self):
+        # CHANGE WARNING (2026-01-26): UI construction changes here can impact
+        # dock layout, graph scaling, and signal wiring. Review
+        # CHANGE_IMPACT_REFERENCE.md before modifying.
         # Authoritative UI builder
         try:
             self.setWindowTitle(get_app_title())
@@ -4536,6 +4540,27 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
         yolo_layout.addWidget(self.yolo_min_area_input, y, 1)
+        y += 1
+
+        if getattr(self, "yolo_max_area_label", None) is None:
+            self.yolo_max_area_label = QLabel("Max Area (px):")
+        yolo_layout.addWidget(self.yolo_max_area_label, y, 0)
+        if getattr(self, "yolo_max_area_input", None) is None:
+            self.yolo_max_area_input = QSpinBox()
+            try:
+                self.yolo_max_area_input.setRange(0, 10000000)
+                self.yolo_max_area_input.setValue(0)
+                # Set width to match full width
+                self.yolo_max_area_input.setMinimumWidth(170)
+            except Exception:
+                pass
+        try:
+            self._safe_connect(
+                "yolo_max_area_input", "valueChanged", self.save_settings
+            )
+        except Exception:
+            pass
+        yolo_layout.addWidget(self.yolo_max_area_input, y, 1)
         y += 1
         # Small status label to show current detection count for easier debugging
         try:
@@ -6402,12 +6427,19 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 health_layout.addRow(QLabel("Total (mA):"), self.total_current_label)
 
                 if getattr(self, "health_graph", None) is None:
-                    self.health_graph = HealthGraphWidget()
+                    # Servo interface spec: 1.2A nominal, 2.0A max -> use 2000mA danger threshold.
+                    # Keep fixed scale so spikes don't flatten the visible trend.
+                    self.health_graph = HealthGraphWidget(
+                        max_val=2500,
+                        danger_threshold=2000,
+                        danger_fill_max_alpha=50,
+                        expand_max=False,
+                    )
                 health_layout.addRow(self.health_graph)
 
                 health_layout.addRow(QLabel("FPS:"))
                 if getattr(self, "fps_graph", None) is None:
-                    self.fps_graph = HealthGraphWidget(max_val=60, show_value_text=False)
+                    self.fps_graph = HealthGraphWidget(max_val=60, show_value_text=False, expand_max=False)
                     self.fps_graph.setMinimumHeight(60)
                 health_layout.addRow(self.fps_graph)
 
@@ -6420,14 +6452,26 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 # Pan Stats
                 health_layout.addRow(QLabel("Pan Load (Torque):"))
                 if getattr(self, "pan_load_graph", None) is None:
-                     self.pan_load_graph = HealthGraphWidget(max_val=1000)
-                     self.pan_load_graph.setMinimumHeight(50)
+                    self.pan_load_graph = HealthGraphWidget(
+                        max_val=1000,
+                        unit="Load",
+                        value_label="Load",
+                        expand_max=False,
+                    )
+                    self.pan_load_graph.setMinimumHeight(50)
                 health_layout.addRow(self.pan_load_graph)
 
-                health_layout.addRow(QLabel("Pan Current (mA):"))
+                health_layout.addRow(QLabel("Pan Current (mA, est):"))
                 if getattr(self, "pan_current_graph", None) is None:
-                     self.pan_current_graph = HealthGraphWidget(max_val=2500)
-                     self.pan_current_graph.setMinimumHeight(50)
+                    self.pan_current_graph = HealthGraphWidget(
+                        max_val=2500,
+                        danger_threshold=2000,
+                        danger_fill_max_alpha=50,
+                        unit="mA",
+                        value_label="Current",
+                        expand_max=False,
+                    )
+                    self.pan_current_graph.setMinimumHeight(50)
                 health_layout.addRow(self.pan_current_graph)
 
                 # Separator
@@ -6439,13 +6483,20 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 # Tilt Stats
                 health_layout.addRow(QLabel("Tilt Load (Torque):"))
                 if getattr(self, "tilt_load_graph", None) is None:
-                     self.tilt_load_graph = HealthGraphWidget(max_val=1000)
+                     self.tilt_load_graph = HealthGraphWidget(max_val=1000, unit="Load", value_label="Load", expand_max=False)
                      self.tilt_load_graph.setMinimumHeight(50)
                 health_layout.addRow(self.tilt_load_graph)
 
-                health_layout.addRow(QLabel("Tilt Current (mA):"))
+                health_layout.addRow(QLabel("Tilt Current (mA, est):"))
                 if getattr(self, "tilt_current_graph", None) is None:
-                     self.tilt_current_graph = HealthGraphWidget(max_val=2500)
+                     self.tilt_current_graph = HealthGraphWidget(
+                        max_val=2500,
+                        danger_threshold=2000,
+                        danger_fill_max_alpha=50,
+                        unit="mA",
+                        value_label="Current",
+                        expand_max=False,
+                     )
                      self.tilt_current_graph.setMinimumHeight(50)
                 health_layout.addRow(self.tilt_current_graph)
                 
@@ -6458,8 +6509,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     try:
                         # Total Current
                         tot = getattr(self, "total_current_mA", None)
-                        if hasattr(self, "health_graph"): 
-                           self.health_graph.push_data(tot if tot is not None else 0)
+                        tot_disp = getattr(self, "total_current_mA_display", None)
+                        shown = tot_disp if (tot_disp is not None) else tot
+                        if hasattr(self, "health_graph") and (shown is not None):
+                            self.health_graph.push_data(shown)
                         
                         # FPS
                         fps_val = getattr(self, "measured_fps_val", 0)
@@ -6468,19 +6521,23 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
                         # Pan Data
                         pload = getattr(self, "pan_load_val", 0) or 0
-                        pcurr = getattr(self, "pan_current_mA", 0) or 0
+                        pcurr_raw = getattr(self, "pan_current_mA", None)
+                        pcurr_est = getattr(self, "pan_current_mA_est", None)
+                        pcurr = pcurr_raw if (pcurr_raw is not None) else (pcurr_est if pcurr_est is not None else 0)
                         if hasattr(self, "pan_load_graph"):
-                             self.pan_load_graph.push_data(pload)
+                            self.pan_load_graph.push_data(pload)
                         if hasattr(self, "pan_current_graph"):
-                             self.pan_current_graph.push_data(pcurr)
+                            self.pan_current_graph.push_data(pcurr)
 
                         # Tilt Data
                         tload = getattr(self, "tilt_load_val", 0) or 0
-                        tcurr = getattr(self, "tilt_current_mA", 0) or 0
+                        tcurr_raw = getattr(self, "tilt_current_mA", None)
+                        tcurr_est = getattr(self, "tilt_current_mA_est", None)
+                        tcurr = tcurr_raw if (tcurr_raw is not None) else (tcurr_est if tcurr_est is not None else 0)
                         if hasattr(self, "tilt_load_graph"):
-                             self.tilt_load_graph.push_data(tload)
+                            self.tilt_load_graph.push_data(tload)
                         if hasattr(self, "tilt_current_graph"):
-                             self.tilt_current_graph.push_data(tcurr)
+                            self.tilt_current_graph.push_data(tcurr)
 
                     except Exception:
                         pass
@@ -9278,22 +9335,26 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except:
                     pan_id, tilt_id = 1, 2
 
-                # Read Pan Load (0x3C=Current/Load)
-                # Bus servo usually returns ~ 0-1000 range for load.
+                # Read Pan Load (bus servo internal load/torque proxy)
+                # NOTE: This is not mA.
                 pload = self._bus_servo_read_addr(pan_id, 0x3C, 2, signed=True)
                 self.pan_load_val = pload
-                
-                # Approximate current from load if no sensor (1 unit ~ 1-2mA typically? pure guess, but visualizes activity)
-                # If pan_current_mA is NOT coming from the main board (None or 0), pop it
-                if getattr(self, "pan_current_mA", None) is None or self.pan_current_mA == 0:
-                     self.pan_current_mA = pload 
+
+                # Explicit estimated current (mA) derived from load for visualization only.
+                # Scales load 0..1000 to 0..~2000mA (servo interface max current spec).
+                try:
+                    self.pan_current_mA_est = int(round(min(1.0, max(0.0, float(pload) / 1000.0)) * 2000.0))
+                except Exception:
+                    self.pan_current_mA_est = 0
 
                 # Read Tilt Load
                 tload = self._bus_servo_read_addr(tilt_id, 0x3C, 2, signed=True)
                 self.tilt_load_val = tload
-                
-                if getattr(self, "tilt_current_mA", None) is None or self.tilt_current_mA == 0:
-                     self.tilt_current_mA = tload
+
+                try:
+                    self.tilt_current_mA_est = int(round(min(1.0, max(0.0, float(tload) / 1000.0)) * 2000.0))
+                except Exception:
+                    self.tilt_current_mA_est = 0
                 
                 try:
                     if getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked():
@@ -9314,76 +9375,92 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 return 0
 
             # Build Read Packet: FF FF ID 04 02 ADDR LEN CHK
-            # Checksum = ~sum(ID+LEN+INST+ADDR+LEN) & 0xFF
+            # IMPORTANT: Use the same checksum algorithm as write/ping.
             sid = int(servo_id)
-            inst = 0x02 # Read
+            inst = 0x02  # Read
             pkt_len = 4
-            
-            payload = [sid, pkt_len, inst, addr, length]
-            s = sum(payload)
-            chk = (~s) & 0xFF
-            packet = bytes([0xFF, 0xFF] + payload + [chk])
-            
-            # Flush input to clear old trash
-            try:
-                if hasattr(active_ser, "reset_input_buffer"):
-                    active_ser.reset_input_buffer()
-            except:
-                pass
-                
-            active_ser.write(packet)
-            
+
             # Read response: FF FF ID LEN ERR P1... CHK
-            # Response len = 6 + length - 1? 
-            # Header(2) + ID(1) + Len(1) + Err(1) + Params(length) + Chk(1)
-            # Total = 6 + length  Wait: Standard is Header(2) + ID(1) + Len(1) + Err(1) + Params(N) + Checksum(1) = 6+N
-            expected = 6 + length
-            
-            # Use small timeout to avoid lag
-            active_ser.timeout = 0.05 
-            resp = active_ser.read(expected)
-            
-            if len(resp) >= expected:
-                 # Check header
-                 if resp[0] == 0xFF and resp[1] == 0xFF:
-                     # Params start at index 5
-                     params = resp[5 : 5+length]
-                     val = 0
-                     if length == 1:
-                         val = params[0]
-                     elif length == 2:
-                         # Little endian vs Big endian? 
-                         # WaveShare / STS servos usually LOW byte first? No, actually:
-                         # standard protocol uses LOW byte first for 16-bit values in params.
-                         # BUT the logic below assumed HIGH first.
-                         # Let's try correct bus servo order: LOW byte at index 0, HIGH byte at index 1?
-                         # Or usually: DataL, DataH in the packet order.
-                         # Let's assume standard [LB, HB] order if it was behaving oddly.
-                         # Actually most bus servos (STS/SCS) send Low Byte first.
-                         # Let's check typical implementations. 
-                         # If params[0] is Low, params[1] is High:
-                         # val = (params[1] << 8) | params[0]
-                         # My previous code was: val = (params[0] << 8) | params[1] (Big Endian)
-                         # Many serial protocols are Little Endian. Swapping this might fix it.
-                         val = (params[1] << 8) | params[0]
-                         
-                     if signed and length == 2:
-                         if val > 32767:
-                             val -= 65536
-                     
-                     # Also update currents if this is load read
-                     if addr == 0x3C:
-                         # Load ~ Current roughly. 
-                         # If it's the Pan ID, update pan_current_mA as a fallback
-                         # Map roughly 1 unit = 1mA? Or just display raw load.
-                         pass
-                         
-                     return abs(val) # Return absolute load
+            # Standard total bytes = 6 + N, where N is param length.
+            expected = 6 + int(length)
+
+            prev_timeout = getattr(active_ser, "timeout", None)
+            try:
+                active_ser.timeout = 0.08
+            except Exception:
+                pass
+
+            prev_mode = str(getattr(self, "_bus_servo_checksum_mode", "sub") or "sub").lower()
+            modes_to_try = [prev_mode] if prev_mode in ("sub", "xor") else ["sub", "xor"]
+
+            for m in modes_to_try:
+                try:
+                    # Clear any prior bytes so we don't parse stale packets.
+                    try:
+                        if hasattr(active_ser, "reset_input_buffer"):
+                            active_ser.reset_input_buffer()
+                    except Exception:
+                        pass
+
+                    self._bus_servo_checksum_mode = m
+                    payload = bytes([sid & 0xFF, pkt_len & 0xFF, inst & 0xFF, int(addr) & 0xFF, int(length) & 0xFF])
+                    chk = self._bus_servo_checksum(payload)
+                    packet = b"\xFF\xFF" + payload + bytes([chk & 0xFF])
+
+                    active_ser.write(packet)
+                    try:
+                        if hasattr(active_ser, "flush"):
+                            active_ser.flush()
+                    except Exception:
+                        pass
+
+                    resp = active_ser.read(expected)
+                    if len(resp) < expected:
+                        continue
+
+                    if resp[0] != 0xFF or resp[1] != 0xFF:
+                        continue
+
+                    # Params start at index 5
+                    params = resp[5 : 5 + int(length)]
+                    val = 0
+                    if int(length) == 1 and len(params) >= 1:
+                        val = int(params[0])
+                    elif int(length) == 2 and len(params) >= 2:
+                        # Most bus servo variants send 16-bit params as [low, high]
+                        val = (int(params[1]) << 8) | int(params[0])
+
+                    if signed and int(length) == 2:
+                        if val > 32767:
+                            val -= 65536
+
+                    # If we were in auto/unknown mode and got a good reply, keep it.
+                    if prev_mode not in ("sub", "xor"):
+                        try:
+                            self._bus_servo_checksum_mode = m
+                        except Exception:
+                            pass
+
+                    return abs(val)
+                except Exception:
+                    continue
             
             # Fallback/Debug: Print if read failed but bytes came
             # if resp: print(f"Bus Read Fail: {resp.hex()}")
         except Exception:
             pass
+        finally:
+            # Restore serial timeout and checksum mode (unless auto-detected above).
+            try:
+                if 'prev_timeout' in locals() and prev_timeout is not None:
+                    active_ser.timeout = prev_timeout
+            except Exception:
+                pass
+            try:
+                if 'prev_mode' in locals() and prev_mode in ("sub", "xor"):
+                    self._bus_servo_checksum_mode = prev_mode
+            except Exception:
+                pass
         return 0
 
     def _serial_active_is_bus_mode(self) -> bool:
@@ -10056,6 +10133,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self._set_attr_visible("yolo_max_results_input", bool(show_adv))
         self._set_attr_visible("yolo_min_area_label", bool(show_adv))
         self._set_attr_visible("yolo_min_area_input", bool(show_adv))
+        self._set_attr_visible("yolo_max_area_label", bool(show_adv))
+        self._set_attr_visible("yolo_max_area_input", bool(show_adv))
         self._set_attr_visible("yolo_detect_status_title", bool(show_adv))
         self._set_attr_visible("yolo_detect_status_label", bool(show_adv))
 
@@ -11791,6 +11870,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
 
+            # --- Load Manual Control Suppression (Jan 2026) ---
+            # Duration (seconds) to suppress auto-tracking updates after manual input.
+            try:
+                self.manual_control_suppress_seconds = float(
+                    settings.get("manual_control_suppress_seconds", 1.5)
+                )
+            except Exception:
+                self.manual_control_suppress_seconds = 1.5
+
             # --- Load Hold Behavior Settings ---
             try:
                 self.lost_hold_seconds = float(
@@ -12012,6 +12100,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         )
                     except Exception:
                         pass
+                if getattr(self, "yolo_max_area_input", None) is not None:
+                    try:
+                        self.yolo_max_area_input.setValue(
+                            int(settings.get("yolo_max_area", 0))
+                        )
+                    except Exception:
+                        pass
             except Exception:
                 pass
             # Update detector target classes from persisted setting
@@ -12191,6 +12286,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "deadzone": val("deadzone_slider", 40),
                 "tracking_speed": val("tracking_speed_slider", 50),
                 "detection_pause_ms": val("detection_pause_slider", 1000),
+                "manual_control_suppress_seconds": getattr(
+                    self, "manual_control_suppress_seconds", 1.5
+                ),
                 "trigger_cooldown": val("trigger_cooldown_input", 1.5),
                 "auto_tracking": getattr(self, "auto_tracking_enabled", False),
                 "detection_enabled": getattr(self, "detection_enabled", False),
@@ -12280,6 +12378,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "yolo_classes": val("yolo_classes_input", "person", "text"),
                 "yolo_max_results": val("yolo_max_results_input", 0),
                 "yolo_min_area": val("yolo_min_area_input", 0),
+                "yolo_max_area": val("yolo_max_area_input", 0),
                 "preset_index": self._safe_current_index("preset_combo", 1),
                 # Hybrid detection mode settings
                 "fusion_strategy": val("fusion_strategy_combo", 0, "index"),
@@ -12648,6 +12747,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # YOLO extra filters (do not change detection mode)
             s['yolo_max_results'] = safe_int('yolo_max_results_input', 0)
             s['yolo_min_area'] = safe_int('yolo_min_area_input', 0)
+            s['yolo_max_area'] = safe_int('yolo_max_area_input', 0)
             s['yolo_model'] = safe_text('yolo_model_combo', '')
             s['yolo_confidence'] = safe_float('yolo_confidence_input', 0.5)
             s['yolo_classes'] = safe_text('yolo_classes_input', '')
@@ -12667,6 +12767,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             s['overshoot_percent'] = safe_int('overshoot_input', 0)
             s['hold_seconds'] = safe_float('lost_hold_input', getattr(self, 'lost_hold_seconds', 5.0))
             s['hold_infinite'] = bool(getattr(self, 'hold_infinite', False))
+            s['manual_control_suppress_seconds'] = float(
+                getattr(self, 'manual_control_suppress_seconds', 1.5)
+            )
 
             # Precision aim (persisted + presettable)
             s['precision_mode'] = bool(getattr(getattr(self, 'precision_mode_checkbox', None), 'isChecked', lambda: False)())
@@ -12814,6 +12917,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 if 'yolo_min_area' in preset and getattr(self, 'yolo_min_area_input', None) is not None:
                     try:
                         self.yolo_min_area_input.setValue(int(preset['yolo_min_area']))
+                    except Exception:
+                        pass
+                if 'yolo_max_area' in preset and getattr(self, 'yolo_max_area_input', None) is not None:
+                    try:
+                        self.yolo_max_area_input.setValue(int(preset['yolo_max_area']))
                     except Exception:
                         pass
             except Exception:
@@ -13687,6 +13795,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self, "yolo_max_results_input", lambda: 0
                 )(),
                 "yolo_min_area": getattr(self, "yolo_min_area_input", lambda: 0)(),
+                "yolo_max_area": getattr(self, "yolo_max_area_input", lambda: 0)(),
             }
             preferred_path = self.PREFERRED_FILE
             try:
@@ -13889,6 +13998,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         if getattr(self, "yolo_min_area_input", None) is not None:
                             self.yolo_min_area_input.setValue(
                                 int(prefs["yolo_min_area"])
+                            )
+                    except Exception:
+                        pass
+                if "yolo_max_area" in prefs:
+                    try:
+                        if getattr(self, "yolo_max_area_input", None) is not None:
+                            self.yolo_max_area_input.setValue(
+                                int(prefs["yolo_max_area"])
                             )
                     except Exception:
                         pass
@@ -14160,6 +14277,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.yolo_max_results_input.setValue(int(preset["yolo_max_results"]))
                 if "yolo_min_area" in preset and getattr(self, "yolo_min_area_input", None) is not None:
                     self.yolo_min_area_input.setValue(int(preset["yolo_min_area"]))
+                if "yolo_max_area" in preset and getattr(self, "yolo_max_area_input", None) is not None:
+                    self.yolo_max_area_input.setValue(int(preset["yolo_max_area"]))
             except Exception:
                 pass
 
@@ -15920,13 +16039,24 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # We want the operator to be able to move the turret while detection remains
         # active; manual_override and a short suppression timer ensure operator control
         # temporarily takes precedence without disabling detection entirely.
+        now_ts = time.time()
+        # Set temporary suppression so detection/tracking doesn't fight manual input.
+        # DEFENSIVE: Validate timeout is within reasonable bounds (max 5 seconds)
+        suppress_secs = min(getattr(self, "manual_control_suppress_seconds", 1.5), 5.0)
+        self._manual_override_until = now_ts + suppress_secs
+
         if not self.manual_override:
             self.manual_override = True
             self.tracking_was_active = self.tracking_active  # Remember state
-            # Set temporary suppression so detection/tracking doesn't fight manual input
-            # DEFENSIVE: Validate timeout is within reasonable bounds (max 5 seconds)
-            suppress_secs = min(getattr(self, "manual_control_suppress_seconds", 1.0), 5.0)
-            self._manual_override_until = time.time() + suppress_secs
+            # Remember whether tracking should resume after manual override
+            self._manual_resume_tracking = bool(getattr(self, "tracking_active", False))
+            # Disable tracking/aiming during manual control to prevent fighting
+            try:
+                if getattr(self, "tracking_active", False) or getattr(self, "aiming_active", False):
+                    self._sync_tracking_flags(False)
+            except Exception:
+                self.tracking_active = False
+                self.aiming_active = False
             # Play movement sound if enabled
             try:
                 if getattr(self, "sound_enabled", True):
@@ -15944,6 +16074,47 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.override_status_label.setText("Manual Override: active")
             except Exception:
                 pass
+
+        # Refresh the auto-resume timer on every manual nudge
+        try:
+            self._manual_resume_token = int(getattr(self, "_manual_resume_token", 0)) + 1
+            token = self._manual_resume_token
+
+            def _resume_after_manual():
+                try:
+                    if token != getattr(self, "_manual_resume_token", 0):
+                        return
+                    if time.time() < getattr(self, "_manual_override_until", 0):
+                        return
+                    # Clear manual override and resume tracking if it was active
+                    if getattr(self, "manual_override", False):
+                        self.manual_override = False
+                        self._manual_override_active = False
+                        try:
+                            lbl = getattr(self, "override_status_label", None)
+                            if lbl:
+                                lbl.setText("")
+                        except Exception:
+                            pass
+                    resume_tracking = bool(getattr(self, "_manual_resume_tracking", False))
+                    if resume_tracking:
+                        try:
+                            self._sync_tracking_flags(True)
+                        except Exception:
+                            self.tracking_active = True
+                            self.aiming_active = True
+                    else:
+                        try:
+                            self._sync_tracking_flags(False)
+                        except Exception:
+                            self.tracking_active = False
+                            self.aiming_active = False
+                except Exception:
+                    pass
+
+            QTimer.singleShot(int(suppress_secs * 1000), _resume_after_manual)
+        except Exception:
+            pass
 
         pan_dir = -1 if self.flip_pan_direction else 1
         tilt_dir = -1 if self.flip_tilt_direction else 1
@@ -16201,7 +16372,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # update UI status if cleared
         try:
             if getattr(self, "override_status_label", None):
-                if not self.manual_override:
+                if not self.manual_override and (
+                    getattr(self, "tracking_active", False)
+                    or getattr(self, "aiming_active", False)
+                ):
                     self.override_status_label.setText("")
         except Exception:
             pass
@@ -16792,7 +16966,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # CHANGE WARNING:
         # Modifications here affect frame processing, tracking flow, and runtime state.
         # See CHANGE_IMPACT_REFERENCE.md → Camera & Video Capture Pipeline.
-        # Last modified: 2026-01-26 by Copilot Agent
+        # Last modified: 2026-01-27 by Copilot Agent
         # NOTE: Idle button now uses direct click detection (ClickDetectButton class)
         # No need for polling - direct mouse events work reliably
 
@@ -17769,7 +17943,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # should set a dedicated test flag (not enabled by default).
 
             # Apply YOLO-specific post-processing: allow the user to filter by
-            # minimum box area and limit the number of results considered. These
+            # min/max box area and limit the number of results considered. These
             # settings live in the YOLO settings group and are intentionally
             # applied here (host-side) so the detector remains simple.
             try:
@@ -17784,6 +17958,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         try:
                             boxes = [
                                 b for b in boxes if (int(b[2]) * int(b[3])) >= min_area
+                            ]
+                        except Exception:
+                            pass
+                    try:
+                        max_area = int(
+                            self._safe_int_widget_value("yolo_max_area_input", 0) or 0
+                        )
+                    except Exception:
+                        max_area = 0
+                    if max_area > 0:
+                        try:
+                            boxes = [
+                                b
+                                for b in boxes
+                                if (int(b[2]) * int(b[3])) <= max_area
                             ]
                         except Exception:
                             pass
@@ -18414,7 +18603,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     yolo_boxes = []
 
-                # Apply YOLO post-processing filters (min area / max results)
+                # Apply YOLO post-processing filters (min/max area / max results)
                 try:
                     if yolo_boxes:
                         try:
@@ -18430,6 +18619,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     b
                                     for b in yolo_boxes
                                     if (int(b[2]) * int(b[3])) >= min_area
+                                ]
+                            except Exception:
+                                pass
+                        try:
+                            max_area = int(
+                                self._safe_int_widget_value("yolo_max_area_input", 0)
+                                or 0
+                            )
+                        except Exception:
+                            max_area = 0
+                        if max_area > 0:
+                            try:
+                                yolo_boxes = [
+                                    b
+                                    for b in yolo_boxes
+                                    if (int(b[2]) * int(b[3])) <= max_area
                                 ]
                             except Exception:
                                 pass
@@ -18678,10 +18883,19 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         if idle_modes is not None:
                             actual_idle_mode = idle_modes.get_mode()
                         auto_track_enabled = getattr(self, "auto_tracking_enabled", False)
+                        manual_block = bool(
+                            getattr(self, "manual_override", False)
+                            or getattr(self, "_manual_override_active", False)
+                        )
                         
                         # AUTO-ENABLE TRACKING: If auto_tracking is enabled and no idle mode is active,
                         # automatically enable tracking and aiming when detection occurs
-                        if actual_idle_mode is None and auto_track_enabled and not getattr(self, "tracking_active", False):
+                        if (
+                            actual_idle_mode is None
+                            and auto_track_enabled
+                            and not getattr(self, "tracking_active", False)
+                            and not manual_block
+                        ):
                             self.tracking_active = True
                             self.aiming_active = True
                             self.enhancer.log_serial_output(
@@ -18805,9 +19019,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     pass
                 # === END DETECTION PAUSE LOGIC ===
 
-                # Only update tracking position if not in manual override or manual suppression
-                # AND not in detection pause
-                if not (
+                # Only update tracking position if tracking/aiming are active,
+                # and not in manual override or detection pause.
+                tracking_enabled = bool(
+                    getattr(self, "tracking_active", False)
+                    or getattr(self, "aiming_active", False)
+                )
+                if tracking_enabled and not (
                     getattr(self, "manual_override", False)
                     or getattr(self, "_manual_override_active", False)
                     or (time.time() < getattr(self, "_detection_pause_until", 0.0))
@@ -19118,9 +19336,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 # Normal tracking - skip if quick strike is active
                 if getattr(self, "quick_strike_active", False):
                     pass  # Quick strike handles its own movement
-                elif not (
-                    getattr(self, "manual_override", False)
-                    or getattr(self, "_manual_override_active", False)
+                elif (
+                    (getattr(self, "tracking_active", False)
+                    or getattr(self, "aiming_active", False))
+                    and not (
+                        getattr(self, "manual_override", False)
+                        or getattr(self, "_manual_override_active", False)
+                    )
                 ):
                     pan_dir = -1 if getattr(self, "flip_pan_direction", False) else 1
                     tilt_dir = -1 if getattr(self, "flip_tilt_direction", False) else 1
@@ -22000,6 +22222,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         if total_enabled:
                             if "total" in cur:
                                 self.total_current_mA = cur.get("total")
+                                try:
+                                    self._update_total_current_display(self.total_current_mA)
+                                except Exception:
+                                    pass
                         self.last_current_telemetry_time = time.time()
                         try:
                             self._update_current_protection_state(
@@ -22087,6 +22313,44 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             return out if out else None
         except Exception:
             return None
+
+    def _update_total_current_display(self, total_mA):
+        """Compute a display-only total current value.
+
+        CHANGE WARNING (2026-01-26): This must NOT affect safety/protection.
+        Keep `self.total_current_mA` as the raw telemetry value used by protection.
+
+        Goal: stabilize the UI/graph with clamping + light EMA smoothing,
+        while keeping raw values intact for protection logic.
+        """
+        try:
+            if total_mA is None:
+                self.total_current_mA_display = None
+                return
+
+            raw = int(total_mA)
+            if raw < 0:
+                raw = 0
+            # For ACS712 5A, values far above ~5A are not meaningful; clamp UI.
+            if raw > 5500:
+                raw = 5500
+
+            # Light EMA smoothing for UI only.
+            disp_ema = getattr(self, "_total_current_display_ema", None)
+            if disp_ema is None:
+                disp_ema = float(raw)
+            else:
+                disp_alpha = 0.25
+                disp_ema = (1.0 - disp_alpha) * float(disp_ema) + disp_alpha * float(raw)
+            self._total_current_display_ema = float(disp_ema)
+
+            self.total_current_mA_display = int(round(disp_ema))
+        except Exception:
+            # Never let UI helpers break serial processing.
+            try:
+                self.total_current_mA_display = total_mA
+            except Exception:
+                pass
 
     def _any_current_sensors_enabled(self) -> bool:
         try:

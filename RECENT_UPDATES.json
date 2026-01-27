@@ -3,8 +3,16 @@
   "max_items": 10,
   "items": [
     {
+      "date": "2026-01-27",
+      "title": "Added Nano+Bluetooth (HC-05/HC-06 SPP) setup guide and a bt_serial_probe utility to help identify the Windows Bluetooth COM port and validate connectivity."
+    },
+    {
+      "date": "2026-01-27",
+      "title": "Manual control: pauses tracking/aiming during manual nudges and auto-resumes after the suppression window for smoother manual pan/tilt across modes."
+    },
+    {
       "date": "2026-01-26",
-      "title": "AutoTrack Lab: added target/candidate overlays and stabilized blob detection to prevent random scanning."
+      "title": "YOLO Settings: added max area filter control with persistence and post-processing filtering."
     },
     {
       "date": "2026-01-26",
@@ -37,15 +45,6 @@
     {
       "date": "2026-01-26",
       "title": "Current telemetry + Health Monitor: stop graph flatlining at 0 when telemetry is missing; add explicit 'No telemetry' status and COM-swap warning; added Dual Port Nano IO+telemetry 2026 firmware (STAT I=<mA> on A2); SerialBus Upgrade 2026 firmware now enables total-current telemetry by default (A2)."
-    },
-    {
-      "date": "2026-01-26",
-      "title": "Sentry Mode startup fix: re-enabled sentry hooks by default so the Sentry tab receives the live camera feed and can take control when enabled."
     }
   ]
 }
-
-    {
-      "date": "2026-01-26",
-      "title": "Aiming stability: main app now uses SmartTracker (centroid smoothing + persistence) and avoids ROI centroid drift so the yellow-dot stays centered on the tracked object." 
-    },
