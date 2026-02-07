@@ -499,6 +499,16 @@ Creates and manages all PyQt5 widgets, dock panels, menus, and visual layout.
 | Window geometry | settings.json:`window_geometry` | base64 | Saved window position |
 | Window state | settings.json:`window_state` | base64 | Saved dock arrangement |
 
+### Dock objectName + saveState (CRITICAL)
+
+- Every dock that participates in `saveState()/restoreState()` **must have a stable, non-empty `objectName`**. Clearing it (e.g., `setObjectName("")`) makes Qt warn `QMainWindow::saveState(): 'objectName' not set...` and can crash with `sipBadCatcherResult()` on restore.
+- The Behavior Presets dock is hidden by default but **must keep its objectName**. Current fix: [app/MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py#L8840-L8856) assigns `Dock_Behavior_Presets` while keeping it hidden.
+- When adding new docks via `add_dock()`, let the helper set a deterministic objectName (`Dock_<Title>`). Do **not** override to empty strings.
+- If excluding a dock from layouts, hide it or manage visibility flags; do **not** blank the object name.
+
+**Verification**
+- Run `python test_app_start.py` (or `python run.py`) and confirm no `objectName not set for QDockWidget` warnings and no `sipBadCatcherResult()` during layout save/restore.
+
 ### Widget Signal Connections (CRITICAL)
 
 The following widgets have signals that MUST be connected correctly:
@@ -1292,6 +1302,9 @@ main_tab_widget.currentChanged(index) → _on_tab_changed() → activate/deactiv
 6. `send_serial_command()` checks `manual_override` / `_manual_override_until` and allows command through sentry block
 7. Command sent to Arduino
 8. **Go Home** clears manual override and applies a short detection/aiming suspend window to avoid auto-tracking fighting the return
+9. **Detection Loop Safety**: `update_frame` loop checks `_manual_override_until` and `_in_go_home` every frame. 
+   - If `_manual_override_until` expires, it **forcefully resets** `manual_override = False`.
+   - If `_in_go_home` is True, it **blocks tracking updates** completely (prevents target position overwrite), allowing the Homing Timer to interpolate exclusively.
 
 ### If You Change ANY of the Following
 
@@ -1328,6 +1341,8 @@ You **MUST ALSO** check/update:
 | Sentry not detecting | Detection format mismatch (check box format) |
 | Crash on manual track draw | Using wrong method `_analyze_pending_tracks()` - use `analyze_track()` |
 | Manual control not working | `manual_override` flag not checked in sentry block |
+| YOLO tracking won't resume | `manual_override` flag stuck true (fixed by `update_frame` watchdog) |
+| Go Home stutters/fails in YOLO mode | `_in_go_home` flag not blocking detection updates in `update_frame` |
 
 ### Required Verification Steps
 
@@ -1456,6 +1471,39 @@ You **MUST ALSO** check/update:
 - [ ] Test turret move signals work
 - [ ] Verify overlays render correctly
 - [ ] Check Arduino serial compatibility
+
+---
+
+## Appendix: State Ownership — Auto-Tracking, Manual, Go Home (2026-02-07)
+
+### Design Rule (CRITICAL — do NOT regress)
+
+**`_user_initiated_stop` is the single authority that blocks auto-tracking re-engagement.**
+
+| Action | Sets `_user_initiated_stop` | Tracking after action |
+|---|---|---|
+| **Stop Tracking** button | `True` | OFF — stays off |
+| **Go Home** button | `True` | OFF — stays off after move completes |
+| **Manual move** (arrow buttons) | `True` | OFF — stays off after override expires |
+| **Start Tracking** button | `False` (clears) | ON — auto-tracking enabled |
+
+### Why this matters
+Previously, Go Home and Manual moves were treated as temporary pauses. The detection loop's auto-tracking re-engagement block would see a target ≤1 s after the action and snap the turret back. This made it impossible to manually aim or park at home.
+
+### Code locations (keep in sync)
+- `_user_initiated_stop` initialized: `__init__` (line ~1432)
+- Set `True` by `stop_tracking()`, `go_home()`, `move_manual()`
+- Cleared by `start_tracking()`
+- Checked by auto-tracking re-engagement: `update_frame` detection block (~line 19833)
+
+### Hidden coupling: `_complete_go_home` callback (REMOVED)
+The `_complete_go_home` QTimer.singleShot callback unconditionally set `tracking_active=True` after a delay, overriding all state guards. It was removed (2026-02-07) because the interpolation timer's own completion handler now handles cleanup and respects `_user_initiated_stop`.
+
+### Hidden coupling: Dual Port `_home_step` serial guard
+`_home_step` must check BOTH `self.ser` and `self.bus_ser` before calling `send_serial_command()`. In Dual Port mode, pan/tilt routes through `bus_ser` while `self.ser` is Nano (IO only). If the guard only checks `self.ser`, homing silently fails when only `bus_ser` is open.
+
+### Hidden coupling: Dual Port IO duplicate send (FIXED)
+The `try...except...else` pattern in dual-port IO sending had the fallback code in the `else` clause (which runs on SUCCESS, not failure). This caused S/M/F/L/R/G tokens to be sent twice to the Nano every cycle. Fixed 2026-02-07.
 
 ---
 

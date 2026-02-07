@@ -4,6 +4,34 @@
   "items": [
     {
       "date": "2026-02-07",
+      "title": "Critical Fix: Eliminated Auto-Tracking 'Snap-Back' loop. Go Home and Manual moves now hard-stop auto-tracking (set _user_initiated_stop). Removed _complete_go_home unconditional re-enable callback. User must press Start Tracking to resume. Fixed dual-port _home_step guard to check bus_ser too. Fixed duplicate IO send bug in dual-port (try/except/else was double-sending S/M/F/L/R/G to Nano). Bus servo failures now always logged (not gated by debug checkbox)."
+    },
+    {
+      "date": "2026-02-07",
+      "title": "Finetuning: Increased 'Go Home' speed (5%→10% default) and speed limit (8→25 deg/sec) for better responsiveness. Updated default Home Tilt to 80° per user request."
+    },
+    {
+      "date": "2026-02-07",
+      "title": "Finetuning: Improved auto-track stability with debounce (0.5s) on target loss. Added detailed debug logging for Bus Servo write failures in Dual Port mode."
+    },
+    {
+      "date": "2026-02-07",
+      "title": "Critical Fix: 'Home' and 'Stop Tracking' buttons now correctly prevent auto-tracking from immediately re-enabling in YOLO modes. Explicit stop actions are respected until user manually restarts tracking."
+    },
+    {
+      "date": "2026-02-07",
+      "title": "Critical Fix: Resolved UI limitation where Home Tilt/Pan inputs were clamped to default ranges (e.g. 70) even when limits were increased. load_settings now updates widget ranges before setting values."
+    },
+    {
+      "date": "2026-02-07",
+      "title": "Critical Fix: Resolved resource contention where YOLO detection would override 'Go Home' and 'Manual Set' targets with 'Passive Tracking' updates. Now explicitly gates tracking calculations with 'tracking_active' and blocks idle/hold logic during 'Go Home' moves."
+    },
+    {
+      "date": "2026-02-07",
+      "title": "Behavior Presets dock now keeps a stable objectName to prevent saveState/restoreState crashes when layouts are saved or restored."
+    },
+    {
+      "date": "2026-02-07",
       "title": "Go Home completion now restores tracking/aiming when auto-tracking is enabled or when tracking was previously active (prevents autotrack from staying off after homing)."
     },
     {
@@ -29,18 +57,6 @@
     {
       "date": "2026-01-26",
       "title": "Aiming stability: main app now uses SmartTracker (centroid smoothing + persistence) and avoids ROI centroid drift so the yellow-dot stays centered on the tracked object."
-    },
-    {
-      "date": "2026-01-26",
-      "title": "Sentry Mode startup fix: re-enabled sentry hooks by default so the Sentry tab receives the live camera feed and can take control when enabled."
-    },
-    {
-      "date": "2026-01-26",
-      "title": "Current telemetry + Health Monitor: stop graph flatlining at 0 when telemetry is missing; add explicit 'No telemetry' status and COM-swap warning; added Dual Port Nano IO+telemetry 2026 firmware (STAT I=<mA> on A2); SerialBus Upgrade 2026 firmware now enables total-current telemetry by default (A2)."
-    },
-    {
-      "date": "2026-01-26",
-      "title": "TRIGGER FIX: Fixed projectile servo not firing in Dual Port mode. Root cause: Arduino single-token parser incorrectly matched packed commands (F1L1R0G0S0M1) as 'F1', ignoring mode token M1. Fix: Python now sends S0/M1 as separate commands before F/L/R/G, ensuring Arduino correctly sets projectile mode before processing fire. Arduino sketch also updated to check line length before treating as single-token."
     }
   ]
 }

@@ -1429,6 +1429,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.tracking_active = False
         self.aiming_active = False
         self.manual_override = False
+        self._user_initiated_stop = False # Flags explicitly stopped by user
         self.trigger_fired = False
         self.tracking_was_active = False
         self._manual_override_until = 0.0
@@ -1494,11 +1495,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Home defaults
         # NOTE: prefer a lower/resting tilt so the camera looks slightly down by default
         self.HOME_PAN = 90
-        self.HOME_TILT = 40  # lowered from 80 to avoid resting tilted-up at startup
-        self.HOME_SPEED = 5  # Default homing speed: 5% (smooth, not jerky - reduced for 7.4V fast servo)
+        # HOME_TILT: Safe parking position (40-80 typical).
+        # NOTE: If servos are physically limited or hit base, adjust TILT_MAX accordingly.
+        self.HOME_TILT = 80  # Default 80 (looking somewhat level)
+        self.HOME_SPEED = 10  # Increased from 5 to 10% for faster responsiveness
         # Max degrees per second at 100% home speed (used by host-side interpolation)
         # Reduced from 15 to 8 deg/sec for smoother home movement with faster servo at 7.4V
-        self.HOME_MAX_SPEED_DEG_PER_SEC = 8.0
+        self.HOME_MAX_SPEED_DEG_PER_SEC = 25.0 # Increased from 8 to 25 deg/sec for smoother but faster home movement
 
         # Internal state
         self.prev_pan_angle = self.HOME_PAN
@@ -2150,12 +2153,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             ):
                                 self.tilt_safety_triggered = True
                                 try:
-                                    self.tilt_safety_label.setText("🛡️ Tilt Safety: TRIGGERED!")
-                                    self.tilt_safety_label.setStyleSheet("color: #FF3333; font-size: 10px; background-color: #2d2d2d; font-weight: bold;")
+                                    self.tilt_safety_label.setText("🛡️ Tilt Safety: TRIGGERED")
+                                    self.tilt_safety_label.setStyleSheet("color: #FF3333; font-size: 10px; background-color: #2d2d2d;")
                                 except Exception:
                                     pass
                             else:
-                                # Switch not enabled - just display message, don't block movement
                                 try:
                                     if getattr(self, "tilt_safety_hardware_installed", False):
                                         self.tilt_safety_label.setText("🛡️ Tilt Safety: Not Enabled")
@@ -8847,9 +8849,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # User can open from Widgets menu if needed
             try:
                 if presets_dock is not None:
-                    # Exclude from saved layouts/window state
+                    # Keep a stable object name for saveState/restoreState
                     try:
-                        presets_dock.setObjectName("")
+                        presets_dock.setObjectName("Dock_Behavior_Presets")
                     except Exception:
                         pass
                     presets_dock.hide()
@@ -8890,21 +8892,38 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     def _safe_widget_call(self, attr_name: str, method_name: str, *args, **kwargs):
         """Call a widget method if present. Returns True if the call or set
         succeeded, False otherwise.
+
+        SNAP-BACK FIX 2026-02-07:
+        When calling ``setChecked`` on a checkable button, signals are
+        temporarily blocked so the programmatic state change does NOT fire
+        ``toggled`` → ``toggle_tracking`` → ``stop_tracking`` (which would
+        set ``_user_initiated_stop = True`` and permanently block
+        auto-tracking re-engagement).
         """
         w = getattr(self, attr_name, None)
         if w is None:
             return False
         try:
-            m = getattr(w, method_name, None)
-            if callable(m):
-                m(*args, **kwargs)
-                return True
-        except Exception:
+            # Block signals for programmatic setChecked to prevent signal loops
+            block_signals = (method_name == "setChecked" and hasattr(w, "blockSignals"))
+            if block_signals:
+                w.blockSignals(True)
             try:
-                setattr(w, method_name, args[0] if args else None)
-                return True
+                m = getattr(w, method_name, None)
+                if callable(m):
+                    m(*args, **kwargs)
+                    return True
             except Exception:
-                return False
+                try:
+                    setattr(w, method_name, args[0] if args else None)
+                    return True
+                except Exception:
+                    return False
+            finally:
+                if block_signals:
+                    w.blockSignals(False)
+        except Exception:
+            return False
         return False
 
     def _get_widget_value(self, attr_name: str, default=None):
@@ -9636,6 +9655,26 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         
         # Poll polls stats directly now to ensure they are updated even if send logic changes
         self._poll_bus_servo_stats()
+
+        if not (ok1 and ok2):
+            # FIX 2026-02-07: Always log bus failures (not just in debug mode)
+            # so operators can see why the turret refuses to move.
+            try:
+                active_ser = getattr(self, "bus_ser", None) if self._serial_is_dual_port() else self.ser
+                is_active = bool(active_ser and getattr(active_ser, "is_open", False))
+                port_name = getattr(active_ser, "port", "None") if active_ser else "None"
+                msg = (
+                    f"[BUS FAIL] pan_ok={ok1} tilt_ok={ok2} "
+                    f"dual={self._serial_is_dual_port()} "
+                    f"bus_port={port_name} bus_open={is_active} "
+                    f"bus_ser_exists={getattr(self, 'bus_ser', None) is not None}"
+                )
+                if hasattr(self, "enhancer"):
+                    self.enhancer.log_serial_output(msg, fire=False)
+                else:
+                    print(msg)
+            except Exception:
+                pass
 
         return bool(ok1 and ok2)
 
@@ -12137,6 +12176,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self._safe_widget_call("pan_max_input", "setValue", self.PAN_MAX)
             self._safe_widget_call("tilt_min_input", "setValue", self.TILT_MIN)
             self._safe_widget_call("tilt_max_input", "setValue", self.TILT_MAX)
+            
+            # CRITICAL FIX: Update Home Range limits to match loaded servo limits
+            # Otherwise home inputs remain clamped to initial defaults (e.g. 70 deg)
+            self._safe_widget_call("home_pan_input", "setRange", self.PAN_MIN, self.PAN_MAX)
+            self._safe_widget_call("home_tilt_input", "setRange", self.TILT_MIN, self.TILT_MAX)
 
             # --- Load Home & State ---
             self.HOME_PAN = int(settings.get("home_pan", self.HOME_PAN))
@@ -15736,14 +15780,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 try:
                     if getattr(self, "tracking_btn", None) is not None:
                         self.tracking_btn.setEnabled(False)
+                        self.tracking_btn.blockSignals(True)
                         self.tracking_btn.setChecked(False)
+                        self.tracking_btn.blockSignals(False)
                         self.tracking_btn.setText("Start Tracking")
                 except Exception:
                     pass
                 try:
                     if getattr(self, "aiming_btn", None) is not None:
                         self.aiming_btn.setEnabled(False)
+                        self.aiming_btn.blockSignals(True)
                         self.aiming_btn.setChecked(False)
+                        self.aiming_btn.blockSignals(False)
                         self.aiming_btn.setText("Start Aiming")
                 except Exception:
                     pass
@@ -16985,6 +17033,19 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         if not self.manual_override:
             self.manual_override = True
             self.tracking_was_active = self.tracking_active  # Remember state
+            # FIX 2026-02-07: Disable tracking/aiming while manual control is active.
+            # Snap-back is prevented by the Target-Lost tracking_active guard
+            # (see update_frame → else: Target Lost → SNAP-BACK FIX).
+            # Do NOT set _user_initiated_stop here — auto-tracking should re-engage
+            # when the manual suppression window expires and a new detection occurs.
+            self.tracking_active = False
+            self.aiming_active = False
+            try:
+                self._safe_widget_call("tracking_btn", "setChecked", False)
+                self._safe_widget_call("tracking_btn", "setText", "Start Tracking")
+                self._safe_widget_call("aiming_btn", "setChecked", False)
+            except Exception:
+                pass
             # Set temporary suppression so detection/tracking doesn't fight manual input
             # DEFENSIVE: Validate timeout is within reasonable bounds (max 5 seconds)
             suppress_secs = min(getattr(self, "manual_control_suppress_seconds", 1.0), 5.0)
@@ -17246,20 +17307,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
     def manual_control_released(self):
         """Called when a manual control button is released."""
-        # Keep manual_override True until suppression expires; releasing button
-        # only ends the local pressed state. This allows tiny nudges without
-        # permanently disabling the manual override behavior.
+        # FIX 2026-02-07: Manual control release no longer restores auto-tracking.
+        # The user's manual move is a deliberate override; tracking stays off
+        # until the user explicitly presses "Start Tracking".
         if self.manual_override:
             try:
                 # Short-circuit: if manual override timer already expired, clear it
                 if time.time() >= getattr(self, "_manual_override_until", 0):
                     self.manual_override = False
-                    if self.tracking_was_active:
-                        self.tracking_active = True
-                        self.tracking_was_active = False
-                        self.enhancer.log_serial_output(
-                            "Resumed tracking after manual move", fire=False
-                        )
+                    # Do NOT restore tracking_active here — auto-tracking
+                    # re-engagement will fire on next detection (gated by all
+                    # normal conditions in the detection if-boxes block).
+                    self.tracking_was_active = False
+                    self.enhancer.log_serial_output(
+                        "Manual override cleared — auto-tracking will resume on detection", fire=False
+                    )
                 else:
                     # Keep manual_override True until the suppression window finishes
                     self.enhancer.log_serial_output(
@@ -17331,6 +17393,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self._hold_last_position = False
             self._idle_state = None
             self._in_go_home = True
+            # FIX 2026-02-07: Snap-back is prevented by the Target-Lost
+            # tracking_active guard (see update_frame → else: Target Lost →
+            # SNAP-BACK FIX).  Do NOT set _user_initiated_stop here so that
+            # auto-tracking can re-engage when Go Home completes and a new
+            # detection arrives.
 
             # CRITICAL FIX: Define suspend_time for QTimer callback
             # This was commented out but is still needed for the timer delay
@@ -17422,14 +17489,27 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             except Exception:
                                 pass
                             self._in_go_home = False
-                            # restore tracking/aiming state
-                            self.tracking_active = True
-                            self.aiming_active = True
+                            
+                            # FIX 2026-02-07: Do NOT auto-resume tracking after Go Home.
+                            # Go Home is a deliberate user action to park the turret.
+                            # Auto-tracking re-engagement is blocked by _user_initiated_stop.
+                            # User must explicitly press "Start Tracking" to resume.
+                            self.tracking_active = False
+                            self.aiming_active = False
+                            
+                            try:
+                                self._safe_widget_call("tracking_btn", "setChecked", False)
+                                self._safe_widget_call("tracking_btn", "setText", "Start Tracking")
+                                self._safe_widget_call("aiming_btn", "setChecked", False)
+                            except Exception:
+                                pass
+
                             try:
                                 getattr(self.override_status_label, "setText", lambda x: None)("")
                             except Exception:
                                 pass
-                            self.enhancer.log_serial_output("Host-interpolated Go Home complete, tracking resumed", fire=False)
+                            
+                            self.enhancer.log_serial_output("Go Home complete — turret parked. Press Start Tracking to resume.", fire=False)
                             try:
                                 self.send_serial_command()
                             except Exception:
@@ -17448,8 +17528,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.target_tilt = new_tilt
 
                         # Send command to hardware (if connected); send_serial_command is defensive
+                        # FIX 2026-02-07: Check EITHER port (Nano or Debug Board) for Dual Port mode.
+                        # Previously only checked self.ser (Nano), causing Go Home to silently
+                        # skip sending when bus_ser (Debug Board) handles pan/tilt.
                         try:
-                            if self.ser is not None and getattr(self.ser, "is_open", False):
+                            primary_ok = bool(self.ser is not None and getattr(self.ser, "is_open", False))
+                            bus_ok = bool(getattr(self, "bus_ser", None) is not None and getattr(self.bus_ser, "is_open", False))
+                            if primary_ok or bus_ok:
                                 self.send_serial_command()
                         except Exception:
                             pass
@@ -17472,29 +17557,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception as e:
             self.enhancer.log_serial_output(f"Error performing host-side Go Home: {e}", fire=False)
 
-        # --- RESTORE PHASE ---
-        try:
-            # After delay, start fresh tracking from home position
-            def _complete_go_home():
-                try:
-                    setattr(self, "_in_go_home", False)
-                    setattr(self, "tracking_active", True)
-                    setattr(self, "aiming_active", True)
-                    setattr(self, "target_x", None)
-                    setattr(self, "target_y", None)
-                    # CRITICAL: Clear detection history so we don't immediately re-lock to old target
-                    if hasattr(self, "last_detections"):
-                        self.last_detections.clear()
-                    # Reset last_seen_time so hold window doesn't trigger
-                    setattr(self, "last_seen_time", 0.0)
-                    getattr(self.override_status_label, "setText", lambda x: None)("")
-                    self.enhancer.log_serial_output("Go Home complete — fresh tracking started at home (detection history cleared)", fire=False)
-                except Exception as e:
-                    print(f"go_home completion error: {e}")
-            
-            QTimer.singleShot(int(suspend_time * 1000), _complete_go_home)
-        except Exception:
-            pass
+        # --- RESTORE PHASE (REMOVED 2026-02-07) ---
+        # The _complete_go_home callback previously fired after suspend_time and
+        # unconditionally set tracking_active=True, aiming_active=True.  This was
+        # the root cause of the "snap-back" bug: it overrode the user's Go Home
+        # intent by re-enabling auto-tracking.  The interpolation timer's own
+        # completion handler (_home_step finalize) now handles cleanup correctly
+        # and respects _user_initiated_stop.  No delayed restore is needed.
 
 
 
@@ -18126,21 +18195,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.last_sent_pan = int(getattr(self, "last_known_pan", getattr(self, "last_sent_pan", self.prev_pan_angle)))
                     self.last_sent_tilt = int(getattr(self, "last_known_tilt", getattr(self, "last_sent_tilt", self.prev_tilt_angle)))
 
-                    # Restore tracking state after Go Home when appropriate.
-                    # If the user had tracking active before, restore it. Otherwise,
-                    # auto-resume only when auto_tracking_enabled is on.
-                    resume_requested = bool(getattr(self, "_go_home_prev_tracking", False))
-                    auto_track_enabled = bool(getattr(self, "auto_tracking_enabled", False))
-                    resume_tracking = resume_requested or auto_track_enabled
-
-                    self.tracking_active = bool(resume_tracking)
-                    self.aiming_active = bool(resume_tracking)
+                    # FIX 2026-02-07: Do NOT auto-resume tracking after Go Home.
+                    # _user_initiated_stop is set by go_home() and must be respected.
+                    # User must explicitly press "Start Tracking" to resume.
+                    self.tracking_active = False
+                    self.aiming_active = False
 
                     # Update UI button states if present
                     try:
-                        self._safe_widget_call("tracking_btn", "setChecked", self.tracking_active)
-                        self._safe_widget_call("tracking_btn", "setText", "Stop Tracking" if self.tracking_active else "Start Tracking")
-                        self._safe_widget_call("aiming_btn", "setChecked", self.aiming_active)
+                        self._safe_widget_call("tracking_btn", "setChecked", False)
+                        self._safe_widget_call("tracking_btn", "setText", "Start Tracking")
+                        self._safe_widget_call("aiming_btn", "setChecked", False)
                     except Exception:
                         pass
 
@@ -18151,10 +18216,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     except Exception:
                         pass
 
-                    if resume_tracking:
-                        self.enhancer.log_serial_output("Go Home complete — tracking resumed.", fire=False)
-                    else:
-                        self.enhancer.log_serial_output("Go Home complete — awaiting user input.", fire=False)
+                    self.enhancer.log_serial_output("Go Home complete — turret parked. Press Start Tracking to resume.", fire=False)
             except Exception:
                 pass
         # Auto-resume tracking/aiming if detection found after idle/home
@@ -18329,16 +18391,19 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         else:
             # suppression expired
             self._manual_override_active = False
-            # Manual override timers should not mutate runtime flags directly.
+            # BULLETPROOF FIX: Auto-clear manual_override when suppression expires.
+            # This ensures that if manual_control_released is missed (e.g. click vs press),
+            # the system doesn't get stuck in manual mode indefinitely.
             if getattr(self, "manual_override", False):
+                self.manual_override = False
                 try:
                     if hasattr(self, "enhancer"):
                         self.enhancer.log_serial_output(
-                            "[STATE] manual_override timeout expired (no auto-clear)",
+                            "[STATE] manual_override timeout expired - auto-clearing flag",
                             fire=False,
                         )
                 except Exception as e:
-                    print(f"[STATE] manual_override timeout log failed: {e}")
+                    print(f"[STATE] manual_override logic check failed: {e}")
 
                 # BULLETPROOF FIX: No wait for suppression - immediately clear go_home when done
                 # This allows detection to resume immediately
@@ -19785,10 +19850,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         if (
                             actual_idle_mode is None
                             and auto_track_enabled
+                            # RESPECT DETECT PAUSE: Don't auto-start if recently paused (e.g. just lost detection)
+                            # This prevents rapid on/off cycling when target is on edge
+                            and (time.time() - getattr(self, "last_target_loss_time", 0) > 0.5)
                             and not getattr(self, "tracking_active", False)
                             and not getattr(self, "_in_go_home", False)
                             and not getattr(self, "manual_override", False)
                             and not getattr(self, "_manual_override_active", False)
+                            and not getattr(self, "_user_initiated_stop", False)  # Respect explicit stop
                         ):
                             self.tracking_active = True
                             self.aiming_active = True
@@ -20245,12 +20314,25 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.quick_strike_active = False
                 # ========== END QUICK STRIKE LOGIC ==========
 
+                # Keep direction flags synced with UI checkboxes (manual + tracking)
+                try:
+                    if getattr(self, "invert_pan_checkbox", None) is not None:
+                        self.flip_pan_direction = bool(self.invert_pan_checkbox.isChecked())
+                except Exception:
+                    pass
+                try:
+                    if getattr(self, "invert_tilt_checkbox", None) is not None:
+                        self.flip_tilt_direction = bool(self.invert_tilt_checkbox.isChecked())
+                except Exception:
+                    pass
+
                 # Normal tracking - skip if quick strike is active
                 if getattr(self, "quick_strike_active", False):
                     pass  # Quick strike handles its own movement
-                elif not (
+                elif getattr(self, "tracking_active", False) and not (
                     getattr(self, "manual_override", False)
                     or getattr(self, "_manual_override_active", False)
+                    or getattr(self, "_in_go_home", False)
                 ):
                     pan_dir = -1 if getattr(self, "flip_pan_direction", False) else 1
                     tilt_dir = -1 if getattr(self, "flip_tilt_direction", False) else 1
@@ -20888,21 +20970,31 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
             else:
                 # --- Target Lost: Hold Last Position for a configurable time ---
-                # AIMING PRIORITY: If target reappears during hold window, keep turret aiming immediately
-                # This gives aiming/centering priority over idle behaviors
-                # ========== FIXED: READ lost_hold_seconds FROM UI WIDGET IN REAL-TIME ==========
-                # Instead of using cached value, read from UI to ensure user changes apply immediately
-                hold_window = self._safe_float_widget_value("lost_hold_input", 5.0)
+                # Update loss timestamp for auto-track debounce logic
+                self.last_target_loss_time = time.time()
                 
-                # REACQUISITION ACCELERATION: If tracking_active, accelerate timeout from 5s to 2s
-                # This prioritizes re-centering a reacquired target over idle mode behavior
-                if getattr(self, "tracking_active", False):
-                    hold_window = min(hold_window, 2.0)  # Max 2 sec hold during active tracking
-                
-                now_ts = time.time()
-                time_since_seen = now_ts - getattr(self, "last_seen_time", 0.0)
+                # ╔══════════════════════════════════════════════════════════════╗
+                # ║  SNAP-BACK FIX 2026-02-07                                  ║
+                # ║  When tracking_active is False, do NOT touch target_pan/    ║
+                # ║  target_tilt.  The hold/idle logic below uses stale         ║
+                # ║  last_known_pan/tilt values from the previous tracking      ║
+                # ║  session and would pull the turret off the Home or Manual   ║
+                # ║  position the user deliberately set.                        ║
+                # ║  See CHANGE_IMPACT_REFERENCE.md → Appendix: State Ownership ║
+                # ╚══════════════════════════════════════════════════════════════╝
+                if not getattr(self, "tracking_active", False):
+                    # Tracking is OFF — preserve current target_pan/tilt as-is.
+                    # Only clear transient detection state so detection UI stays clean.
+                    self.target_locked = False
+                    self.last_detections = []
+                    self.trigger_fired = False
+                    if not getattr(self, "hold_infinite", False):
+                        self._hold_infinite_active = False
+                else:
+                    # — local variables for hold/idle logic (restored after SNAP-BACK FIX) —
+                    hold_window = float(getattr(self, "lost_hold_seconds", 5.0))
+                    time_since_seen = time.time() - float(getattr(self, "last_seen_time", 0.0))
 
-                if not self.manual_override:
                     # If user requested infinite hold, never timeout
                     if getattr(self, "hold_infinite", False):
                         self.target_pan = float(
@@ -21248,35 +21340,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     )
                                 except Exception:
                                     pass
-                else:
-                    # CRITICAL FIX DEC8: manual_override=True failsafe
-                    # When user is manually controlling, still restore position on detection loss
-                    # Otherwise turret position never updates and defaults to minimum (PAN_MIN=5, TILT_MIN=18)
-                    try:
-                        self.target_pan = float(
-                            getattr(
-                                self,
-                                "last_known_pan",
-                                getattr(
-                                    self,
-                                    "last_sent_pan",
-                                    getattr(self, "prev_pan_angle", float(self.HOME_PAN)),
-                                ),
-                            )
-                        )
-                        self.target_tilt = float(
-                            getattr(
-                                self,
-                                "last_known_tilt",
-                                getattr(
-                                    self,
-                                    "last_sent_tilt",
-                                    getattr(self, "prev_tilt_angle", float(self.HOME_TILT)),
-                                ),
-                            )
-                        )
-                    except Exception:
-                        pass
 
                 # clear detection/lock state
                 try:
@@ -22856,27 +22919,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 self.ser.write(io_cmd.encode("utf-8"))
                             except Exception as e:
                                 print(f"[MODE_DEBUG] ✗ SEND FAILED: {e}")
-                            else:
-                                # Bus ping failed OR Bus write failed: keep IO working, but do not send pan/tilt to Nano.
+
+                            # FIX 2026-02-07: Removed duplicate IO send that was in a try/except/else
+                            # clause.  The 'else' fired on SUCCESSFUL write (no exception), causing
+                            # S/M/F/L/R/G tokens to be sent TWICE to the Nano every cycle.
+                            # Log bus status when pan/tilt failed but IO succeeded.
+                            if not pan_tilt_params_sent:
                                 try:
-                                    # FIX 2026-01-26: Same fix - send S/M first
-                                    try:
-                                        self.ser.write(f"S{safety_token}\n".encode("utf-8"))
-                                        self.ser.write(f"M{mode_token}\n".encode("utf-8"))
-                                    except Exception:
-                                        pass
-                                    io_cmd = f"F{fire_token}L{led_token}R{laser_token}G{acc3_token}\n"
-                                    if fire_token == 1:
-                                        print(f"[MODE_DEBUG] ✓ SENDING (fallback path): S{safety_token}, M{mode_token}, {io_cmd.strip()}")
-                                    self.ser.write(io_cmd.encode("utf-8"))
                                     if debug_on and hasattr(self, "enhancer"):
-                                        try:
-                                            self.enhancer.log_serial_output(
-                                                "[DUAL PORT] Bus pan/tilt failed; sent IO-only to Nano (no P/T fallback)",
-                                                fire=False,
-                                            )
-                                        except Exception:
-                                            pass
+                                        self.enhancer.log_serial_output(
+                                            "[DUAL PORT] Bus pan/tilt write failed; IO-only sent to Nano (no P/T fallback)",
+                                            fire=False,
+                                        )
                                 except Exception:
                                     pass
                     
@@ -23727,6 +23781,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
     def start_tracking(self):
         """Enable tracking process."""
+        self._user_initiated_stop = False  # Clear explicit stop flag
         # CHANGE WARNING:
         # Modifications here affect tracking/aiming state ownership and command flow.
         # See CHANGE_IMPACT_REFERENCE.md → Code-Level Change Enforcement.
@@ -23961,6 +24016,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
     def stop_tracking(self):
         """Disable tracking process."""
+        self._user_initiated_stop = True  # Set explicit stop flag to prevent auto-resume
         self.tracking_active = False
         # CRITICAL FIX: Disable aiming when tracking stops (keep them in sync)
         self.aiming_active = False
@@ -24043,7 +24099,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 # best-effort: if helper not available, try direct attribute
                 try:
                     if getattr(self, "aiming_btn", None) is not None:
+                        self.aiming_btn.blockSignals(True)
                         self.aiming_btn.setChecked(self.aiming_active)
+                        self.aiming_btn.blockSignals(False)
                 except Exception:
                     pass
         except Exception:
@@ -24120,7 +24178,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     if getattr(self, "tracking_btn", None) is not None:
                         self.tracking_btn.setText("Stop Tracking")
                         try:
+                            self.tracking_btn.blockSignals(True)
                             self.tracking_btn.setChecked(True)
+                            self.tracking_btn.blockSignals(False)
                         except Exception:
                             pass
                 except Exception:
@@ -24131,7 +24191,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     if getattr(self, "tracking_btn", None) is not None:
                         self.tracking_btn.setText("Start Tracking")
                         try:
+                            self.tracking_btn.blockSignals(True)
                             self.tracking_btn.setChecked(False)
+                            self.tracking_btn.blockSignals(False)
                         except Exception:
                             pass
                 except Exception:
@@ -24894,13 +24956,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.aiming_active = False
                     try:
                         if hasattr(self, "tracking_btn") and self.tracking_btn is not None:
+                            self.tracking_btn.blockSignals(True)
                             self.tracking_btn.setChecked(False)
+                            self.tracking_btn.blockSignals(False)
                             self.tracking_btn.setText("Start Tracking")
                     except Exception:
                         pass
                     try:
                         if hasattr(self, "aiming_btn") and self.aiming_btn is not None:
+                            self.aiming_btn.blockSignals(True)
                             self.aiming_btn.setChecked(False)
+                            self.aiming_btn.blockSignals(False)
                             self.aiming_btn.setText("Start Aiming")
                     except Exception:
                         pass
@@ -24936,13 +25002,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.aiming_active = True
                     try:
                         if hasattr(self, "tracking_btn") and self.tracking_btn is not None:
+                            self.tracking_btn.blockSignals(True)
                             self.tracking_btn.setChecked(True)
+                            self.tracking_btn.blockSignals(False)
                             self.tracking_btn.setText("Stop Tracking")
                     except Exception:
                         pass
                     try:
                         if hasattr(self, "aiming_btn") and self.aiming_btn is not None:
+                            self.aiming_btn.blockSignals(True)
                             self.aiming_btn.setChecked(True)
+                            self.aiming_btn.blockSignals(False)
                             self.aiming_btn.setText("Stop Aiming")
                     except Exception:
                         pass
@@ -24967,13 +25037,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.tracking_active = False
                     self.aiming_active = False
                     try:
-                        if hasattr(self, "aiming_btn"):
+                        if hasattr(self, "aiming_btn") and self.aiming_btn is not None:
+                            self.aiming_btn.blockSignals(True)
                             self.aiming_btn.setChecked(False)
+                            self.aiming_btn.blockSignals(False)
                     except Exception:
                         pass
                     try:
-                        if hasattr(self, "start_tracking_btn"):
+                        if hasattr(self, "start_tracking_btn") and self.start_tracking_btn is not None:
+                            self.start_tracking_btn.blockSignals(True)
                             self.start_tracking_btn.setChecked(False)
+                            self.start_tracking_btn.blockSignals(False)
                     except Exception:
                         pass
                 
