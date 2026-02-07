@@ -1199,6 +1199,89 @@ def build_ui(app: QMainWindow):
     behavior_layout.addLayout(detection_pause_row, br, 1)
     br += 1
 
+    # Motion-Verified Auto-Fire (optional safety gate)
+    behavior_layout.addWidget(QLabel("Motion-Verified Auto-Fire"), br, 0)
+    if getattr(app, "motion_fire_checkbox", None) is None:
+        app.motion_fire_checkbox = QCheckBox("Require Motion")
+    try:
+        app.motion_fire_checkbox.setChecked(
+            bool(getattr(app, "motion_fire_enabled", False))
+        )
+        app._safe_connect("motion_fire_checkbox", "toggled", app.save_settings)
+    except Exception:
+        pass
+    try:
+        app.motion_fire_checkbox.setToolTip(
+            "When enabled, auto-fire requires recent target motion to prevent firing on stationary objects."
+        )
+    except Exception:
+        pass
+    behavior_layout.addWidget(app.motion_fire_checkbox, br, 1)
+    br += 1
+
+    behavior_layout.addWidget(QLabel("Motion Threshold (px)"), br, 0)
+    if getattr(app, "motion_fire_px_threshold_input", None) is None:
+        app.motion_fire_px_threshold_input = QDoubleSpinBox()
+    try:
+        app.motion_fire_px_threshold_input.setRange(0.5, 50.0)
+        app.motion_fire_px_threshold_input.setSingleStep(0.5)
+        app.motion_fire_px_threshold_input.setValue(4.0)
+        app._safe_connect("motion_fire_px_threshold_input", "valueChanged", app.save_settings)
+    except Exception:
+        pass
+    behavior_layout.addWidget(app.motion_fire_px_threshold_input, br, 1)
+    br += 1
+
+    behavior_layout.addWidget(QLabel("Motion Frames Required"), br, 0)
+    if getattr(app, "motion_fire_frames_input", None) is None:
+        app.motion_fire_frames_input = QSpinBox()
+    try:
+        app.motion_fire_frames_input.setRange(1, 10)
+        app.motion_fire_frames_input.setValue(3)
+        app._safe_connect("motion_fire_frames_input", "valueChanged", app.save_settings)
+    except Exception:
+        pass
+    try:
+        app.motion_fire_frames_input.setToolTip(
+            "Number of consecutive frames that must exceed the motion threshold before auto-fire is allowed."
+        )
+    except Exception:
+        pass
+    behavior_layout.addWidget(app.motion_fire_frames_input, br, 1)
+    br += 1
+
+    behavior_layout.addWidget(QLabel("Motion Recent Window (ms)"), br, 0)
+    if getattr(app, "motion_fire_recent_ms_input", None) is None:
+        app.motion_fire_recent_ms_input = QSpinBox()
+    try:
+        app.motion_fire_recent_ms_input.setRange(0, 5000)
+        app.motion_fire_recent_ms_input.setValue(800)
+        app._safe_connect("motion_fire_recent_ms_input", "valueChanged", app.save_settings)
+    except Exception:
+        pass
+    try:
+        app.motion_fire_recent_ms_input.setToolTip(
+            "How recent motion must be (milliseconds). 0 disables the recency check."
+        )
+    except Exception:
+        pass
+    behavior_layout.addWidget(app.motion_fire_recent_ms_input, br, 1)
+    br += 1
+
+    behavior_layout.addWidget(QLabel("Stationary Lockout (ms)"), br, 0)
+    if getattr(app, "motion_fire_stationary_lock_ms_input", None) is None:
+        app.motion_fire_stationary_lock_ms_input = QSpinBox()
+    try:
+        app.motion_fire_stationary_lock_ms_input.setRange(0, 5000)
+        app.motion_fire_stationary_lock_ms_input.setValue(1200)
+        app._safe_connect(
+            "motion_fire_stationary_lock_ms_input", "valueChanged", app.save_settings
+        )
+    except Exception:
+        pass
+    behavior_layout.addWidget(app.motion_fire_stationary_lock_ms_input, br, 1)
+    br += 1
+
     behavior_layout.addWidget(QLabel("Snap Threshold (px)"), br, 0)
     snap_row = QHBoxLayout()
     if getattr(app, "snap_threshold_slider", None) is None:

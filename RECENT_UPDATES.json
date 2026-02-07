@@ -3,36 +3,36 @@
   "max_items": 10,
   "items": [
     {
-      "date": "2026-01-26",
-      "title": "AutoTrack Lab: added target/candidate overlays and stabilized blob detection to prevent random scanning."
+      "date": "2026-02-07",
+      "title": "Go Home completion now restores tracking/aiming when auto-tracking is enabled or when tracking was previously active (prevents autotrack from staying off after homing)."
+    },
+    {
+      "date": "2026-02-06",
+      "title": "Manual control + Go Home: refresh manual override suppression per button press, prevent YOLO/Hybrid auto-tracking from overriding manual/home moves, force threaded YOLO with shorter async max-age, and avoid sync model loads in update_frame."
+    },
+    {
+      "date": "2026-02-06",
+      "title": "UI cleanup: removed unused Workspace dock; Behavior Presets dock stays hidden by default and excluded from saved layouts (still available via Widgets menu)."
+    },
+    {
+      "date": "2026-02-06",
+      "title": "Presets/defaults now persist motion-gate, detection pause, speed optimization, and scope visual settings; scope visual settings window height reduced."
+    },
+    {
+      "date": "2026-02-06",
+      "title": "Auto-fire safety: optional motion-verified gate (UI in Tracking Behavior) to prevent firing on stationary targets. Disabled by default; settings persist via motion_fire_* keys."
+    },
+    {
+      "date": "2026-02-06",
+      "title": "Speed optimizations: faster serial cadence, faster bus-servo timing, predictive lead, async YOLO, ROI cropping, light-model preference, and optional redundant-command bypass."
     },
     {
       "date": "2026-01-26",
-      "title": "AutoTrack Lab: added OpenCV tracker fallback to avoid 'cv2 has no attribute' errors by using detection-only tracking when contrib trackers are unavailable."
+      "title": "Aiming stability: main app now uses SmartTracker (centroid smoothing + persistence) and avoids ROI centroid drift so the yellow-dot stays centered on the tracked object."
     },
     {
       "date": "2026-01-26",
-      "title": "AutoTrack Lab: simplified detection with default blob detector for reliable precision tracking (YOLO optional)."
-    },
-    {
-      "date": "2026-01-26",
-      "title": "AutoTrack Lab: synced pan/tilt limits to main app defaults (PAN 0–220, TILT 0–70)."
-    },
-    {
-      "date": "2026-01-26",
-      "title": "AutoTrack Lab: added camera selection control with live reopen and saved camera index."
-    },
-    {
-      "date": "2026-01-26",
-      "title": "AutoTrack Lab UI: auto-run on launch, single Connect/Disconnect toggle, dark theme styling, and camera debug logging with backend/index fallbacks."
-    },
-    {
-      "date": "2026-01-26",
-      "title": "AutoTrack Lab: added isolated experimental app in autotrack_lab with First-Lock targeting, Follow/Quick Strike modes, YOLO+tracker hybrid pipeline, and Dual Port defaults (COM8 Nano IO + COM9 Debug Board pan/tilt)."
-    },
-    {
-      "date": "2026-01-26",
-      "title": "TRIGGER FIX: Fixed projectile servo not firing in Dual Port mode. Root cause: Arduino single-token parser incorrectly matched packed commands (F1L1R0G0S0M1) as 'F1', ignoring mode token M1. Fix: Python now sends S0/M1 as separate commands before F/L/R/G, ensuring Arduino correctly sets projectile mode before processing fire. Arduino sketch also updated to check line length before treating as single-token."
+      "title": "Sentry Mode startup fix: re-enabled sentry hooks by default so the Sentry tab receives the live camera feed and can take control when enabled."
     },
     {
       "date": "2026-01-26",
@@ -40,12 +40,7 @@
     },
     {
       "date": "2026-01-26",
-      "title": "Sentry Mode startup fix: re-enabled sentry hooks by default so the Sentry tab receives the live camera feed and can take control when enabled."
+      "title": "TRIGGER FIX: Fixed projectile servo not firing in Dual Port mode. Root cause: Arduino single-token parser incorrectly matched packed commands (F1L1R0G0S0M1) as 'F1', ignoring mode token M1. Fix: Python now sends S0/M1 as separate commands before F/L/R/G, ensuring Arduino correctly sets projectile mode before processing fire. Arduino sketch also updated to check line length before treating as single-token."
     }
   ]
 }
-
-    {
-      "date": "2026-01-26",
-      "title": "Aiming stability: main app now uses SmartTracker (centroid smoothing + persistence) and avoids ROI centroid drift so the yellow-dot stays centered on the tracked object." 
-    },

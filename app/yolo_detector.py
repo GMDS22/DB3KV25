@@ -1,6 +1,11 @@
 import os
 import time
 
+# CHANGE WARNING:
+# Keep this module's YOLO inference behavior in sync with
+# app/MAIN_FILE_SINGLE_CAM.py (async/threading, ROI usage, class filters,
+# confidence handling). If you change one, update the other or document why.
+
 # Do not import ultralytics at module import time. Import lazily inside
 # load_model so we can attempt a CPU-only import on systems where GPU
 # drivers/PyTorch CUDA support may be missing (common on some AMD/Windows setups).

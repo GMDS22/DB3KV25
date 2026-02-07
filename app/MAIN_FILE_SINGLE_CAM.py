@@ -1696,6 +1696,52 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.detection_pause_ms = 1000  # Milliseconds to pause detection when target enters scope
         self._detection_pause_until = 0.0  # Timestamp when detection pause expires
         self._was_in_scope = False  # Track scope entry for edge detection
+
+        # ========== MOTION-VERIFIED AUTO-FIRE (Feb 2026) ==========
+        # Optional gate to prevent firing on stationary targets.
+        self.motion_fire_enabled = False
+        self.motion_fire_px_threshold = 4.0
+        self.motion_fire_frames_required = 3
+        self.motion_fire_recent_ms = 800
+        self.motion_fire_stationary_lock_ms = 1200
+        self._motion_fire_prev_center = None
+        self._motion_fire_prev_ts = None
+        self._motion_fire_last_move_ts = None
+        self._motion_fire_consecutive = 0
+
+        # === SPEED-OPT START (2026-02-06) ===
+        # Master toggle + tunables for performance/latency improvements.
+        # Easy revert: set speed_opt_enabled=False in settings.json or code.
+        self.speed_opt_enabled = True
+        self.speed_serial_interval_ms = 15
+        self.speed_bus_servo_time_ms = 12
+        self.speed_predictive_lead_ms = 70
+        self.speed_predictive_max_px = 120
+        self.speed_roi_enabled = True
+        self.speed_roi_scale = 0.6
+        self.speed_roi_min_size = 200
+        self.speed_roi_padding_px = 24
+        self.speed_threaded_yolo = True
+        self.speed_threaded_yolo_max_age_s = 0.35
+        self.speed_prefer_light_yolo = True
+        self.speed_disable_command_filter = True
+        # Derived runtime settings used by timers/packet layer
+        self.serial_timer_interval_ms = int(self.speed_serial_interval_ms)
+        # bus_servo_time_ms remains available for manual overrides (None by default)
+        self.bus_servo_time_ms = None
+        # Predictive motion state
+        self._speed_last_target_center = None
+        self._speed_last_target_ts = None
+        self._speed_target_vel = (0.0, 0.0)
+        # Async YOLO state (initialized lazily)
+        self._yolo_async_lock = None
+        self._yolo_async_inflight = False
+        self._yolo_async_last_result = None
+        self._yolo_async_last_result_ts = 0.0
+        self._yolo_async_last_offset = (0, 0)
+        self._yolo_async_last_error = None
+        self._yolo_model_loading = False
+        # === SPEED-OPT END ===
         
         # ========== HUD COLOR PALETTE (Unified - Dec 2024) ==========
         # All HUD elements use these colors - no ad-hoc BGR values
@@ -2658,7 +2704,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             assert self.baud_rate_input is not None
         # Faster output loop benefits serial-bus servos: smoother and more responsive.
         # Use the serial timer as the primary output cadence (update_frame no longer needs to force-send).
-        self.serial_timer.start(20)
+        self.serial_timer.start(int(getattr(self, "serial_timer_interval_ms", 20)))
         # ==========================================
         # POLISHED GLOBAL UI THEME
         # ==========================================
@@ -2921,7 +2967,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             if getattr(self, "scope_settings_window", None) is None:
                 self.scope_settings_window = QMainWindow()
                 self.scope_settings_window.setWindowTitle("Scope Visual Settings")
-                self.scope_settings_window.setGeometry(100, 100, 550, 650)
+                self.scope_settings_window.setGeometry(100, 100, 550, 560)
                 
                 scope_widget = QWidget()
                 scope_layout = QGridLayout()
@@ -5143,6 +5189,262 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         behavior_layout.addLayout(detection_pause_row, br, 1)
         br += 1
 
+        # Motion-Verified Auto-Fire (optional safety gate)
+        behavior_layout.addWidget(QLabel("Motion-Verified Auto-Fire"), br, 0)
+        if getattr(self, "motion_fire_checkbox", None) is None:
+            self.motion_fire_checkbox = QCheckBox("Require Motion")
+        try:
+            self.motion_fire_checkbox.setChecked(
+                bool(getattr(self, "motion_fire_enabled", False))
+            )
+            self._safe_connect("motion_fire_checkbox", "toggled", self.save_settings)
+        except Exception:
+            pass
+        try:
+            self.motion_fire_checkbox.setToolTip(
+                "When enabled, auto-fire requires recent target motion to prevent firing on stationary objects."
+            )
+        except Exception:
+            pass
+        behavior_layout.addWidget(self.motion_fire_checkbox, br, 1)
+        br += 1
+
+        behavior_layout.addWidget(QLabel("Motion Threshold (px)"), br, 0)
+        if getattr(self, "motion_fire_px_threshold_input", None) is None:
+            self.motion_fire_px_threshold_input = QDoubleSpinBox()
+        try:
+            self.motion_fire_px_threshold_input.setRange(0.5, 50.0)
+            self.motion_fire_px_threshold_input.setSingleStep(0.5)
+            self.motion_fire_px_threshold_input.setValue(4.0)
+            self._safe_connect(
+                "motion_fire_px_threshold_input", "valueChanged", self.save_settings
+            )
+        except Exception:
+            pass
+        behavior_layout.addWidget(self.motion_fire_px_threshold_input, br, 1)
+        br += 1
+
+        behavior_layout.addWidget(QLabel("Motion Frames Required"), br, 0)
+        if getattr(self, "motion_fire_frames_input", None) is None:
+            self.motion_fire_frames_input = QSpinBox()
+        try:
+            self.motion_fire_frames_input.setRange(1, 10)
+            self.motion_fire_frames_input.setValue(3)
+            self._safe_connect(
+                "motion_fire_frames_input", "valueChanged", self.save_settings
+            )
+        except Exception:
+            pass
+        try:
+            self.motion_fire_frames_input.setToolTip(
+                "Number of consecutive frames that must exceed the motion threshold before auto-fire is allowed."
+            )
+        except Exception:
+            pass
+        behavior_layout.addWidget(self.motion_fire_frames_input, br, 1)
+        br += 1
+
+        behavior_layout.addWidget(QLabel("Motion Recent Window (ms)"), br, 0)
+        if getattr(self, "motion_fire_recent_ms_input", None) is None:
+            self.motion_fire_recent_ms_input = QSpinBox()
+        try:
+            self.motion_fire_recent_ms_input.setRange(0, 5000)
+            self.motion_fire_recent_ms_input.setValue(800)
+            self._safe_connect(
+                "motion_fire_recent_ms_input", "valueChanged", self.save_settings
+            )
+        except Exception:
+            pass
+        try:
+            self.motion_fire_recent_ms_input.setToolTip(
+                "How recent motion must be (milliseconds). 0 disables the recency check."
+            )
+        except Exception:
+            pass
+        behavior_layout.addWidget(self.motion_fire_recent_ms_input, br, 1)
+        br += 1
+
+        behavior_layout.addWidget(QLabel("Stationary Lockout (ms)"), br, 0)
+        if getattr(self, "motion_fire_stationary_lock_ms_input", None) is None:
+            self.motion_fire_stationary_lock_ms_input = QSpinBox()
+        try:
+            self.motion_fire_stationary_lock_ms_input.setRange(0, 5000)
+            self.motion_fire_stationary_lock_ms_input.setValue(1200)
+            self._safe_connect(
+                "motion_fire_stationary_lock_ms_input",
+                "valueChanged",
+                self.save_settings,
+            )
+        except Exception:
+            pass
+        behavior_layout.addWidget(self.motion_fire_stationary_lock_ms_input, br, 1)
+        br += 1
+
+        # SPEED / PERFORMANCE (Feb 2026)
+        try:
+            speed_group = QGroupBox("Speed / Performance")
+            speed_layout = QGridLayout()
+            speed_layout.setSpacing(6)
+            speed_layout.setContentsMargins(8, 8, 8, 8)
+
+            if getattr(self, "speed_opt_checkbox", None) is None:
+                self.speed_opt_checkbox = QCheckBox("Enable speed optimizations")
+            try:
+                self.speed_opt_checkbox.setChecked(bool(getattr(self, "speed_opt_enabled", True)))
+                self.speed_opt_checkbox.setToolTip(
+                    "Master toggle for speed optimizations. Off = safer/default behavior; On = faster response."
+                )
+            except Exception:
+                pass
+            speed_layout.addWidget(self.speed_opt_checkbox, 0, 0, 1, 2)
+
+            # Serial interval
+            speed_layout.addWidget(QLabel("Serial interval (ms)"), 1, 0)
+            if getattr(self, "speed_serial_interval_input", None) is None:
+                self.speed_serial_interval_input = QSpinBox()
+            try:
+                self.speed_serial_interval_input.setRange(5, 50)
+                self.speed_serial_interval_input.setValue(int(getattr(self, "speed_serial_interval_ms", 15)))
+                self.speed_serial_interval_input.setToolTip(
+                    "How often commands are sent. Lower = faster updates (more load). Higher = slower, steadier."
+                )
+            except Exception:
+                pass
+            speed_layout.addWidget(self.speed_serial_interval_input, 1, 1)
+
+            # Bus-servo move time
+            speed_layout.addWidget(QLabel("Bus move time (ms)"), 2, 0)
+            if getattr(self, "speed_bus_servo_time_input", None) is None:
+                self.speed_bus_servo_time_input = QSpinBox()
+            try:
+                self.speed_bus_servo_time_input.setRange(5, 50)
+                self.speed_bus_servo_time_input.setValue(int(getattr(self, "speed_bus_servo_time_ms", 12)))
+                self.speed_bus_servo_time_input.setToolTip(
+                    "Bus-servo move time in ms. Lower = snappier motion; Higher = smoother, slower moves."
+                )
+            except Exception:
+                pass
+            speed_layout.addWidget(self.speed_bus_servo_time_input, 2, 1)
+
+            # Predictive lead
+            speed_layout.addWidget(QLabel("Predictive lead (ms)"), 3, 0)
+            if getattr(self, "speed_predictive_lead_input", None) is None:
+                self.speed_predictive_lead_input = QSpinBox()
+            try:
+                self.speed_predictive_lead_input.setRange(0, 200)
+                self.speed_predictive_lead_input.setValue(int(getattr(self, "speed_predictive_lead_ms", 70)))
+                self.speed_predictive_lead_input.setToolTip(
+                    "Aim ahead by this many ms. Higher = more lead for fast targets; Lower = less overshoot."
+                )
+            except Exception:
+                pass
+            speed_layout.addWidget(self.speed_predictive_lead_input, 3, 1)
+
+            # ROI toggle + scale
+            if getattr(self, "speed_roi_enable_checkbox", None) is None:
+                self.speed_roi_enable_checkbox = QCheckBox("Enable YOLO ROI crop")
+            try:
+                self.speed_roi_enable_checkbox.setChecked(bool(getattr(self, "speed_roi_enabled", True)))
+                self.speed_roi_enable_checkbox.setToolTip(
+                    "Limit YOLO to a smaller region around the last target. On = faster; Off = full-frame accuracy."
+                )
+            except Exception:
+                pass
+            speed_layout.addWidget(self.speed_roi_enable_checkbox, 4, 0, 1, 2)
+
+            speed_layout.addWidget(QLabel("ROI scale (0.3-1.0)"), 5, 0)
+            if getattr(self, "speed_roi_scale_input", None) is None:
+                self.speed_roi_scale_input = QDoubleSpinBox()
+            try:
+                self.speed_roi_scale_input.setRange(0.3, 1.0)
+                self.speed_roi_scale_input.setSingleStep(0.05)
+                self.speed_roi_scale_input.setValue(float(getattr(self, "speed_roi_scale", 0.6)))
+                self.speed_roi_scale_input.setToolTip(
+                    "ROI size as a fraction of the frame. Lower = smaller/faster; Higher = larger/more robust."
+                )
+            except Exception:
+                pass
+            speed_layout.addWidget(self.speed_roi_scale_input, 5, 1)
+
+            # Threaded YOLO
+            if getattr(self, "speed_threaded_yolo_checkbox", None) is None:
+                self.speed_threaded_yolo_checkbox = QCheckBox("Threaded YOLO (async)")
+            try:
+                self.speed_threaded_yolo_checkbox.setChecked(bool(getattr(self, "speed_threaded_yolo", True)))
+                self.speed_threaded_yolo_checkbox.setToolTip(
+                    "Run YOLO off the UI thread. On = smoother UI; Off = simpler but can stutter."
+                )
+            except Exception:
+                pass
+            speed_layout.addWidget(self.speed_threaded_yolo_checkbox, 6, 0, 1, 2)
+
+            # Prefer light model
+            if getattr(self, "speed_prefer_light_yolo_checkbox", None) is None:
+                self.speed_prefer_light_yolo_checkbox = QCheckBox("Prefer light YOLO model")
+            try:
+                self.speed_prefer_light_yolo_checkbox.setChecked(bool(getattr(self, "speed_prefer_light_yolo", True)))
+                self.speed_prefer_light_yolo_checkbox.setToolTip(
+                    "Auto-select lighter YOLO models when possible. On = faster; Off = can use heavier/accurate models."
+                )
+            except Exception:
+                pass
+            speed_layout.addWidget(self.speed_prefer_light_yolo_checkbox, 7, 0, 1, 2)
+
+            # Disable command filter
+            if getattr(self, "speed_disable_cmd_filter_checkbox", None) is None:
+                self.speed_disable_cmd_filter_checkbox = QCheckBox("Disable redundant-command filter")
+            try:
+                self.speed_disable_cmd_filter_checkbox.setChecked(bool(getattr(self, "speed_disable_command_filter", True)))
+                self.speed_disable_cmd_filter_checkbox.setToolTip(
+                    "Send commands every tick even if unchanged. On = more updates; Off = less jitter/traffic."
+                )
+            except Exception:
+                pass
+            speed_layout.addWidget(self.speed_disable_cmd_filter_checkbox, 8, 0, 1, 2)
+
+            def _speed_apply_runtime(_=None):
+                try:
+                    self.speed_opt_enabled = bool(self.speed_opt_checkbox.isChecked())
+                    self.speed_serial_interval_ms = int(self.speed_serial_interval_input.value())
+                    self.speed_bus_servo_time_ms = int(self.speed_bus_servo_time_input.value())
+                    self.speed_predictive_lead_ms = float(self.speed_predictive_lead_input.value())
+                    self.speed_roi_enabled = bool(self.speed_roi_enable_checkbox.isChecked())
+                    self.speed_roi_scale = float(self.speed_roi_scale_input.value())
+                    self.speed_threaded_yolo = bool(self.speed_threaded_yolo_checkbox.isChecked())
+                    self.speed_prefer_light_yolo = bool(self.speed_prefer_light_yolo_checkbox.isChecked())
+                    self.speed_disable_command_filter = bool(self.speed_disable_cmd_filter_checkbox.isChecked())
+                    if self.speed_opt_enabled:
+                        self.serial_timer_interval_ms = int(self.speed_serial_interval_ms)
+                    else:
+                        self.serial_timer_interval_ms = 20
+                    if getattr(self, "serial_timer", None) is not None and self.serial_timer.isActive():
+                        self.serial_timer.start(int(self.serial_timer_interval_ms))
+                except Exception:
+                    pass
+                try:
+                    self.save_settings()
+                except Exception:
+                    pass
+
+            try:
+                self._safe_connect("speed_opt_checkbox", "toggled", _speed_apply_runtime)
+                self._safe_connect("speed_serial_interval_input", "valueChanged", _speed_apply_runtime)
+                self._safe_connect("speed_bus_servo_time_input", "valueChanged", _speed_apply_runtime)
+                self._safe_connect("speed_predictive_lead_input", "valueChanged", _speed_apply_runtime)
+                self._safe_connect("speed_roi_enable_checkbox", "toggled", _speed_apply_runtime)
+                self._safe_connect("speed_roi_scale_input", "valueChanged", _speed_apply_runtime)
+                self._safe_connect("speed_threaded_yolo_checkbox", "toggled", _speed_apply_runtime)
+                self._safe_connect("speed_prefer_light_yolo_checkbox", "toggled", _speed_apply_runtime)
+                self._safe_connect("speed_disable_cmd_filter_checkbox", "toggled", _speed_apply_runtime)
+            except Exception:
+                pass
+
+            speed_group.setLayout(speed_layout)
+            behavior_layout.addWidget(speed_group, br, 0, 1, 2)
+            br += 1
+        except Exception:
+            pass
+
         behavior_layout.addWidget(QLabel("Snap Threshold (px)"), br, 0)
         snap_row = QHBoxLayout()
         if getattr(self, "snap_threshold_slider", None) is None:
@@ -6832,6 +7134,75 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     servo_calib_action.triggered.connect(open_servo_calibration)
                 except Exception:
                     pass
+
+                # Arduino IDE launcher (quick link)
+                arduino_action = tools_menu.addAction("🧰 Arduino IDE")
+                try:
+                    def open_arduino_ide():
+                        try:
+                            import os
+                            import subprocess
+                            import shutil
+                            from pathlib import Path
+
+                            repo_root = Path(__file__).resolve().parent.parent
+                            candidates = [
+                                repo_root / "tools" / "arduino-ide" / "arduino.exe",
+                                repo_root / "tools" / "arduino-ide" / "arduino_debug.exe",
+                                repo_root / "tools" / "arduino" / "arduino.exe",
+                                repo_root / "tools" / "arduino" / "arduino_debug.exe",
+                            ]
+                            ide_path = None
+                            for c in candidates:
+                                try:
+                                    if c.exists():
+                                        ide_path = str(c)
+                                        break
+                                except Exception:
+                                    pass
+
+                            if ide_path is None:
+                                ide_path = shutil.which("arduino") or shutil.which("arduino.exe")
+
+                            if ide_path:
+                                subprocess.Popen([ide_path])
+                                try:
+                                    if hasattr(self, "enhancer"):
+                                        self.enhancer.log_serial_output(
+                                            f"Arduino IDE launched: {ide_path}",
+                                            fire=False,
+                                        )
+                                except Exception:
+                                    pass
+                                return
+
+                            # If not found, open tools folder for user to locate IDE
+                            tools_dir = repo_root / "tools"
+                            try:
+                                if tools_dir.exists():
+                                    os.startfile(str(tools_dir))
+                            except Exception:
+                                pass
+                            try:
+                                if hasattr(self, "enhancer"):
+                                    self.enhancer.log_serial_output(
+                                        "Arduino IDE not found. Opened tools folder.",
+                                        fire=False,
+                                    )
+                            except Exception:
+                                pass
+                        except Exception as e:
+                            try:
+                                if hasattr(self, "enhancer"):
+                                    self.enhancer.log_serial_output(
+                                        f"Error launching Arduino IDE: {e}",
+                                        fire=False,
+                                    )
+                            except Exception:
+                                pass
+                    arduino_action.triggered.connect(open_arduino_ide)
+                except Exception:
+                    pass
                 
                 # Idle Settings is added later (with safe_connect + enhancer logging)
                 # to avoid duplicate menu entries.
@@ -7196,14 +7567,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
 
-        # Widgets menu: quick open/restore of any docked widget and a persistent
-        # bottom 'Workspace' dock that is empty by default (user can dock into it).
-        # Define workspace_container if not already defined to prevent collision in widget_items list
-        if locals().get("workspace_container") is None:
-             w_grp = QGroupBox("Workspace")
-             w_grp.setLayout(QVBoxLayout())
-             workspace_container = w_grp
-             self.add_dock("Workspace", workspace_container, "bottom")
+        # Widgets menu: quick open/restore of any docked widget.
 
         try:
             try:
@@ -7235,7 +7599,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     ("System", status_group),
                     ("System Health Monitor", None),
                     ("Sniper Scope", getattr(self, "sniper_dock", None)),
-                    ("Workspace", workspace_container),
+                    ("Behavior Presets", getattr(self, "behavior_presets_dock", None)),
                 ]
             except Exception:
                 widget_items = []
@@ -7478,16 +7842,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             dlg.resize(400, 300)
             layout = QVBoxLayout(dlg)
             
-            table = QTableWidget(7, 3)
+            table = QTableWidget(8, 3)
             table.setHorizontalHeaderLabels(["Pin", "Function", "Mode"])
             table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
             
             data = [
-                ("D3", "Trigger Servo", "PWM (Projectile)"),
-                ("D4", "Trigger MOSFET", "Digital Out (Water/Fast)"),
-                ("D5", "LED Relay", "Digital Out"),
-                ("D6", "Laser Relay", "Digital Out"),
-                ("D9", "Unused", "-"),
+                ("D9", "Trigger Servo", "PWM (Projectile)"),
+                ("D6", "Trigger MOSFET", "Digital Out (Water/Fast)"),
+                ("D4", "LED Relay", "Digital Out"),
+                ("D5", "Laser Relay", "Digital Out"),
+                ("D7", "Accessory Relay", "Digital Out"),
                 ("A2", "Total Current", "Analog In"),
                 ("A7", "Tilt Safety", "Analog/Dig (Optional)"),
             ]
@@ -8476,14 +8840,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         try:
             presets_dock = self.add_dock("Behavior Presets", scroll, "right")
             try:
-                if "Behavior Presets" not in getattr(self, "widget_items", []):
-                    self.widget_items.append("Behavior Presets")
+                self.behavior_presets_dock = presets_dock
             except Exception:
                 pass
             # === HIDE PRESETS BY DEFAULT - Dec 2025 ===
             # User can open from Widgets menu if needed
             try:
                 if presets_dock is not None:
+                    # Exclude from saved layouts/window state
+                    try:
+                        presets_dock.setObjectName("")
+                    except Exception:
+                        pass
                     presets_dock.hide()
             except Exception:
                 pass
@@ -9247,12 +9615,20 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             pan_id, tilt_id = 1, 2
 
         # Use a speed that's responsive but safe
-        # UPDATED (Agent): Reduced default from 200ms to 20ms for vastly improved tracking latency.
-        # This allows the software PID/smoothing to control the feel, rather than hardware lag.
+        # UPDATED (Agent): Reduced default from 200ms to 20ms for improved tracking latency.
         default_time = 20
+        # SPEED-OPT (2026-02-06): Allow a faster default via settings.
+        if bool(getattr(self, "speed_opt_enabled", False)):
+            try:
+                default_time = int(getattr(self, "speed_bus_servo_time_ms", default_time) or default_time)
+            except Exception:
+                default_time = 20
         # If specifically overridden by a "bus_servo_time_ms" attribute (e.g. for slow pans), use that.
         if time_ms is None:
-            time_ms = int(getattr(self, "bus_servo_time_ms", default_time) or default_time)
+            if self._speed_opt_active() and getattr(self, "bus_servo_time_ms", None) is None:
+                time_ms = int(getattr(self, "speed_bus_servo_time_ms", default_time) or default_time)
+            else:
+                time_ms = int(getattr(self, "bus_servo_time_ms", default_time) or default_time)
         time_ms = int(time_ms)
         
         ok1 = self._bus_servo_write_pos(servo_id=pan_id, deg=float(pan_deg), time_ms=time_ms)
@@ -10100,6 +10476,28 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
 
+            # Ensure YOLO runs in a background thread for UI responsiveness.
+            # This prevents manual controls and Go Home from stalling during inference.
+            try:
+                if (is_yolo or is_hybrid) and not is_color:
+                    if not bool(getattr(self, "speed_threaded_yolo", False)):
+                        self.speed_threaded_yolo = True
+                        try:
+                            if getattr(self, "speed_threaded_yolo_checkbox", None) is not None:
+                                self.speed_threaded_yolo_checkbox.setChecked(True)
+                        except Exception:
+                            pass
+                        try:
+                            if hasattr(self, "enhancer"):
+                                self.enhancer.log_serial_output(
+                                    "[YOLO] Threaded inference forced ON for responsiveness",
+                                    fire=False,
+                                )
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
             # ensure the yolo group exists
             if hasattr(self, "yolo_settings_group"):
                 # Only refresh models when the pure YOLO panel is relevant.
@@ -10183,16 +10581,49 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             else:
                 print("on_detection_mode_change error:", e)
 
+    def _request_yolo_model_load_async(self, model_name: str) -> bool:
+        """Request a YOLO model load without blocking the UI thread."""
+        # CHANGE WARNING:
+        # Keep non-blocking YOLO model load behavior in sync with update_frame.
+        if not model_name:
+            return False
+        try:
+            if bool(getattr(self, "_yolo_model_loading", False)):
+                return False
+        except Exception:
+            pass
+        try:
+            # Delegate to the standard background loader.
+            idx = getattr(self.yolo_model_combo, "currentIndex", lambda: -1)()
+            if idx is None or int(idx) < 0:
+                return False
+            self.on_yolo_model_changed(idx)
+            return True
+        except Exception:
+            return False
+
     def on_yolo_model_changed(self, idx):
+        # CHANGE WARNING:
+        # This method performs background model loading; do not block the UI thread.
         model_name = self.yolo_model_combo.currentText()
         if model_name:
             # Load model in background to prevent UI freeze
             import threading
             def _load_model_bg():
                 try:
+                    try:
+                        if bool(getattr(self, "_yolo_model_loading", False)):
+                            return
+                        self._yolo_model_loading = True
+                    except Exception:
+                        pass
                     success = self.yolo_detector.load_model(model_name)
                     # Callback to UI thread
                     def _on_loaded():
+                        try:
+                            self._yolo_model_loading = False
+                        except Exception:
+                            pass
                         if success:
                             if hasattr(self, "enhancer"):
                                 self.enhancer.log_serial_output(f"Loaded YOLO model: {model_name}")
@@ -10219,6 +10650,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     QTimer.singleShot(0, _on_loaded)
                 except Exception as e:
                     def _on_error():
+                        try:
+                            self._yolo_model_loading = False
+                        except Exception:
+                            pass
                         if hasattr(self, "enhancer"):
                             self.enhancer.log_serial_output(f"Failed to load YOLO model {model_name}: {e}")
                     QTimer.singleShot(0, _on_error)
@@ -11273,6 +11708,92 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.auto_tracking_enabled = settings.get("auto_tracking", False)
             self.detection_enabled = settings.get("detection_enabled", False)
 
+            # --- Speed Optimization Settings (Feb 2026) ---
+            try:
+                self.speed_opt_enabled = bool(settings.get("speed_opt_enabled", True))
+            except Exception:
+                self.speed_opt_enabled = True
+            try:
+                self.speed_serial_interval_ms = int(settings.get("speed_serial_interval_ms", 15) or 15)
+            except Exception:
+                self.speed_serial_interval_ms = 15
+            try:
+                self.speed_bus_servo_time_ms = int(settings.get("speed_bus_servo_time_ms", 12) or 12)
+            except Exception:
+                self.speed_bus_servo_time_ms = 12
+            try:
+                self.speed_predictive_lead_ms = float(settings.get("speed_predictive_lead_ms", 70) or 70)
+            except Exception:
+                self.speed_predictive_lead_ms = 70
+            try:
+                self.speed_predictive_max_px = float(settings.get("speed_predictive_max_px", 120) or 120)
+            except Exception:
+                self.speed_predictive_max_px = 120
+            try:
+                self.speed_roi_enabled = bool(settings.get("speed_roi_enabled", True))
+            except Exception:
+                self.speed_roi_enabled = True
+            try:
+                self.speed_roi_scale = float(settings.get("speed_roi_scale", 0.6) or 0.6)
+            except Exception:
+                self.speed_roi_scale = 0.6
+            try:
+                self.speed_roi_min_size = int(settings.get("speed_roi_min_size", 200) or 200)
+            except Exception:
+                self.speed_roi_min_size = 200
+            try:
+                self.speed_roi_padding_px = int(settings.get("speed_roi_padding_px", 24) or 24)
+            except Exception:
+                self.speed_roi_padding_px = 24
+            try:
+                self.speed_threaded_yolo = bool(settings.get("speed_threaded_yolo", True))
+            except Exception:
+                self.speed_threaded_yolo = True
+            try:
+                self.speed_threaded_yolo_max_age_s = float(settings.get("speed_threaded_yolo_max_age_s", 0.35) or 0.35)
+            except Exception:
+                self.speed_threaded_yolo_max_age_s = 0.35
+            try:
+                self.speed_prefer_light_yolo = bool(settings.get("speed_prefer_light_yolo", True))
+            except Exception:
+                self.speed_prefer_light_yolo = True
+            try:
+                self.speed_disable_command_filter = bool(settings.get("speed_disable_command_filter", True))
+            except Exception:
+                self.speed_disable_command_filter = True
+            # Sync Speed UI controls if present
+            try:
+                if getattr(self, "speed_opt_checkbox", None) is not None:
+                    self.speed_opt_checkbox.setChecked(bool(getattr(self, "speed_opt_enabled", True)))
+                if getattr(self, "speed_serial_interval_input", None) is not None:
+                    self.speed_serial_interval_input.setValue(int(getattr(self, "speed_serial_interval_ms", 15)))
+                if getattr(self, "speed_bus_servo_time_input", None) is not None:
+                    self.speed_bus_servo_time_input.setValue(int(getattr(self, "speed_bus_servo_time_ms", 12)))
+                if getattr(self, "speed_predictive_lead_input", None) is not None:
+                    self.speed_predictive_lead_input.setValue(int(getattr(self, "speed_predictive_lead_ms", 70)))
+                if getattr(self, "speed_roi_enable_checkbox", None) is not None:
+                    self.speed_roi_enable_checkbox.setChecked(bool(getattr(self, "speed_roi_enabled", True)))
+                if getattr(self, "speed_roi_scale_input", None) is not None:
+                    self.speed_roi_scale_input.setValue(float(getattr(self, "speed_roi_scale", 0.6)))
+                if getattr(self, "speed_threaded_yolo_checkbox", None) is not None:
+                    self.speed_threaded_yolo_checkbox.setChecked(bool(getattr(self, "speed_threaded_yolo", True)))
+                if getattr(self, "speed_prefer_light_yolo_checkbox", None) is not None:
+                    self.speed_prefer_light_yolo_checkbox.setChecked(bool(getattr(self, "speed_prefer_light_yolo", True)))
+                if getattr(self, "speed_disable_cmd_filter_checkbox", None) is not None:
+                    self.speed_disable_cmd_filter_checkbox.setChecked(bool(getattr(self, "speed_disable_command_filter", True)))
+            except Exception:
+                pass
+            # Apply derived runtime values
+            if bool(getattr(self, "speed_opt_enabled", True)):
+                self.serial_timer_interval_ms = int(getattr(self, "speed_serial_interval_ms", 15))
+            else:
+                self.serial_timer_interval_ms = 20
+            try:
+                if getattr(self, "serial_timer", None) is not None and self.serial_timer.isActive():
+                    self.serial_timer.start(int(getattr(self, "serial_timer_interval_ms", 20)))
+            except Exception:
+                pass
+
             # Camera orientation defaults (Dec 2025):
             # Working configuration for this build/hardware:
             #   flip_image=False, invert_pan=True, invert_tilt=False
@@ -11791,6 +12312,54 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
 
+            # --- Load Motion-Verified Auto-Fire Settings (Feb 2026) ---
+            try:
+                self.motion_fire_enabled = bool(settings.get("motion_fire_enabled", False))
+            except Exception:
+                self.motion_fire_enabled = False
+            try:
+                self.motion_fire_px_threshold = float(settings.get("motion_fire_px_threshold", 4.0))
+            except Exception:
+                self.motion_fire_px_threshold = 4.0
+            try:
+                self.motion_fire_frames_required = int(settings.get("motion_fire_frames_required", 3))
+            except Exception:
+                self.motion_fire_frames_required = 3
+            try:
+                self.motion_fire_recent_ms = int(settings.get("motion_fire_recent_ms", 800))
+            except Exception:
+                self.motion_fire_recent_ms = 800
+            try:
+                self.motion_fire_stationary_lock_ms = int(settings.get("motion_fire_stationary_lock_ms", 1200))
+            except Exception:
+                self.motion_fire_stationary_lock_ms = 1200
+
+            try:
+                if getattr(self, "motion_fire_checkbox", None) is not None:
+                    self.motion_fire_checkbox.setChecked(bool(self.motion_fire_enabled))
+                self._safe_widget_call(
+                    "motion_fire_px_threshold_input",
+                    "setValue",
+                    float(getattr(self, "motion_fire_px_threshold", 4.0)),
+                )
+                self._safe_widget_call(
+                    "motion_fire_frames_input",
+                    "setValue",
+                    int(getattr(self, "motion_fire_frames_required", 3)),
+                )
+                self._safe_widget_call(
+                    "motion_fire_recent_ms_input",
+                    "setValue",
+                    int(getattr(self, "motion_fire_recent_ms", 800)),
+                )
+                self._safe_widget_call(
+                    "motion_fire_stationary_lock_ms_input",
+                    "setValue",
+                    int(getattr(self, "motion_fire_stationary_lock_ms", 1200)),
+                )
+            except Exception:
+                pass
+
             # --- Load Hold Behavior Settings ---
             try:
                 self.lost_hold_seconds = float(
@@ -12144,6 +12713,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     def save_settings(self):
         """Save current settings to JSON file."""
 
+        # CHANGE WARNING:
+        # This function persists runtime behavior. Keep key sets aligned with load_settings().
+        # Last modified: 2026-02-07 by Copilot Agent
+
         # Build settings dict via helper so other routines can reuse it
         def get_settings_dict():
             # Use getattr to avoid exceptions if save_settings is triggered during UI construction
@@ -12176,6 +12749,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     return default
 
+            # Prefer scope-window opacity sliders if present (so Scope Visual Settings persist).
+            vignette_val = val("vignette_opacity_slider_scope", None)
+            if vignette_val is None:
+                vignette_val = val("vignette_opacity_slider", 50)
+            text_bg_val = val("text_bg_opacity_slider_scope", None)
+            if text_bg_val is None:
+                text_bg_val = val("text_bg_opacity_slider", 100)
+
             settings = {
                 # New parameters from user request
                 "threshold": val("threshold_input", 40),
@@ -12191,9 +12772,44 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "deadzone": val("deadzone_slider", 40),
                 "tracking_speed": val("tracking_speed_slider", 50),
                 "detection_pause_ms": val("detection_pause_slider", 1000),
+                "motion_fire_enabled": val("motion_fire_checkbox", False, "checked"),
+                "motion_fire_px_threshold": val(
+                    "motion_fire_px_threshold_input",
+                    float(getattr(self, "motion_fire_px_threshold", 4.0)),
+                    "value",
+                ),
+                "motion_fire_frames_required": val(
+                    "motion_fire_frames_input",
+                    int(getattr(self, "motion_fire_frames_required", 3)),
+                    "value",
+                ),
+                "motion_fire_recent_ms": val(
+                    "motion_fire_recent_ms_input",
+                    int(getattr(self, "motion_fire_recent_ms", 800)),
+                    "value",
+                ),
+                "motion_fire_stationary_lock_ms": val(
+                    "motion_fire_stationary_lock_ms_input",
+                    int(getattr(self, "motion_fire_stationary_lock_ms", 1200)),
+                    "value",
+                ),
                 "trigger_cooldown": val("trigger_cooldown_input", 1.5),
                 "auto_tracking": getattr(self, "auto_tracking_enabled", False),
                 "detection_enabled": getattr(self, "detection_enabled", False),
+                # Speed optimization settings (Feb 2026)
+                "speed_opt_enabled": val("speed_opt_checkbox", getattr(self, "speed_opt_enabled", True), "checked"),
+                "speed_serial_interval_ms": val("speed_serial_interval_input", int(getattr(self, "speed_serial_interval_ms", 15)), "value"),
+                "speed_bus_servo_time_ms": val("speed_bus_servo_time_input", int(getattr(self, "speed_bus_servo_time_ms", 12)), "value"),
+                "speed_predictive_lead_ms": val("speed_predictive_lead_input", float(getattr(self, "speed_predictive_lead_ms", 70)), "value"),
+                "speed_predictive_max_px": float(getattr(self, "speed_predictive_max_px", 120)),
+                "speed_roi_enabled": val("speed_roi_enable_checkbox", bool(getattr(self, "speed_roi_enabled", True)), "checked"),
+                "speed_roi_scale": val("speed_roi_scale_input", float(getattr(self, "speed_roi_scale", 0.6)), "value"),
+                "speed_roi_min_size": int(getattr(self, "speed_roi_min_size", 200)),
+                "speed_roi_padding_px": int(getattr(self, "speed_roi_padding_px", 24)),
+                "speed_threaded_yolo": val("speed_threaded_yolo_checkbox", bool(getattr(self, "speed_threaded_yolo", True)), "checked"),
+                "speed_threaded_yolo_max_age_s": float(getattr(self, "speed_threaded_yolo_max_age_s", 0.35)),
+                "speed_prefer_light_yolo": val("speed_prefer_light_yolo_checkbox", bool(getattr(self, "speed_prefer_light_yolo", True)), "checked"),
+                "speed_disable_command_filter": val("speed_disable_cmd_filter_checkbox", bool(getattr(self, "speed_disable_command_filter", True)), "checked"),
                 "invert_pan": val("invert_pan_checkbox", False, "checked"),
                 "invert_tilt": val("invert_tilt_checkbox", False, "checked"),
                 "step_size": val("step_size_input", self.STEP_INCREMENT),
@@ -12344,8 +12960,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 # Frame ratio (resolution) setting
                 "frame_ratio_setting": getattr(self, "frame_ratio_setting", "640x480"),
                 # Opacity controls for visual effects
-                "vignette_opacity": val("vignette_opacity_slider", 50),
-                "text_bg_opacity": val("text_bg_opacity_slider", 100),
+                "vignette_opacity": vignette_val,
+                "text_bg_opacity": text_bg_val,
                 # Scope visual settings (floating window)
                 "crosshair_length": val("crosshair_length_slider", 30),
                 "gap": val("gap_slider", 10),
@@ -12667,6 +13283,41 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             s['overshoot_percent'] = safe_int('overshoot_input', 0)
             s['hold_seconds'] = safe_float('lost_hold_input', getattr(self, 'lost_hold_seconds', 5.0))
             s['hold_infinite'] = bool(getattr(self, 'hold_infinite', False))
+            s['detection_pause_ms'] = safe_int('detection_pause_slider', 1000)
+
+            # Motion-verified auto-fire gate (optional)
+            s['motion_fire_enabled'] = bool(
+                getattr(getattr(self, 'motion_fire_checkbox', None), 'isChecked', lambda: False)()
+            )
+            s['motion_fire_px_threshold'] = safe_float('motion_fire_px_threshold_input', 4.0)
+            s['motion_fire_frames_required'] = safe_int('motion_fire_frames_input', 3)
+            s['motion_fire_recent_ms'] = safe_int('motion_fire_recent_ms_input', 800)
+            s['motion_fire_stationary_lock_ms'] = safe_int('motion_fire_stationary_lock_ms_input', 1200)
+
+            # Speed optimization (Feb 2026)
+            s['speed_opt_enabled'] = bool(
+                getattr(getattr(self, 'speed_opt_checkbox', None), 'isChecked', lambda: False)()
+            )
+            s['speed_serial_interval_ms'] = safe_int('speed_serial_interval_input', int(getattr(self, 'speed_serial_interval_ms', 15)))
+            s['speed_bus_servo_time_ms'] = safe_int('speed_bus_servo_time_input', int(getattr(self, 'speed_bus_servo_time_ms', 12)))
+            s['speed_predictive_lead_ms'] = safe_float('speed_predictive_lead_input', float(getattr(self, 'speed_predictive_lead_ms', 70)))
+            s['speed_predictive_max_px'] = float(getattr(self, 'speed_predictive_max_px', 120))
+            s['speed_roi_enabled'] = bool(
+                getattr(getattr(self, 'speed_roi_enable_checkbox', None), 'isChecked', lambda: False)()
+            )
+            s['speed_roi_scale'] = safe_float('speed_roi_scale_input', float(getattr(self, 'speed_roi_scale', 0.6)))
+            s['speed_roi_min_size'] = int(getattr(self, 'speed_roi_min_size', 200))
+            s['speed_roi_padding_px'] = int(getattr(self, 'speed_roi_padding_px', 24))
+            s['speed_threaded_yolo'] = bool(
+                getattr(getattr(self, 'speed_threaded_yolo_checkbox', None), 'isChecked', lambda: False)()
+            )
+            s['speed_threaded_yolo_max_age_s'] = float(getattr(self, 'speed_threaded_yolo_max_age_s', 0.35))
+            s['speed_prefer_light_yolo'] = bool(
+                getattr(getattr(self, 'speed_prefer_light_yolo_checkbox', None), 'isChecked', lambda: False)()
+            )
+            s['speed_disable_command_filter'] = bool(
+                getattr(getattr(self, 'speed_disable_cmd_filter_checkbox', None), 'isChecked', lambda: False)()
+            )
 
             # Precision aim (persisted + presettable)
             s['precision_mode'] = bool(getattr(getattr(self, 'precision_mode_checkbox', None), 'isChecked', lambda: False)())
@@ -12828,6 +13479,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 try_set('snap_threshold_slider', int(preset['snap_threshold']))
             if 'deadzone' in preset:
                 try_set('deadzone_slider', int(preset['deadzone']))
+            if 'detection_pause_ms' in preset:
+                try_set('detection_pause_slider', int(preset['detection_pause_ms']))
             
             # CRITICAL FIX: smoothing_factor (preset key) -> smoothing_input (widget name)
             if 'smoothing_factor' in preset:
@@ -12871,6 +13524,58 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.final_approach_boost_checkbox.setChecked(self.final_approach_boost)
                 except Exception as e:
                     if logger: log_exception(e, "Setting final_approach_boost from preset")
+
+            # --- Motion-Verified Auto-Fire Gate ---
+            if 'motion_fire_enabled' in preset and getattr(self, 'motion_fire_checkbox', None) is not None:
+                try:
+                    self.motion_fire_checkbox.setChecked(bool(preset['motion_fire_enabled']))
+                except Exception:
+                    pass
+            for key, widget in (
+                ('motion_fire_px_threshold', 'motion_fire_px_threshold_input'),
+                ('motion_fire_frames_required', 'motion_fire_frames_input'),
+                ('motion_fire_recent_ms', 'motion_fire_recent_ms_input'),
+                ('motion_fire_stationary_lock_ms', 'motion_fire_stationary_lock_ms_input'),
+            ):
+                if key in preset:
+                    try_set(widget, preset[key])
+
+            # --- Speed Optimization (Feb 2026) ---
+            if 'speed_opt_enabled' in preset and getattr(self, 'speed_opt_checkbox', None) is not None:
+                try:
+                    self.speed_opt_checkbox.setChecked(bool(preset['speed_opt_enabled']))
+                except Exception:
+                    pass
+            for key, widget in (
+                ('speed_serial_interval_ms', 'speed_serial_interval_input'),
+                ('speed_bus_servo_time_ms', 'speed_bus_servo_time_input'),
+                ('speed_predictive_lead_ms', 'speed_predictive_lead_input'),
+                ('speed_roi_scale', 'speed_roi_scale_input'),
+            ):
+                if key in preset:
+                    try_set(widget, preset[key])
+            for key, widget in (
+                ('speed_roi_enabled', 'speed_roi_enable_checkbox'),
+                ('speed_threaded_yolo', 'speed_threaded_yolo_checkbox'),
+                ('speed_prefer_light_yolo', 'speed_prefer_light_yolo_checkbox'),
+                ('speed_disable_command_filter', 'speed_disable_cmd_filter_checkbox'),
+            ):
+                if key in preset and getattr(self, widget, None) is not None:
+                    try:
+                        getattr(self, widget).setChecked(bool(preset[key]))
+                    except Exception:
+                        pass
+            for key in (
+                'speed_predictive_max_px',
+                'speed_roi_min_size',
+                'speed_roi_padding_px',
+                'speed_threaded_yolo_max_age_s',
+            ):
+                if key in preset:
+                    try:
+                        setattr(self, key, preset[key])
+                    except Exception:
+                        pass
 
             # --- Auto Strike (single decisive movement) ---
             if 'auto_strike_enabled' in preset:
@@ -13687,6 +14392,55 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self, "yolo_max_results_input", lambda: 0
                 )(),
                 "yolo_min_area": getattr(self, "yolo_min_area_input", lambda: 0)(),
+                # Precision mode default
+                "precision_mode": getattr(
+                    getattr(self, "precision_mode_checkbox", None), "isChecked", lambda: False
+                )(),
+                # Detection pause default
+                "detection_pause_ms": getattr(
+                    getattr(self, "detection_pause_slider", None), "value", lambda: 1000
+                )(),
+                # Motion-verified auto-fire defaults
+                "motion_fire_enabled": getattr(
+                    getattr(self, "motion_fire_checkbox", None), "isChecked", lambda: False
+                )(),
+                "motion_fire_px_threshold": getattr(
+                    getattr(self, "motion_fire_px_threshold_input", None), "value", lambda: 4.0
+                )(),
+                "motion_fire_frames_required": getattr(
+                    getattr(self, "motion_fire_frames_input", None), "value", lambda: 3
+                )(),
+                "motion_fire_recent_ms": getattr(
+                    getattr(self, "motion_fire_recent_ms_input", None), "value", lambda: 800
+                )(),
+                "motion_fire_stationary_lock_ms": getattr(
+                    getattr(self, "motion_fire_stationary_lock_ms_input", None), "value", lambda: 1200
+                )(),
+                # Scope visual settings
+                "crosshair_length": getattr(
+                    getattr(self, "crosshair_length_slider", None), "value", lambda: 30
+                )(),
+                "gap": getattr(
+                    getattr(self, "gap_slider", None), "value", lambda: 10
+                )(),
+                "crosshair_thickness": getattr(
+                    getattr(self, "crosshair_thickness_slider", None), "value", lambda: 2
+                )(),
+                "scope_radius_pct": getattr(
+                    getattr(self, "scope_radius_percent_slider", None), "value", lambda: 35
+                )(),
+                "corner_size": getattr(
+                    getattr(self, "corner_size_slider", None), "value", lambda: 40
+                )(),
+                "status_text_scale_x10": getattr(
+                    getattr(self, "status_text_scale_slider", None), "value", lambda: 12
+                )(),
+                "vignette_opacity": getattr(
+                    getattr(self, "vignette_opacity_slider_scope", None), "value", lambda: 50
+                )(),
+                "text_bg_opacity": getattr(
+                    getattr(self, "text_bg_opacity_slider_scope", None), "value", lambda: 100
+                )(),
             }
             preferred_path = self.PREFERRED_FILE
             try:
@@ -13854,6 +14608,44 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         )
                     except Exception:
                         pass
+                if "precision_mode" in prefs:
+                    try:
+                        self._safe_widget_call(
+                            "precision_mode_checkbox",
+                            "setChecked",
+                            bool(prefs["precision_mode"]),
+                        )
+                    except Exception:
+                        pass
+                if "detection_pause_ms" in prefs:
+                    try:
+                        self._safe_widget_call(
+                            "detection_pause_slider",
+                            "setValue",
+                            int(prefs["detection_pause_ms"]),
+                        )
+                    except Exception:
+                        pass
+                if "motion_fire_enabled" in prefs:
+                    try:
+                        self._safe_widget_call(
+                            "motion_fire_checkbox",
+                            "setChecked",
+                            bool(prefs["motion_fire_enabled"]),
+                        )
+                    except Exception:
+                        pass
+                for key, widget in (
+                    ("motion_fire_px_threshold", "motion_fire_px_threshold_input"),
+                    ("motion_fire_frames_required", "motion_fire_frames_input"),
+                    ("motion_fire_recent_ms", "motion_fire_recent_ms_input"),
+                    ("motion_fire_stationary_lock_ms", "motion_fire_stationary_lock_ms_input"),
+                ):
+                    if key in prefs:
+                        try:
+                            self._safe_widget_call(widget, "setValue", prefs[key])
+                        except Exception:
+                            pass
                 # YOLO preferences
                 if "yolo_confidence" in prefs:
                     try:
@@ -13892,6 +14684,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             )
                     except Exception:
                         pass
+                # Scope visual settings
+                for key, widget in (
+                    ("crosshair_length", "crosshair_length_slider"),
+                    ("gap", "gap_slider"),
+                    ("crosshair_thickness", "crosshair_thickness_slider"),
+                    ("scope_radius_pct", "scope_radius_percent_slider"),
+                    ("corner_size", "corner_size_slider"),
+                    ("status_text_scale_x10", "status_text_scale_slider"),
+                    ("vignette_opacity", "vignette_opacity_slider_scope"),
+                    ("text_bg_opacity", "text_bg_opacity_slider_scope"),
+                ):
+                    if key in prefs:
+                        try:
+                            self._safe_widget_call(widget, "setValue", prefs[key])
+                        except Exception:
+                            pass
                 if "home_return_mode" in prefs:
                     try:
                         mode = str(prefs["home_return_mode"])
@@ -14196,6 +15004,51 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.precision_max_step_input.setValue(float(preset["precision_max_step"]))
                 if "precision_frac_threshold" in preset and getattr(self, "precision_frac_threshold_input", None) is not None:
                     self.precision_frac_threshold_input.setValue(float(preset["precision_frac_threshold"]))
+            except Exception:
+                pass
+
+            # Speed optimization (presettable)
+            try:
+                if "speed_opt_enabled" in preset and getattr(self, "speed_opt_checkbox", None) is not None:
+                    self.speed_opt_checkbox.setChecked(bool(preset["speed_opt_enabled"]))
+                if "speed_serial_interval_ms" in preset and getattr(self, "speed_serial_interval_input", None) is not None:
+                    self.speed_serial_interval_input.setValue(int(preset["speed_serial_interval_ms"]))
+                if "speed_bus_servo_time_ms" in preset and getattr(self, "speed_bus_servo_time_input", None) is not None:
+                    self.speed_bus_servo_time_input.setValue(int(preset["speed_bus_servo_time_ms"]))
+                if "speed_predictive_lead_ms" in preset and getattr(self, "speed_predictive_lead_input", None) is not None:
+                    self.speed_predictive_lead_input.setValue(int(preset["speed_predictive_lead_ms"]))
+                if "speed_roi_enabled" in preset and getattr(self, "speed_roi_enable_checkbox", None) is not None:
+                    self.speed_roi_enable_checkbox.setChecked(bool(preset["speed_roi_enabled"]))
+                if "speed_roi_scale" in preset and getattr(self, "speed_roi_scale_input", None) is not None:
+                    self.speed_roi_scale_input.setValue(float(preset["speed_roi_scale"]))
+                if "speed_threaded_yolo" in preset and getattr(self, "speed_threaded_yolo_checkbox", None) is not None:
+                    self.speed_threaded_yolo_checkbox.setChecked(bool(preset["speed_threaded_yolo"]))
+                if "speed_prefer_light_yolo" in preset and getattr(self, "speed_prefer_light_yolo_checkbox", None) is not None:
+                    self.speed_prefer_light_yolo_checkbox.setChecked(bool(preset["speed_prefer_light_yolo"]))
+                if "speed_disable_command_filter" in preset and getattr(self, "speed_disable_cmd_filter_checkbox", None) is not None:
+                    self.speed_disable_cmd_filter_checkbox.setChecked(bool(preset["speed_disable_command_filter"]))
+
+                # Apply runtime values
+                self.speed_opt_enabled = bool(preset.get("speed_opt_enabled", True))
+                self.speed_serial_interval_ms = int(preset.get("speed_serial_interval_ms", 15))
+                self.speed_bus_servo_time_ms = int(preset.get("speed_bus_servo_time_ms", 12))
+                self.speed_predictive_lead_ms = float(preset.get("speed_predictive_lead_ms", 70))
+                self.speed_predictive_max_px = float(preset.get("speed_predictive_max_px", 120))
+                self.speed_roi_enabled = bool(preset.get("speed_roi_enabled", True))
+                self.speed_roi_scale = float(preset.get("speed_roi_scale", 0.6))
+                self.speed_roi_min_size = int(preset.get("speed_roi_min_size", 200))
+                self.speed_roi_padding_px = int(preset.get("speed_roi_padding_px", 24))
+                self.speed_threaded_yolo = bool(preset.get("speed_threaded_yolo", True))
+                self.speed_threaded_yolo_max_age_s = float(preset.get("speed_threaded_yolo_max_age_s", 0.35))
+                self.speed_prefer_light_yolo = bool(preset.get("speed_prefer_light_yolo", True))
+                self.speed_disable_command_filter = bool(preset.get("speed_disable_command_filter", True))
+
+                if self.speed_opt_enabled:
+                    self.serial_timer_interval_ms = int(self.speed_serial_interval_ms)
+                else:
+                    self.serial_timer_interval_ms = 20
+                if getattr(self, "serial_timer", None) is not None and self.serial_timer.isActive():
+                    self.serial_timer.start(int(self.serial_timer_interval_ms))
             except Exception:
                 pass
 
@@ -15592,6 +16445,215 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             return False
 
+    def _update_motion_fire_state(self, cx: float, cy: float, now: float | None = None) -> None:
+        """Update motion gate state from the latest target center."""
+        try:
+            ts = float(now) if now is not None else time.time()
+            prev = getattr(self, "_motion_fire_prev_center", None)
+            self._motion_fire_prev_center = (float(cx), float(cy))
+            self._motion_fire_prev_ts = ts
+            if prev is None:
+                self._motion_fire_consecutive = 0
+                return
+            dx = float(cx) - float(prev[0])
+            dy = float(cy) - float(prev[1])
+            dist = float((dx * dx + dy * dy) ** 0.5)
+            threshold = float(getattr(self, "motion_fire_px_threshold", 4.0) or 4.0)
+            if dist >= threshold:
+                self._motion_fire_consecutive = int(getattr(self, "_motion_fire_consecutive", 0)) + 1
+                self._motion_fire_last_move_ts = ts
+            else:
+                self._motion_fire_consecutive = 0
+        except Exception:
+            pass
+
+    def _motion_fire_allowed(self, now: float | None = None) -> bool:
+        """Return True if motion-verified auto-fire gate allows firing."""
+        try:
+            if not bool(getattr(self, "motion_fire_enabled", False)):
+                return True
+            ts = float(now) if now is not None else time.time()
+            last_move = getattr(self, "_motion_fire_last_move_ts", None)
+            if last_move is None:
+                return False
+            recent_ms = int(getattr(self, "motion_fire_recent_ms", 800) or 0)
+            if recent_ms > 0 and (ts - float(last_move)) * 1000.0 > float(recent_ms):
+                return False
+            lock_ms = int(getattr(self, "motion_fire_stationary_lock_ms", 1200) or 0)
+            if lock_ms > 0 and (ts - float(last_move)) * 1000.0 > float(lock_ms):
+                return False
+            frames_req = int(getattr(self, "motion_fire_frames_required", 3) or 1)
+            if frames_req > 1 and int(getattr(self, "_motion_fire_consecutive", 0)) < frames_req:
+                return False
+            return True
+        except Exception:
+            return False
+
+    # === SPEED-OPT START (2026-02-06) ===
+    def _speed_opt_active(self) -> bool:
+        return bool(getattr(self, "speed_opt_enabled", False))
+
+    def _speed_update_target_motion(self, cx: float, cy: float) -> None:
+        try:
+            now = time.time()
+            last = getattr(self, "_speed_last_target_center", None)
+            last_ts = getattr(self, "_speed_last_target_ts", None)
+            if last is not None and last_ts:
+                dt = max(0.001, float(now) - float(last_ts))
+                vx = (float(cx) - float(last[0])) / dt
+                vy = (float(cy) - float(last[1])) / dt
+                self._speed_target_vel = (vx, vy)
+            self._speed_last_target_center = (float(cx), float(cy))
+            self._speed_last_target_ts = now
+        except Exception:
+            pass
+
+    def _speed_predict_target(self, cx: float, cy: float) -> tuple[float, float]:
+        try:
+            if not self._speed_opt_active():
+                return float(cx), float(cy)
+            lead_ms = float(getattr(self, "speed_predictive_lead_ms", 0.0) or 0.0)
+            if lead_ms <= 0.0:
+                return float(cx), float(cy)
+            vx, vy = getattr(self, "_speed_target_vel", (0.0, 0.0))
+            lead_s = float(lead_ms) / 1000.0
+            px = float(cx) + (float(vx) * lead_s)
+            py = float(cy) + (float(vy) * lead_s)
+            max_px = float(getattr(self, "speed_predictive_max_px", 0.0) or 0.0)
+            if max_px > 0:
+                px = float(np.clip(px, float(cx) - max_px, float(cx) + max_px))
+                py = float(np.clip(py, float(cy) - max_px, float(cy) + max_px))
+            w = float(getattr(self, "frame_width", 640))
+            h = float(getattr(self, "frame_height", 480))
+            px = float(np.clip(px, 0.0, max(0.0, w - 1.0)))
+            py = float(np.clip(py, 0.0, max(0.0, h - 1.0)))
+            return px, py
+        except Exception:
+            return float(cx), float(cy)
+
+    def _speed_get_yolo_roi(self, frame):
+        """Return (roi_frame, (x0,y0), roi_active) for YOLO-only acceleration."""
+        try:
+            if frame is None:
+                return frame, (0, 0), False
+            if not self._speed_opt_active() or not bool(getattr(self, "speed_roi_enabled", False)):
+                return frame, (0, 0), False
+            if not bool(getattr(self, "tracking_active", False)):
+                return frame, (0, 0), False
+            last = getattr(self, "last_target_center", None)
+            if not last:
+                return frame, (0, 0), False
+            h, w = frame.shape[:2]
+            scale = float(getattr(self, "speed_roi_scale", 0.6) or 0.6)
+            scale = float(np.clip(scale, 0.3, 1.0))
+            min_size = int(getattr(self, "speed_roi_min_size", 200) or 200)
+            pad = int(getattr(self, "speed_roi_padding_px", 24) or 0)
+            roi_w = max(min_size, int(w * scale))
+            roi_h = max(min_size, int(h * scale))
+            cx, cy = float(last[0]), float(last[1])
+            x0 = int(cx - roi_w / 2) - pad
+            y0 = int(cy - roi_h / 2) - pad
+            x1 = int(cx + roi_w / 2) + pad
+            y1 = int(cy + roi_h / 2) + pad
+            x0 = max(0, x0)
+            y0 = max(0, y0)
+            x1 = min(w, x1)
+            y1 = min(h, y1)
+            if (x1 - x0) <= 0 or (y1 - y0) <= 0:
+                return frame, (0, 0), False
+            if (x1 - x0) >= w and (y1 - y0) >= h:
+                return frame, (0, 0), False
+            return frame[y0:y1, x0:x1], (x0, y0), True
+        except Exception:
+            return frame, (0, 0), False
+
+    def _speed_pick_light_yolo_model(self) -> str | None:
+        try:
+            if not self._speed_opt_active() or not bool(getattr(self, "speed_prefer_light_yolo", False)):
+                return None
+            combo = getattr(self, "yolo_model_combo", None)
+            if combo is None:
+                return None
+            names = [str(combo.itemText(i)) for i in range(int(combo.count()))]
+            if not names:
+                return None
+            preferred = []
+            for n in names:
+                n_l = n.lower()
+                if any(k in n_l for k in ("nano", "tiny", "yolov8n", "yolov5n", "yolov4-tiny", "-n", "_n", " n")):
+                    preferred.append(n)
+            if preferred:
+                return sorted(preferred, key=lambda s: len(s))[0]
+            # fallback: choose the shortest model name
+            return sorted(names, key=lambda s: len(s))[0]
+        except Exception:
+            return None
+
+    def _speed_yolo_detect_async(self, frame, conf: float, roi_offset=(0, 0)) -> list:
+        """Run YOLO in a background thread; return last recent result (offset applied)."""
+        try:
+            if frame is None:
+                return []
+            if not bool(getattr(self, "speed_threaded_yolo", False)):
+                return []
+            # Lazily create a lock
+            lock = getattr(self, "_yolo_async_lock", None)
+            if lock is None:
+                import threading
+
+                lock = threading.Lock()
+                self._yolo_async_lock = lock
+
+            # Start worker if idle
+            start_worker = False
+            with lock:
+                if not bool(getattr(self, "_yolo_async_inflight", False)):
+                    self._yolo_async_inflight = True
+                    start_worker = True
+            if start_worker:
+                import threading
+
+                frame_copy = frame.copy()
+                conf_val = float(conf)
+
+                def _worker():
+                    boxes = []
+                    err = None
+                    try:
+                        boxes = self.yolo_detector.detect(frame_copy, conf_val)
+                    except Exception as e:
+                        err = e
+                        boxes = []
+                    try:
+                        with lock:
+                            self._yolo_async_last_result = boxes
+                            self._yolo_async_last_result_ts = time.time()
+                            self._yolo_async_last_offset = roi_offset
+                            self._yolo_async_last_error = str(err) if err else None
+                            self._yolo_async_inflight = False
+                    except Exception:
+                        pass
+
+                threading.Thread(target=_worker, daemon=True).start()
+
+            # Return last recent result (if any)
+            with lock:
+                ts = float(getattr(self, "_yolo_async_last_result_ts", 0.0) or 0.0)
+                max_age = float(getattr(self, "speed_threaded_yolo_max_age_s", 0.35) or 0.35)
+                if ts > 0 and (time.time() - ts) <= max_age:
+                    boxes = getattr(self, "_yolo_async_last_result", []) or []
+                    ox, oy = getattr(self, "_yolo_async_last_offset", (0, 0))
+                    if ox or oy:
+                        try:
+                            return [(int(x + ox), int(y + oy), int(w), int(h)) for x, y, w, h in boxes]
+                        except Exception:
+                            return []
+                    return boxes
+            return []
+        except Exception:
+            return []
+    # === SPEED-OPT END ===
+
     def _request_trigger_pulse(self, reason: str = "", hold_ms=None) -> bool:
         """Fire a single non-blocking pulse (F1 then F0).
 
@@ -15945,6 +17007,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
 
+        # Refresh suppression window on every manual movement so tracking doesn't
+        # immediately override operator input (especially in YOLO/Hybrid modes).
+        try:
+            suppress_secs = min(getattr(self, "manual_control_suppress_seconds", 1.0), 5.0)
+            self._manual_override_until = time.time() + suppress_secs
+        except Exception:
+            pass
+
         pan_dir = -1 if self.flip_pan_direction else 1
         tilt_dir = -1 if self.flip_tilt_direction else 1
 
@@ -16252,7 +17322,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         # --- HARD RESET PHASE ---
         try:
-            # Stop current actions
+            # Stop current actions (capture prior state for restore)
+            self._go_home_prev_tracking = bool(getattr(self, "tracking_active", False))
+            self._go_home_prev_aiming = bool(getattr(self, "aiming_active", False))
             self.tracking_active = False
             self.aiming_active = False
             self.manual_override = False
@@ -16792,7 +17864,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # CHANGE WARNING:
         # Modifications here affect frame processing, tracking flow, and runtime state.
         # See CHANGE_IMPACT_REFERENCE.md → Camera & Video Capture Pipeline.
-        # Last modified: 2026-01-26 by Copilot Agent
+        # Last modified: 2026-02-06 by Copilot Agent
         # NOTE: Idle button now uses direct click detection (ClickDetectButton class)
         # No need for polling - direct mouse events work reliably
 
@@ -17041,16 +18113,48 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # the detector from immediately overriding the user intent.
         if getattr(self, "_in_go_home", False):
             try:
-                self._in_go_home = False
-                # make sure hold/last-sent values are set to the home angles
-                self.last_known_pan = int(getattr(self, "target_pan", getattr(self, "last_sent_pan", self.prev_pan_angle)))
-                self.last_known_tilt = int(getattr(self, "target_tilt", getattr(self, "last_sent_tilt", self.prev_tilt_angle)))
-                self.last_sent_pan = int(getattr(self, "last_known_pan", getattr(self, "last_sent_pan", self.prev_pan_angle)))
-                self.last_sent_tilt = int(getattr(self, "last_known_tilt", getattr(self, "last_sent_tilt", self.prev_tilt_angle)))
-                # DISABLED: Don't auto-resume - let user control with buttons
-                # self.tracking_active = True
-                # self.aiming_active = True
-                self.enhancer.log_serial_output("Go Home complete — awaiting user input.", fire=False)
+                go_home_timer = getattr(self, "_go_home_timer", None)
+                go_home_active = bool(
+                    go_home_timer is not None
+                    and getattr(go_home_timer, "isActive", lambda: False)()
+                )
+                if not go_home_active:
+                    self._in_go_home = False
+                    # make sure hold/last-sent values are set to the home angles
+                    self.last_known_pan = int(getattr(self, "target_pan", getattr(self, "last_sent_pan", self.prev_pan_angle)))
+                    self.last_known_tilt = int(getattr(self, "target_tilt", getattr(self, "last_sent_tilt", self.prev_tilt_angle)))
+                    self.last_sent_pan = int(getattr(self, "last_known_pan", getattr(self, "last_sent_pan", self.prev_pan_angle)))
+                    self.last_sent_tilt = int(getattr(self, "last_known_tilt", getattr(self, "last_sent_tilt", self.prev_tilt_angle)))
+
+                    # Restore tracking state after Go Home when appropriate.
+                    # If the user had tracking active before, restore it. Otherwise,
+                    # auto-resume only when auto_tracking_enabled is on.
+                    resume_requested = bool(getattr(self, "_go_home_prev_tracking", False))
+                    auto_track_enabled = bool(getattr(self, "auto_tracking_enabled", False))
+                    resume_tracking = resume_requested or auto_track_enabled
+
+                    self.tracking_active = bool(resume_tracking)
+                    self.aiming_active = bool(resume_tracking)
+
+                    # Update UI button states if present
+                    try:
+                        self._safe_widget_call("tracking_btn", "setChecked", self.tracking_active)
+                        self._safe_widget_call("tracking_btn", "setText", "Stop Tracking" if self.tracking_active else "Start Tracking")
+                        self._safe_widget_call("aiming_btn", "setChecked", self.aiming_active)
+                    except Exception:
+                        pass
+
+                    # Clear cached pre-home state
+                    try:
+                        self._go_home_prev_tracking = False
+                        self._go_home_prev_aiming = False
+                    except Exception:
+                        pass
+
+                    if resume_tracking:
+                        self.enhancer.log_serial_output("Go Home complete — tracking resumed.", fire=False)
+                    else:
+                        self.enhancer.log_serial_output("Go Home complete — awaiting user input.", fire=False)
             except Exception:
                 pass
         # Auto-resume tracking/aiming if detection found after idle/home
@@ -17166,43 +18270,49 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # the detector from immediately overriding the user intent.
             if getattr(self, "_in_go_home", False):
                 try:
-                    self._in_go_home = False
-                    # make sure hold/last-sent values are set to the home angles
-                    self.last_known_pan = int(
-                        getattr(
-                            self,
-                            "target_pan",
-                            getattr(self, "last_sent_pan", self.prev_pan_angle),
-                        )
+                    go_home_timer = getattr(self, "_go_home_timer", None)
+                    go_home_active = bool(
+                        go_home_timer is not None
+                        and getattr(go_home_timer, "isActive", lambda: False)()
                     )
-                    self.last_known_tilt = int(
-                        getattr(
-                            self,
-                            "target_tilt",
-                            getattr(self, "last_sent_tilt", self.prev_tilt_angle),
+                    if not go_home_active:
+                        self._in_go_home = False
+                        # make sure hold/last-sent values are set to the home angles
+                        self.last_known_pan = int(
+                            getattr(
+                                self,
+                                "target_pan",
+                                getattr(self, "last_sent_pan", self.prev_pan_angle),
+                            )
                         )
-                    )
-                    self.last_sent_pan = int(
-                        getattr(
-                            self,
-                            "last_known_pan",
-                            getattr(self, "last_sent_pan", self.prev_pan_angle),
+                        self.last_known_tilt = int(
+                            getattr(
+                                self,
+                                "target_tilt",
+                                getattr(self, "last_sent_tilt", self.prev_tilt_angle),
+                            )
                         )
-                    )
-                    self.last_sent_tilt = int(
-                        getattr(
-                            self,
-                            "last_known_tilt",
-                            getattr(self, "last_sent_tilt", self.prev_tilt_angle),
+                        self.last_sent_pan = int(
+                            getattr(
+                                self,
+                                "last_known_pan",
+                                getattr(self, "last_sent_pan", self.prev_pan_angle),
+                            )
                         )
-                    )
-                    # Keep prev angles as floats to preserve fractional adjustments
-                    try:
-                        self.prev_pan_angle = float(self.last_sent_pan)
-                        self.prev_tilt_angle = float(self.last_sent_tilt)
-                    except Exception:
-                        self.prev_pan_angle = float(int(self.last_sent_pan))
-                        self.prev_tilt_angle = float(int(self.last_sent_tilt))
+                        self.last_sent_tilt = int(
+                            getattr(
+                                self,
+                                "last_known_tilt",
+                                getattr(self, "last_sent_tilt", self.prev_tilt_angle),
+                            )
+                        )
+                        # Keep prev angles as floats to preserve fractional adjustments
+                        try:
+                            self.prev_pan_angle = float(self.last_sent_pan)
+                            self.prev_tilt_angle = float(self.last_sent_tilt)
+                        except Exception:
+                            self.prev_pan_angle = float(int(self.last_sent_pan))
+                            self.prev_tilt_angle = float(int(self.last_sent_tilt))
                 except Exception:
                     pass
         # If manual operator override suppression is active, treat like a transient suspend
@@ -17430,6 +18540,28 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
 
+        # SPEED-OPT: Prepare a smaller ROI for YOLO-based detection (optional).
+        yolo_frame = frame1
+        yolo_roi_offset = (0, 0)
+        yolo_roi_active = False
+        try:
+            yolo_frame, yolo_roi_offset, yolo_roi_active = self._speed_get_yolo_roi(frame1)
+        except Exception:
+            yolo_frame = frame1
+            yolo_roi_offset = (0, 0)
+            yolo_roi_active = False
+
+        def _apply_roi_offset(_boxes, _offset):
+            try:
+                if not _boxes:
+                    return _boxes
+                ox, oy = _offset
+                if not ox and not oy:
+                    return _boxes
+                return [(int(x + ox), int(y + oy), int(w), int(h)) for x, y, w, h in _boxes]
+            except Exception:
+                return _boxes
+
         if detection_mode == 0:  # Frame Difference
             if suppressed:
                 boxes = []
@@ -17640,11 +18772,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             self.yolo_detector.set_target_classes(classes)
                         except Exception:
                             pass
-                        
-                        boxes = self.yolo_detector.detect(
-                            frame1,
-                            self._safe_float_widget_value("yolo_confidence_input", 0.5),
-                        )
+
+                        conf_val = self._safe_float_widget_value("yolo_confidence_input", 0.5)
+                        if bool(getattr(self, "speed_threaded_yolo", False)):
+                            boxes = self._speed_yolo_detect_async(yolo_frame, conf_val, yolo_roi_offset)
+                        else:
+                            boxes = self.yolo_detector.detect(yolo_frame, conf_val)
+                            boxes = _apply_roi_offset(boxes, yolo_roi_offset)
                         try:
                             yolo_boxes_len = len(boxes)
                         except Exception:
@@ -17662,85 +18796,28 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         except Exception:
                             pass
                     else:
-                        # try a best-effort load if combo has selection
+                        # ASYNC ONLY: model loads are never run in update_frame().
+                        # Request a background load and return no boxes until ready.
                         model_name = (
                             self._safe_widget_method_return(
                                 "yolo_model_combo", "currentText", ""
                             )
                             or ""
                         )
+                        if not model_name and self._speed_opt_active():
+                            preferred = self._speed_pick_light_yolo_model()
+                            if preferred:
+                                try:
+                                    self._safe_widget_call("yolo_model_combo", "setCurrentText", preferred)
+                                except Exception:
+                                    pass
+                                model_name = preferred
                         if model_name:
-                            # DEBUG: Report attempting model load
                             try:
-                                if (
-                                    getattr(self, "debug_checkbox", None)
-                                    and getattr(
-                                        self.debug_checkbox, "isChecked", lambda: False
-                                    )()
-                                ):
-                                    print(f"[YOLO DEBUG] Attempting to load model: {model_name}")
+                                self._request_yolo_model_load_async(model_name)
                             except Exception:
                                 pass
-                            
-                            try:
-                                load_success = self.yolo_detector.load_model(model_name)
-                                if not load_success:
-                                    try:
-                                        if hasattr(self, "enhancer"):
-                                            self.enhancer.log_serial_output(
-                                                f"YOLO: Failed to load model {model_name}",
-                                                fire=False
-                                            )
-                                    except Exception:
-                                        pass
-                            except Exception as e:
-                                try:
-                                    if hasattr(self, "enhancer"):
-                                        self.enhancer.log_serial_output(
-                                            f"YOLO: Error loading model {model_name}: {e}",
-                                            fire=False
-                                        )
-                                except Exception:
-                                    pass
-                            try:
-                                classes = (
-                                    self._safe_widget_method_return(
-                                        "yolo_classes_input", "text", "person"
-                                    )
-                                    or "person"
-                                )
-                                self.yolo_detector.set_target_classes(classes)
-                            except Exception:
-                                pass
-                            try:
-                                self.enhancer.log_serial_output(
-                                    f"Loaded YOLO model: {model_name}"
-                                )
-                            except Exception:
-                                pass
-                            try:
-                                boxes = self.yolo_detector.detect(
-                                    frame1,
-                                    self._safe_float_widget_value(
-                                        "yolo_confidence_input", 0.5
-                                    ),
-                                )
-                                try:
-                                    yolo_boxes_len = len(boxes)
-                                except Exception:
-                                    yolo_boxes_len = 0
-                            except Exception as e:
-                                boxes = []
-                                try:
-                                    if hasattr(self, "enhancer"):
-                                        self.enhancer.log_serial_output(
-                                            f"YOLO detect error: {e}",
-                                            fire=False
-                                        )
-                                except Exception:
-                                    pass
                         else:
-                            # No model selected in combo
                             try:
                                 if (
                                     getattr(self, "debug_checkbox", None)
@@ -17921,25 +18998,31 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 pass
                             # Add timeout to prevent freeze
                             start = time.time()
-                            boxes = self.yolo_detector.detect(frame1, self._safe_float_widget_value("yolo_confidence_input", 0.5))
+                            conf_val = self._safe_float_widget_value("yolo_confidence_input", 0.5)
+                            if bool(getattr(self, "speed_threaded_yolo", False)):
+                                boxes = self._speed_yolo_detect_async(yolo_frame, conf_val, yolo_roi_offset)
+                            else:
+                                boxes = self.yolo_detector.detect(yolo_frame, conf_val)
+                                boxes = _apply_roi_offset(boxes, yolo_roi_offset)
                             elapsed = time.time() - start
                             if elapsed > 1.0:  # If detection took >1 sec, skip next frame
                                 print(f"[HYBRID] YOLO detection slow ({elapsed:.2f}s) - throttling")
                         else:
                             model_name = self._safe_widget_method_return("yolo_model_combo", "currentText", "") or ""
+                            if not model_name and self._speed_opt_active():
+                                preferred = self._speed_pick_light_yolo_model()
+                                if preferred:
+                                    try:
+                                        self._safe_widget_call("yolo_model_combo", "setCurrentText", preferred)
+                                    except Exception:
+                                        pass
+                                    model_name = preferred
                             if model_name:
                                 try:
-                                    start = time.time()
-                                    self.yolo_detector.load_model(model_name)
-                                    elapsed = time.time() - start
-                                    if elapsed > 2.0:
-                                        print(f"[HYBRID] YOLO model load slow ({elapsed:.2f}s)")
-                                    classes = self._safe_widget_method_return("yolo_classes_input", "text", "person") or "person"
-                                    self.yolo_detector.set_target_classes(classes)
-                                    boxes = self.yolo_detector.detect(frame1, self._safe_float_widget_value("yolo_confidence_input", 0.5))
-                                except Exception as ex:
-                                    print(f"[HYBRID] YOLO error: {ex}")
-                                    boxes = []
+                                    # ASYNC ONLY: avoid blocking model loads in update_frame().
+                                    self._request_yolo_model_load_async(model_name)
+                                except Exception:
+                                    pass
                     except Exception:
                         boxes = []
 
@@ -17993,25 +19076,31 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             pass
                         # Add timeout monitoring
                         start = time.time()
-                        yolo_boxes = self.yolo_detector.detect(frame1, self._safe_float_widget_value("yolo_confidence_input", 0.5))
+                        conf_val = self._safe_float_widget_value("yolo_confidence_input", 0.5)
+                        if bool(getattr(self, "speed_threaded_yolo", False)):
+                            yolo_boxes = self._speed_yolo_detect_async(yolo_frame, conf_val, yolo_roi_offset)
+                        else:
+                            yolo_boxes = self.yolo_detector.detect(yolo_frame, conf_val)
+                            yolo_boxes = _apply_roi_offset(yolo_boxes, yolo_roi_offset)
                         elapsed = time.time() - start
                         if elapsed > 1.0:
                             print(f"[HYBRID MODE 5] YOLO detection slow ({elapsed:.2f}s) - throttling")
                     else:
                         model_name = self._safe_widget_method_return("yolo_model_combo", "currentText", "") or ""
+                        if not model_name and self._speed_opt_active():
+                            preferred = self._speed_pick_light_yolo_model()
+                            if preferred:
+                                try:
+                                    self._safe_widget_call("yolo_model_combo", "setCurrentText", preferred)
+                                except Exception:
+                                    pass
+                                model_name = preferred
                         if model_name:
                             try:
-                                start = time.time()
-                                self.yolo_detector.load_model(model_name)
-                                elapsed = time.time() - start
-                                if elapsed > 2.0:
-                                    print(f"[HYBRID MODE 5] YOLO model load slow ({elapsed:.2f}s)")
-                                classes = self._safe_widget_method_return("yolo_classes_input", "text", "person") or "person"
-                                self.yolo_detector.set_target_classes(classes)
-                                yolo_boxes = self.yolo_detector.detect(frame1, self._safe_float_widget_value("yolo_confidence_input", 0.5))
-                            except Exception as ex:
-                                print(f"[HYBRID MODE 5] YOLO error: {ex}")
-                                yolo_boxes = []
+                                # ASYNC ONLY: avoid blocking model loads in update_frame().
+                                self._request_yolo_model_load_async(model_name)
+                            except Exception:
+                                pass
                 except Exception:
                     yolo_boxes = []
 
@@ -18376,10 +19465,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             self.yolo_detector.set_target_classes(classes)
                         except Exception:
                             pass
-                        yolo_boxes = self.yolo_detector.detect(
-                            frame1,
-                            self._safe_float_widget_value("yolo_confidence_input", 0.5),
-                        )
+                        conf_val = self._safe_float_widget_value("yolo_confidence_input", 0.5)
+                        if bool(getattr(self, "speed_threaded_yolo", False)):
+                            yolo_boxes = self._speed_yolo_detect_async(yolo_frame, conf_val, yolo_roi_offset)
+                        else:
+                            yolo_boxes = self.yolo_detector.detect(yolo_frame, conf_val)
+                            yolo_boxes = _apply_roi_offset(yolo_boxes, yolo_roi_offset)
                     else:
                         model_name = (
                             self._safe_widget_method_return(
@@ -18387,6 +19478,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             )
                             or ""
                         )
+                        if not model_name and self._speed_opt_active():
+                            preferred = self._speed_pick_light_yolo_model()
+                            if preferred:
+                                try:
+                                    self._safe_widget_call("yolo_model_combo", "setCurrentText", preferred)
+                                except Exception:
+                                    pass
+                                model_name = preferred
                         if model_name:
                             try:
                                 self.yolo_detector.load_model(model_name)
@@ -18403,12 +19502,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             except Exception:
                                 pass
                             try:
-                                yolo_boxes = self.yolo_detector.detect(
-                                    frame1,
-                                    self._safe_float_widget_value(
-                                        "yolo_confidence_input", 0.5
-                                    ),
+                                conf_val = self._safe_float_widget_value(
+                                    "yolo_confidence_input", 0.5
                                 )
+                                if bool(getattr(self, "speed_threaded_yolo", False)):
+                                    yolo_boxes = self._speed_yolo_detect_async(yolo_frame, conf_val, yolo_roi_offset)
+                                else:
+                                    yolo_boxes = self.yolo_detector.detect(yolo_frame, conf_val)
+                                    yolo_boxes = _apply_roi_offset(yolo_boxes, yolo_roi_offset)
                             except Exception:
                                 yolo_boxes = []
                 except Exception:
@@ -18681,7 +19782,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         
                         # AUTO-ENABLE TRACKING: If auto_tracking is enabled and no idle mode is active,
                         # automatically enable tracking and aiming when detection occurs
-                        if actual_idle_mode is None and auto_track_enabled and not getattr(self, "tracking_active", False):
+                        if (
+                            actual_idle_mode is None
+                            and auto_track_enabled
+                            and not getattr(self, "tracking_active", False)
+                            and not getattr(self, "_in_go_home", False)
+                            and not getattr(self, "manual_override", False)
+                            and not getattr(self, "_manual_override_active", False)
+                        ):
                             self.tracking_active = True
                             self.aiming_active = True
                             self.enhancer.log_serial_output(
@@ -18751,6 +19859,20 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.last_detections = [(int(x), int(y), int(w), int(h))]
                     # Store target center for Quick Strike feature
                     self.last_target_center = (x + w / 2.0, y + h / 2.0)
+                    try:
+                        self._update_motion_fire_state(
+                            float(self.last_target_center[0]),
+                            float(self.last_target_center[1])
+                        )
+                    except Exception:
+                        pass
+                    try:
+                        self._speed_update_target_motion(
+                            float(self.last_target_center[0]),
+                            float(self.last_target_center[1])
+                        )
+                    except Exception:
+                        pass
                 except Exception:
                     pass
 
@@ -18810,6 +19932,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 if not (
                     getattr(self, "manual_override", False)
                     or getattr(self, "_manual_override_active", False)
+                    or getattr(self, "_in_go_home", False)
                     or (time.time() < getattr(self, "_detection_pause_until", 0.0))
                 ):
                     try:
@@ -18829,6 +19952,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         # This ensures deadzone checks for firing use the same point the operator sees.
                         try:
                             self.last_target_center = (float(cx), float(cy))
+                            self._update_motion_fire_state(float(cx), float(cy))
+                            self._speed_update_target_motion(float(cx), float(cy))
+                        except Exception:
+                            pass
+                        # SPEED-OPT: Predictive lead (aim ahead based on recent motion)
+                        try:
+                            cx, cy = self._speed_predict_target(float(cx), float(cy))
                         except Exception:
                             pass
                         if frame1 is not None:
@@ -20283,51 +21413,62 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         now = time.time()
                         # Only auto-fire when turret is ARMED (safety_state==0)
                         if self.safety_state == 0:
-                            # Handle both rapid fire and normal auto-fire
-                            if getattr(self, "rapid_fire_enabled", False):
-                                # Projectile (BB Servo) cannot rapid-fire as a latched state.
-                                # Use edge-triggered pulses instead so the servo visibly moves.
-                                if getattr(self, "trigger_mode_bb", False):
-                                    msg = None
-                                    if entered_deadzone and (now - self.last_trigger_time >= cooldown):
-                                        msg = f"[RAPID-FIRE] Target locked (BB pulse) (dist={dist:.1f}px)"
-                                        self._request_trigger_pulse(msg)
-                                else:
-                                    # MOSFET mode: allow continuous ON while in deadzone (bounded by timeout).
-                                    if self.trigger_fired and (now - self._firing_start_time) > self._max_firing_duration:
-                                        self.trigger_fired = False
-                                        self.enhancer.log_serial_output(
-                                            f"[RAPID-FIRE] Firing timeout ({self._max_firing_duration:.1f}s) - stopped",
-                                            fire=False,
-                                        )
-                                        msg = None
-                                    else:
-                                        if not self.trigger_fired:
-                                            self._firing_start_time = now
-                                        self.trigger_fired = True
-                                        msg = f"[RAPID-FIRE] Target locked & firing (dist={dist:.1f}px)"
+                            motion_ok = True
+                            try:
+                                motion_ok = bool(self._motion_fire_allowed(now))
+                            except Exception:
+                                motion_ok = True
 
-                                    if msg:
-                                        self.send_serial_command()
-                                        self.enhancer.log_serial_output(msg, fire=True)
-                                        try:
-                                            self._pulse_fire_indicator()
-                                        except Exception:
-                                            pass
-                            elif getattr(self, "auto_fire_enabled", False) and (now - self.last_trigger_time >= cooldown):
-                                # Fire on deadzone entry, or while aiming if already centered.
-                                # This prevents missed shots when the target starts inside the deadzone.
-                                aiming_active = bool(getattr(self, "aiming_active", False))
-                                if entered_deadzone or (aiming_active and in_deadzone):
-                                    if entered_deadzone:
-                                        msg = (
-                                            f"[AUTO-FIRE] Target centered -> FIRE (dist={dist:.1f}px, cooldown={cooldown:.2f}s)"
-                                        )
+                            if not motion_ok:
+                                # Motion gate blocks firing on stationary targets
+                                if getattr(self, "trigger_fired", False):
+                                    self.trigger_fired = False
+                            else:
+                                # Handle both rapid fire and normal auto-fire
+                                if getattr(self, "rapid_fire_enabled", False):
+                                    # Projectile (BB Servo) cannot rapid-fire as a latched state.
+                                    # Use edge-triggered pulses instead so the servo visibly moves.
+                                    if getattr(self, "trigger_mode_bb", False):
+                                        msg = None
+                                        if entered_deadzone and (now - self.last_trigger_time >= cooldown):
+                                            msg = f"[RAPID-FIRE] Target locked (BB pulse) (dist={dist:.1f}px)"
+                                            self._request_trigger_pulse(msg)
                                     else:
-                                        msg = (
-                                            f"[AUTO-FIRE] Aiming locked -> FIRE (dist={dist:.1f}px, cooldown={cooldown:.2f}s)"
-                                        )
-                                    self._request_trigger_pulse(msg)
+                                        # MOSFET mode: allow continuous ON while in deadzone (bounded by timeout).
+                                        if self.trigger_fired and (now - self._firing_start_time) > self._max_firing_duration:
+                                            self.trigger_fired = False
+                                            self.enhancer.log_serial_output(
+                                                f"[RAPID-FIRE] Firing timeout ({self._max_firing_duration:.1f}s) - stopped",
+                                                fire=False,
+                                            )
+                                            msg = None
+                                        else:
+                                            if not self.trigger_fired:
+                                                self._firing_start_time = now
+                                            self.trigger_fired = True
+                                            msg = f"[RAPID-FIRE] Target locked & firing (dist={dist:.1f}px)"
+
+                                        if msg:
+                                            self.send_serial_command()
+                                            self.enhancer.log_serial_output(msg, fire=True)
+                                            try:
+                                                self._pulse_fire_indicator()
+                                            except Exception:
+                                                pass
+                                elif getattr(self, "auto_fire_enabled", False) and (now - self.last_trigger_time >= cooldown):
+                                    # Fire on deadzone entry, or while aiming if already centered.
+                                    # This prevents missed shots when the target starts inside the deadzone.
+                                    aiming_active = bool(getattr(self, "aiming_active", False))
+                                    if entered_deadzone or (aiming_active and in_deadzone):
+                                        if entered_deadzone:
+                                            msg = (
+                                                f"[AUTO-FIRE] Target centered -> FIRE (dist={dist:.1f}px, cooldown={cooldown:.2f}s)"
+                                            )
+                                        else:
+                                            msg = (
+                                                f"[AUTO-FIRE] Aiming locked -> FIRE (dist={dist:.1f}px, cooldown={cooldown:.2f}s)"
+                                            )
+                                        self._request_trigger_pulse(msg)
                     else:
                         color_box = (0, 255, 255)  # yellow = normal
                         label = f"{int(dist)}px"
@@ -21026,7 +22167,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Modifications here affect servo movement, serial protocol encoding,
         # redundant-command filtering, and safety interlocks.
         # See CHANGE_IMPACT_REFERENCE.md → Sections 5 and 6.
-        # Last modified: 2026-01-25 by Copilot Agent
+        # Last modified: 2026-02-06 by Copilot Agent
         # ========== SENTRY MODE BLOCK ==========
         # When sentry mode is active, sentry controls the turret - block main app commands
         # EXCEPTION: Manual override bypasses this block (user pressing direction buttons)
@@ -21433,6 +22574,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # This prevents the servo from receiving duplicate commands while tracking micro-movements
         should_send = True
         force_send = bool(getattr(self, "_force_send_next_command", False))
+        speed_disable_filter = bool(getattr(self, "speed_opt_enabled", False)) and bool(
+            getattr(self, "speed_disable_command_filter", False)
+        )
         last_pan = int(getattr(self, "last_sent_pan", -9999))
         last_tilt = int(getattr(self, "last_sent_tilt", -9999))
 
@@ -21455,7 +22599,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         else:
             pos_unchanged = (pan_angle == last_pan and tilt_angle == last_tilt)
         
-        if (not force_send and pos_unchanged and 
+        if (not speed_disable_filter and not force_send and pos_unchanged and 
             fire_token == int(getattr(self, "_last_fire_token", 0)) and
             led_token == int(getattr(self, "_last_led_token", 0)) and
             laser_token == int(getattr(self, "_last_laser_token", 0)) and

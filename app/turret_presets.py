@@ -41,6 +41,87 @@ PRECISION_DEFAULTS = {
     "precision_frac_threshold": 0.25,
 }
 
+# Speed optimization presets (Feb 2026)
+SPEED_BEHAVIOR_SMOOTH = {
+    "speed_opt_enabled": True,
+    "speed_serial_interval_ms": 20,
+    "speed_bus_servo_time_ms": 18,
+    "speed_predictive_lead_ms": 35,
+    "speed_predictive_max_px": 80,
+    "speed_roi_enabled": True,
+    "speed_roi_scale": 0.75,
+    "speed_roi_min_size": 220,
+    "speed_roi_padding_px": 28,
+    "speed_threaded_yolo": True,
+    "speed_threaded_yolo_max_age_s": 0.7,
+    "speed_prefer_light_yolo": True,
+    "speed_disable_command_filter": False,
+}
+
+SPEED_BEHAVIOR_RESPONSIVE = {
+    "speed_opt_enabled": True,
+    "speed_serial_interval_ms": 16,
+    "speed_bus_servo_time_ms": 14,
+    "speed_predictive_lead_ms": 55,
+    "speed_predictive_max_px": 110,
+    "speed_roi_enabled": True,
+    "speed_roi_scale": 0.65,
+    "speed_roi_min_size": 200,
+    "speed_roi_padding_px": 24,
+    "speed_threaded_yolo": True,
+    "speed_threaded_yolo_max_age_s": 0.6,
+    "speed_prefer_light_yolo": True,
+    "speed_disable_command_filter": True,
+}
+
+SPEED_BEHAVIOR_AGGRESSIVE = {
+    "speed_opt_enabled": True,
+    "speed_serial_interval_ms": 12,
+    "speed_bus_servo_time_ms": 10,
+    "speed_predictive_lead_ms": 85,
+    "speed_predictive_max_px": 140,
+    "speed_roi_enabled": True,
+    "speed_roi_scale": 0.55,
+    "speed_roi_min_size": 180,
+    "speed_roi_padding_px": 20,
+    "speed_threaded_yolo": True,
+    "speed_threaded_yolo_max_age_s": 0.5,
+    "speed_prefer_light_yolo": True,
+    "speed_disable_command_filter": True,
+}
+
+SPEED_MOTION_BALANCED = {
+    "speed_opt_enabled": True,
+    "speed_serial_interval_ms": 18,
+    "speed_bus_servo_time_ms": 16,
+    "speed_predictive_lead_ms": 45,
+    "speed_predictive_max_px": 90,
+    "speed_roi_enabled": False,
+    "speed_roi_scale": 0.7,
+    "speed_roi_min_size": 220,
+    "speed_roi_padding_px": 24,
+    "speed_threaded_yolo": False,
+    "speed_threaded_yolo_max_age_s": 0.6,
+    "speed_prefer_light_yolo": False,
+    "speed_disable_command_filter": False,
+}
+
+SPEED_YOLO_FAST = {
+    "speed_opt_enabled": True,
+    "speed_serial_interval_ms": 15,
+    "speed_bus_servo_time_ms": 12,
+    "speed_predictive_lead_ms": 70,
+    "speed_predictive_max_px": 120,
+    "speed_roi_enabled": True,
+    "speed_roi_scale": 0.6,
+    "speed_roi_min_size": 200,
+    "speed_roi_padding_px": 24,
+    "speed_threaded_yolo": True,
+    "speed_threaded_yolo_max_age_s": 0.6,
+    "speed_prefer_light_yolo": True,
+    "speed_disable_command_filter": True,
+}
+
 PRESETS = {
     # ======================================================================
     # CONSISTENT PRESET NAMING (Dec 2025)
@@ -759,3 +840,35 @@ PRESETS = {
         "precision_frac_threshold": 0.25,
     },
 }
+
+
+def _apply_speed_profiles() -> None:
+    """Inject speed optimization settings into presets based on preset type."""
+    for name, preset in PRESETS.items():
+        if not isinstance(preset, dict):
+            continue
+
+        # Decide profile by name
+        profile = SPEED_MOTION_BALANCED
+
+        name_l = name.lower()
+        if name_l.startswith("behavior / smooth"):
+            profile = SPEED_BEHAVIOR_SMOOTH
+        elif name_l.startswith("behavior / responsive"):
+            profile = SPEED_BEHAVIOR_RESPONSIVE
+        elif name_l.startswith("behavior / aggressive"):
+            profile = SPEED_BEHAVIOR_AGGRESSIVE
+        elif "yolo" in name_l:
+            profile = SPEED_YOLO_FAST
+        elif "color" in name_l:
+            profile = SPEED_MOTION_BALANCED
+        elif "frame difference" in name_l or "background subtraction" in name_l:
+            profile = SPEED_MOTION_BALANCED
+
+        # Apply defaults without overwriting explicit values
+        for k, v in profile.items():
+            preset.setdefault(k, v)
+
+
+# Apply speed profiles on import
+_apply_speed_profiles()

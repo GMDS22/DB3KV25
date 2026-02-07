@@ -192,7 +192,7 @@ Whenever you see the instruction "INITIATE SERVO UPGRADE", you MUST review this 
 ## AutoTracker System Change Impact Map
 
 > **Document Version:** 1.0  
-> **Last Updated:** 2025-12-20  
+> **Last Updated:** 2026-02-06  
 > **Maintainer:** AutoTracker Development Team
 
 ---
@@ -257,6 +257,21 @@ Captures video frames from USB camera/webcam, configures resolution, and provide
 - **Cause:** Probing the camera resolution (`frame.shape`) too quickly after setting it. Many webcams take >200ms to switch firmware modes.
 - **Fix:** Ensure `time.sleep(0.5)` or greater exists in `open_camera` between `cap.set` and `cap.read` (probe).
 
+### Performance / Speed Optimizations (2026-02-06)
+**Scope:** `update_frame`, `send_serial_command`, bus-servo packet timing, and YOLO detection path.
+
+**Settings (all in settings.json):**
+- `speed_opt_enabled` (master toggle)
+- `speed_serial_interval_ms` (serial timer cadence)
+- `speed_bus_servo_time_ms` (bus-servo move time)
+- `speed_predictive_lead_ms`, `speed_predictive_max_px` (predictive lead)
+- `speed_roi_enabled`, `speed_roi_scale`, `speed_roi_min_size`, `speed_roi_padding_px` (YOLO ROI crop)
+- `speed_threaded_yolo`, `speed_threaded_yolo_max_age_s` (async YOLO)
+- `speed_prefer_light_yolo` (auto-select lighter model)
+- `speed_disable_command_filter` (bypass redundant-command suppression)
+
+**Revert strategy:** set `speed_opt_enabled=false` or revert to defaults per key.
+
 ### If You Change ANY of the Following
 
 #### Resolution (`frame_width`, `frame_height`)
@@ -316,6 +331,8 @@ Processes video frames to detect targets using multiple algorithms (YOLO, Frame 
 | [app/yolo_detector.py](app/yolo_detector.py) | YOLO model loading and inference |
 | [app/color_detection/color_detector.py](app/color_detection/color_detector.py) | HSV color-based detection |
 | [app/color_detection/hybrid_fusion.py](app/color_detection/hybrid_fusion.py) | Multi-detector fusion logic |
+
+**STRICT RULE (YOLO sync):** Any change to the YOLO pipeline in [app/MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py) **must** be mirrored (or explicitly documented as intentionally different) in [app/yolo_detector.py](app/yolo_detector.py), and vice-versa. Add a CHANGE WARNING comment when editing either file so future changes are not missed.
 
 ### Supporting / Dependent Files
 | File | Impact |
@@ -520,6 +537,7 @@ You **MUST ALSO** check/update:
 - [ ] `window_state` base64 in settings becomes invalid - user needs reset
 - [ ] Layout presets in `app/layouts/*.json`
 - [ ] `layout_manager.py` dock registration
+- [ ] Behavior Presets dock is **hidden by default** and excluded from saved layouts (dock objectName cleared). Users can toggle it via Widgets menu.
 
 #### Signal Connections
 You **MUST ALSO** check/update:
@@ -535,6 +553,7 @@ You **MUST ALSO** check/update:
 3. **Widget existence**: Many widgets guarded by `getattr(self, "widget", None)` - None causes silent failures
 4. **Tooltip filters**: Custom tooltip filters installed - modifying styles may not take effect
 5. **Tab widget structure**: Video/Notes/Home are tabs, not docks - different lifecycle
+6. **Scope Visual Settings window size**: Window geometry is explicitly set (550×560) to reduce height; adjust documentation/tests if this changes
 
 ### Common Failure Modes
 
@@ -841,6 +860,7 @@ You **MUST ALSO** check/update:
 - [ ] ARM button state sync
 - [ ] Fire indicator pulse timing
 - [ ] Auto-fire enable flag
+- [ ] Motion-verified auto-fire gate (`motion_fire_*` settings + Tracking Behavior UI)
 - [ ] Rapid-fire duty cycle
 - [ ] Safety interlock checks
 - [ ] Dual Port IO path: Nano must still receive IO tokens even if bus pan/tilt fails
@@ -1007,11 +1027,15 @@ Manages persistent settings, presets, and runtime configuration.
 
 ### Settings Persistence
 
-Settings are saved to multiple locations:
-- `app/config/settings.json` - Primary runtime settings
-- `app/settings.json` - Legacy/backup location  
-- `app/preferred_defaults.json` - User defaults
-- `settings.json` (root) - Root-level backup
+Settings are saved to multiple locations (script-relative paths):
+- `settings.json` (root) - Primary runtime settings (resolved from MAIN_FILE_SINGLE_CAM.py via Path(__file__).resolve().parent.parent)
+- `preferred_defaults.json` (root) - User defaults (applied and then persisted into settings.json)
+- `app/settings.json` - Legacy/backup location used by older tools/scripts (not the current primary path)
+
+**Preferred defaults scope (persisted):**
+- Detection pause: `detection_pause_ms`
+- Motion-verified auto-fire: `motion_fire_enabled`, `motion_fire_px_threshold`, `motion_fire_frames_required`, `motion_fire_recent_ms`, `motion_fire_stationary_lock_ms`
+- Scope visual settings: `crosshair_length`, `gap`, `crosshair_thickness`, `scope_radius_pct`, `corner_size`, `status_text_scale_x10`, `vignette_opacity`, `text_bg_opacity`
 
 ### Critical Constants (Hardcoded)
 
@@ -1263,9 +1287,11 @@ main_tab_widget.currentChanged(index) → _on_tab_changed() → activate/deactiv
 1. User clicks direction button in Sentry tab
 2. `manual_move_requested` signal emitted
 3. Main app `_on_sentry_manual_move()` called
-4. `move_manual()` sets `manual_override = True`
-5. `send_serial_command()` checks `manual_override` and allows command through sentry block
-6. Command sent to Arduino
+4. `move_manual()` sets `manual_override = True` and refreshes suppression timer (`_manual_override_until`)
+5. Manual input refreshes the suppression window on each press to prevent YOLO/Hybrid from immediately overriding
+6. `send_serial_command()` checks `manual_override` / `_manual_override_until` and allows command through sentry block
+7. Command sent to Arduino
+8. **Go Home** clears manual override and applies a short detection/aiming suspend window to avoid auto-tracking fighting the return
 
 ### If You Change ANY of the Following
 

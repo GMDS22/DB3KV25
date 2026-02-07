@@ -139,6 +139,8 @@ The app supports three serial modes (UI: **Configuration & Connection → Serial
 - `python test_nano_io.py` (checks COM8 IO)
 - `python test_bus_servo_read.py COM9` (checks COM9 bus-servo comms)
 
+**Arduino IDE quick link:** Use **Tools → Arduino IDE** inside the app to launch the IDE (or open the tools folder if the IDE isn’t found).
+
 ## Presets (minimal UI workflow)
 
 Factory presets (from `app/turret_presets.py`) can be applied from two places:
