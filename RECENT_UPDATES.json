@@ -4,7 +4,19 @@
   "items": [
     {
       "date": "2026-02-07",
-      "title": "Critical Fix: Eliminated Auto-Tracking 'Snap-Back' loop. Go Home and Manual moves now hard-stop auto-tracking (set _user_initiated_stop). Removed _complete_go_home unconditional re-enable callback. User must press Start Tracking to resume. Fixed dual-port _home_step guard to check bus_ser too. Fixed duplicate IO send bug in dual-port (try/except/else was double-sending S/M/F/L/R/G to Nano). Bus servo failures now always logged (not gated by debug checkbox)."
+      "title": "Fix: Prevent settings overwrite during UI init by guarding save_settings with _loading_settings and clearing it after load. Idle Zones divisions now restore reliably (signal blocking + UI sync). Added multi-zone selection cycling and persistence. Added test_idle_zones_verification.py for end-to-end checks. Files: app/MAIN_FILE_SINGLE_CAM.py, app/idle_zones_widget.py, test_idle_zones_verification.py."
+    },
+    {
+      "date": "2026-02-07",
+      "title": "Feature: Added Idle Zones tab with a graphical pan/tilt range selector tied to live limits. Selected zone can be used as the target-loss return when idle mode is enabled (Rest behavior), with persisted divisions/selection settings. Files: app/MAIN_FILE_SINGLE_CAM.py, app/idle_zones_widget.py."
+    },
+    {
+      "date": "2026-02-07",
+      "title": "Critical Fix: Eliminated Auto-Tracking 'Snap-Back' by gating Target Lost hold/idle logic with tracking_active (prevents stale last_known_pan/tilt from overriding Go Home or Manual positions). Go Home and Manual no longer set _user_initiated_stop so auto-tracking can re-engage on new detections. Restored hold_window/time_since_seen locals and added test_snapback_fix.py to prevent regression. Files: app/MAIN_FILE_SINGLE_CAM.py, test_snapback_fix.py."
+    },
+    {
+      "date": "2026-02-07",
+      "title": "Critical Fix: Removed _complete_go_home unconditional re-enable callback. Fixed dual-port _home_step guard to check bus_ser too. Fixed duplicate IO send bug in dual-port (try/except/else was double-sending S/M/F/L/R/G to Nano). Bus servo failures now always logged (not gated by debug checkbox). Files: app/MAIN_FILE_SINGLE_CAM.py."
     },
     {
       "date": "2026-02-07",
@@ -16,7 +28,7 @@
     },
     {
       "date": "2026-02-07",
-      "title": "Critical Fix: 'Home' and 'Stop Tracking' buttons now correctly prevent auto-tracking from immediately re-enabling in YOLO modes. Explicit stop actions are respected until user manually restarts tracking."
+      "title": "Critical Fix: Stop Tracking is the only explicit stop. Auto-tracking re-engagement respects _user_initiated_stop and will not resume until Start Tracking clears it. Files: app/MAIN_FILE_SINGLE_CAM.py."
     },
     {
       "date": "2026-02-07",
@@ -24,39 +36,11 @@
     },
     {
       "date": "2026-02-07",
-      "title": "Critical Fix: Resolved resource contention where YOLO detection would override 'Go Home' and 'Manual Set' targets with 'Passive Tracking' updates. Now explicitly gates tracking calculations with 'tracking_active' and blocks idle/hold logic during 'Go Home' moves."
+      "title": "Critical Fix: Tracking calculations gated by tracking_active; Target Lost hold/idle logic now respects tracking_active to prevent stale last_known_* from overriding Go Home/Manual positions. Files: app/MAIN_FILE_SINGLE_CAM.py."
     },
     {
       "date": "2026-02-07",
       "title": "Behavior Presets dock now keeps a stable objectName to prevent saveState/restoreState crashes when layouts are saved or restored."
-    },
-    {
-      "date": "2026-02-07",
-      "title": "Go Home completion now restores tracking/aiming when auto-tracking is enabled or when tracking was previously active (prevents autotrack from staying off after homing)."
-    },
-    {
-      "date": "2026-02-06",
-      "title": "Manual control + Go Home: refresh manual override suppression per button press, prevent YOLO/Hybrid auto-tracking from overriding manual/home moves, force threaded YOLO with shorter async max-age, and avoid sync model loads in update_frame."
-    },
-    {
-      "date": "2026-02-06",
-      "title": "UI cleanup: removed unused Workspace dock; Behavior Presets dock stays hidden by default and excluded from saved layouts (still available via Widgets menu)."
-    },
-    {
-      "date": "2026-02-06",
-      "title": "Presets/defaults now persist motion-gate, detection pause, speed optimization, and scope visual settings; scope visual settings window height reduced."
-    },
-    {
-      "date": "2026-02-06",
-      "title": "Auto-fire safety: optional motion-verified gate (UI in Tracking Behavior) to prevent firing on stationary targets. Disabled by default; settings persist via motion_fire_* keys."
-    },
-    {
-      "date": "2026-02-06",
-      "title": "Speed optimizations: faster serial cadence, faster bus-servo timing, predictive lead, async YOLO, ROI cropping, light-model preference, and optional redundant-command bypass."
-    },
-    {
-      "date": "2026-01-26",
-      "title": "Aiming stability: main app now uses SmartTracker (centroid smoothing + persistence) and avoids ROI centroid drift so the yellow-dot stays centered on the tracked object."
     }
   ]
 }

@@ -211,6 +211,12 @@ except Exception:
     IdleModes = None
     IdleSettingsWindow = None
 
+# Idle zones tab (graphical idle return selection)
+try:
+    from idle_zones_widget import IdleZonesWidget
+except Exception:
+    IdleZonesWidget = None
+
 # Keyboard shortcuts and floating panel windows
 try:
     from keyboard_shortcuts_window import KeyboardShortcutsWindow
@@ -926,6 +932,140 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 traceback.print_exc()
                 self.sentry_tab = None
         # ========== END AGENT-MANAGED BLOCK: SENTRY MODE TAB ==========
+
+        # === IDLE ZONES TAB ===
+        self.idle_zones_tab = None
+        if IdleZonesWidget is not None:
+            try:
+                idle_zones_container = QWidget()
+                idle_zones_layout = QVBoxLayout(idle_zones_container)
+                idle_zones_layout.setContentsMargins(12, 12, 12, 12)
+                idle_zones_layout.setSpacing(10)
+
+                header = QLabel("Idle Zones (Target-Loss Return)")
+                header.setStyleSheet("color: #00FF99; font-weight: bold; font-size: 12px;")
+                idle_zones_layout.addWidget(header)
+
+                controls = QHBoxLayout()
+                controls.setSpacing(10)
+
+                pan_label = QLabel("Pan divisions:")
+                controls.addWidget(pan_label)
+                if getattr(self, "idle_zone_pan_divisions_combo", None) is None:
+                    self.idle_zone_pan_divisions_combo = QComboBox()
+                try:
+                    if self.idle_zone_pan_divisions_combo.count() == 0:
+                        self.idle_zone_pan_divisions_combo.addItems(["3", "4"])
+                except Exception:
+                    pass
+                controls.addWidget(self.idle_zone_pan_divisions_combo)
+
+                tilt_label = QLabel("Tilt divisions:")
+                controls.addWidget(tilt_label)
+                if getattr(self, "idle_zone_tilt_divisions_combo", None) is None:
+                    self.idle_zone_tilt_divisions_combo = QComboBox()
+                try:
+                    if self.idle_zone_tilt_divisions_combo.count() == 0:
+                        self.idle_zone_tilt_divisions_combo.addItems(["2", "3"])
+                except Exception:
+                    pass
+                controls.addWidget(self.idle_zone_tilt_divisions_combo)
+
+                controls.addStretch()
+
+                if getattr(self, "idle_zone_enable_checkbox", None) is None:
+                    self.idle_zone_enable_checkbox = QCheckBox("Use zone return on target loss")
+                controls.addWidget(self.idle_zone_enable_checkbox)
+
+                if getattr(self, "idle_zone_multi_select_checkbox", None) is None:
+                    self.idle_zone_multi_select_checkbox = QCheckBox("Multi-select zones")
+                controls.addWidget(self.idle_zone_multi_select_checkbox)
+
+                idle_zones_layout.addLayout(controls)
+
+                self.idle_zones_widget = IdleZonesWidget()
+                try:
+                    self.idle_zones_widget.set_limits(self.PAN_MIN, self.PAN_MAX, self.TILT_MIN, self.TILT_MAX)
+                    self.idle_zones_widget.set_divisions(
+                        int(getattr(self, "idle_zone_pan_divisions", 3)),
+                        int(getattr(self, "idle_zone_tilt_divisions", 3)),
+                    )
+                    self.idle_zones_widget.set_selected_zone(
+                        int(getattr(self, "idle_zone_selected_pan", 1)),
+                        int(getattr(self, "idle_zone_selected_tilt", 1)),
+                        emit=False,
+                    )
+                except Exception:
+                    pass
+                idle_zones_layout.addWidget(self.idle_zones_widget, stretch=1)
+
+                self.idle_zone_selection_label = QLabel("Selected: —")
+                self.idle_zone_selection_label.setStyleSheet("color: #CCCCCC; font-size: 10px;")
+                idle_zones_layout.addWidget(self.idle_zone_selection_label)
+
+                try:
+                    self.idle_zones_widget.zoneSelected.connect(self._on_idle_zone_selected)
+                    self.idle_zones_widget.selectionChanged.connect(self._on_idle_zone_selection_changed)
+                except Exception:
+                    pass
+                try:
+                    self._safe_connect(
+                        "idle_zone_pan_divisions_combo",
+                        "currentIndexChanged",
+                        self._on_idle_zone_divisions_changed,
+                    )
+                    self._safe_connect(
+                        "idle_zone_tilt_divisions_combo",
+                        "currentIndexChanged",
+                        self._on_idle_zone_divisions_changed,
+                    )
+                except Exception:
+                    pass
+                try:
+                    self._safe_connect(
+                        "idle_zone_enable_checkbox",
+                        "toggled",
+                        self.save_settings,
+                    )
+                    self._safe_connect(
+                        "idle_zone_multi_select_checkbox",
+                        "toggled",
+                        lambda checked: self.idle_zones_widget.set_multi_select(bool(checked)),
+                    )
+                except Exception:
+                    pass
+
+                try:
+                    pan_div_text = str(getattr(self, "idle_zone_pan_divisions", 3))
+                    self.idle_zone_pan_divisions_combo.setCurrentText(pan_div_text)
+                    tilt_div_text = str(getattr(self, "idle_zone_tilt_divisions", 3))
+                    self.idle_zone_tilt_divisions_combo.setCurrentText(tilt_div_text)
+                    self.idle_zone_enable_checkbox.setChecked(
+                        bool(getattr(self, "idle_zone_return_enabled", False))
+                    )
+                    self.idle_zone_multi_select_checkbox.setChecked(True)
+                    self.idle_zones_widget.set_multi_select(True)
+                except Exception:
+                    pass
+
+                try:
+                    center = self._idle_zone_get_center()
+                    if center is not None:
+                        selected = getattr(self, "idle_zone_selected_list", []) or [
+                            (int(getattr(self, "idle_zone_selected_pan", 1)), int(getattr(self, "idle_zone_selected_tilt", 1)))
+                        ]
+                        labels = ", ".join([self.idle_zones_widget.get_zone_label(p, t) for p, t in selected])
+                        self.idle_zone_selection_label.setText(
+                            f"Selected: {labels}  |  Center: Pan {center[0]:.1f}°, Tilt {center[1]:.1f}°"
+                        )
+                except Exception:
+                    pass
+
+                self.idle_zones_tab = idle_zones_container
+                self.main_tab_widget.addTab(idle_zones_container, "🧭 Idle Zones")
+            except Exception as e:
+                print(f"[IDLE-ZONES] Failed to create tab: {e}")
+                self.idle_zones_tab = None
         
         # === SERIAL SETTINGS TAB ===
         serial_settings_container = QWidget()
@@ -1423,6 +1563,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # See CHANGE_IMPACT_REFERENCE.md → Code-Level Change Enforcement.
         # Last modified: 2026-01-26 by Copilot
         super().__init__()
+        # Guard against save_settings() firing during early UI construction
+        self._loading_settings = True
         # ---- Early runtime state initialization (before timers/signals/threads) ----
         self.ser = None
         self.cap = None
@@ -1651,6 +1793,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # This attribute was being set in polling but never initialized
         # causing AttributeError if accessed before first save
         self.idle_behavior = "rest"
+
+        # Idle Zones (graphical idle return selection)
+        self.idle_zone_return_enabled = False
+        self.idle_zone_pan_divisions = 3
+        self.idle_zone_tilt_divisions = 3
+        self.idle_zone_selected_pan = 1
+        self.idle_zone_selected_tilt = 1
+        self.idle_zone_selected_list = [(1, 1)]
+        self._idle_zone_cycle_index = 0
 
         # Manual control and overrides
         self._pressed_keys = set()  # For tracking keyboard input
@@ -9241,6 +9392,248 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
 
+    def _idle_zone_should_apply(self, idle_behavior: str) -> bool:
+        """Return True when idle-zone return should override home return."""
+        try:
+            if not bool(getattr(self, "idle_zone_return_enabled", False)):
+                return False
+            beh = str(idle_behavior or "").strip().lower()
+            if beh not in ("rest", "", "none"):
+                return False
+            try:
+                btn = getattr(self, "idle_mode_toggle_btn", None)
+                if btn is not None and getattr(btn, "isChecked", lambda: False)():
+                    return True
+            except Exception:
+                pass
+            try:
+                idle_modes = getattr(self, "idle_modes", None)
+                if idle_modes is not None and getattr(idle_modes, "is_idle_mode_active", None):
+                    return bool(idle_modes.is_idle_mode_active())
+            except Exception:
+                pass
+        except Exception:
+            return False
+        return False
+
+    def _idle_zone_get_center(self) -> tuple[float, float] | None:
+        try:
+            pan_divs = int(getattr(self, "idle_zone_pan_divisions", 3))
+            tilt_divs = int(getattr(self, "idle_zone_tilt_divisions", 3))
+            try:
+                selected = list(getattr(self, "idle_zone_selected_list", []) or [])
+            except Exception:
+                selected = []
+            if selected:
+                pan_idx, tilt_idx = selected[0]
+            else:
+                pan_idx = int(getattr(self, "idle_zone_selected_pan", 1))
+                tilt_idx = int(getattr(self, "idle_zone_selected_tilt", 1))
+            pan_divs = max(1, pan_divs)
+            tilt_divs = max(1, tilt_divs)
+            pan_idx = max(0, min(pan_idx, pan_divs - 1))
+            tilt_idx = max(0, min(tilt_idx, tilt_divs - 1))
+
+            pan_min = float(getattr(self, "PAN_MIN", 0))
+            pan_max = float(getattr(self, "PAN_MAX", 180))
+            tilt_min = float(getattr(self, "TILT_MIN", 0))
+            tilt_max = float(getattr(self, "TILT_MAX", 90))
+            if pan_max <= pan_min or tilt_max <= tilt_min:
+                return None
+
+            pan_step = (pan_max - pan_min) / float(pan_divs)
+            tilt_step = (tilt_max - tilt_min) / float(tilt_divs)
+            center_pan = pan_min + pan_step * (pan_idx + 0.5)
+            center_tilt = tilt_min + tilt_step * (tilt_idx + 0.5)
+            return float(center_pan), float(center_tilt)
+        except Exception:
+            return None
+
+    def _idle_zone_get_next_center(self) -> tuple[float, float] | None:
+        try:
+            zones = list(getattr(self, "idle_zone_selected_list", []) or [])
+            if not zones:
+                return self._idle_zone_get_center()
+            idx = int(getattr(self, "_idle_zone_cycle_index", 0))
+            if idx < 0 or idx >= len(zones):
+                idx = 0
+            pan_idx, tilt_idx = zones[idx]
+            self._idle_zone_cycle_index = (idx + 1) % max(1, len(zones))
+
+            pan_divs = max(1, int(getattr(self, "idle_zone_pan_divisions", 3)))
+            tilt_divs = max(1, int(getattr(self, "idle_zone_tilt_divisions", 3)))
+            pan_idx = max(0, min(int(pan_idx), pan_divs - 1))
+            tilt_idx = max(0, min(int(tilt_idx), tilt_divs - 1))
+
+            pan_min = float(getattr(self, "PAN_MIN", 0))
+            pan_max = float(getattr(self, "PAN_MAX", 180))
+            tilt_min = float(getattr(self, "TILT_MIN", 0))
+            tilt_max = float(getattr(self, "TILT_MAX", 90))
+            if pan_max <= pan_min or tilt_max <= tilt_min:
+                return None
+
+            pan_step = (pan_max - pan_min) / float(pan_divs)
+            tilt_step = (tilt_max - tilt_min) / float(tilt_divs)
+            center_pan = pan_min + pan_step * (pan_idx + 0.5)
+            center_tilt = tilt_min + tilt_step * (tilt_idx + 0.5)
+            return float(center_pan), float(center_tilt)
+        except Exception:
+            return None
+
+    def _on_idle_zone_selected(self, pan_idx: int, tilt_idx: int, label: str, center_pan: float, center_tilt: float) -> None:
+        try:
+            self.idle_zone_selected_pan = int(pan_idx)
+            self.idle_zone_selected_tilt = int(tilt_idx)
+            self.idle_zone_selected_list = [(self.idle_zone_selected_pan, self.idle_zone_selected_tilt)]
+        except Exception:
+            pass
+        try:
+            if getattr(self, "idle_zone_selection_label", None) is not None:
+                self.idle_zone_selection_label.setText(
+                    f"Selected: {label}  |  Center: Pan {center_pan:.1f}°, Tilt {center_tilt:.1f}°"
+                )
+        except Exception:
+            pass
+        try:
+            self.save_settings()
+        except Exception:
+            pass
+
+    def _on_idle_zone_selection_changed(self, zones: list) -> None:
+        try:
+            cleaned = []
+            for item in zones:
+                try:
+                    p, t = item
+                    cleaned.append((int(p), int(t)))
+                except Exception:
+                    continue
+            self.idle_zone_selected_list = cleaned or [(int(getattr(self, "idle_zone_selected_pan", 1)), int(getattr(self, "idle_zone_selected_tilt", 1)))]
+            if self.idle_zone_selected_list:
+                self.idle_zone_selected_pan, self.idle_zone_selected_tilt = self.idle_zone_selected_list[-1]
+        except Exception:
+            pass
+        try:
+            if getattr(self, "idle_zone_selection_label", None) is not None:
+                center = self._idle_zone_get_center()
+                zones_text = ", ".join(
+                    [
+                        self.idle_zones_widget.get_zone_label(p, t)
+                        for p, t in getattr(self, "idle_zone_selected_list", [])
+                    ]
+                )
+                if center is not None:
+                    self.idle_zone_selection_label.setText(
+                        f"Selected: {zones_text}  |  Center: Pan {center[0]:.1f}°, Tilt {center[1]:.1f}°"
+                    )
+        except Exception:
+            pass
+        try:
+            self.save_settings()
+        except Exception:
+            pass
+
+    def _on_idle_zone_divisions_changed(self, *_args) -> None:
+        try:
+            pan_divs = int(
+                self._safe_widget_method_return(
+                    "idle_zone_pan_divisions_combo", "currentText", getattr(self, "idle_zone_pan_divisions", 3)
+                )
+            )
+        except Exception:
+            pan_divs = int(getattr(self, "idle_zone_pan_divisions", 3))
+        try:
+            tilt_divs = int(
+                self._safe_widget_method_return(
+                    "idle_zone_tilt_divisions_combo", "currentText", getattr(self, "idle_zone_tilt_divisions", 3)
+                )
+            )
+        except Exception:
+            tilt_divs = int(getattr(self, "idle_zone_tilt_divisions", 3))
+
+        self.idle_zone_pan_divisions = max(1, int(pan_divs))
+        self.idle_zone_tilt_divisions = max(1, int(tilt_divs))
+
+        try:
+            widget = getattr(self, "idle_zones_widget", None)
+            if widget is not None:
+                widget.set_divisions(self.idle_zone_pan_divisions, self.idle_zone_tilt_divisions)
+                widget.set_selected_zone(
+                    getattr(self, "idle_zone_selected_pan", 1),
+                    getattr(self, "idle_zone_selected_tilt", 1),
+                    emit=True,
+                )
+        except Exception:
+            pass
+
+        try:
+            self.save_settings()
+        except Exception:
+            pass
+
+    def _update_idle_zone_widget_limits(self) -> None:
+        try:
+            widget = getattr(self, "idle_zones_widget", None)
+            if widget is None:
+                return
+            widget.set_limits(self.PAN_MIN, self.PAN_MAX, self.TILT_MIN, self.TILT_MAX)
+        except Exception:
+            pass
+
+    def _sync_idle_zone_ui(self) -> None:
+        try:
+            pan_combo = getattr(self, "idle_zone_pan_divisions_combo", None)
+            tilt_combo = getattr(self, "idle_zone_tilt_divisions_combo", None)
+            if pan_combo is not None:
+                idx = pan_combo.findText(str(getattr(self, "idle_zone_pan_divisions", 3)))
+                if idx != -1:
+                    try:
+                        pan_combo.blockSignals(True)
+                    except Exception:
+                        pass
+                    pan_combo.setCurrentIndex(idx)
+                    try:
+                        pan_combo.blockSignals(False)
+                    except Exception:
+                        pass
+            if tilt_combo is not None:
+                idx = tilt_combo.findText(str(getattr(self, "idle_zone_tilt_divisions", 3)))
+                if idx != -1:
+                    try:
+                        tilt_combo.blockSignals(True)
+                    except Exception:
+                        pass
+                    tilt_combo.setCurrentIndex(idx)
+                    try:
+                        tilt_combo.blockSignals(False)
+                    except Exception:
+                        pass
+
+            widget = getattr(self, "idle_zones_widget", None)
+            if widget is not None:
+                widget.set_limits(self.PAN_MIN, self.PAN_MAX, self.TILT_MIN, self.TILT_MAX)
+                widget.set_divisions(
+                    int(getattr(self, "idle_zone_pan_divisions", 3)),
+                    int(getattr(self, "idle_zone_tilt_divisions", 3)),
+                )
+                widget.set_selected_zone(
+                    int(getattr(self, "idle_zone_selected_pan", 1)),
+                    int(getattr(self, "idle_zone_selected_tilt", 1)),
+                    emit=False,
+                )
+
+            center = self._idle_zone_get_center()
+            if center is not None and getattr(self, "idle_zone_selection_label", None) is not None and widget is not None:
+                label = widget.get_zone_label(
+                    int(getattr(self, "idle_zone_selected_pan", 1)),
+                    int(getattr(self, "idle_zone_selected_tilt", 1)),
+                )
+                self.idle_zone_selection_label.setText(
+                    f"Selected: {label}  |  Center: Pan {center[0]:.1f}°, Tilt {center[1]:.1f}°"
+                )
+        except Exception:
+            pass
+
     def _qt_enum(self, name: str, fallback: int):
         """Return a Qt enum value by name or a fallback integer.
 
@@ -12479,6 +12872,112 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 pass
                     except Exception:
                         pass
+
+                    # Restore idle zone selection/settings
+                    try:
+                        self.idle_zone_return_enabled = bool(
+                            settings.get("idle_zone_return_enabled", getattr(self, "idle_zone_return_enabled", False))
+                        )
+                    except Exception:
+                        self.idle_zone_return_enabled = bool(getattr(self, "idle_zone_return_enabled", False))
+                    try:
+                        self.idle_zone_pan_divisions = int(
+                            settings.get("idle_zone_pan_divisions", getattr(self, "idle_zone_pan_divisions", 3))
+                        )
+                    except Exception:
+                        self.idle_zone_pan_divisions = int(getattr(self, "idle_zone_pan_divisions", 3))
+                    try:
+                        self.idle_zone_tilt_divisions = int(
+                            settings.get("idle_zone_tilt_divisions", getattr(self, "idle_zone_tilt_divisions", 3))
+                        )
+                    except Exception:
+                        self.idle_zone_tilt_divisions = int(getattr(self, "idle_zone_tilt_divisions", 3))
+                    try:
+                        self.idle_zone_selected_pan = int(
+                            settings.get("idle_zone_selected_pan", getattr(self, "idle_zone_selected_pan", 1))
+                        )
+                    except Exception:
+                        self.idle_zone_selected_pan = int(getattr(self, "idle_zone_selected_pan", 1))
+                    try:
+                        self.idle_zone_selected_tilt = int(
+                            settings.get("idle_zone_selected_tilt", getattr(self, "idle_zone_selected_tilt", 1))
+                        )
+                    except Exception:
+                        self.idle_zone_selected_tilt = int(getattr(self, "idle_zone_selected_tilt", 1))
+                    try:
+                        raw_list = settings.get("idle_zone_selected_list", None)
+                        if isinstance(raw_list, list):
+                            cleaned = []
+                            for item in raw_list:
+                                try:
+                                    p, t = item
+                                    cleaned.append((int(p), int(t)))
+                                except Exception:
+                                    continue
+                            if cleaned:
+                                self.idle_zone_selected_list = cleaned
+                    except Exception:
+                        pass
+                    if not getattr(self, "idle_zone_selected_list", None):
+                        self.idle_zone_selected_list = [(self.idle_zone_selected_pan, self.idle_zone_selected_tilt)]
+
+                    try:
+                        if getattr(self, "idle_zone_enable_checkbox", None) is not None:
+                            self.idle_zone_enable_checkbox.setChecked(bool(self.idle_zone_return_enabled))
+                        if getattr(self, "idle_zone_pan_divisions_combo", None) is not None:
+                            idx = self.idle_zone_pan_divisions_combo.findText(str(self.idle_zone_pan_divisions))
+                            if idx != -1:
+                                try:
+                                    self.idle_zone_pan_divisions_combo.blockSignals(True)
+                                except Exception:
+                                    pass
+                                self.idle_zone_pan_divisions_combo.setCurrentIndex(idx)
+                                try:
+                                    self.idle_zone_pan_divisions_combo.blockSignals(False)
+                                except Exception:
+                                    pass
+                        if getattr(self, "idle_zone_tilt_divisions_combo", None) is not None:
+                            idx = self.idle_zone_tilt_divisions_combo.findText(str(self.idle_zone_tilt_divisions))
+                            if idx != -1:
+                                try:
+                                    self.idle_zone_tilt_divisions_combo.blockSignals(True)
+                                except Exception:
+                                    pass
+                                self.idle_zone_tilt_divisions_combo.setCurrentIndex(idx)
+                                try:
+                                    self.idle_zone_tilt_divisions_combo.blockSignals(False)
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+
+                    try:
+                        if getattr(self, "idle_zones_widget", None) is not None:
+                            self.idle_zones_widget.set_limits(self.PAN_MIN, self.PAN_MAX, self.TILT_MIN, self.TILT_MAX)
+                            self.idle_zones_widget.set_divisions(self.idle_zone_pan_divisions, self.idle_zone_tilt_divisions)
+                            self.idle_zones_widget.set_selected_zones(
+                                list(getattr(self, "idle_zone_selected_list", []) or []),
+                                emit=False,
+                            )
+                            center = self._idle_zone_get_center()
+                            if center is not None and getattr(self, "idle_zone_selection_label", None) is not None:
+                                labels = ", ".join(
+                                    [
+                                        self.idle_zones_widget.get_zone_label(p, t)
+                                        for p, t in getattr(self, "idle_zone_selected_list", [])
+                                    ]
+                                )
+                                self.idle_zone_selection_label.setText(
+                                    f"Selected: {labels}  |  Center: Pan {center[0]:.1f}°, Tilt {center[1]:.1f}°"
+                                )
+                    except Exception:
+                        pass
+
+                    try:
+                        QTimer.singleShot(0, self._sync_idle_zone_ui)
+                    except Exception:
+                        pass
+
                     try:
                         try:
                             rf_rate = int(settings.get("rapid_fire_rate_hz", getattr(self, "rapid_fire_rate_hz", 1)))
@@ -12754,12 +13253,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             )
             self.load_default_settings_to_ui()
 
+        try:
+            self._loading_settings = False
+        except Exception:
+            pass
+
     def save_settings(self):
         """Save current settings to JSON file."""
 
         # CHANGE WARNING:
         # This function persists runtime behavior. Keep key sets aligned with load_settings().
-        # Last modified: 2026-02-07 by Copilot Agent
+        # Last modified: 2026-02-07 by Copilot Agent (Idle Zones)
+
+        # Avoid overwriting settings while loading/initializing UI
+        if getattr(self, "_loading_settings", False):
+            return
 
         # Build settings dict via helper so other routines can reuse it
         def get_settings_dict():
@@ -12962,6 +13470,31 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 ),
                 # Idle mode toggle button state
                 "idle_mode_enabled": val("idle_mode_toggle_btn", False, "checked"),
+                # Idle zone return settings
+                "idle_zone_return_enabled": val(
+                    "idle_zone_enable_checkbox",
+                    bool(getattr(self, "idle_zone_return_enabled", False)),
+                    "checked",
+                ),
+                "idle_zone_pan_divisions": int(
+                    val(
+                        "idle_zone_pan_divisions_combo",
+                        getattr(self, "idle_zone_pan_divisions", 3),
+                        "currentText",
+                    )
+                    or getattr(self, "idle_zone_pan_divisions", 3)
+                ),
+                "idle_zone_tilt_divisions": int(
+                    val(
+                        "idle_zone_tilt_divisions_combo",
+                        getattr(self, "idle_zone_tilt_divisions", 3),
+                        "currentText",
+                    )
+                    or getattr(self, "idle_zone_tilt_divisions", 3)
+                ),
+                "idle_zone_selected_pan": int(getattr(self, "idle_zone_selected_pan", 1)),
+                "idle_zone_selected_tilt": int(getattr(self, "idle_zone_selected_tilt", 1)),
+                "idle_zone_selected_list": list(getattr(self, "idle_zone_selected_list", [])),
                 # Rapid-fire MOSFET settings
                 "rapid_fire_rate_hz": val("rapid_fire_rate_spin", getattr(self, "rapid_fire_rate_hz", 1)),
                 "rapid_fire_enabled": val("rapid_fire_enable_checkbox", getattr(self, "rapid_fire_enabled", False), "checked"),
@@ -17638,6 +18171,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
 
+        try:
+            self._update_idle_zone_widget_limits()
+        except Exception:
+            pass
+
         self.enhancer.log_serial_output(
             f"New Limits Applied → PAN[{self.PAN_MIN}, {self.PAN_MAX}], TILT[{self.TILT_MIN}, {self.TILT_MAX}]",
             fire=False,
@@ -17933,7 +18471,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # CHANGE WARNING:
         # Modifications here affect frame processing, tracking flow, and runtime state.
         # See CHANGE_IMPACT_REFERENCE.md → Camera & Video Capture Pipeline.
-        # Last modified: 2026-02-06 by Copilot Agent
+        # Last modified: 2026-02-07 by Copilot Agent (Idle Zones)
         # NOTE: Idle button now uses direct click detection (ClickDetectButton class)
         # No need for polling - direct mouse events work reliably
 
@@ -21080,6 +21618,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 home_tilt = float(getattr(self, "HOME_TILT", 40))
                                 home_pan = float(np.clip(home_pan, self.PAN_MIN, self.PAN_MAX))
                                 home_tilt = float(np.clip(home_tilt, self.TILT_MIN, self.TILT_MAX))
+
+                                # Idle Zones override (Rest mode only) while idle mode is enabled
+                                try:
+                                    if self._idle_zone_should_apply(idle_beh):
+                                        center = self._idle_zone_get_next_center()
+                                        if center is not None:
+                                            home_pan = float(np.clip(center[0], self.PAN_MIN, self.PAN_MAX))
+                                            home_tilt = float(np.clip(center[1], self.TILT_MIN, self.TILT_MAX))
+                                except Exception:
+                                    pass
 
                                 nowt = time.time()
 

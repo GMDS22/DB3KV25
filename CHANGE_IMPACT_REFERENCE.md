@@ -1047,6 +1047,10 @@ Settings are saved to multiple locations (script-relative paths):
 - Motion-verified auto-fire: `motion_fire_enabled`, `motion_fire_px_threshold`, `motion_fire_frames_required`, `motion_fire_recent_ms`, `motion_fire_stationary_lock_ms`
 - Scope visual settings: `crosshair_length`, `gap`, `crosshair_thickness`, `scope_radius_pct`, `corner_size`, `status_text_scale_x10`, `vignette_opacity`, `text_bg_opacity`
 
+**Load/Save guard (Feb 2026):**
+- `save_settings()` short-circuits when `_loading_settings=True` to prevent early UI initialization from overwriting persisted values.
+- `_loading_settings` is set True at init and cleared after `load_settings()` completes.
+
 ### Critical Constants (Hardcoded)
 
 | Constant | Location | Value | Impact |
@@ -1105,6 +1109,23 @@ The idle system relies on a persisted setting key (`auto_tracking`) and several 
 - Auto-resume gate (idle modes): [app/MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py#L16161-L16172)
 - Guard random-point behavior + fallback sweep: [app/MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py#L17229-L17256)
 - Guard speed UI callback exists (keep in sync with behavior expectations): [app/MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py#L3510-L3519)
+
+### Idle Zones (Target-Loss Return)
+
+The Idle Zones tab provides a graphical selection of idle return areas and overrides the home-return target **only** when idle mode is enabled and `idle_behavior` is `rest`. Multiple zones can be selected and are cycled in order on successive target-loss returns.
+
+**Settings keys (persisted):**
+- `idle_zone_return_enabled`
+- `idle_zone_pan_divisions`
+- `idle_zone_tilt_divisions`
+- `idle_zone_selected_pan`
+- `idle_zone_selected_tilt`
+- `idle_zone_selected_list`
+
+**Dependencies:**
+- Uses live `PAN_MIN/PAN_MAX` and `TILT_MIN/TILT_MAX` to compute the zone geometry.
+- Target-lost logic consumes the selected zone center in [app/MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py).
+- UI wiring in [app/MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py) and [app/idle_zones_widget.py](app/idle_zones_widget.py).
 
 #### If You Change ANY of the Following
 
@@ -1483,18 +1504,28 @@ You **MUST ALSO** check/update:
 | Action | Sets `_user_initiated_stop` | Tracking after action |
 |---|---|---|
 | **Stop Tracking** button | `True` | OFF — stays off |
-| **Go Home** button | `True` | OFF — stays off after move completes |
-| **Manual move** (arrow buttons) | `True` | OFF — stays off after override expires |
+| **Go Home** button | **No** | OFF during homing; can re-engage on new detection |
+| **Manual move** (arrow buttons) | **No** | OFF during manual override; can re-engage on new detection |
 | **Start Tracking** button | `False` (clears) | ON — auto-tracking enabled |
 
 ### Why this matters
-Previously, Go Home and Manual moves were treated as temporary pauses. The detection loop's auto-tracking re-engagement block would see a target ≤1 s after the action and snap the turret back. This made it impossible to manually aim or park at home.
+Previously, the Target Lost block wrote `target_pan/target_tilt` even when tracking was OFF, which pulled the turret back to stale `last_known_*` values after Go Home or Manual moves. The fix is to gate Target Lost hold/idle logic with `tracking_active` and only clear detection state when tracking is OFF.
 
 ### Code locations (keep in sync)
 - `_user_initiated_stop` initialized: `__init__` (line ~1432)
-- Set `True` by `stop_tracking()`, `go_home()`, `move_manual()`
+- Set `True` by `stop_tracking()` only
 - Cleared by `start_tracking()`
 - Checked by auto-tracking re-engagement: `update_frame` detection block (~line 19833)
+- **Snap-back guard**: `update_frame` → `else: Target Lost` (SNAP-BACK FIX block; tracking_active early-exit)
+- Manual/Go Home suppression: `move_manual()` and `go_home()` set `tracking_active=False` without setting `_user_initiated_stop`
+- Regression test: `test_snapback_fix.py`
+
+### MARKERS & REFERENCES (do NOT remove)
+- **MARKER: SNAP-BACK-GUARD** → `app/MAIN_FILE_SINGLE_CAM.py` → `update_frame()` → `else: Target Lost` block (SNAP-BACK FIX 2026-02-07)
+- **MARKER: USER-STOP-AUTHORITY** → `app/MAIN_FILE_SINGLE_CAM.py` → `stop_tracking()` / `start_tracking()`
+- **MARKER: MANUAL-HOME-SUPPRESS** → `app/MAIN_FILE_SINGLE_CAM.py` → `move_manual()` / `go_home()` (tracking_active False, no `_user_initiated_stop`)
+- **MARKER: AUTO-REENGAGE** → `app/MAIN_FILE_SINGLE_CAM.py` → detection auto-enable block in `update_frame` (~line 19833)
+- **MARKER: SNAPBACK-TEST** → `test_snapback_fix.py`
 
 ### Hidden coupling: `_complete_go_home` callback (REMOVED)
 The `_complete_go_home` QTimer.singleShot callback unconditionally set `tracking_active=True` after a delay, overriding all state guards. It was removed (2026-02-07) because the interpolation timer's own completion handler now handles cleanup and respects `_user_initiated_stop`.
