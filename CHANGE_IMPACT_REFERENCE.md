@@ -102,20 +102,27 @@ A tracking behavior control that pauses detection updates when target enters sco
 **Documentation**:
 - See `DETECTION_PAUSE_UI_LOCATION.md` for detailed UI guide and troubleshooting
 
-### 3. Dual Port Pinout Reference
-A quick-reference help panel for the Dual Port wiring scheme.
+### 3. ESP32 Pinout Reference
+A quick-reference help panel for the ESP32 wiring scheme.
 
-**Access**: `Help -> Arduino Nano Pin Assignments`
-**Content**: Hardcoded table in `open_pin_assignment_window` matching the validated 2026 hardware standard.
+**Access**: `Help -> ESP32 Pin Assignments`
+**Content**: Hardcoded table in `open_pin_assignment_window` matching the current ESP32 DevKit v1 mapping.
+**Firmware**: Arduino sketch at `arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino`.
+**Flash workflow**: See `ESP32_UDP_FLASH.md` and `tools/flash_esp32_udp.ps1`.
 
 | Pin | Function | Mode |
 |---|---|---|
-| D3 | Trigger Servo | PWM |
-| D4 | Trigger MOSFET | Digital Out (Fast) |
-| D5 | LED Relay | Digital Out |
-| D6 | Laser Relay | Digital Out |
-| A2 | Total Current | Analog In |
-| A7 | Tilt Safety | Analog In |
+| GPIO16 | UART2 RX (debug board TX) | Serial In |
+| GPIO17 | UART2 TX (debug board RX) | Serial Out |
+| GPIO25 | Pan Servo PWM | PWM |
+| GPIO26 | Tilt Servo PWM | PWM |
+| GPIO27 | Trigger MOSFET (Water) | Digital Out |
+| GPIO13 | Trigger Servo (Projectile) | PWM |
+| GPIO32 | LED Relay | Digital Out |
+| GPIO33 | Laser Relay | Digital Out |
+| GPIO36 | Pan Current Sensor | ADC1 Input |
+| GPIO39 | Tilt Current Sensor | ADC1 Input |
+| GPIO34 | Total Current Sensor | ADC1 Input |
 
 ---
 

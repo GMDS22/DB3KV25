@@ -120,33 +120,46 @@ def build_ui(app: QMainWindow):
     settings_layout = QGridLayout()
     settings_layout.setSpacing(6)
     settings_layout.setContentsMargins(8, 8, 8, 8)
-    settings_layout.addWidget(QLabel("COM Port:"), 0, 0)
-    if getattr(app, "com_port_input", None) is None:
-        app.com_port_input = QLineEdit()
+    settings_layout.addWidget(QLabel("ESP32 Host:"), 0, 0)
+    if getattr(app, "esp32_host_input", None) is None:
+        app.esp32_host_input = QLineEdit()
     try:
-        if not getattr(app.com_port_input, "text", lambda: "")():
-            app.com_port_input.setText("COM3")
+        if not getattr(app.esp32_host_input, "text", lambda: "")():
+            app.esp32_host_input.setText("192.168.4.1")
     except Exception:
         pass
-    settings_layout.addWidget(app.com_port_input, 0, 1)
-    settings_layout.addWidget(QLabel("Baud Rate:"), 1, 0)
-    if getattr(app, "baud_rate_input", None) is None:
-        app.baud_rate_input = QSpinBox()
+    settings_layout.addWidget(app.esp32_host_input, 0, 1)
+    settings_layout.addWidget(QLabel("ESP32 Port:"), 1, 0)
+    if getattr(app, "esp32_port_input", None) is None:
+        app.esp32_port_input = QSpinBox()
     try:
-        if getattr(app, "baud_rate_input", None) is not None:
+        if getattr(app, "esp32_port_input", None) is not None:
             try:
-                app._safe_widget_call("baud_rate_input", "setRange", 2400, 115200)
-                # prefer safe call for setValue too
-                app._safe_widget_call("baud_rate_input", "setValue", 115200)
+                app._safe_widget_call("esp32_port_input", "setRange", 1, 65535)
+                app._safe_widget_call("esp32_port_input", "setValue", 9000)
             except Exception:
                 pass
     except Exception:
         pass
-    settings_layout.addWidget(app.baud_rate_input, 1, 1)
+    settings_layout.addWidget(app.esp32_port_input, 1, 1)
+
+    settings_layout.addWidget(QLabel("Local Port:"), 2, 0)
+    if getattr(app, "esp32_local_port_input", None) is None:
+        app.esp32_local_port_input = QSpinBox()
+    try:
+        if getattr(app, "esp32_local_port_input", None) is not None:
+            try:
+                app._safe_widget_call("esp32_local_port_input", "setRange", 0, 65535)
+                app._safe_widget_call("esp32_local_port_input", "setValue", 0)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    settings_layout.addWidget(app.esp32_local_port_input, 2, 1)
     # Factory preset quick-access (keeps UI usable even if Behavior dock is hidden)
     # NOTE: This is a separate combo box from any behavior-panel preset widget.
     # Qt widgets cannot have multiple parents.
-    settings_layout.addWidget(QLabel("Factory Preset:"), 2, 0)
+    settings_layout.addWidget(QLabel("Factory Preset:"), 3, 0)
     if getattr(app, "connection_preset_combo", None) is None:
         app.connection_preset_combo = QComboBox()
         try:
@@ -165,7 +178,7 @@ def build_ui(app: QMainWindow):
             )
     except Exception:
         pass
-    settings_layout.addWidget(app.connection_preset_combo, 2, 1)
+    settings_layout.addWidget(app.connection_preset_combo, 3, 1)
 
     if getattr(app, "connect_button", None) is None:
         app.connect_button = QPushButton("Connect")
@@ -175,7 +188,7 @@ def build_ui(app: QMainWindow):
             if logger: log_connection_error("connect_button", "clicked", "handle_connect_sound", "Connection failed")
     except Exception as e:
         if logger: log_exception(e, "Connecting connect_button.clicked signal")
-    settings_layout.addWidget(app.connect_button, 3, 0, 1, 2)
+    settings_layout.addWidget(app.connect_button, 4, 0, 1, 2)
 
     if getattr(app, "sound_checkbox", None) is None:
         app.sound_checkbox = QCheckBox("Sound Effects")
@@ -236,7 +249,7 @@ def build_ui(app: QMainWindow):
                 pass
     except Exception:
         pass
-    settings_layout.addWidget(app.sound_checkbox, 4, 0, 1, 2)
+    settings_layout.addWidget(app.sound_checkbox, 5, 0, 1, 2)
 
     # Small status label to show override/suspend states (manual, go-home, hold)
     app.override_status_label = QLabel("")
@@ -249,7 +262,7 @@ def build_ui(app: QMainWindow):
             pass
     except Exception:
         pass
-    settings_layout.addWidget(app.override_status_label, 7, 0, 1, 2)
+    settings_layout.addWidget(app.override_status_label, 8, 0, 1, 2)
 
     # Camera selection (allow user to prefer a specific camera index or use Auto)
     if getattr(app, "camera_index_combo", None) is None:
@@ -259,7 +272,7 @@ def build_ui(app: QMainWindow):
                 app.camera_index_combo.addItems(["Auto", "0", "1", "2", "3", "4"])
         except Exception:
             pass
-    settings_layout.addWidget(app.camera_index_combo, 6, 1)
+    settings_layout.addWidget(app.camera_index_combo, 7, 1)
 
     # Tracking toggle (replaces separate Start/Stop buttons)
     if getattr(app, "tracking_btn", None) is None:
@@ -293,8 +306,8 @@ def build_ui(app: QMainWindow):
     except Exception:
         pass
 
-    settings_layout.addWidget(app.tracking_btn, 5, 0)
-    settings_layout.addWidget(app.aiming_btn, 5, 1)
+    settings_layout.addWidget(app.tracking_btn, 6, 0)
+    settings_layout.addWidget(app.aiming_btn, 6, 1)
     settings_group.setLayout(settings_layout)
 
     # Home position
@@ -1982,8 +1995,8 @@ def build_ui(app: QMainWindow):
     manual_layout.addLayout(fire_controls)
     manual_group.setLayout(manual_layout)
 
-    # Serial / Log output
-    serial_output_group = QGroupBox("Serial / Log Output")
+    # Link / Log output
+    serial_output_group = QGroupBox("Link / Log Output")
     serial_output_layout = QVBoxLayout()
     if getattr(app, "serial_output", None) is None:
         app.serial_output = QTextEdit()
@@ -2054,17 +2067,8 @@ def build_ui(app: QMainWindow):
             enabled = bool(getattr(app, "total_current_sensor_enabled", False))
             last_t = float(getattr(app, "last_current_telemetry_time", 0.0) or 0.0)
 
-            # If operator enables total current while not using Nano telemetry, make it obvious.
-            needs_dual = False
-            try:
-                if enabled and hasattr(app, "_serial_is_debug_board_bus") and hasattr(app, "_serial_is_dual_port"):
-                    if bool(app._serial_is_debug_board_bus()) and (not bool(app._serial_is_dual_port())):
-                        needs_dual = True
-            except Exception:
-                needs_dual = False
-
             stale = False
-            if enabled and (not needs_dual):
+            if enabled:
                 if last_t <= 0.0:
                     stale = True
                 else:
@@ -2075,9 +2079,6 @@ def build_ui(app: QMainWindow):
                     app.total_current_label.setText("Disabled")
                     if hasattr(app, "health_graph"):
                         app.health_graph.push_data(0)
-                elif needs_dual:
-                    app.total_current_label.setText("Needs Nano telemetry (Dual Port)")
-                    # Don't push fake zeros; leave graph as-is.
                 elif stale:
                     app.total_current_label.setText("No telemetry")
                     # Don't push fake zeros; leave graph as-is.
@@ -2175,7 +2176,7 @@ def build_ui(app: QMainWindow):
         app.add_dock("Tracking Behavior", behavior_scroll, "right")
         app.add_dock("Manual Movement & Firing", manual_scroll, "right")
         app.add_dock("System Health Monitor", current_group, "right")
-        app.add_dock("Serial / Log Output", serial_output_group, "right")
+        app.add_dock("Link / Log Output", serial_output_group, "right")
         app.add_dock("System", status_group, "right")
         try:
             # sniper dock - REMOVED (Dec 2024)

@@ -7,7 +7,7 @@ This tool allows you to:
 1. Discover the full range of the PAN servo (expects >200°)
 2. Verify/adjust TILT servo safe limits (currently 0-70°)
 3. Save calibrated values to servo_calibration.json
-4. Apply values to main app and Arduino sketch
+4. Apply values to main app and ESP32 firmware
 
 Usage:
     python servo_calibration_tool.py
@@ -29,16 +29,13 @@ Date: December 3, 2025
 import sys
 import json
 import time
-import serial
-import serial.tools.list_ports
+from esp32_link import Esp32Link
 from pathlib import Path
-from typing import Optional, Tuple
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTabWidget, QGroupBox, QLabel, QPushButton, QSpinBox, QSlider,
-    QComboBox, QTextEdit, QMessageBox, QFormLayout, QDoubleSpinBox,
-    QProgressBar, QCheckBox
+    QTextEdit, QMessageBox, QFormLayout, QLineEdit
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject
 from PyQt5.QtGui import QFont, QColor
@@ -50,107 +47,102 @@ BASE_DIR = Path(__file__).resolve().parent
 CALIB_FILE = BASE_DIR / "servo_calibration.json"
 
 
-class SerialCommands:
-    """Commands sent to Arduino for servo control
-    
-    Command format matches main app protocol:
-    P<pan>T<tilt>F<fire>L<led>R<laser>G<acc>S<safety>M<mode>\n
-    
-    Example: P90T54F0L0R0G0S1M0\n
-    """
-    
+class LinkCommands:
+    """Commands sent to ESP32 for servo calibration control."""
+
     @staticmethod
-    def move_pan(angle: int) -> str:
-        """Command to move pan servo to angle (0-255)
-        
-        Keep tilt at safe middle position (54°) during pan calibration
-        """
+    def move_pan(angle: int) -> dict:
+        """Move pan while holding tilt at a safe midpoint."""
         tilt = 54
-        return f"P{angle}T{tilt}F0L0R0G0S1M0\n"
-    
+        return {
+            "pan": int(angle),
+            "tilt": int(tilt),
+            "fire": 0,
+            "led": 0,
+            "laser": 0,
+            "safety": 1,
+            "mode": 0,
+            "calib": True,
+        }
+
     @staticmethod
-    def move_tilt(angle: int) -> str:
-        """Command to move tilt servo to angle (0-255)
-        
-        Keep pan at center (90°) during tilt testing
-        """
+    def move_tilt(angle: int) -> dict:
+        """Move tilt while holding pan at center."""
         pan = 90
-        return f"P{pan}T{angle}F0L0R0G0S1M0\n"
-    
+        return {
+            "pan": int(pan),
+            "tilt": int(angle),
+            "fire": 0,
+            "led": 0,
+            "laser": 0,
+            "safety": 1,
+            "mode": 0,
+            "calib": True,
+        }
+
     @staticmethod
-    def move_both(pan: int, tilt: int) -> str:
-        """Command to move both servos"""
-        return f"P{pan}T{tilt}F0L0R0G0S1M0\n"
-    
-    @staticmethod
-    def query_position() -> str:
-        """Query current servo position - tracked locally in tool"""
-        # Tool maintains position state internally
-        return "POS?\n"
+    def move_both(pan: int, tilt: int) -> dict:
+        """Move both servos to target angles."""
+        return {
+            "pan": int(pan),
+            "tilt": int(tilt),
+            "fire": 0,
+            "led": 0,
+            "laser": 0,
+            "safety": 1,
+            "mode": 0,
+            "calib": True,
+        }
 
 
-class SerialWorker(QObject):
-    """Worker thread for serial communication"""
-    
+class LinkWorker(QObject):
+    """Worker for ESP32 UDP link communication."""
+
     position_updated = pyqtSignal(int, int)  # pan, tilt
     error_occurred = pyqtSignal(str)  # error message
-    
-    def __init__(self, port: str, baudrate: int = 115200):
+
+    def __init__(self, host: str, port: int, local_port: int):
         super().__init__()
-        self.port = port
-        self.baudrate = baudrate
-        self.ser = None
+        self.host = host
+        self.port = int(port)
+        self.local_port = int(local_port)
+        self.link = None
         self.connected = False
-        
+
     def connect(self) -> bool:
-        """Connect to Arduino"""
+        """Connect to ESP32 link."""
         try:
-            self.ser = serial.Serial(
+            self.link = Esp32Link(
+                host=self.host,
                 port=self.port,
-                baudrate=self.baudrate,
-                timeout=1.0,
-                write_timeout=1.0
+                local_port=self.local_port,
             )
-            time.sleep(2)  # Wait for Arduino reset
+            self.link.connect()
             self.connected = True
             return True
         except Exception as e:
-            self.error_occurred.emit(f"Connection failed: {e}")
+            self.error_occurred.emit(f"Link connection failed: {e}")
             return False
-    
+
     def disconnect(self):
-        """Disconnect from Arduino"""
-        if self.ser and self.ser.is_open:
-            self.ser.close()
+        """Disconnect from ESP32 link."""
+        if self.link:
+            self.link.disconnect()
+            self.link = None
         self.connected = False
-    
-    def send_command(self, command: str) -> bool:
-        """Send command to Arduino"""
-        if not self.connected or not self.ser:
-            self.error_occurred.emit("Not connected to Arduino")
+
+    def send_command(self, payload: dict) -> bool:
+        """Send command payload to ESP32."""
+        if not self.connected or not self.link:
+            self.error_occurred.emit("Not connected to ESP32 link")
             return False
-        
+
         try:
-            self.ser.write(command.encode())
-            self.ser.flush()
+            self.link.send_payload(payload)
             return True
         except Exception as e:
             self.error_occurred.emit(f"Send failed: {e}")
             return False
-    
-    def read_response(self) -> Optional[str]:
-        """Read response from Arduino"""
-        if not self.connected or not self.ser:
-            return None
-        
-        try:
-            if self.ser.in_waiting:
-                response = self.ser.readline().decode().strip()
-                return response
-        except Exception as e:
-            self.error_occurred.emit(f"Read failed: {e}")
-        
-        return None
 
 
 class ServoCalibrationTool(QMainWindow):
@@ -161,8 +153,8 @@ class ServoCalibrationTool(QMainWindow):
         self.setWindowTitle("Servo Calibration Tool")
         self.setGeometry(100, 100, 900, 700)
         
-        # Serial worker
-        self.serial_worker = None
+        # Link worker
+        self.link_worker = None
         self.connected = False
         
         # Calibration data
@@ -186,20 +178,26 @@ class ServoCalibrationTool(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         
         # Connection section
-        conn_group = QGroupBox("Serial Connection")
+        conn_group = QGroupBox("Link Connection")
         conn_layout = QHBoxLayout()
-        
-        # COM port selector
-        conn_layout.addWidget(QLabel("COM Port:"))
-        self.com_combo = QComboBox()
-        self.refresh_ports()
-        conn_layout.addWidget(self.com_combo)
-        
-        # Refresh button
-        refresh_btn = QPushButton("Refresh Ports")
-        refresh_btn.clicked.connect(self.refresh_ports)
-        conn_layout.addWidget(refresh_btn)
-        
+
+        conn_layout.addWidget(QLabel("ESP32 Host:"))
+        self.host_input = QLineEdit()
+        self.host_input.setText("192.168.4.1")
+        conn_layout.addWidget(self.host_input)
+
+        conn_layout.addWidget(QLabel("Port:"))
+        self.port_input = QSpinBox()
+        self.port_input.setRange(1, 65535)
+        self.port_input.setValue(9000)
+        conn_layout.addWidget(self.port_input)
+
+        conn_layout.addWidget(QLabel("Local Port:"))
+        self.local_port_input = QSpinBox()
+        self.local_port_input.setRange(0, 65535)
+        self.local_port_input.setValue(0)
+        conn_layout.addWidget(self.local_port_input)
+
         # Connect button
         self.connect_btn = QPushButton("Connect")
         self.connect_btn.clicked.connect(self.toggle_connection)
@@ -444,52 +442,44 @@ class ServoCalibrationTool(QMainWindow):
         widget.setLayout(layout)
         return widget
     
-    def refresh_ports(self):
-        """Refresh available COM ports"""
-        self.com_combo.clear()
-        ports = serial.tools.list_ports.comports()
-        for port in ports:
-            self.com_combo.addItem(port.device)
-        
-        if len(ports) == 0:
-            self.com_combo.addItem("No ports found")
-    
     def toggle_connection(self):
-        """Connect/disconnect from Arduino"""
+        """Connect/disconnect from ESP32 link."""
         if self.connected:
-            self.disconnect_arduino()
+            self.disconnect_link()
         else:
-            self.connect_arduino()
-    
-    def connect_arduino(self):
-        """Connect to Arduino"""
-        port = self.com_combo.currentText()
-        if port == "No ports found" or not port:
-            QMessageBox.warning(self, "Error", "No COM port selected")
+            self.connect_link()
+
+    def connect_link(self):
+        """Connect to ESP32 link."""
+        host = self.host_input.text().strip()
+        port = int(self.port_input.value())
+        local_port = int(self.local_port_input.value())
+        if not host:
+            QMessageBox.warning(self, "Error", "ESP32 host is required")
             return
-        
-        self.serial_worker = SerialWorker(port)
-        self.serial_worker.error_occurred.connect(lambda msg: self.log(f"❌ {msg}"))
-        
-        if self.serial_worker.connect():
+
+        self.link_worker = LinkWorker(host, port, local_port)
+        self.link_worker.error_occurred.connect(lambda msg: self.log(f"❌ {msg}"))
+
+        if self.link_worker.connect():
             self.connected = True
             self.connect_btn.setText("Disconnect")
             self.status_label.setText("Connected ✓")
             self.status_label.setStyleSheet("color: green; font-weight: bold;")
-            self.log(f"✓ Connected to {port}")
+            self.log(f"✓ Link connected to {host}:{port}")
             self.log("✓ Ready to calibrate - Click 'Find MIN' or 'Find MAX' to start")
         else:
-            self.log(f"❌ Failed to connect to {port}")
-    
-    def disconnect_arduino(self):
-        """Disconnect from Arduino"""
-        if self.serial_worker:
-            self.serial_worker.disconnect()
+            self.log(f"❌ Failed to connect to {host}:{port}")
+
+    def disconnect_link(self):
+        """Disconnect from ESP32 link."""
+        if self.link_worker:
+            self.link_worker.disconnect()
         self.connected = False
         self.connect_btn.setText("Connect")
         self.status_label.setText("Disconnected")
         self.status_label.setStyleSheet("color: red; font-weight: bold;")
-        self.log("Disconnected from Arduino")
+        self.log("Link disconnected")
     
     def log(self, message: str):
         """Log message to status text"""
@@ -499,15 +489,15 @@ class ServoCalibrationTool(QMainWindow):
     def pan_move_to(self, angle: int):
         """Move pan to specific angle"""
         if not self.connected:
-            self.log("❌ Not connected to Arduino")
+            self.log("❌ Not connected to ESP32 link")
             return
-        
+
         self.current_pan = angle
-        cmd = SerialCommands.move_pan(angle)
-        self.serial_worker.send_command(cmd)
+        payload = LinkCommands.move_pan(angle)
+        self.link_worker.send_command(payload)
         self.pan_current_display.setText(f"{angle}°")
         self.pan_angle_spin.setValue(angle)
-        self.log(f"🔄 Pan → {angle}° (cmd: {cmd.strip()})")
+        self.log(f"🔄 Pan → {angle}° (payload: {payload})")
     
     def pan_increment(self, delta: int):
         """Increment pan position"""
@@ -517,7 +507,7 @@ class ServoCalibrationTool(QMainWindow):
     def pan_find_min(self):
         """Auto-sweep to find minimum pan angle"""
         if not self.connected:
-            self.log("❌ Not connected to Arduino")
+            self.log("❌ Not connected to ESP32 link")
             return
         
         self.log("🔍 Finding PAN minimum... Move slowly toward limit...")
@@ -539,7 +529,7 @@ class ServoCalibrationTool(QMainWindow):
     def pan_find_max(self):
         """Auto-sweep to find maximum pan angle"""
         if not self.connected:
-            self.log("❌ Not connected to Arduino")
+            self.log("❌ Not connected to ESP32 link")
             return
         
         self.log("🔍 Finding PAN maximum... Move slowly toward limit...")
@@ -577,14 +567,14 @@ class ServoCalibrationTool(QMainWindow):
     def tilt_move_to(self, angle: int):
         """Move tilt to specific angle"""
         if not self.connected:
-            self.log("❌ Not connected to Arduino")
+            self.log("❌ Not connected to ESP32 link")
             return
-        
+
         self.current_tilt = angle
-        cmd = SerialCommands.move_tilt(angle)
-        self.serial_worker.send_command(cmd)
+        payload = LinkCommands.move_tilt(angle)
+        self.link_worker.send_command(payload)
         self.tilt_current_display.setText(f"{angle}°")
-        self.log(f"🔄 Tilt → {angle}° (cmd: {cmd.strip()})")
+        self.log(f"🔄 Tilt → {angle}° (payload: {payload})")
     
     def tilt_confirm(self):
         """Confirm tilt adjustments"""
@@ -660,7 +650,7 @@ class ServoCalibrationTool(QMainWindow):
     def closeEvent(self, event):
         """Handle window close"""
         if self.connected:
-            self.disconnect_arduino()
+            self.disconnect_link()
         event.accept()
 
 

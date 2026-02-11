@@ -253,7 +253,7 @@ class TurretEnhancements:
         sb = QStatusBar()
         self.fps_label = QLabel("FPS: --")
         self.mode_label = QLabel("Mode: --")
-        self.serial_status = QLabel("Serial: --")
+        self.serial_status = QLabel("Link: --")
         sb.addWidget(self.fps_label)
         sb.addWidget(self.mode_label)
         sb.addWidget(self.serial_status)
@@ -273,7 +273,7 @@ class TurretEnhancements:
 
     def update_serial_status(self, text):
         try:
-            self.serial_status.setText(f"Serial: {text}")
+            self.serial_status.setText(f"Link: {text}")
         except Exception:
             pass
 

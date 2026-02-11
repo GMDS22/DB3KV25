@@ -1,39 +1,19 @@
-"""Serial and frame helpers and binder for Movement_Detect_Yolo_me.
+"""Link and frame helpers for Movement_Detect_Yolo_me.
 
-This module contains safe wrappers for opening serial ports and
-small capture/frame helpers. Call bind_serial_helpers(app) to attach
-these as instance-level callables on `app`.
+Serial helpers are intentionally disabled now that ESP32 UDP is the
+only supported hardware link. Frame helpers remain for compatibility.
+Call bind_serial_helpers(app) to attach these helpers on `app`.
 """
 from typing import Any
 
 
 def _safe_open_serial(app, port, baud, **kwargs):
     try:
-        p = str(port) if port is not None else ''
-        b = int(baud)
+        if getattr(app, "_safe_append_log", None):
+            app._safe_append_log("Serial helpers are disabled. Use ESP32 link settings.")
     except Exception:
-        try:
-            p = str(port)
-        except Exception:
-            p = ''
-        try:
-            b = int(str(baud))
-        except Exception:
-            b = 115200
-    try:
-        import serial
-        return serial.Serial(p, b, **kwargs)
-    except Exception as e:
-        try:
-            # Best-effort log via app if available
-            if getattr(app, '_safe_append_log', None):
-                try:
-                    app._safe_append_log(f"Serial open failed: {e}")
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        return None
+        pass
+    return None
 
 
 def _cap_read(app):

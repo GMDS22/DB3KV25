@@ -3,6 +3,18 @@
   "max_items": 10,
   "items": [
     {
+      "date": "2026-02-11",
+      "title": "Workflow: Added Arduino CLI flash script and guide for ESP32 UDP firmware upload. Files: tools/flash_esp32_udp.ps1, ESP32_UDP_FLASH.md."
+    },
+    {
+      "date": "2026-02-11",
+      "title": "Firmware: Added ESP32 UDP link sketch for Arduino upload (DB3000_ESP32_UDP_Link.ino) with JSON+CRC protocol, pin map, and basic IO handling. File: arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino."
+    },
+    {
+      "date": "2026-02-10",
+      "title": "Docs/UI: Updated Help -> Pin Assignments dialog to ESP32 DevKit v1 mapping and refreshed the pinout reference in CHANGE_IMPACT_REFERENCE.md. Files: app/MAIN_FILE_SINGLE_CAM.py, CHANGE_IMPACT_REFERENCE.md."
+    },
+    {
       "date": "2026-02-07",
       "title": "Fix: Prevent settings overwrite during UI init by guarding save_settings with _loading_settings and clearing it after load. Idle Zones divisions now restore reliably (signal blocking + UI sync). Added multi-zone selection cycling and persistence. Added test_idle_zones_verification.py for end-to-end checks. Files: app/MAIN_FILE_SINGLE_CAM.py, app/idle_zones_widget.py, test_idle_zones_verification.py."
     },
@@ -29,18 +41,6 @@
     {
       "date": "2026-02-07",
       "title": "Critical Fix: Stop Tracking is the only explicit stop. Auto-tracking re-engagement respects _user_initiated_stop and will not resume until Start Tracking clears it. Files: app/MAIN_FILE_SINGLE_CAM.py."
-    },
-    {
-      "date": "2026-02-07",
-      "title": "Critical Fix: Resolved UI limitation where Home Tilt/Pan inputs were clamped to default ranges (e.g. 70) even when limits were increased. load_settings now updates widget ranges before setting values."
-    },
-    {
-      "date": "2026-02-07",
-      "title": "Critical Fix: Tracking calculations gated by tracking_active; Target Lost hold/idle logic now respects tracking_active to prevent stale last_known_* from overriding Go Home/Manual positions. Files: app/MAIN_FILE_SINGLE_CAM.py."
-    },
-    {
-      "date": "2026-02-07",
-      "title": "Behavior Presets dock now keeps a stable objectName to prevent saveState/restoreState crashes when layouts are saved or restored."
     }
   ]
 }
