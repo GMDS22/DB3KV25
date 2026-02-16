@@ -2064,6 +2064,7 @@ def build_ui(app: QMainWindow):
         try:
             import time
             total = getattr(app, "total_current_mA", None)
+            total_raw = getattr(app, "total_current_mA_raw", None)
             enabled = bool(getattr(app, "total_current_sensor_enabled", False))
             last_t = float(getattr(app, "last_current_telemetry_time", 0.0) or 0.0)
 
@@ -2076,9 +2077,15 @@ def build_ui(app: QMainWindow):
 
             try:
                 if not enabled:
-                    app.total_current_label.setText("Disabled")
-                    if hasattr(app, "health_graph"):
-                        app.health_graph.push_data(0)
+                    # Keep visibility if telemetry is arriving but install flag is off.
+                    if total_raw is not None and not stale:
+                        app.total_current_label.setText(f"{int(total_raw)} (telemetry)")
+                        if hasattr(app, "health_graph"):
+                            app.health_graph.push_data(total_raw)
+                    else:
+                        app.total_current_label.setText("Disabled")
+                        if hasattr(app, "health_graph"):
+                            app.health_graph.push_data(0)
                 elif stale:
                     app.total_current_label.setText("No telemetry")
                     # Don't push fake zeros; leave graph as-is.

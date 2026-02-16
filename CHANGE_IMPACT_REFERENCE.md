@@ -10,19 +10,19 @@ This section documents the required steps, affected subsystems, and review check
 **Update (2026-01-22):** Current sensing is now optional end-to-end. The app can run with no current sensors, and supports total-only telemetry via legacy `STAT I=<mA>` when a total sensor is installed and enabled.
 
 **Update (2026-01-24):** The app supports selectable serial modes:
-- **Arduino/Nano (DB3000 ASCII)**: one COM port to Nano; Nano drives pan/tilt via its debug-board wiring and handles IO.
-- **Debug Board (Bus Servo Direct)**: one COM port to the debug board; app drives PAN/TILT via binary Yahboom-style packets (no Nano IO).
-- **Dual Port (Nano IO + Debug Board Pan/Tilt)**: two COM ports; app sends PAN/TILT directly to Debug Board while Nano handles IO.
+- **ESP32/Primary IO (DB3000 ASCII)**: one COM port to ESP32 (or compatible primary IO board); board handles IO and optional telemetry.
+- **Debug Board (Bus Servo Direct)**: one COM port to the debug board; app drives PAN/TILT via binary Yahboom-style packets (no primary-IO accessories in this mode).
+- **Dual Port (ESP32 IO + Debug Board Pan/Tilt)**: two COM ports; app sends PAN/TILT directly to Debug Board while ESP32 handles IO.
 
 **Update (2026-01-26): Dual Port wiring/topology clarification (IMPORTANT)**
 - Dual Port assumes the **Debug Board is connected directly to the PC as its own USB serial device** (e.g., COM9).
-- The **Nano is also connected directly to the PC** as its own USB serial device (e.g., COM8).
-- The Debug Board is **NOT required to be physically connected/"chained" to the Nano** for Dual Port operation.
+- The **ESP32 primary IO board is also connected directly to the PC** as its own USB serial device (e.g., COM10).
+- The Debug Board is **NOT required to be physically connected/"chained" to the ESP32** for Dual Port operation.
 
 **Critical invariants (do not regress):**
 - Debug Board bus traffic is **binary** (must never be decoded as UTF-8 lines).
-- Nano traffic is **ASCII** telemetry/status (must be drained/parsed in Dual Port even though pan/tilt are bus-driven).
-- In Dual Port, do **NOT** "fallback" to sending full `P{pan}T{tilt}...` commands to the Nano when the bus write fails (prevents split-control when the boards are not chained).
+- ESP32 primary traffic is **ASCII** telemetry/status (must be drained/parsed in Dual Port even though pan/tilt are bus-driven).
+- In Dual Port, do **NOT** "fallback" to sending full `P{pan}T{tilt}...` commands to the ESP32 when the bus write fails (prevents split-control when the boards are not chained).
 
 ---
 
@@ -106,16 +106,16 @@ A tracking behavior control that pauses detection updates when target enters sco
 A quick-reference help panel for the ESP32 wiring scheme.
 
 **Access**: `Help -> ESP32 Pin Assignments`
-**Content**: Hardcoded table in `open_pin_assignment_window` matching the current ESP32 DevKit v1 mapping.
-**Firmware**: Arduino sketch at `arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino`.
+**Content**: Table in this section is loaded by `open_pin_assignment_window` at runtime so the Help menu stays in sync.
+**Firmware**:
+- UDP link mode: `arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino`
+- USB serial IO mode (Dual Port primary COM, e.g. COM10): `arduino/DB3000_ESP32_IO_Telemetry_2026/DB3000_ESP32_IO_Telemetry_2026.ino`
 **Flash workflow**: See `ESP32_UDP_FLASH.md` and `tools/flash_esp32_udp.ps1`.
 
 | Pin | Function | Mode |
 |---|---|---|
-| GPIO16 | UART2 RX (debug board TX) | Serial In |
-| GPIO17 | UART2 TX (debug board RX) | Serial Out |
-| GPIO25 | Pan Servo PWM | PWM |
-| GPIO26 | Tilt Servo PWM | PWM |
+| GPIO16 | UART2 RX (debug board TX - pan/tilt bus) | Serial In |
+| GPIO17 | UART2 TX (debug board RX - pan/tilt bus) | Serial Out |
 | GPIO27 | Trigger MOSFET (Water) | Digital Out |
 | GPIO13 | Trigger Servo (Projectile) | PWM |
 | GPIO32 | LED Relay | Digital Out |
@@ -810,7 +810,7 @@ Manages serial port connection to Arduino/MCU and sends control commands.
 
 These modes change **which COM port(s)** are opened and **how bytes are encoded/decoded**.
 
-1) **Arduino/Nano (DB3000 ASCII)**
+1) **ESP32/Primary IO (DB3000 ASCII)**
 - Uses primary COM only (settings: `com_port` / `baud_rate`).
 - Host sends packed ASCII commands: `P..T..F..L..R..G..S..M..`.
 - Host expects ASCII telemetry/status back and drains via `_drain_serial_input()`.
@@ -819,26 +819,31 @@ These modes change **which COM port(s)** are opened and **how bytes are encoded/
 - Uses Debug Board COM only (settings: `debug_board_com_port` / `debug_board_baud`).
 - Host sends **binary** bus-servo packets for PAN/TILT.
 - Host must **not** call `_drain_serial_input()` because inbound bytes are not line-oriented UTF-8.
-- IO features (fire/relays) are not available unless a Nano is also connected (use Dual Port).
+- IO features (fire/relays) are not available unless a primary IO board is also connected (use Dual Port).
 
-3) **Dual Port (Nano IO + Debug Board Pan/Tilt)**
-- Uses both ports: primary COM = Nano (IO + telemetry), debug COM = Debug Board (PAN/TILT bus packets).
-- Host sends PAN/TILT only to Debug Board; host sends IO-only tokens to Nano.
-- Host must still drain Nano ASCII input in Dual Port (telemetry/safety/current parsing).
+3) **Dual Port (ESP32 IO + Debug Board Pan/Tilt)**
+- Uses both ports: primary COM = ESP32 (IO + telemetry), debug COM = Debug Board (PAN/TILT bus packets).
+- Host sends PAN/TILT only to Debug Board; host sends IO-only tokens to ESP32.
+- Host must still drain ESP32 ASCII input in Dual Port (telemetry/safety/current parsing).
+
+4) **ESP32 Link (UDP)**
+- Uses WiFi/UDP (settings: `esp32_host`, `esp32_port`, `esp32_local_port`).
+- Optional `esp32_only` disables COM modes and forces Connect to use ESP32.
 
 **Sensitive functions / regression hotspots:**
 - `connect_serial()` (mode selection, which port is opened)
 - `_connect_serial_async()` / `_connect_bus_serial_async()` (threading + port roles)
 - `send_serial_command()` (routing PAN/TILT vs IO-only)
-- `_drain_serial_input()` (must not decode bus bytes; must decode Nano bytes in Dual Port)
+- `_drain_serial_input()` (must not decode bus bytes; must decode ESP32 bytes in Dual Port)
 - `_serial_active_is_bus_mode()` (used as a gate for decoding logic)
 
 ### Direct Dependencies
 
 | Parameter | Location | Default | Affects |
 |-----------|----------|---------|---------|
-| `com_port` | settings.json | "COM3" | Which port to connect |
+| `com_port` | settings.json | "COM10" | Which primary IO port to connect |
 | `baud_rate` | settings.json | 115200 | Connection speed |
+| `esp32_only` | settings.json | false | Forces ESP32 link, skips COM modes |
 | `serial_timeout` | MAIN_FILE_SINGLE_CAM.py | 0.1s | Read timeout |
 
 ### Serial Command Protocol
@@ -1542,6 +1547,9 @@ The `_complete_go_home` QTimer.singleShot callback unconditionally set `tracking
 
 ### Hidden coupling: Dual Port IO duplicate send (FIXED)
 The `try...except...else` pattern in dual-port IO sending had the fallback code in the `else` clause (which runs on SUCCESS, not failure). This caused S/M/F/L/R/G tokens to be sent twice to the Nano every cycle. Fixed 2026-02-07.
+
+### Hidden coupling: Serial mode UI widgets are routing-critical
+`_serial_device_type_index()` depends on UI/runtime fields (`serial_device_type_combo`, `debug_board_com_port_input`, `debug_board_baud_rate_input`, plus primary `com_port_input`/`baud_rate_input`). If these widgets are removed or not created, mode detection silently falls back to index `0` (Nano ASCII), which breaks Dual Port routing (PAN/TILT no longer targets Debug Board COM). Keep these widgets initialized and persisted in `load_settings()`/`save_settings()` whenever serial routing is active.
 
 ---
 

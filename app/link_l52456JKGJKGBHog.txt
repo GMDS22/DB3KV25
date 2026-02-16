@@ -1,0 +1,380 @@
+[APP INIT] TurretEnhancements initialized
+[INIT] Bulletproof state manager initialized
+WIDGET: tracking_btn present; signals: clicked, pressed, released, toggled
+WIDGET: aiming_btn present; signals: clicked, pressed, released, toggled
+WIDGET: go_home_button present; signals: clicked, pressed, released, toggled
+WIDGET: connect_button present; signals: clicked, pressed, released, toggled
+WIDGET: btn_up present; signals: clicked, pressed, released, toggled
+WIDGET: btn_down present; signals: clicked, pressed, released, toggled
+WIDGET: btn_left present; signals: clicked, pressed, released, toggled
+WIDGET: btn_right present; signals: clicked, pressed, released, toggled
+WIDGET: btn_center present; signals: clicked, pressed, released, toggled
+WIDGET: fire_button present; signals: clicked, pressed, released, toggled
+WIDGET: safety_button present; signals: clicked, pressed, released, toggled
+WIDGET: open_trainer_btn present; signals: clicked, pressed, released, toggled
+[CALIBRATION] Loaded from: servo_calibration.json
+[CALIBRATION] Pan: 5-185° | Tilt: 0-70°
+Sound effects DISABLED
+Settings loaded successfully.
+Layout 'standard' loaded successfully
+WIDGET: tracking_btn present; signals: clicked, pressed, released, toggled
+WIDGET: aiming_btn present; signals: clicked, pressed, released, toggled
+WIDGET: go_home_button present; signals: clicked, pressed, released, toggled
+WIDGET: connect_button present; signals: clicked, pressed, released, toggled
+WIDGET: btn_up present; signals: clicked, pressed, released, toggled
+WIDGET: btn_down present; signals: clicked, pressed, released, toggled
+WIDGET: btn_left present; signals: clicked, pressed, released, toggled
+WIDGET: btn_right present; signals: clicked, pressed, released, toggled
+WIDGET: btn_center present; signals: clicked, pressed, released, toggled
+WIDGET: fire_button present; signals: clicked, pressed, released, toggled
+WIDGET: safety_button present; signals: clicked, pressed, released, toggled
+WIDGET: open_trainer_btn present; signals: clicked, pressed, released, toggled
+[LINK] ESP32-only mode enabled (COM disabled).
+[LINK] Local port 8 is privileged; using ephemeral port.
+Layout 'custom2' loaded successfully
+[LINK] ESP32-only mode enabled (COM disabled).
+Disconnected from ESP32 link.
+[STATE] manual_override cleared on tracking start
+Tracking started. Opening camera in background...
+Tracking started.
+[SERIAL DIAG] ser_is_none=True ser_is_open=False port=NONE tx_paused=False tracking=True aiming=True send_cmd_calls=0
+[ISSUE] Serial port object is None - not connected!
+Starting tracking with detection mode index: 5
+[LINK] ESP32-only mode enabled (COM disabled).
+[CAMERA] Opened camera 1 (DSHOW): requested 1280x720 → 1280x720
+Camera opened successfully: 1280x720
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=False
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[IDLE] Idle mode updates suppressed
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=-9999.0 prev_tilt=-9999.0 last_sent_pan=-9999 last_sent_tilt=-9999 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+[DETECT DIAG] mode=5 boxes=0 frame=(720, 1280, 3) yolo_loaded=True backSub=True contours_raw=0 contours_filtered=0 fg_nonzero=0 yolo_hits=0
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+[DETECT DIAG] mode=5 boxes=0 frame=(720, 1280, 3) yolo_loaded=True backSub=True contours_raw=0 contours_filtered=0 fg_nonzero=0 yolo_hits=0
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+Aiming stopped (servos locked).
+[AIM DIAG] aiming_active=False tracking_active=True manual_override=False _manual_override_active=False _manual_override_until=0.0 _suspend_tracking_until=0 _suppress_detection_until=0 _in_go_home=False backSub=yes
+[STATE] tracking_active=True while aiming_active=False - AUTO-SYNCED aiming to True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+[DETECT DIAG] mode=5 boxes=0 frame=(720, 1280, 3) yolo_loaded=True backSub=True contours_raw=0 contours_filtered=0 fg_nonzero=0 yolo_hits=0
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+[DETECT DIAG] mode=5 boxes=0 frame=(720, 1280, 3) yolo_loaded=True backSub=True contours_raw=0 contours_filtered=0 fg_nonzero=0 yolo_hits=0
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=True aiming=True mode=5
+[TRACK] Hold window expired (5.0s) - entering idle behavior (tracking preserved)
+WILL SEND: pan=90.00 tilt=80.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=80.0 last_sent_pan=90 last_sent_tilt=80 target_pan=90.0 target_tilt=80.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=True
+[RESET] Tracking + Idle state cleared before Go Home
+Started host-side interpolated Go Home (speed_deg/s=1.250, step_deg=0.062)
+Go Home complete — turret parked. Press Start Tracking to resume.
+WILL SEND: pan=90.00 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=90.0 last_sent_pan=90 last_sent_tilt=90 target_pan=90.0 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=90.00 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=90.0 last_sent_pan=90 last_sent_tilt=90 target_pan=90.0 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=90.00 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=90.0 last_sent_pan=90 last_sent_tilt=90 target_pan=90.0 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=90.00 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=90.0 last_sent_pan=90 last_sent_tilt=90 target_pan=90.0 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=90.00 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=90.0 last_sent_pan=90 last_sent_tilt=90 target_pan=90.0 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+[DETECT DIAG] mode=5 boxes=0 frame=(720, 1280, 3) yolo_loaded=True backSub=True contours_raw=0 contours_filtered=0 fg_nonzero=0 yolo_hits=0
+WILL SEND: pan=90.00 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=90.0 last_sent_pan=90 last_sent_tilt=90 target_pan=90.0 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+Manual PAN: -2.5° (to 87.5°) [Speed: 50%]
+Manual Move: PAN=87.5° TILT=90.0° [encoder_limits=40.0°-120.0°]
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=90.0 prev_tilt=90.0 last_sent_pan=90 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=True _manual_override_active=False safety_state=0 aiming_active=False
+Manual control released; operator override remains until suppression expires
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=True _manual_override_active=True safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=True _manual_override_active=True safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=True _manual_override_active=True safety_state=0 aiming_active=False
+[STATE] manual_override timeout expired - auto-clearing flag
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+[DETECT DIAG] mode=5 boxes=0 frame=(720, 1280, 3) yolo_loaded=True backSub=True contours_raw=0 contours_filtered=0 fg_nonzero=0 yolo_hits=0
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+[DETECT DIAG] mode=5 boxes=0 frame=(720, 1280, 3) yolo_loaded=True backSub=True contours_raw=0 contours_filtered=0 fg_nonzero=0 yolo_hits=0
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+[DETECT DIAG] mode=5 boxes=0 frame=(720, 1280, 3) yolo_loaded=True backSub=True contours_raw=0 contours_filtered=0 fg_nonzero=0 yolo_hits=0
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[DETECT DIAG] mode=5 yolo_loaded=True backSub=True
+[TRACKING DIAG] boxes=0 tracking=False aiming=False mode=5
+[DETECT DIAG] mode=5 boxes=0 frame=(720, 1280, 3) yolo_loaded=True backSub=True contours_raw=0 contours_filtered=0 fg_nonzero=0 yolo_hits=0
+WILL SEND: pan=87.50 tilt=90.00 fire=0 safety=0 mode=0 [DBG] prev_pan=88.0 prev_tilt=90.0 last_sent_pan=88 last_sent_tilt=90 target_pan=87.5 target_tilt=90.0 manual_override=False _manual_override_active=False safety_state=0 aiming_active=False
+[LINK] Log exported to link_log_20260212_093254.txt

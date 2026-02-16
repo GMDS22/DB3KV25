@@ -18,6 +18,8 @@ env/
 
 # Application logs
 app_debug.log
+link_log_*.txt
+app/link_log_*.txt
 
 # Exclude all files in YOLO_MODELS but keep the folder
 YOLO_MODELS/*

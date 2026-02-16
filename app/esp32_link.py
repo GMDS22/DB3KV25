@@ -96,10 +96,10 @@ class Esp32Link:
         self._connected = False
         self._queue_event({"type": "link", "status": "disconnected"})
 
-    def send_command(self, payload: Dict[str, Any]) -> int:
+    def send_command(self, payload: Dict[str, Any], *, expect_ack: bool = True) -> int:
         seq = self._next_seq()
         msg = {"v": 1, "t": "cmd", "seq": seq, "ts": self._now_ms(), "p": payload}
-        self._enqueue(msg, expect_ack=True)
+        self._enqueue(msg, expect_ack=bool(expect_ack))
         return seq
 
     def send_action(self, action: str, payload: Optional[Dict[str, Any]] = None) -> int:
@@ -118,6 +118,13 @@ class Esp32Link:
             last_error=self._last_error,
             pending=len(self._pending),
         )
+
+    def is_open(self) -> bool:
+        """True if the UDP socket/IO thread are running (even if no replies yet)."""
+        try:
+            return bool(self._sock is not None and self._thread is not None and self._thread.is_alive())
+        except Exception:
+            return False
 
     def get_state(self) -> Dict[str, Any]:
         return dict(self._last_state)

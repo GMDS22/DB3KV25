@@ -148,34 +148,50 @@ PRESETS = {
         "snap_threshold": 90,
         "aim_aggression": 35,
         "final_approach_boost": True,
+        "detection_pause_ms": 400,
+        "motion_fire_frames_required": 2,
+        "fire_stability_frames_required": 2,
+        "speed_profile_mode": "Balanced",
         **PRECISION_DEFAULTS,
     },
 
     "Behavior / Responsive": {
         "tracking_speed": 65,
         "movement_sensitivity": 50,
-        "smoothing_factor": 0.55,
-        "deadzone": 18,
+        "smoothing_factor": 0.22,
+        "deadzone": 10,
         "snap_threshold": 120,
-        "aim_aggression": 55,
+        "aim_aggression": 90,
         "final_approach_boost": True,
+        "detection_pause_ms": 300,
+        "motion_fire_frames_required": 1,
+        "fire_stability_frames_required": 1,
+        "speed_profile_mode": "Aggressive",
         **PRECISION_DEFAULTS,
+        "precision_mode": False,
+        "precision_max_step": 1.8,
     },
 
     "Behavior / Aggressive": {
         "tracking_speed": 80,
         "movement_sensitivity": 65,
-        "smoothing_factor": 0.35,
-        "deadzone": 14,
+        "smoothing_factor": 0.18,
+        "deadzone": 8,
         "snap_threshold": 160,
-        "aim_aggression": 75,
+        "aim_aggression": 95,
         "final_approach_boost": True,
+        "detection_pause_ms": 250,
+        "motion_fire_frames_required": 1,
+        "fire_stability_frames_required": 1,
+        "speed_profile_mode": "Aggressive",
+        **PRECISION_DEFAULTS,
+        "precision_mode": False,
+        "precision_max_step": 1.8,
         # Single-strike aiming: one decisive move then short hold (avoids many micro-steps)
         "auto_strike_enabled": True,
         "auto_strike_hold_ms": 320,
         "auto_strike_cooldown_ms": 260,
         "auto_strike_min_error_deg": 2.0,
-        **PRECISION_DEFAULTS,
     },
 
     # ----------------------------------------------------------------------
@@ -870,5 +886,36 @@ def _apply_speed_profiles() -> None:
             preset.setdefault(k, v)
 
 
+def _apply_target_aggressive_baseline() -> None:
+    """Propagate aggressive-centering tuning to all Target/* factory presets."""
+    for name, preset in PRESETS.items():
+        if not isinstance(preset, dict):
+            continue
+        if not str(name).startswith("Target /"):
+            continue
+
+        try:
+            # Core centering responsiveness
+            preset["final_approach_boost"] = True
+            preset["aim_aggression"] = max(90, int(preset.get("aim_aggression", 90)))
+            preset["smoothing_factor"] = min(0.22, float(preset.get("smoothing_factor", 0.22)))
+            preset["deadzone"] = min(10, int(preset.get("deadzone", 10)))
+
+            # Convergence behavior
+            preset["detection_pause_ms"] = 300
+            preset["speed_profile_mode"] = "Aggressive"
+
+            # Fire gating responsiveness
+            preset["motion_fire_frames_required"] = 1
+            preset["fire_stability_frames_required"] = 1
+
+            # Precision mode: keep disabled for fastest lock-in unless explicitly re-enabled later
+            preset["precision_mode"] = False
+            preset["precision_max_step"] = max(1.8, float(preset.get("precision_max_step", 1.8)))
+        except Exception:
+            continue
+
+
 # Apply speed profiles on import
 _apply_speed_profiles()
+_apply_target_aggressive_baseline()

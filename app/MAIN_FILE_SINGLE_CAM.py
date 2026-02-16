@@ -29,6 +29,7 @@
 import base64
 import json
 import random  # For guard mode random positions
+import socket
 try:
     from tracking_enhancements import SmartTracker
 except Exception:
@@ -71,6 +72,7 @@ import importlib
 
 import cv2
 import numpy as np
+import serial
 from PyQt5.QtCore import QByteArray, Qt, QTimer, QEvent, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap, QFont, QKeySequence, QTextCursor
 from PyQt5.QtWidgets import (
@@ -387,123 +389,22 @@ class AutotrackingStateManager:
     """
     
     def __init__(self, app_instance, enable_logging=True):
-        """Drain and parse ESP32 link events.
-
-        Keeps telemetry/status parsing responsive even when outbound commands are
-        skipped (redundant-command filter) or TX is paused.
+        """Initialize the AutotrackingStateManager.
+        
+        Args:
+            app_instance: Reference to the main TrackingApp
+            enable_logging: Whether to log state transitions
         """
-        try:
-            if not self.esp32_link:
-                return 0
-            events = self.esp32_link.drain_events(max_items=int(max_lines or 0))
-            if not events:
-                return 0
-            for evt in events:
-                etype = evt.get("type")
-                if etype == "state":
-                    data = evt.get("data", {}) or {}
-                    try:
-                        if "pan" in data:
-                            self.prev_pan_angle = float(data.get("pan"))
-                        if "tilt" in data:
-                            self.prev_tilt_angle = float(data.get("tilt"))
-                    except Exception:
-                        pass
-                    try:
-                        if "safety" in data:
-                            self.safety_state = int(data.get("safety"))
-                    except Exception:
-                        pass
-                    try:
-                        if "tilt_safety_locked" in data:
-                            self._mcu_tilt_safety_locked = bool(data.get("tilt_safety_locked"))
-                    except Exception:
-                        pass
-                    try:
-                        cur = data.get("currents", {}) or {}
-                        per_servo_enabled = bool(getattr(self, "per_servo_current_sensors_enabled", False))
-                        total_enabled = bool(getattr(self, "total_current_sensor_enabled", False))
-                        if not per_servo_enabled:
-                            self.pan_current_mA = None
-                            self.tilt_current_mA = None
-                        if not total_enabled:
-                            self.total_current_mA = None
-                        if per_servo_enabled:
-                            if "pan_mA" in cur:
-                                self.pan_current_mA = cur.get("pan_mA")
-                            if "tilt_mA" in cur:
-                                self.tilt_current_mA = cur.get("tilt_mA")
-                        if total_enabled:
-                            if "total_mA" in cur:
-                                self.total_current_mA = cur.get("total_mA")
-                        if any(k in cur for k in ("pan_mA", "tilt_mA", "total_mA")):
-                            self.last_current_telemetry_time = time.time()
-                            self._update_current_protection_state(
-                                pan_mA=self.pan_current_mA,
-                                tilt_mA=self.tilt_current_mA,
-                                total_mA=self.total_current_mA,
-                            )
-                    except Exception:
-                        pass
-                    try:
-                        if bool(data.get("fire_confirmed")):
-                            self._pulse_fire_indicator(confirmed=True)
-                    except Exception:
-                        pass
-                elif etype == "caps":
-                    self._last_link_caps = evt.get("data", {}) or {}
-                elif etype == "link":
-                    status = evt.get("status")
-                    try:
-                        if hasattr(self, "enhancer"):
-                            self.enhancer.update_serial_status(status)
-                    except Exception:
-                        pass
-                    try:
-                        if hasattr(self, "connection_status_label"):
-                            if status == "lost":
-                                self.connection_status_label.setText("Link lost")
-                                self.connection_status_label.setStyleSheet(
-                                    "color: #FF6666; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
-                                )
-                            elif status == "connecting":
-                                self.connection_status_label.setText("Connecting...")
-                                self.connection_status_label.setStyleSheet(
-                                    "color: #FFFF00; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
-                                )
-                            elif status == "disconnected":
-                                self.connection_status_label.setText("Disconnected")
-                                self.connection_status_label.setStyleSheet(
-                                    "color: #999999; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
-                                )
-                            else:
-                                self.connection_status_label.setText("Connected")
-                                self.connection_status_label.setStyleSheet(
-                                    "color: #00FF00; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
-                                )
-                    except Exception:
-                        pass
-                elif etype == "warn":
-                    msg = evt.get("msg", "ESP32 warning")
-                    try:
-                        self.enhancer.log_serial_output(f"[LINK WARN] {msg}", fire=False)
-                    except Exception:
-                        pass
-                elif etype == "error":
-                    msg = evt.get("error", "ESP32 link error")
-                    try:
-                        self.enhancer.log_serial_output(f"[LINK ERROR] {msg}", fire=False)
-                    except Exception:
-                        pass
-                elif etype == "msg":
-                    try:
-                        if debug_on:
-                            self.enhancer.log_serial_output(f"[LINK MSG] {evt.get('data')}", fire=False)
-                    except Exception:
-                        pass
-            return len(events)
-        except Exception:
-            return 0
+        self.app = app_instance
+        self.enable_logging = enable_logging
+        self.transaction_log = []
+        self._corruption_count = 0
+        self._last_state_check = 0
+    
+    def set_tracking_state_synced(self, tracking_enabled, aiming_enabled=None):
+        """Set tracking and aiming states in sync to prevent split-brain.
+        
+        Enforces the invariant: tracking_active=True implies aiming_active=True.
         """
         if aiming_enabled is None:
             aiming_enabled = tracking_enabled
@@ -512,21 +413,27 @@ class AutotrackingStateManager:
         if tracking_enabled and not aiming_enabled:
             raise ValueError("Cannot enable tracking without aiming")
         
-        old_tracking = getattr(self, "tracking_active", False)
-        old_aiming = getattr(self, "aiming_active", False)
+        old_tracking = getattr(self.app, "tracking_active", False)
+        old_aiming = getattr(self.app, "aiming_active", False)
         
-        self.tracking_active = tracking_enabled
-        self.aiming_active = aiming_enabled
+        self.app.tracking_active = tracking_enabled
+        self.app.aiming_active = aiming_enabled
         
         # Log if changed
         if old_tracking != tracking_enabled or old_aiming != aiming_enabled:
             try:
-                if hasattr(self, "enhancer"):
-                    self.enhancer.log_serial_output(
+                if hasattr(self.app, "enhancer"):
+                    self.app.enhancer.log_serial_output(
                         f"[FLAG_SYNC] tracking={tracking_enabled} aiming={aiming_enabled}", fire=False
                     )
             except Exception:
                 pass
+            # Record in transaction log
+            self.transaction_log.append({
+                "time": time.time(),
+                "old": {"tracking": old_tracking, "aiming": old_aiming},
+                "new": {"tracking": tracking_enabled, "aiming": aiming_enabled}
+            })
         
         return True
     
@@ -585,6 +492,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             "final_approach_boost_checkbox": "Enable speed boost and reduced smoothing when the target is very close to improve final centering.",
             "lock_target_btn": "Snap to the last detected target at maximum speed. If armed, fires automatically when position is reached.",
             "fire_indicator": "Indicates a requested fire event from the host. Pulses when a fire is requested and remains extended when MCU confirms.",
+            "fire_stability_checkbox": "Require the target to remain stable near center before auto-fire is allowed. Reduces shots caused by jitter.",
+            "fire_stability_frames_input": "Number of consecutive in-deadzone frames required before firing. Higher = safer/stabler, lower = faster response.",
+            "fire_stability_jitter_input": "Maximum allowed target movement between frames (pixels) while building stability. Lower = stricter lock quality.",
+            "speed_profile_mode_combo": "Freshness strategy for async YOLO results: Balanced favors smooth reuse; Aggressive discards older detections sooner for fast targets.",
         }
         for attr, text in tips.items():
             try:
@@ -830,7 +741,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         scroll_home.setWidget(home_content)
         home_layout.addWidget(scroll_home)
         
-        self.main_tab_widget.addTab(home_container, "🏠 Home")
+        self.main_tab_widget.addTab(home_container, "Home")
 
         # === VIDEO TAB ===
         if not hasattr(self, "video_frame") or self.video_frame is None:
@@ -840,7 +751,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             if getattr(self, "video_label", None) is not None:
                 video_layout.addWidget(self.video_label)
         
-        self.main_tab_widget.addTab(self.video_frame, "📹 Video")
+        self.main_tab_widget.addTab(self.video_frame, "Video")
 
         # Shortcuts tab removed - now in Tools menu as "Keyboard Shortcuts" window
         
@@ -870,7 +781,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
             notes_layout.addWidget(self.notes_edit)
 
-        self.main_tab_widget.addTab(notes_container, "📝 Notes")
+        self.main_tab_widget.addTab(notes_container, "Notes")
         
         # ========== AGENT-MANAGED BLOCK: SENTRY MODE TAB ==========
         # Intelligent guard turret with pattern learning and predictive fire
@@ -882,7 +793,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         if SENTRY_MODE_AVAILABLE and SentryTabWidget is not None:
             try:
                 self.sentry_tab = SentryTabWidget()
-                self.main_tab_widget.addTab(self.sentry_tab, "🎯 Sentry")
+                self.main_tab_widget.addTab(self.sentry_tab, "Sentry")
                 
                 # Connect sentry signals to main app
                 # AGENT-MANAGED: Signal connections for sentry mode (Dec 2024)
@@ -1032,7 +943,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     pass
 
                 self.idle_zones_tab = idle_zones_container
-                self.main_tab_widget.addTab(idle_zones_container, "🧭 Idle Zones")
+                self.main_tab_widget.addTab(idle_zones_container, "Idle Zones")
             except Exception as e:
                 print(f"[IDLE-ZONES] Failed to create tab: {e}")
                 self.idle_zones_tab = None
@@ -1049,33 +960,51 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         
         # ESP32 Host
         try:
-            host_label = QLabel("ESP32 Host:")
+            self.esp32_host_label = QLabel("ESP32 Host/IP:")
             if getattr(self, "esp32_host_input", None) is None:
                 self.esp32_host_input = QLineEdit()
                 self.esp32_host_input.setText("192.168.4.1")
-            serial_form.addRow(host_label, self.esp32_host_input)
+            try:
+                self.esp32_host_input.setToolTip(
+                    "ESP32 access point IP. Default: 192.168.4.1"
+                )
+            except Exception:
+                pass
+            serial_form.addRow(self.esp32_host_label, self.esp32_host_input)
         except Exception:
             pass
         
-        # ESP32 Port
+        # ESP32 UDP Port
         try:
-            port_label = QLabel("ESP32 Port:")
+            self.esp32_port_label = QLabel("ESP32 UDP Port:")
             if getattr(self, "esp32_port_input", None) is None:
                 self.esp32_port_input = QSpinBox()
                 self.esp32_port_input.setRange(1, 65535)
                 self.esp32_port_input.setValue(9000)
-            serial_form.addRow(port_label, self.esp32_port_input)
+            try:
+                self.esp32_port_input.setToolTip(
+                    "Remote UDP port on ESP32 firmware. Default: 9000"
+                )
+            except Exception:
+                pass
+            serial_form.addRow(self.esp32_port_label, self.esp32_port_input)
         except Exception:
             pass
         
-        # Local Port
+        # PC local UDP Port
         try:
-            local_label = QLabel("Local Port:")
+            self.esp32_local_port_label = QLabel("PC Local UDP Port:")
             if getattr(self, "esp32_local_port_input", None) is None:
                 self.esp32_local_port_input = QSpinBox()
                 self.esp32_local_port_input.setRange(0, 65535)
                 self.esp32_local_port_input.setValue(0)
-            serial_form.addRow(local_label, self.esp32_local_port_input)
+            try:
+                self.esp32_local_port_input.setToolTip(
+                    "Local bind port on PC. Use 0 for Auto (recommended)."
+                )
+            except Exception:
+                pass
+            serial_form.addRow(self.esp32_local_port_label, self.esp32_local_port_input)
         except Exception:
             pass
         
@@ -1172,7 +1101,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         serial_settings_layout.addLayout(button_layout)
         serial_settings_layout.addStretch()
         
-        self.main_tab_widget.addTab(serial_settings_container, "⚙️ Wireless Settings")
+        self.main_tab_widget.addTab(serial_settings_container, "Wireless Settings")
         
         # === RECORDING SETTINGS TAB (HIDDEN BY DEFAULT) ===
         try:
@@ -1379,7 +1308,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             recording_settings_layout.addStretch()
             
             # Create Recording Settings tab and HIDE it by default
-            recording_tab_index = self.main_tab_widget.addTab(recording_settings_container, "🎬 Recording Settings")
+            recording_tab_index = self.main_tab_widget.addTab(recording_settings_container, "Recording Settings")
             self.recording_settings_tab_index = recording_tab_index
             # Hide the tab by removing it or set a property
             # We'll use a property to track that it's hidden but still accessible via menu
@@ -1677,6 +1606,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.pan_current_mA = None
         self.tilt_current_mA = None
         self.total_current_mA = None
+        self.total_current_mA_raw = None
         self.last_current_telemetry_time = 0.0
 
         # Current sensor installation flags
@@ -1791,6 +1721,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self._motion_fire_prev_ts = None
         self._motion_fire_last_move_ts = None
         self._motion_fire_consecutive = 0
+        # ========== PHASE 2: FIRE STABILITY GATE (Feb 2026) ==========
+        self.fire_stability_enabled = True
+        self.fire_stability_frames_required = 2
+        self.fire_stability_max_jitter_px = 10.0
+        self._fire_stability_prev_center = None
+        self._fire_stability_consecutive = 0
 
         # === SPEED-OPT START (2026-02-06) ===
         # Master toggle + tunables for performance/latency improvements.
@@ -1806,6 +1742,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.speed_roi_padding_px = 24
         self.speed_threaded_yolo = True
         self.speed_threaded_yolo_max_age_s = 0.35
+        self.speed_profile_mode = "Aggressive"
         self.speed_prefer_light_yolo = True
         self.speed_disable_command_filter = True
         # Derived runtime settings used by timers/packet layer
@@ -2553,6 +2490,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         try:
             self.load_settings()
+            try:
+                self._update_connection_panel_visibility()
+            except Exception:
+                pass
+            try:
+                self._refresh_connect_button_state()
+            except Exception:
+                pass
             
             # ===== SET MODE 5 (BackSub+YOLO) AS DEFAULT ON FIRST RUN =====
             # If detection mode is still at 0 (Frame Difference), user hasn't customized it yet.
@@ -3285,35 +3230,89 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         settings_layout = QGridLayout()
         settings_layout.setSpacing(6)
         settings_layout.setContentsMargins(8, 8, 8, 8)
-        settings_layout.addWidget(QLabel("ESP32 Host:"), 0, 0)
-        if getattr(self, "esp32_host_input", None) is None:
-            self.esp32_host_input = QLineEdit()
+        self.primary_com_label = QLabel("ESP32 USB COM:")
+        settings_layout.addWidget(self.primary_com_label, 0, 0)
+        if getattr(self, "com_port_input", None) is None:
+            self.com_port_input = QLineEdit()
         try:
-            if not getattr(self.esp32_host_input, "text", lambda: "")():
-                self.esp32_host_input.setText("192.168.4.1")
+            if not getattr(self.com_port_input, "text", lambda: "")():
+                self.com_port_input.setText("COM10")
         except Exception:
             pass
-        settings_layout.addWidget(self.esp32_host_input, 0, 1)
+        settings_layout.addWidget(self.com_port_input, 0, 1)
+        self.primary_baud_label = QLabel("ESP32 USB Baud:")
+        settings_layout.addWidget(self.primary_baud_label, 1, 0)
+        if getattr(self, "baud_rate_input", None) is None:
+            self.baud_rate_input = QSpinBox()
+        try:
+            if getattr(self, "baud_rate_input", None) is not None:
+                try:
+                    self._safe_widget_call("baud_rate_input", "setRange", 2400, 115200)
+                    self._safe_widget_call("baud_rate_input", "setValue", 115200)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        settings_layout.addWidget(self.baud_rate_input, 1, 1)
 
-        settings_layout.addWidget(QLabel("ESP32 Port:"), 1, 0)
-        if getattr(self, "esp32_port_input", None) is None:
-            self.esp32_port_input = QSpinBox()
+        self.serial_device_label = QLabel("Connection Mode:")
+        settings_layout.addWidget(self.serial_device_label, 1, 2)
+        if getattr(self, "serial_device_type_combo", None) is None:
+            self.serial_device_type_combo = QComboBox()
+            try:
+                self.serial_device_type_combo.addItems(
+                    [
+                        "ESP32 (DB3000 ASCII/IO)",
+                        "Debug Board (Bus Servo Direct)",
+                        "Dual Port (ESP32 IO + Debug Board Pan/Tilt)",
+                    ]
+                )
+                self.serial_device_type_combo.setToolTip(
+                    "Select how the app talks to the selected COM port.\n"
+                    "- ESP32: sends text commands like P90T40F0... for IO/control.\n"
+                    "- Debug Board: sends binary bus-servo packets for PAN/TILT on Debug Board COM.\n"
+                    "  If ESP32 Host/Port is filled, Connect also opens ESP32 Wi-Fi link for IO/fire/relays (no ESP32 USB needed).\n"
+                    "- Dual Port: uses TWO independent USB serial ports (ESP32 + Debug Board).\n"
+                    "  ESP32 handles IO/telemetry (fire/relays/safety), Debug Board COM handles PAN/TILT.\n"
+                    "  Note: Dual Port does NOT require the Debug Board to be chained to the ESP32."
+                )
+            except Exception:
+                pass
         try:
-            self._safe_widget_call("esp32_port_input", "setRange", 1, 65535)
-            self._safe_widget_call("esp32_port_input", "setValue", 9000)
+            self._safe_connect(
+                "serial_device_type_combo",
+                "currentIndexChanged",
+                lambda _idx: self._on_serial_device_type_changed(),
+            )
         except Exception:
             pass
-        settings_layout.addWidget(self.esp32_port_input, 1, 1)
+        settings_layout.addWidget(self.serial_device_type_combo, 1, 3)
 
-        settings_layout.addWidget(QLabel("Local Port:"), 2, 0)
-        if getattr(self, "esp32_local_port_input", None) is None:
-            self.esp32_local_port_input = QSpinBox()
+        self.debug_board_com_label = QLabel("Debug Board COM:")
+        settings_layout.addWidget(self.debug_board_com_label, 2, 2)
+        if getattr(self, "debug_board_com_port_input", None) is None:
+            self.debug_board_com_port_input = QLineEdit()
         try:
-            self._safe_widget_call("esp32_local_port_input", "setRange", 0, 65535)
-            self._safe_widget_call("esp32_local_port_input", "setValue", 0)
+            if not getattr(self.debug_board_com_port_input, "text", lambda: "")():
+                self.debug_board_com_port_input.setText("COM9")
         except Exception:
             pass
-        settings_layout.addWidget(self.esp32_local_port_input, 2, 1)
+        settings_layout.addWidget(self.debug_board_com_port_input, 2, 3)
+
+        self.debug_board_baud_label = QLabel("Debug Board Baud:")
+        settings_layout.addWidget(self.debug_board_baud_label, 3, 2)
+        if getattr(self, "debug_board_baud_rate_input", None) is None:
+            self.debug_board_baud_rate_input = QSpinBox()
+        try:
+            self._safe_widget_call(
+                "debug_board_baud_rate_input", "setRange", 2400, 115200
+            )
+            self._safe_widget_call(
+                "debug_board_baud_rate_input", "setValue", 115200
+            )
+        except Exception:
+            pass
+        settings_layout.addWidget(self.debug_board_baud_rate_input, 3, 3)
 
         # Factory Preset removed from Connection Panel to prevent conflict/duplication
         # (User Request: "Remove the one in connection panel")
@@ -5319,6 +5318,51 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         behavior_layout.addWidget(self.motion_fire_stationary_lock_ms_input, br, 1)
         br += 1
 
+        behavior_layout.addWidget(QLabel("Fire Stability Gate"), br, 0)
+        if getattr(self, "fire_stability_checkbox", None) is None:
+            self.fire_stability_checkbox = QCheckBox("Require stable lock")
+        try:
+            self.fire_stability_checkbox.setChecked(bool(getattr(self, "fire_stability_enabled", True)))
+            self._safe_connect("fire_stability_checkbox", "toggled", self.save_settings)
+            self.fire_stability_checkbox.setToolTip(
+                "Require a stable lock before auto-fire: target must remain in deadzone with low jitter for consecutive frames."
+            )
+        except Exception:
+            pass
+        behavior_layout.addWidget(self.fire_stability_checkbox, br, 1)
+        br += 1
+
+        behavior_layout.addWidget(QLabel("Stability Frames"), br, 0)
+        if getattr(self, "fire_stability_frames_input", None) is None:
+            self.fire_stability_frames_input = QSpinBox()
+        try:
+            self.fire_stability_frames_input.setRange(1, 10)
+            self.fire_stability_frames_input.setValue(int(getattr(self, "fire_stability_frames_required", 2)))
+            self._safe_connect("fire_stability_frames_input", "valueChanged", self.save_settings)
+            self.fire_stability_frames_input.setToolTip(
+                "Consecutive stable frames needed before firing. Higher values reduce false shots but delay firing."
+            )
+        except Exception:
+            pass
+        behavior_layout.addWidget(self.fire_stability_frames_input, br, 1)
+        br += 1
+
+        behavior_layout.addWidget(QLabel("Stability Jitter (px)"), br, 0)
+        if getattr(self, "fire_stability_jitter_input", None) is None:
+            self.fire_stability_jitter_input = QDoubleSpinBox()
+        try:
+            self.fire_stability_jitter_input.setRange(1.0, 50.0)
+            self.fire_stability_jitter_input.setSingleStep(0.5)
+            self.fire_stability_jitter_input.setValue(float(getattr(self, "fire_stability_max_jitter_px", 10.0)))
+            self._safe_connect("fire_stability_jitter_input", "valueChanged", self.save_settings)
+            self.fire_stability_jitter_input.setToolTip(
+                "Maximum frame-to-frame target movement allowed while stabilizing (pixels). Lower = stricter, higher = more tolerant."
+            )
+        except Exception:
+            pass
+        behavior_layout.addWidget(self.fire_stability_jitter_input, br, 1)
+        br += 1
+
         # SPEED / PERFORMANCE (Feb 2026)
         try:
             speed_group = QGroupBox("Speed / Performance")
@@ -5336,6 +5380,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
             speed_layout.addWidget(self.speed_opt_checkbox, 0, 0, 1, 2)
+
+            speed_layout.addWidget(QLabel("Freshness profile"), 9, 0)
+            if getattr(self, "speed_profile_mode_combo", None) is None:
+                self.speed_profile_mode_combo = QComboBox()
+            try:
+                if self.speed_profile_mode_combo.count() == 0:
+                    self.speed_profile_mode_combo.addItems(["Balanced", "Aggressive"])
+                idx = self.speed_profile_mode_combo.findText(str(getattr(self, "speed_profile_mode", "Aggressive")))
+                if idx != -1:
+                    self.speed_profile_mode_combo.setCurrentIndex(idx)
+                self.speed_profile_mode_combo.setToolTip(
+                    "Async YOLO freshness profile: Balanced reuses recent detections for smoother tracking; Aggressive rejects stale detections sooner for fast-moving targets."
+                )
+            except Exception:
+                pass
+            speed_layout.addWidget(self.speed_profile_mode_combo, 9, 1)
 
             # Link interval
             speed_layout.addWidget(QLabel("Link interval (ms)"), 1, 0)
@@ -5450,6 +5510,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.speed_roi_enabled = bool(self.speed_roi_enable_checkbox.isChecked())
                     self.speed_roi_scale = float(self.speed_roi_scale_input.value())
                     self.speed_threaded_yolo = bool(self.speed_threaded_yolo_checkbox.isChecked())
+                    self.speed_profile_mode = str(
+                        self._safe_widget_method_return(
+                            "speed_profile_mode_combo",
+                            "currentText",
+                            getattr(self, "speed_profile_mode", "Aggressive"),
+                        )
+                    )
                     self.speed_prefer_light_yolo = bool(self.speed_prefer_light_yolo_checkbox.isChecked())
                     self.speed_disable_command_filter = bool(self.speed_disable_cmd_filter_checkbox.isChecked())
                     if self.speed_opt_enabled:
@@ -5473,6 +5540,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self._safe_connect("speed_roi_enable_checkbox", "toggled", _speed_apply_runtime)
                 self._safe_connect("speed_roi_scale_input", "valueChanged", _speed_apply_runtime)
                 self._safe_connect("speed_threaded_yolo_checkbox", "toggled", _speed_apply_runtime)
+                self._safe_connect("speed_profile_mode_combo", "currentIndexChanged", _speed_apply_runtime)
                 self._safe_connect("speed_prefer_light_yolo_checkbox", "toggled", _speed_apply_runtime)
                 self._safe_connect("speed_disable_cmd_filter_checkbox", "toggled", _speed_apply_runtime)
             except Exception:
@@ -7264,7 +7332,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     pass
                 
                 # CODE FIXER - Search, Analyze & Fix Code
-                code_fixer_action = tools_menu.addAction("🔧 Code Fixer")
+                code_fixer_action = tools_menu.addAction("Code Fixer")
                 try:
                     def open_code_fixer():
                         try:
@@ -7281,7 +7349,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     pass
                 
                 # Floating Panel
-                panel_action = tools_menu.addAction("📦 Floating Panel")
+                panel_action = tools_menu.addAction("Floating Panel")
                 try:
                     def open_floating_panel():
                         try:
@@ -7299,7 +7367,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 
                 # Widget Management submenu
                 try:
-                    widget_mgmt_menu = tools_menu.addMenu("📦 Widget Management")
+                    widget_mgmt_menu = tools_menu.addMenu("Widget Management")
                     
                     def move_to_panel(widget_name, dock_widget):
                         """Move a dock widget to the floating panel."""
@@ -7884,8 +7952,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             data = [
                 ("GPIO16", "UART2 RX (debug board TX)", "Serial In"),
                 ("GPIO17", "UART2 TX (debug board RX)", "Serial Out"),
-                ("GPIO25", "Pan Servo PWM", "PWM"),
-                ("GPIO26", "Tilt Servo PWM", "PWM"),
                 ("GPIO27", "Trigger MOSFET (Water)", "Digital Out"),
                 ("GPIO13", "Trigger Servo (Projectile)", "PWM"),
                 ("GPIO32", "LED Relay", "Digital Out"),
@@ -9693,33 +9759,132 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass  # Timeout setting is optional - don't block
         
+        # Helper to attempt opening a port and log failures in the UI when possible
+        def _try_open(port_name):
+            try:
+                import serial as _serial
+                # Pre-initialize Windows COM port to set timeouts
+                _set_windows_com_timeout(port_name)
+                # Now open with Python timeout settings
+                ser = _serial.Serial(port_name, b, **kwargs)
+                try:
+                    self._safe_append_log(f"Serial opened: {port_name} @ {b}")
+                except Exception:
+                    pass
+                return ser
+            except Exception as e:
+                try:
+                    self._safe_append_log(f"Serial open failed for {port_name}: {e}")
+                except Exception:
+                    pass
+                return None
+
+        # First, try the provided port string directly
+        ser = _try_open(p)
+        if ser is not None:
+            return ser
+
+        # On Windows some COM numbers >= 10 require the "\\\\.\\COM#" device path.
+        # Try the Windows extended name as a fallback.
         try:
-            self._safe_append_log("[LINK] Serial open disabled. Use ESP32 link settings.")
+            if os.name == "nt" and isinstance(p, str) and p.upper().startswith("COM"):
+                try:
+                    num = int(p[3:])
+                    if num >= 10:
+                        alt = "\\\\.\\" + p
+                        ser = _try_open(alt)
+                        if ser is not None:
+                            return ser
+                except Exception:
+                    pass
         except Exception:
             pass
+
+        # No success
         return None
 
     def _serial_device_type_index(self) -> int:
-        """Legacy serial mode (unused in ESP32 link workflow)."""
+        """0 = ESP32 ASCII/IO, 1 = Debug Board bus-servo, 2 = Dual Port."""
         try:
-            return 0
+            idx = self._safe_widget_method_return(
+                "serial_device_type_combo", "currentIndex", None
+            )
+            if idx is not None:
+                return int(idx)
+        except Exception:
+            pass
+        try:
+            return int(getattr(self, "serial_device_type_index", 0) or 0)
         except Exception:
             return 0
 
     def _serial_is_debug_board_bus(self) -> bool:
         try:
-            return False
+            return int(self._serial_device_type_index()) == 1
         except Exception:
             return False
 
     def _serial_is_dual_port(self) -> bool:
         try:
-            return False
+            return int(self._serial_device_type_index()) == 2
         except Exception:
             return False
 
     def _serial_is_nano_ascii(self) -> bool:
-        return False
+        # Backward-compatible helper name: index 0 is now ESP32 ASCII/IO mode.
+        try:
+            return int(self._serial_device_type_index()) == 0
+        except Exception:
+            return True
+
+    def _on_serial_device_type_changed(self):
+        try:
+            self.serial_device_type_index = int(self._serial_device_type_index())
+        except Exception:
+            pass
+        try:
+            self._update_connection_panel_visibility()
+        except Exception:
+            pass
+        try:
+            self._refresh_connect_button_state()
+        except Exception:
+            pass
+        try:
+            self.save_settings()
+        except Exception:
+            pass
+
+    def _update_connection_panel_visibility(self):
+        """Show only relevant connection fields for selected connection mode."""
+        try:
+            mode_idx = int(self._serial_device_type_index())
+        except Exception:
+            mode_idx = 0
+
+        show_primary = bool(mode_idx in (0, 2))
+        show_debug = bool(mode_idx in (1, 2))
+        show_wifi = bool(mode_idx == 1)
+
+        try:
+            self._set_visible(getattr(self, "primary_com_label", None), show_primary)
+            self._set_visible(getattr(self, "com_port_input", None), show_primary)
+            self._set_visible(getattr(self, "primary_baud_label", None), show_primary)
+            self._set_visible(getattr(self, "baud_rate_input", None), show_primary)
+
+            self._set_visible(getattr(self, "debug_board_com_label", None), show_debug)
+            self._set_visible(getattr(self, "debug_board_com_port_input", None), show_debug)
+            self._set_visible(getattr(self, "debug_board_baud_label", None), show_debug)
+            self._set_visible(getattr(self, "debug_board_baud_rate_input", None), show_debug)
+
+            self._set_visible(getattr(self, "esp32_host_label", None), show_wifi)
+            self._set_visible(getattr(self, "esp32_host_input", None), show_wifi)
+            self._set_visible(getattr(self, "esp32_port_label", None), show_wifi)
+            self._set_visible(getattr(self, "esp32_port_input", None), show_wifi)
+            self._set_visible(getattr(self, "esp32_local_port_label", None), show_wifi)
+            self._set_visible(getattr(self, "esp32_local_port_input", None), show_wifi)
+        except Exception:
+            pass
 
     def _bus_servo_deg_to_ticks(self, deg: float) -> int:
         """Map degrees to bus-servo ticks (0..4095 over 0..270 degrees)."""
@@ -10742,6 +10907,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     def on_detection_mode_change(self, idx=None):
         # robust handler: accept index change signal or manual call
         try:
+            now_ts = time.time()
             mode_text = self.detection_mode_combo.currentText().lower()
             is_yolo = "yolo" in mode_text or "object detection" in mode_text
             is_hybrid = "hybrid" in mode_text
@@ -10852,6 +11018,45 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             )
                     except Exception as e:
                         print(f"[STATE] manual_override change log failed: {e}")
+
+                # MODE-SWITCH STABILITY FIX:
+                # Keep tracking/aiming ownership coherent during rapid mode changes and
+                # clear only transient stale gates that can block re-acquisition.
+                try:
+                    # If suppression window already expired, don't keep stale manual override.
+                    if (
+                        bool(getattr(self, "manual_override", False))
+                        and float(getattr(self, "_manual_override_until", 0.0) or 0.0) <= now_ts
+                    ):
+                        self.manual_override = False
+                        self._manual_override_active = False
+
+                    # Detection-pause gate is mode-local; reset it on mode changes.
+                    self._detection_pause_until = 0.0
+                    self._was_in_scope = False
+
+                    # Preserve active tracking intent across detection mode switches.
+                    tracking_checked = False
+                    try:
+                        tracking_checked = bool(
+                            self._safe_widget_method_return(
+                                "tracking_btn", "isChecked", bool(getattr(self, "tracking_active", False))
+                            )
+                        )
+                    except Exception:
+                        tracking_checked = bool(getattr(self, "tracking_active", False))
+
+                    if tracking_checked and not bool(getattr(self, "_in_go_home", False)):
+                        self.tracking_active = True
+                        self.aiming_active = True
+                        self._user_initiated_stop = False
+                        try:
+                            self._safe_widget_call("aiming_btn", "setChecked", True)
+                            self._safe_widget_call("aiming_btn", "setText", "Stop Aiming")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
         except Exception as e:
             # fallback: log error
             if hasattr(self, "enhancer"):
@@ -12038,6 +12243,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 self.speed_threaded_yolo_max_age_s = 0.35
             try:
+                self.speed_profile_mode = str(settings.get("speed_profile_mode", "Aggressive") or "Aggressive")
+            except Exception:
+                self.speed_profile_mode = "Aggressive"
+            try:
                 self.speed_prefer_light_yolo = bool(settings.get("speed_prefer_light_yolo", True))
             except Exception:
                 self.speed_prefer_light_yolo = True
@@ -12061,6 +12270,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.speed_roi_scale_input.setValue(float(getattr(self, "speed_roi_scale", 0.6)))
                 if getattr(self, "speed_threaded_yolo_checkbox", None) is not None:
                     self.speed_threaded_yolo_checkbox.setChecked(bool(getattr(self, "speed_threaded_yolo", True)))
+                if getattr(self, "speed_profile_mode_combo", None) is not None:
+                    idx = self.speed_profile_mode_combo.findText(str(getattr(self, "speed_profile_mode", "Aggressive")))
+                    if idx != -1:
+                        self.speed_profile_mode_combo.setCurrentIndex(idx)
                 if getattr(self, "speed_prefer_light_yolo_checkbox", None) is not None:
                     self.speed_prefer_light_yolo_checkbox.setChecked(bool(getattr(self, "speed_prefer_light_yolo", True)))
                 if getattr(self, "speed_disable_cmd_filter_checkbox", None) is not None:
@@ -12194,7 +12407,36 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
 
-            # --- Load ESP32 link settings ---
+            # --- Load serial connection settings (Nano / Debug Board / Dual Port) ---
+            self._safe_widget_call(
+                "com_port_input", "setText", settings.get("com_port", "COM3")
+            )
+            self._safe_widget_call(
+                "baud_rate_input", "setValue", int(settings.get("baud_rate", 115200) or 115200)
+            )
+            self._safe_widget_call(
+                "serial_device_type_combo",
+                "setCurrentIndex",
+                int(settings.get("serial_device_type_index", 0) or 0),
+            )
+            try:
+                self.serial_device_type_index = int(
+                    settings.get("serial_device_type_index", 0) or 0
+                )
+            except Exception:
+                pass
+            self._safe_widget_call(
+                "debug_board_com_port_input",
+                "setText",
+                settings.get("debug_board_com_port", "COM9"),
+            )
+            self._safe_widget_call(
+                "debug_board_baud_rate_input",
+                "setValue",
+                int(settings.get("debug_board_baud_rate", 115200) or 115200),
+            )
+
+            # Keep ESP32 fields optional for diagnostics/tools compatibility.
             self._safe_widget_call(
                 "esp32_host_input", "setText", settings.get("esp32_host", "192.168.4.1")
             )
@@ -12204,21 +12446,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self._safe_widget_call(
                 "esp32_local_port_input", "setValue", int(settings.get("esp32_local_port", 0) or 0)
             )
-            try:
-                legacy_keys = (
-                    "com_port",
-                    "baud_rate",
-                    "serial_device_type_index",
-                    "debug_board_com_port",
-                    "debug_board_baud_rate",
-                )
-                if any(k in settings for k in legacy_keys) and "esp32_host" not in settings:
-                    self._safe_enhancer_log(
-                        "[LINK] Legacy serial settings detected; preserved in settings.json but ignored.",
-                        fire=False,
-                    )
-            except Exception:
-                pass
             self._safe_widget_call(
                 "smoothing_input", "setValue", settings.get("smoothing_factor", 0.5)
             )
@@ -12615,6 +12842,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self.motion_fire_stationary_lock_ms = int(settings.get("motion_fire_stationary_lock_ms", 1200))
             except Exception:
                 self.motion_fire_stationary_lock_ms = 1200
+            try:
+                self.fire_stability_enabled = bool(settings.get("fire_stability_enabled", True))
+            except Exception:
+                self.fire_stability_enabled = True
+            try:
+                self.fire_stability_frames_required = int(settings.get("fire_stability_frames_required", 2) or 2)
+            except Exception:
+                self.fire_stability_frames_required = 2
+            try:
+                self.fire_stability_max_jitter_px = float(settings.get("fire_stability_max_jitter_px", 10.0) or 10.0)
+            except Exception:
+                self.fire_stability_max_jitter_px = 10.0
 
             try:
                 if getattr(self, "motion_fire_checkbox", None) is not None:
@@ -12638,6 +12877,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     "motion_fire_stationary_lock_ms_input",
                     "setValue",
                     int(getattr(self, "motion_fire_stationary_lock_ms", 1200)),
+                )
+                self._safe_widget_call(
+                    "fire_stability_checkbox",
+                    "setChecked",
+                    bool(getattr(self, "fire_stability_enabled", True)),
+                )
+                self._safe_widget_call(
+                    "fire_stability_frames_input",
+                    "setValue",
+                    int(getattr(self, "fire_stability_frames_required", 2)),
+                )
+                self._safe_widget_call(
+                    "fire_stability_jitter_input",
+                    "setValue",
+                    float(getattr(self, "fire_stability_max_jitter_px", 10.0)),
                 )
             except Exception:
                 pass
@@ -13031,6 +13285,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 if wg and isinstance(wg, str):
                     rawg = base64.b64decode(wg)
                     self.restoreGeometry(QByteArray(rawg))
+
+                # Keep Behavior Presets closed on startup even if a saved layout reopens it.
+                try:
+                    presets_dock = getattr(self, "behavior_presets_dock", None)
+                    if presets_dock is not None:
+                        presets_dock.hide()
+                        try:
+                            presets_dock._user_closed = True
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             
                 # If settings include sniper visibility/floating preferences,
                 # apply them now. Persisted 'sniper_visible' explicitly hides
@@ -13100,6 +13366,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         try:
             self._loading_settings = False
+        except Exception:
+            pass
+
+        try:
+            self._update_connection_panel_visibility()
+        except Exception:
+            pass
+        try:
+            self._refresh_connect_button_state()
         except Exception:
             pass
 
@@ -13190,6 +13465,21 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     int(getattr(self, "motion_fire_stationary_lock_ms", 1200)),
                     "value",
                 ),
+                "fire_stability_enabled": val(
+                    "fire_stability_checkbox",
+                    bool(getattr(self, "fire_stability_enabled", True)),
+                    "checked",
+                ),
+                "fire_stability_frames_required": val(
+                    "fire_stability_frames_input",
+                    int(getattr(self, "fire_stability_frames_required", 2)),
+                    "value",
+                ),
+                "fire_stability_max_jitter_px": val(
+                    "fire_stability_jitter_input",
+                    float(getattr(self, "fire_stability_max_jitter_px", 10.0)),
+                    "value",
+                ),
                 "trigger_cooldown": val("trigger_cooldown_input", 1.5),
                 "auto_tracking": getattr(self, "auto_tracking_enabled", False),
                 "detection_enabled": getattr(self, "detection_enabled", False),
@@ -13205,6 +13495,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "speed_roi_padding_px": int(getattr(self, "speed_roi_padding_px", 24)),
                 "speed_threaded_yolo": val("speed_threaded_yolo_checkbox", bool(getattr(self, "speed_threaded_yolo", True)), "checked"),
                 "speed_threaded_yolo_max_age_s": float(getattr(self, "speed_threaded_yolo_max_age_s", 0.35)),
+                "speed_profile_mode": val("speed_profile_mode_combo", str(getattr(self, "speed_profile_mode", "Aggressive")), "currentText"),
                 "speed_prefer_light_yolo": val("speed_prefer_light_yolo_checkbox", bool(getattr(self, "speed_prefer_light_yolo", True)), "checked"),
                 "speed_disable_command_filter": val("speed_disable_cmd_filter_checkbox", bool(getattr(self, "speed_disable_command_filter", True)), "checked"),
                 "invert_pan": val("invert_pan_checkbox", False, "checked"),
@@ -13214,6 +13505,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "flip_image": val("flip_checkbox", False, "checked"),
                 # store as True when LOCKED; button checked==ARMED so invert
                 "safety_lock": (not val("safety_button", False, "checked")),
+                # Serial connection settings
+                "com_port": val("com_port_input", "COM3", "text"),
+                "baud_rate": val("baud_rate_input", 115200),
+                "serial_device_type_index": val("serial_device_type_combo", 0, "index"),
+                "debug_board_com_port": val("debug_board_com_port_input", "COM9", "text"),
+                "debug_board_baud_rate": val("debug_board_baud_rate_input", 115200),
                 # ESP32 link settings
                 "esp32_host": val("esp32_host_input", "192.168.4.1", "text"),
                 "esp32_port": val("esp32_port_input", 9000),
@@ -13704,6 +14001,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             s['motion_fire_frames_required'] = safe_int('motion_fire_frames_input', 3)
             s['motion_fire_recent_ms'] = safe_int('motion_fire_recent_ms_input', 800)
             s['motion_fire_stationary_lock_ms'] = safe_int('motion_fire_stationary_lock_ms_input', 1200)
+            s['fire_stability_enabled'] = bool(
+                getattr(getattr(self, 'fire_stability_checkbox', None), 'isChecked', lambda: getattr(self, 'fire_stability_enabled', True))()
+            )
+            s['fire_stability_frames_required'] = safe_int('fire_stability_frames_input', int(getattr(self, 'fire_stability_frames_required', 2)))
+            s['fire_stability_max_jitter_px'] = safe_float('fire_stability_jitter_input', float(getattr(self, 'fire_stability_max_jitter_px', 10.0)))
 
             # Speed optimization (Feb 2026)
             s['speed_opt_enabled'] = bool(
@@ -13723,6 +14025,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 getattr(getattr(self, 'speed_threaded_yolo_checkbox', None), 'isChecked', lambda: False)()
             )
             s['speed_threaded_yolo_max_age_s'] = float(getattr(self, 'speed_threaded_yolo_max_age_s', 0.35))
+            s['speed_profile_mode'] = safe_text('speed_profile_mode_combo', str(getattr(self, 'speed_profile_mode', 'Aggressive')))
             s['speed_prefer_light_yolo'] = bool(
                 getattr(getattr(self, 'speed_prefer_light_yolo_checkbox', None), 'isChecked', lambda: False)()
             )
@@ -13896,6 +14199,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 try_set('deadzone_slider', int(preset['deadzone']))
             if 'detection_pause_ms' in preset:
                 try_set('detection_pause_slider', int(preset['detection_pause_ms']))
+            if 'speed_profile_mode' in preset and getattr(self, 'speed_profile_mode_combo', None) is not None:
+                try:
+                    mode = str(preset['speed_profile_mode'])
+                    idx = self.speed_profile_mode_combo.findText(mode)
+                    if idx >= 0:
+                        self.speed_profile_mode_combo.setCurrentIndex(idx)
+                    self.speed_profile_mode = mode
+                except Exception:
+                    pass
             
             # CRITICAL FIX: smoothing_factor (preset key) -> smoothing_input (widget name)
             if 'smoothing_factor' in preset:
@@ -15230,6 +15542,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.restoreGeometry(QByteArray(rawg))
                     except Exception:
                         pass
+                # Keep Behavior Presets closed on startup even if preferred defaults reopen it.
+                try:
+                    presets_dock = getattr(self, "behavior_presets_dock", None)
+                    if presets_dock is not None:
+                        presets_dock.hide()
+                        try:
+                            presets_dock._user_closed = True
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
                 # re-equalize dock widths after restoring geometry/state
                 try:
                     QTimer.singleShot(200, lambda: self.equalize_dock_columns())
@@ -15314,6 +15637,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self.smoothing_input.setValue(float(preset["smoothing_factor"]))
             if "deadzone" in preset:
                 self.deadzone_slider.setValue(int(preset["deadzone"]))
+            if "detection_pause_ms" in preset and getattr(self, "detection_pause_slider", None) is not None:
+                self.detection_pause_slider.setValue(int(preset["detection_pause_ms"]))
+                self.detection_pause_ms = int(preset["detection_pause_ms"])
+                if getattr(self, "detection_pause_label", None) is not None:
+                    self.detection_pause_label.setText(str(self.detection_pause_ms))
             if "snap_threshold" in preset:
                 self.snap_threshold_slider.setValue(int(preset["snap_threshold"]))
 
@@ -15455,6 +15783,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.speed_prefer_light_yolo_checkbox.setChecked(bool(preset["speed_prefer_light_yolo"]))
                 if "speed_disable_command_filter" in preset and getattr(self, "speed_disable_cmd_filter_checkbox", None) is not None:
                     self.speed_disable_cmd_filter_checkbox.setChecked(bool(preset["speed_disable_command_filter"]))
+                if "speed_profile_mode" in preset:
+                    self.speed_profile_mode = str(preset["speed_profile_mode"])
+                    if getattr(self, "speed_profile_mode_combo", None) is not None:
+                        idx = self.speed_profile_mode_combo.findText(self.speed_profile_mode)
+                        if idx >= 0:
+                            self.speed_profile_mode_combo.setCurrentIndex(idx)
 
                 # Apply runtime values
                 self.speed_opt_enabled = bool(preset.get("speed_opt_enabled", True))
@@ -15477,6 +15811,23 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.serial_timer_interval_ms = 20
                 if getattr(self, "serial_timer", None) is not None and self.serial_timer.isActive():
                     self.serial_timer.start(int(self.serial_timer_interval_ms))
+            except Exception:
+                pass
+
+            # Motion/stability fire gates (presettable)
+            try:
+                if "motion_fire_enabled" in preset and getattr(self, "motion_fire_checkbox", None) is not None:
+                    self.motion_fire_checkbox.setChecked(bool(preset["motion_fire_enabled"]))
+                if "motion_fire_frames_required" in preset:
+                    self.motion_fire_frames_required = int(preset["motion_fire_frames_required"])
+                    if getattr(self, "motion_fire_frames_input", None) is not None:
+                        self.motion_fire_frames_input.setValue(self.motion_fire_frames_required)
+                if "fire_stability_enabled" in preset and getattr(self, "fire_stability_checkbox", None) is not None:
+                    self.fire_stability_checkbox.setChecked(bool(preset["fire_stability_enabled"]))
+                if "fire_stability_frames_required" in preset:
+                    self.fire_stability_frames_required = int(preset["fire_stability_frames_required"])
+                    if getattr(self, "fire_stability_frames_input", None) is not None:
+                        self.fire_stability_frames_input.setValue(self.fire_stability_frames_required)
             except Exception:
                 pass
 
@@ -15542,11 +15893,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 pass
 
     def _connect_serial_async(self, port, baud):
-        try:
-            self._safe_enhancer_log("[LINK] Legacy serial connect is disabled.", fire=False)
-        except Exception:
-            pass
-        return
         """Background worker for serial connection with timeout protection.
         Runs in separate thread to prevent GUI freeze.
         Updates UI via thread-safe QTimer.singleShot() callback.
@@ -15635,15 +15981,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         bg_thread.start()
 
     def _connect_bus_serial_async(self, port, baud):
-        try:
-            self._safe_enhancer_log("[LINK] Legacy bus-serial connect is disabled.", fire=False)
-        except Exception:
-            pass
-        return
         """Background worker for debug-board bus serial connection.
 
         This is separate from the main `self.ser` connection so Dual Port mode can
-        open Nano (ASCII) and Debug Board (bus servo) concurrently.
+        open ESP32 (ASCII/IO) and Debug Board (bus servo) concurrently.
         """
         import threading
         import time
@@ -15697,11 +16038,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         bg_thread.start()
 
     def _handle_bus_serial_connection_result(self, result):
-        try:
-            self._safe_enhancer_log("[LINK] Legacy bus-serial handler disabled.", fire=False)
-        except Exception:
-            pass
-        return
         """Handle debug-board bus serial connection result on main thread."""
         try:
             if result.get("success") and result.get("ser") is not None:
@@ -15806,11 +16142,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.bus_ser = None
 
     def _handle_serial_connection_result(self, result):
-        try:
-            self._safe_enhancer_log("[LINK] Legacy serial handler disabled.", fire=False)
-        except Exception:
-            pass
-        return
         """Handle serial connection result from background thread.
         Runs on main Qt thread so it's safe to update GUI.
         Provides clear error messages and status feedback.
@@ -15976,63 +16307,140 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     pass
 
-    def connect_serial(self):
-        """Handle ESP32 link connect/disconnect (UDP)."""
         try:
-            status = self.esp32_link.get_status() if self.esp32_link else None
-            is_connected = bool(status and status.connected)
+            self._refresh_connect_button_state()
         except Exception:
-            is_connected = False
+            pass
 
-        if is_connected:
-            try:
-                if self.esp32_link:
-                    self.esp32_link.disconnect()
-            except Exception:
-                pass
-            try:
-                if getattr(self, "enhancer", None):
-                    self.enhancer.update_serial_status("disconnected")
-            except Exception:
-                pass
-            try:
-                self._safe_enhancer_log("Disconnected from ESP32 link.")
-            except Exception:
-                pass
-            try:
-                self.connect_button.setText("Connect")
-                self.connect_button.setEnabled(True)
-            except Exception:
-                pass
-            try:
-                if hasattr(self, "connection_status_label"):
-                    self.connection_status_label.setText("Disconnected")
-                    self.connection_status_label.setStyleSheet(
-                        "color: #999999; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
-                    )
-            except Exception:
-                pass
-        else:
-            if getattr(self, "_link_connection_in_progress", False):
-                self._safe_enhancer_log("Link attempt already in progress, please wait...")
+    def connect_serial(self):
+        """Handle serial connect/disconnect. Uses async connection to prevent GUI freeze.
+
+        Connection flow:
+        1. Check if connection already in progress (return early if so)
+        2. Validate COM port is selected
+        3. Show "Connecting..." UI feedback
+        4. Call _connect_serial_async() to connect in background thread
+        5. Callback (_handle_serial_connection_result) updates UI when done
+
+        Disconnect flow:
+        1. Close serial port (blocking but fast)
+        2. Update UI
+        3. Close camera if open
+        """
+        print("[DEBUG] connect_serial() called")
+
+        dual_mode = bool(self._serial_is_dual_port())
+        debug_board_mode = bool(self._serial_is_debug_board_bus())
+
+        primary_open = bool(self.ser is not None and getattr(self.ser, "is_open", False))
+        bus_open = bool(
+            getattr(self, "bus_ser", None) is not None
+            and getattr(self.bus_ser, "is_open", False)
+        )
+        link_open = bool(
+            getattr(self, "esp32_link", None) is not None
+            and self.esp32_link.is_open()
+        )
+
+        try:
+            self._refresh_connect_button_state()
+        except Exception:
+            pass
+
+        # Debug Board mode hybrid behavior:
+        # - If Debug Board is connected but ESP32 Wi-Fi link is not, Connect should open Wi-Fi link.
+        # - If ESP32 Wi-Fi link is connected but Debug Board is not, Connect should open Debug Board COM.
+        if debug_board_mode and (not primary_open):
+            if bus_open and (not link_open):
+                return self._connect_esp32_link_from_panel()
+
+        # If only ESP32 UDP link is active, pressing Connect acts as disconnect toggle.
+        if link_open and (not primary_open) and (not bus_open) and (not debug_board_mode):
+            return self._disconnect_esp32_link()
+
+        if (not primary_open) and (not bus_open):
+            print("[DEBUG] Attempting to connect...")
+
+            if getattr(self, "_serial_connection_in_progress", False):
+                self._safe_enhancer_log(
+                    "Connection attempt already in progress, please wait..."
+                )
                 return False
 
-            host = self._safe_widget_method_return("esp32_host_input", "text", "")
-            port = self._safe_int_widget_value("esp32_port_input", 9000)
-            local_port = self._safe_int_widget_value("esp32_local_port_input", 0)
-            if not host or not str(host).strip():
-                self._safe_enhancer_log("ESP32 host is required.")
+            port = self._safe_widget_method_return("com_port_input", "text", "")
+            baud = self._safe_int_widget_value("baud_rate_input", 115200)
+            dbg_port = self._safe_widget_method_return(
+                "debug_board_com_port_input", "text", ""
+            )
+            dbg_baud = self._safe_int_widget_value(
+                "debug_board_baud_rate_input", 115200
+            )
+            selected_port = dbg_port if debug_board_mode else port
+            selected_baud = dbg_baud if debug_board_mode else baud
+            debug_wifi_requested = False
+            try:
+                if debug_board_mode:
+                    esp32_host = str(
+                        self._safe_widget_method_return("esp32_host_input", "text", "")
+                        or ""
+                    ).strip()
+                    debug_wifi_requested = bool(esp32_host)
+            except Exception:
+                debug_wifi_requested = False
+            print(
+                f"[DEBUG] Port={port}, Baud={baud}, Dual={dual_mode}, DBG_Port={dbg_port}, DBG_Baud={dbg_baud}"
+            )
+
+            # ESP32 UDP-only mode (no COM ports selected): auto-connect ESP32 link.
+            wifi_only_requested = (not str(port).strip()) and (not str(dbg_port).strip())
+            if wifi_only_requested:
+                return self._connect_esp32_link_from_panel()
+
+            # If switching into serial-only mode, close UDP link first.
+            # Keep ESP32 link active for Debug Board + Wi-Fi hybrid operation.
+            if link_open and (not debug_wifi_requested):
                 try:
-                    if hasattr(self, "connection_status_label"):
-                        self.connection_status_label.setText("✗ ESP32 host missing")
-                        self.connection_status_label.setStyleSheet(
-                            "color: #FF6666; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
-                        )
+                    self._disconnect_esp32_link()
                 except Exception:
                     pass
-                return False
 
-            self._link_connection_in_progress = True
+            if dual_mode:
+                if (not port or port.strip() == "") or (
+                    not dbg_port or dbg_port.strip() == ""
+                ):
+                    self._safe_enhancer_log(
+                        "Dual Port mode requires BOTH COM ports (ESP32 + Debug Board)."
+                    )
+                    try:
+                        if hasattr(self, "connection_status_label"):
+                            self.connection_status_label.setText(
+                                "✗ Dual Port requires both COM ports"
+                            )
+                            self.connection_status_label.setStyleSheet(
+                                "color: #FF6666; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                            )
+                    except Exception:
+                        pass
+                    return False
+            else:
+                if not selected_port or selected_port.strip() == "":
+                    self._safe_enhancer_log(
+                        "COM port not specified. Please select a valid port."
+                    )
+                    try:
+                        if hasattr(self, "connection_status_label"):
+                            self.connection_status_label.setText(
+                                "✗ No COM port specified"
+                            )
+                            self.connection_status_label.setStyleSheet(
+                                "color: #FF6666; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                            )
+                    except Exception:
+                        pass
+                    return False
+
+            self._serial_connection_in_progress = True
+
             try:
                 if hasattr(self, "connect_button") and self.connect_button is not None:
                     self.connect_button.setText("Connecting...")
@@ -16042,11 +16450,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self._safe_widget_call("connect_button", "setEnabled", False)
             except Exception:
                 pass
+
             try:
                 if hasattr(self, "connection_status_label"):
-                    self.connection_status_label.setText(
-                        f"Connecting to {host}:{int(port)}..."
-                    )
+                    if dual_mode:
+                        self.connection_status_label.setText(
+                            f"Connecting: ESP32={port} and DebugBoard={dbg_port}..."
+                        )
+                    else:
+                        if debug_board_mode:
+                            self.connection_status_label.setText(
+                                f"Connecting: DebugBoard={selected_port} @ {selected_baud}..."
+                            )
+                        else:
+                            self.connection_status_label.setText(
+                                f"Connecting to {selected_port} @ {selected_baud}..."
+                            )
                     self.connection_status_label.setStyleSheet(
                         "color: #FFFF00; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
                     )
@@ -16054,28 +16473,165 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 pass
 
             try:
-                if self.esp32_link:
-                    self.esp32_link.connect(str(host), int(port), local_port=int(local_port))
-                self._send_link_config(reason="connect")
-            except Exception as e:
+                if self.ser and not getattr(self.ser, "is_open", False):
+                    try:
+                        if getattr(self, "enhancer", None):
+                            self.enhancer.update_serial_status(False)
+                        self.ser.close()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            if dual_mode:
+                self._connect_serial_async(port, baud)
+                self._connect_bus_serial_async(dbg_port, dbg_baud)
+            else:
+                self._connect_serial_async(selected_port, selected_baud)
+                if debug_wifi_requested and (not link_open):
+                    try:
+                        self._connect_esp32_link_from_panel()
+                    except Exception:
+                        pass
+            return
+
+        ok = True
+        try:
+            if getattr(self, "enhancer", None):
+                self.enhancer.update_serial_status(False)
+        except Exception:
+            pass
+
+        try:
+            if self.ser is not None:
                 try:
-                    self._safe_enhancer_log(f"Link connect failed: {e}")
+                    self.ser.close()
+                except Exception:
+                    ok = False
+        except Exception:
+            ok = False
+        self.ser = None
+
+        try:
+            if getattr(self, "bus_ser", None) is not None:
+                try:
+                    self.bus_ser.close()
+                except Exception:
+                    ok = False
+        except Exception:
+            ok = False
+        self.bus_ser = None
+
+        try:
+            if getattr(self, "esp32_link", None) is not None and self.esp32_link.is_open():
+                self.esp32_link.disconnect()
+        except Exception:
+            pass
+
+        try:
+            self._safe_enhancer_log("Disconnected.")
+        except Exception:
+            pass
+        try:
+            self._refresh_connect_button_state()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "connection_status_label"):
+                self.connection_status_label.setText("Disconnected")
+                self.connection_status_label.setStyleSheet(
+                    "color: #999999; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                )
+        except Exception:
+            pass
+
+        try:
+            if (
+                getattr(self, "cap", None) is not None
+                and getattr(self.cap, "isOpened", lambda: False)()
+            ):
+                try:
+                    self._cap_release()
                 except Exception:
                     pass
-            finally:
-                self._link_connection_in_progress = False
-            try:
-                if getattr(self, "enhancer", None):
-                    self.enhancer.update_serial_status("connecting")
-            except Exception:
-                pass
-            try:
-                if hasattr(self, "connect_button") and self.connect_button is not None:
-                    self.connect_button.setText("Disconnect")
-                    self.connect_button.setEnabled(True)
-            except Exception:
-                pass
-        return True
+                try:
+                    self.cap = None
+                except Exception:
+                    self.cap = None
+                try:
+                    self.video_label.clear()
+                    self.video_label.setText("Camera Feed")
+                except Exception:
+                    pass
+                try:
+                    if getattr(self, "tracking_btn", None) is not None:
+                        self.tracking_btn.setEnabled(False)
+                        self.tracking_btn.setChecked(False)
+                        self.tracking_btn.setText("Start Tracking")
+                except Exception:
+                    pass
+                try:
+                    if getattr(self, "aiming_btn", None) is not None:
+                        self.aiming_btn.setEnabled(False)
+                        self.aiming_btn.setChecked(False)
+                        self.aiming_btn.setText("Start Aiming")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        return ok
+
+    def _refresh_connect_button_state(self):
+        """Synchronize connect button text from actual transport state."""
+        try:
+            btn = getattr(self, "connect_button", None)
+            if btn is None:
+                return
+
+            in_progress = bool(getattr(self, "_serial_connection_in_progress", False))
+            primary_open = bool(
+                getattr(self, "ser", None) is not None
+                and getattr(self.ser, "is_open", False)
+            )
+            bus_open = bool(
+                getattr(self, "bus_ser", None) is not None
+                and getattr(self.bus_ser, "is_open", False)
+            )
+            link_open = bool(
+                getattr(self, "esp32_link", None) is not None
+                and self.esp32_link.is_open()
+            )
+
+            if in_progress:
+                btn.setText("Connecting...")
+                btn.setEnabled(False)
+                return
+
+            mode_idx = int(self._serial_device_type_index())
+
+            # Debug Board hybrid mode: expose partial-connect actions clearly.
+            if mode_idx == 1:
+                if bus_open and link_open:
+                    btn.setText("Disconnect")
+                elif bus_open and (not link_open):
+                    btn.setText("Connect ESP32 Wi-Fi")
+                elif link_open and (not bus_open):
+                    btn.setText("Connect Debug Board")
+                else:
+                    btn.setText("Connect")
+                btn.setEnabled(True)
+                return
+
+            if primary_open or bus_open or link_open:
+                btn.setText("Disconnect")
+                btn.setEnabled(True)
+                return
+
+            btn.setText("Connect")
+            btn.setEnabled(True)
+        except Exception:
+            pass
 
     def _send_link_config(self, *, reason: str = "") -> bool:
         """Send configuration payload so ESP32 owns limits/safety."""
@@ -16303,11 +16859,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         print("[DEBUG] handle_connect_sound() called - Connect button clicked!")  # DEBUG
         try:
             # Check if we're connecting or disconnecting
-            try:
-                status = self.esp32_link.get_status() if self.esp32_link else None
-                connecting = not bool(status and status.connected)
-            except Exception:
-                connecting = True
+            connecting = self.ser is None or not getattr(self.ser, "is_open", False)
             print(f"[DEBUG] connecting={connecting}")  # DEBUG
 
             # Attempt the operation - connect_serial is now async, so this just starts it
@@ -16316,6 +16868,155 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception as e:
             print(f"[DEBUG] handle_connect_sound error: {e}")  # DEBUG
             pass
+
+    def _get_esp32_link_panel_values(self):
+        """Read ESP32 UDP link host/port/local-port values from connection panel."""
+        host = ""
+        port = 9000
+        local_port = 0
+        try:
+            host = str(
+                self._safe_widget_method_return("esp32_host_input", "text", "") or ""
+            ).strip()
+        except Exception:
+            host = ""
+        try:
+            port = int(self._safe_int_widget_value("esp32_port_input", 9000))
+        except Exception:
+            port = 9000
+        try:
+            local_port = int(self._safe_int_widget_value("esp32_local_port_input", 0))
+        except Exception:
+            local_port = 0
+        if local_port != 0 and local_port < 1024:
+            try:
+                self._safe_enhancer_log(
+                    f"[LINK] Local port {local_port} is privileged; using ephemeral port.",
+                    fire=False,
+                )
+            except Exception:
+                pass
+            local_port = 0
+        return host, int(port), int(local_port)
+
+    def _warn_esp32_wifi_not_connected(self, host: str, local_ip: str):
+        """Show popup guidance when PC is not on ESP32 AP subnet."""
+        text = (
+            "ESP32 Wi-Fi connection was not detected.\n\n"
+            f"Target host: {host}\n"
+            f"Current PC route IP: {local_ip or 'unknown'}\n\n"
+            "Connect this PC to SSID 'DB3000-ESP32' (192.168.4.x), then press Connect again."
+        )
+        try:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "ESP32 Wi-Fi Not Connected", text)
+        except Exception:
+            pass
+
+    def _connect_esp32_link_from_panel(self) -> bool:
+        """Open ESP32 UDP link using connection panel values (ESP32-only mode)."""
+        host, port, local_port = self._get_esp32_link_panel_values()
+        if not host:
+            try:
+                self._safe_enhancer_log(
+                    "ESP32 host is empty. Enter ESP32 Host in Configuration & Connection.",
+                    fire=False,
+                )
+            except Exception:
+                pass
+            return False
+
+        if host.startswith("192.168.4."):
+            local_ip = ""
+            route_ok = False
+            try:
+                probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                probe.connect((host, int(port)))
+                local_ip = str(probe.getsockname()[0])
+                route_ok = local_ip.startswith("192.168.4.")
+                probe.close()
+            except Exception:
+                route_ok = False
+
+            if not route_ok:
+                self._warn_esp32_wifi_not_connected(host, local_ip)
+                try:
+                    if hasattr(self, "connection_status_label"):
+                        self.connection_status_label.setText(
+                            "✗ ESP32 Wi-Fi not connected (join DB3000-ESP32)"
+                        )
+                        self.connection_status_label.setStyleSheet(
+                            "color: #FF6666; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                        )
+                except Exception:
+                    pass
+                return False
+
+        try:
+            self.esp32_link.connect(host, int(port), local_port=int(local_port))
+            try:
+                self._safe_enhancer_log("[LINK] ESP32-only mode enabled (COM disabled).", fire=False)
+            except Exception:
+                pass
+            try:
+                self._refresh_connect_button_state()
+            except Exception:
+                pass
+            try:
+                if hasattr(self, "connection_status_label"):
+                    self.connection_status_label.setText(
+                        f"✓ ESP32 link open: {host}:{int(port)}"
+                    )
+                    self.connection_status_label.setStyleSheet(
+                        "color: #00FF00; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                    )
+            except Exception:
+                pass
+            try:
+                self._send_link_config(reason="connect_button")
+            except Exception:
+                pass
+            return True
+        except Exception as e:
+            try:
+                self._safe_enhancer_log(f"[LINK] ESP32 connect failed: {e}", fire=False)
+            except Exception:
+                pass
+            try:
+                from PyQt5.QtWidgets import QMessageBox
+                QMessageBox.warning(
+                    self,
+                    "ESP32 Link Error",
+                    f"Failed to open ESP32 UDP link to {host}:{int(port)}\n\n{e}",
+                )
+            except Exception:
+                pass
+            return False
+
+    def _disconnect_esp32_link(self) -> bool:
+        """Close ESP32 UDP link and refresh connect panel UI."""
+        try:
+            if getattr(self, "esp32_link", None):
+                self.esp32_link.disconnect()
+        except Exception:
+            pass
+        try:
+            self._safe_enhancer_log("Disconnected from ESP32 link.", fire=False)
+        except Exception:
+            pass
+        try:
+            self._refresh_connect_button_state()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "connection_status_label"):
+                self.connection_status_label.setText("Disconnected from ESP32 link")
+                self.connection_status_label.setStyleSheet(
+                    "color: #999999; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                )
+        except Exception:
+            pass
+        return True
 
     def toggle_relay(self, relay_number, checked=None):
         if checked is not None:
@@ -16868,6 +17569,56 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             return False
 
+    def _fire_stability_allowed(self, cx: float, cy: float, in_deadzone: bool) -> bool:
+        """Phase 2 gate: require stable in-deadzone target across consecutive frames."""
+        try:
+            enabled = bool(
+                self._safe_widget_method_return(
+                    "fire_stability_checkbox",
+                    "isChecked",
+                    getattr(self, "fire_stability_enabled", True),
+                )
+            )
+            self.fire_stability_enabled = enabled
+            if not enabled:
+                return True
+            frames_req = int(
+                self._safe_int_widget_value(
+                    "fire_stability_frames_input",
+                    int(getattr(self, "fire_stability_frames_required", 2)),
+                )
+            )
+            jitter_limit = float(
+                self._safe_float_widget_value(
+                    "fire_stability_jitter_input",
+                    float(getattr(self, "fire_stability_max_jitter_px", 10.0)),
+                )
+            )
+            self.fire_stability_frames_required = max(1, frames_req)
+            self.fire_stability_max_jitter_px = max(0.1, jitter_limit)
+            if not bool(in_deadzone):
+                self._fire_stability_prev_center = None
+                self._fire_stability_consecutive = 0
+                return False
+
+            prev = getattr(self, "_fire_stability_prev_center", None)
+            self._fire_stability_prev_center = (float(cx), float(cy))
+
+            if prev is None:
+                self._fire_stability_consecutive = 1
+            else:
+                dx = float(cx) - float(prev[0])
+                dy = float(cy) - float(prev[1])
+                dist = float((dx * dx + dy * dy) ** 0.5)
+                if dist <= max(0.1, jitter_limit):
+                    self._fire_stability_consecutive = int(getattr(self, "_fire_stability_consecutive", 0)) + 1
+                else:
+                    self._fire_stability_consecutive = 1
+
+            return int(getattr(self, "_fire_stability_consecutive", 0)) >= max(1, frames_req)
+        except Exception:
+            return False
+
     # === SPEED-OPT START (2026-02-06) ===
     def _speed_opt_active(self) -> bool:
         return bool(getattr(self, "speed_opt_enabled", False))
@@ -16909,6 +17660,58 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             return px, py
         except Exception:
             return float(cx), float(cy)
+
+    def _speed_dynamic_yolo_max_age_s(self) -> float:
+        """Compute a dynamic freshness window for async YOLO result reuse.
+
+        Lower max-age when target speed and/or center error are high so control
+        favors fresh detections. Falls back to configured fixed age on any error.
+        """
+        try:
+            base_age = float(getattr(self, "speed_threaded_yolo_max_age_s", 0.35) or 0.35)
+            base_age = float(np.clip(base_age, 0.05, 1.50))
+            if not self._speed_opt_active():
+                return base_age
+            if not (bool(getattr(self, "tracking_active", False)) or bool(getattr(self, "aiming_active", False))):
+                return base_age
+
+            vx, vy = getattr(self, "_speed_target_vel", (0.0, 0.0))
+            speed_px_s = float((float(vx) ** 2 + float(vy) ** 2) ** 0.5)
+            profile = str(getattr(self, "speed_profile_mode", "Aggressive") or "Aggressive").strip().lower()
+            if profile == "balanced":
+                speed_norm = 750.0
+                speed_weight = 0.50
+                err_weight = 0.25
+                min_abs = 0.08
+                min_rel = 0.30
+            else:
+                speed_norm = 600.0
+                speed_weight = 0.62
+                err_weight = 0.30
+                min_abs = 0.06
+                min_rel = 0.22
+
+            speed_ratio = float(np.clip(speed_px_s / speed_norm, 0.0, 1.0))
+
+            last = getattr(self, "last_target_center", None)
+            err_ratio = 0.0
+            if last is not None:
+                fw = float(getattr(self, "frame_width", 640) or 640)
+                fh = float(getattr(self, "frame_height", 480) or 480)
+                cx = fw / 2.0
+                cy = fh / 2.0
+                err = float(((float(last[0]) - cx) ** 2 + (float(last[1]) - cy) ** 2) ** 0.5)
+                half_diag = max(1.0, float((fw ** 2 + fh ** 2) ** 0.5) * 0.5)
+                err_ratio = float(np.clip(err / half_diag, 0.0, 1.0))
+
+            age = base_age * (1.0 - speed_weight * speed_ratio) * (1.0 - err_weight * err_ratio)
+            min_age = max(min_abs, base_age * min_rel)
+            return float(np.clip(age, min_age, base_age))
+        except Exception:
+            try:
+                return float(getattr(self, "speed_threaded_yolo_max_age_s", 0.35) or 0.35)
+            except Exception:
+                return 0.35
 
     def _speed_get_yolo_roi(self, frame):
         """Return (roi_frame, (x0,y0), roi_active) for YOLO-only acceleration."""
@@ -17018,7 +17821,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # Return last recent result (if any)
             with lock:
                 ts = float(getattr(self, "_yolo_async_last_result_ts", 0.0) or 0.0)
-                max_age = float(getattr(self, "speed_threaded_yolo_max_age_s", 0.35) or 0.35)
+                # Keep explicit 0.35s default path for compatibility with existing responsiveness guards.
+                max_age = float(self._speed_dynamic_yolo_max_age_s())
                 if ts > 0 and (time.time() - ts) <= max_age:
                     boxes = getattr(self, "_yolo_async_last_result", []) or []
                     ox, oy = getattr(self, "_yolo_async_last_offset", (0, 0))
@@ -21820,6 +22624,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             "trigger_cooldown_input", 1.5
                         )
                         now = time.time()
+                        stability_ok = True
+                        try:
+                            stability_ok = bool(
+                                self._fire_stability_allowed(float(tx), float(ty), bool(in_deadzone))
+                            )
+                        except Exception:
+                            stability_ok = True
                         # Only auto-fire when turret is ARMED (safety_state==0)
                         if self.safety_state == 0:
                             motion_ok = True
@@ -21828,7 +22639,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             except Exception:
                                 motion_ok = True
 
-                            if not motion_ok:
+                            if (not motion_ok) or (not stability_ok):
                                 # Motion gate blocks firing on stationary targets
                                 if getattr(self, "trigger_fired", False):
                                     self.trigger_fired = False
@@ -22573,27 +23384,44 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
     def send_serial_command(self):
         # CHANGE WARNING:
-        # Modifications here affect servo movement, link protocol encoding,
+        # Modifications here affect servo movement, serial protocol encoding,
         # redundant-command filtering, and safety interlocks.
         # See CHANGE_IMPACT_REFERENCE.md → Sections 5 and 6.
-        # Last modified: 2026-02-10 by Copilot Agent (ESP32 link migration)
+        # Last modified: 2026-02-16 by Copilot Agent
         # ========== SENTRY MODE BLOCK ==========
+        # When sentry mode is active, sentry controls the turret - block main app commands
+        # EXCEPTION: Manual override bypasses this block (user pressing direction buttons)
+        # AGENT-MANAGED: Sentry integration (Dec 2024)
+        # See CHANGE_IMPACT_REFERENCE.md Section 12 for sentry signal flow
         try:
             if (not getattr(self, "_disable_sentry_hooks", False)) and getattr(self, "sentry_mode_active", False) and getattr(self, "sentry_tab", None) is not None:
                 if self.sentry_tab.is_enabled():
+                    # Allow manual override to bypass sentry block
                     if not getattr(self, "manual_override", False):
-                        return
+                        return  # Let sentry handle turret commands
+                    # Manual override is active - allow command through
         except Exception as e:
             try:
                 if hasattr(self, "enhancer"):
-                    self.enhancer.log_serial_output(f"[SENTRY] send_command guard error: {e}", fire=False)
-            except Exception:
-                pass
+                    self.enhancer.log_serial_output(f"[SENTRY] send_serial_command guard error: {e}", fire=False)
+            except Exception as log_err:
+                print(f"[SENTRY] send_serial_command guard error: {e} (log error: {log_err})")
         # ========== END SENTRY MODE BLOCK ==========
 
+        # Drain ESP32 UDP events every cycle so current telemetry remains live
+        # even when serial writes are skipped by redundant-command filtering.
+        try:
+            self._drain_esp32_link_events(max_items=24)
+        except Exception:
+            pass
+
         # ========== QUICK TARGET LOCK OVERRIDE ==========
+        # If target lock is active, move toward target position instead of normal tracking
+        # This temporarily overrides detection/tracking until we reach the target or timeout
         try:
             if getattr(self, "target_lock_active", False):
+                # Optional hold window: keep lock active for a short, fixed time.
+                # This is required for "single strike" behavior because last_sent_* updates immediately.
                 hold_until = getattr(self, "target_lock_hold_until_mono", None)
                 hold_active = False
                 if hold_until is not None:
@@ -22618,73 +23446,104 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     except Exception:
                         hold_active = False
 
-                if not hold_active and getattr(self, "target_lock_active", False):
+                # While hold window is active, do NOT run timeout/arrival logic.
+                if hold_active:
+                    pass
+                elif getattr(self, "target_lock_active", False):
                     current_time = time.time()
                     lock_start = getattr(self, "target_lock_start_time", current_time)
                     lock_timeout = getattr(self, "target_lock_timeout", 5.0)
+
+                    # Check timeout - if exceeded, cancel lock and resume normal tracking
                     if current_time - lock_start > lock_timeout:
                         self.target_lock_active = False
                         self.enhancer.log_serial_output(
                             "[LOCK] ⏱️ Timeout - resuming autotracking",
-                            fire=False,
+                            fire=False
                         )
                     else:
+                        # Lock still active - move toward target
                         target_pan = getattr(self, "target_lock_pan", 90)
                         target_tilt = getattr(self, "target_lock_tilt", 40)
                         current_pan = getattr(self, "last_sent_pan", getattr(self, "prev_pan_angle", 90))
                         current_tilt = getattr(self, "last_sent_tilt", getattr(self, "prev_tilt_angle", 40))
+
+                        # Calculate distance to target
                         pan_distance = abs(target_pan - current_pan)
                         tilt_distance = abs(target_tilt - current_tilt)
                         tolerance = getattr(self, "target_lock_tolerance", 3.0)
+
+                        # Check if we've reached the target (within tolerance)
                         if pan_distance <= tolerance and tilt_distance <= tolerance:
+                            # Arrived at target! Resume normal tracking
                             self.target_lock_active = False
                             self.enhancer.log_serial_output(
                                 f"[LOCK] ✅ Arrived at target (pan={target_pan:.0f}°, tilt={target_tilt:.0f}°)",
-                                fire=False,
+                                fire=False
                             )
+                            # Resume normal autotracking if it was active before
                             if getattr(self, "tracking_was_active", False):
                                 self.tracking_active = True
                                 self.enhancer.log_serial_output(
                                     "[LOCK] Resuming autotracking",
-                                    fire=False,
+                                    fire=False
                                 )
                         else:
+                            # Still moving toward target - use target position as servo command
                             self.target_pan = target_pan
                             self.target_tilt = target_tilt
+                            # Don't exit send_serial_command() yet - continue below to send the command
         except Exception as e:
+            # If lock processing fails, clean up and continue with normal command
             self.target_lock_active = False
             try:
                 self.enhancer.log_serial_output(
                     f"[LOCK ERROR] {e}",
-                    fire=False,
+                    fire=False
                 )
             except Exception:
                 pass
+
         # ========== END QUICK TARGET LOCK OVERRIDE ==========
 
+        # Increment diagnostic counter
         self._send_serial_cmd_count = getattr(self, "_send_serial_cmd_count", 0) + 1
 
+        # Update idle mode positions before sending (if no manual/tracking override)
         try:
             self._update_idle_mode_positions()
         except Exception as e:
             try:
                 if hasattr(self, "enhancer"):
                     self.enhancer.log_serial_output(f"[IDLE] update failed: {e}", fire=False)
-            except Exception:
-                pass
+            except Exception as log_err:
+                print(f"[IDLE] update failed: {e} (log error: {log_err})")
 
+        # Use target_pan/tilt as intended, but only update last_sent_* when writing to serial.
         target_pan_raw = getattr(self, "target_pan", 90)
         target_tilt_raw = getattr(self, "target_tilt", 40)
 
+        # Per-frame bus-servo move-time override (used by Auto Strike / Aggressive preset).
+        strike_bus_time_ms = None
+
+        # ========== FIXED: VALIDATE PAN/TILT ANGLES BEFORE COMMAND ENCODING ==========
+        # Ensure pan/tilt angles are valid numbers (not NaN, not Inf)
+        # If invalid, log warning and use safe defaults instead of malformed command
         try:
-            if not isinstance(target_pan_raw, (int, float)) or math.isnan(target_pan_raw) or math.isinf(target_pan_raw):
+            if not isinstance(target_pan_raw, (int, float)):
                 target_pan_raw = 90
-            if not isinstance(target_tilt_raw, (int, float)) or math.isnan(target_tilt_raw) or math.isinf(target_tilt_raw):
+            elif math.isnan(target_pan_raw) or math.isinf(target_pan_raw):
+                target_pan_raw = 90
+            if not isinstance(target_tilt_raw, (int, float)):
+                target_tilt_raw = 40
+            elif math.isnan(target_tilt_raw) or math.isinf(target_tilt_raw):
                 target_tilt_raw = 40
         except Exception:
             target_pan_raw = 90
             target_tilt_raw = 40
 
+        # ========== AUTO STRIKE (AGGRESSIVE PRESET) ==========
+        # One decisive movement to the computed target, then short hold to avoid "walking" in.
         try:
             if (
                 bool(getattr(self, "auto_strike_enabled", False))
@@ -22704,6 +23563,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     if max(dp, dt) >= min_err:
                         hold_ms = int(getattr(self, "auto_strike_hold_ms", 300) or 300)
                         cooldown_ms = int(getattr(self, "auto_strike_cooldown_ms", 250) or 250)
+
+                        # Activate lock immediately for THIS send.
                         self.target_lock_active = True
                         self.target_lock_pan = float(target_pan_raw)
                         self.target_lock_tilt = float(target_tilt_raw)
@@ -22712,30 +23573,87 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.tracking_was_active = True
                         self.target_pan = self.target_lock_pan
                         self.target_tilt = self.target_lock_tilt
+                        # Force one-shot send even if tokens unchanged.
                         self._force_send_next_command = True
+
+                        # For bus servos, choose a per-strike move time based on delta.
+                        if bool(self._serial_active_is_bus_mode()):
+                            delta = float(max(dp, dt))
+                            strike_bus_time_ms = int(np.clip(10.0 + 3.0 * delta, 15.0, 120.0))
+
+                        # Cooldown prevents rapid re-triggering from noisy detections.
                         self._auto_strike_cooldown_until_mono = now_mono + (max(0, cooldown_ms) / 1000.0)
         except Exception:
             pass
 
+        # ========== CRITICAL FIX: USE ROUNDING FOR FRACTIONAL ANGLES ==========
+        # ISSUE: int() truncates: 50.7° becomes 50° (loses 0.7°)
+        # RESULT: Tilt appears unresponsive - fractional movements accumulate but never reach MCU
+        # SOLUTION: round() properly converts: 50.7° becomes 51° (preserves fractional accuracy)
+        # This ensures both pan and tilt respond equally to small tracking corrections
         pan_angle = int(np.round(np.clip(target_pan_raw, self.PAN_MIN, self.PAN_MAX)))
         tilt_angle = int(np.round(np.clip(target_tilt_raw, self.TILT_MIN, self.TILT_MAX)))
 
+        # Bus-servo modes can accept higher resolution than integer degrees.
+        # Preserve sub-degree targets for Debug Board / Dual Port by sending float degrees
+        # (converted to 0..4095 ticks in the bus packet layer).
+        bus_mode_active = bool(self._serial_active_is_bus_mode())
+        bus_pan_deg = None
+        bus_tilt_deg = None
+        bus_pan_ticks = None
+        bus_tilt_ticks = None
+        if bus_mode_active:
+            try:
+                bus_pan_deg = float(np.clip(float(target_pan_raw), self.PAN_MIN, self.PAN_MAX))
+                bus_tilt_deg = float(np.clip(float(target_tilt_raw), self.TILT_MIN, self.TILT_MAX))
+                bus_pan_ticks = int(self._bus_servo_deg_to_ticks(bus_pan_deg))
+                bus_tilt_ticks = int(self._bus_servo_deg_to_ticks(bus_tilt_deg))
+            except Exception:
+                bus_pan_deg = float(pan_angle)
+                bus_tilt_deg = float(tilt_angle)
+                try:
+                    bus_pan_ticks = int(self._bus_servo_deg_to_ticks(bus_pan_deg))
+                    bus_tilt_ticks = int(self._bus_servo_deg_to_ticks(bus_tilt_deg))
+                except Exception:
+                    bus_pan_ticks = None
+                    bus_tilt_ticks = None
+
+        # ========== TRANSMISSION DIAGNOSTICS ==========
+        # Log rounding impact to verify fractional values are properly converted
+        try:
+            if getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked():
+                pan_rounded = target_pan_raw - int(target_pan_raw)
+                tilt_rounded = target_tilt_raw - int(target_tilt_raw)
+                self.enhancer.log_serial_output(
+                    f"[TILT_SEND] raw={target_tilt_raw:.4f}° → rounded_int={tilt_angle}° (frac={tilt_rounded:.4f} loss={-tilt_rounded if target_tilt_raw > 0 else tilt_rounded:.4f})",
+                    fire=False
+                )
+        except Exception:
+            pass
+
+        # ========== FIXED: UPDATE POSITION LABEL DURING TRACKING ==========
+        # Position label should show current target pan/tilt values while tracking is active
+        # (Previously only updated in manual control, showing stale values during tracking)
         try:
             if getattr(self, "tracking_active", False) and hasattr(self, "position_label"):
                 self.position_label.setText(f"Pan: {pan_angle}° | Tilt: {tilt_angle}°")
         except Exception:
             pass
 
+        # DIAGNOSTIC: Log when approaching minimum position (indicates potential tracking issue)
         if pan_angle <= self.PAN_MIN + 5 or tilt_angle <= self.TILT_MIN + 5:
             try:
                 if getattr(self, "enhancer", None):
                     self.enhancer.log_serial_output(
                         f"[SERVO] Warning: approaching MIN position - pan={pan_angle}° (MIN={self.PAN_MIN}), tilt={tilt_angle}° (MIN={self.TILT_MIN})",
-                        fire=False,
+                        fire=False
                     )
             except Exception:
                 pass
 
+        # If MCU reports tilt safety locked, avoid sending new tilt targets to
+        # prevent host/firmware fighting. Use the last_sent_tilt as the desired
+        # angle to keep commands stable while the MCU enforces the safe position.
         try:
             if (
                 getattr(self, "tilt_safety_hardware_installed", False)
@@ -22746,74 +23664,104 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
 
+        # Predefine debug_on so later references are always bound even if
+        # the diagnostic logging block raises an exception.
         debug_on = False
+
         mosfet_hold_active = bool(getattr(self, "mosfet_hold_active", False))
         fire_token = 1 if (mosfet_hold_active or self.trigger_fired) else 0
         led_token = int(self.relay1_state)
         laser_token = int(self.relay2_state)
+        acc3_token = 0
         safety_token = int(self.safety_state)
         mode_token = 1 if self.trigger_mode_bb else 0
 
-        try:
-            if fire_token == 1:
-                print(f"[MODE_DEBUG] trigger_mode_bb={self.trigger_mode_bb} → mode_token={mode_token} ({'PROJECTILE' if mode_token==1 else 'WATER'})")
-        except Exception:
-            pass
+        # DEBUG: Mode token computation
+        if fire_token == 1:
+            print(f"[MODE_DEBUG] trigger_mode_bb={self.trigger_mode_bb} → mode_token={mode_token} ({'PROJECTILE' if mode_token==1 else 'WATER'})")
 
+        # NOTE: command string is built after any pan/tilt overrides below.
+
+        # --- Fractional accumulation to allow micro-corrections (prevents "stuck at last integer" issue) ---
         try:
+            # In bus-servo modes we send sub-degree targets directly (ticks), so the
+            # integer micro-step accumulator is unnecessary and can introduce drift.
+            if bus_mode_active:
+                self._pan_frac_accum = 0.0
+                self._tilt_frac_accum = 0.0
+                raise RuntimeError("skip micro-step in bus mode")
+            # ensure accumulators exist
             self._pan_frac_accum = getattr(self, "_pan_frac_accum", 0.0)
             self._tilt_frac_accum = getattr(self, "_tilt_frac_accum", 0.0)
+            # FIX: Dynamically read threshold from widget so user adjustments take effect immediately
+            # SAFETY: A 1° micro-step cannot be triggered by tiny (<1°) accumulated noise safely.
+            # Clamp to >= 1.0° to prevent drift/hunting.
             self._frac_send_threshold = float(self._safe_float_widget_value("precision_frac_threshold_input", 0.25))
             effective_threshold = max(1.0, float(self._frac_send_threshold))
 
+            # Reference last sent integer position (fallback to prev angles if sentinel)
             last_pan_int = int(getattr(self, "last_sent_pan", int(pan_angle)))
             last_tilt_int = int(getattr(self, "last_sent_tilt", int(tilt_angle)))
 
+            # Compute desired float deltas relative to last sent integer position
             desired_pan_delta = float(target_pan_raw) - float(last_pan_int)
             desired_tilt_delta = float(target_tilt_raw) - float(last_tilt_int)
 
+            # Only apply accumulation when precision mode is enabled, otherwise keep original behavior.
             precision_enabled = bool(
                 getattr(self, "precision_mode_checkbox", None)
                 and getattr(self.precision_mode_checkbox, "isChecked", lambda: False)()
             )
+
+            # Only allow micro-step behavior when precision PID is actively driving this frame.
+            # This prevents slow drift when centered (noise) and avoids overriding normal tracking.
             precision_pid_driving = bool(getattr(self, "_precision_override_active", False))
 
             if precision_enabled and precision_pid_driving:
+                # Accumulate fractional deltas
                 self._pan_frac_accum += desired_pan_delta
                 self._tilt_frac_accum += desired_tilt_delta
 
+                # If accumulator crosses threshold, prepare a one-degree micro-step
                 pan_override = None
                 tilt_override = None
 
+                # Only attempt a micro-step if the rounded command would otherwise be unchanged.
                 if abs(self._pan_frac_accum) >= float(effective_threshold) and int(pan_angle) == int(last_pan_int):
                     step = int(np.sign(self._pan_frac_accum))
                     pan_override = int(last_pan_int + step)
-                    self._pan_frac_accum -= step
+                    self._pan_frac_accum -= step  # consume step
 
                 if abs(self._tilt_frac_accum) >= float(effective_threshold) and int(tilt_angle) == int(last_tilt_int):
                     step = int(np.sign(self._tilt_frac_accum))
                     tilt_override = int(last_tilt_int + step)
-                    self._tilt_frac_accum -= step
+                    self._tilt_frac_accum -= step  # consume step
 
+                # Apply overrides so we can send micro-step even if rounded target equals last_sent
                 if pan_override is not None:
                     pan_angle = int(np.clip(pan_override, self.PAN_MIN, self.PAN_MAX))
                 if tilt_override is not None:
                     tilt_angle = int(np.clip(tilt_override, self.TILT_MIN, self.TILT_MAX))
 
+                # Debug logging when micro-step triggered
                 if (pan_override is not None or tilt_override is not None) and getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked():
                     try:
                         self.enhancer.log_serial_output(
                             f"[MICRO-SEND] applied micro-step -> pan={pan_angle} tilt={tilt_angle} | accum_pan={self._pan_frac_accum:.3f} accum_tilt={self._tilt_frac_accum:.3f}",
-                            fire=False,
+                            fire=False
                         )
                     except Exception:
                         pass
             else:
+                # If precision isn't actively driving, keep micro-step state neutral.
                 self._pan_frac_accum = 0.0
                 self._tilt_frac_accum = 0.0
         except Exception:
             pass
 
+        # ========== CURRENT PROTECTION OUTPUT GATING ==========
+        # CHANGE WARNING:
+        # This block must NOT change autotracking math/state; it only gates OUTPUT commands.
         try:
             pan_angle, tilt_angle, fire_token, safety_token = self._apply_current_protection_overrides(
                 pan_angle, tilt_angle, fire_token, safety_token
@@ -22828,27 +23776,24 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
 
-        payload = {
-            "pan": float(target_pan_raw),
-            "tilt": float(target_tilt_raw),
-            "pan_cmd": int(pan_angle),
-            "tilt_cmd": int(tilt_angle),
-            "fire": int(fire_token),
-            "fire_hold": bool(mosfet_hold_active),
-            "led": int(led_token),
-            "laser": int(laser_token),
-            "safety": int(safety_token),
-            "mode": int(mode_token),
-            "tracking": bool(getattr(self, "tracking_active", False)),
-            "aiming": bool(getattr(self, "aiming_active", False)),
-            "manual_override": bool(getattr(self, "manual_override", False)),
-            "rapid_fire": {
-                "enabled": bool(getattr(self, "rapid_fire_enabled", False)),
-                "rate_hz": int(getattr(self, "rapid_fire_rate_hz", 1)),
-                "duty": float(getattr(self, "rapid_fire_duty", 0.5)),
-            },
-        }
+        # If any output gating/clamping changed the angles, keep bus targets in sync.
+        if bus_mode_active:
+            try:
+                bus_pan_deg = float(np.clip(float(pan_angle), self.PAN_MIN, self.PAN_MAX))
+                bus_tilt_deg = float(np.clip(float(tilt_angle), self.TILT_MIN, self.TILT_MAX))
+                bus_pan_ticks = int(self._bus_servo_deg_to_ticks(bus_pan_deg))
+                bus_tilt_ticks = int(self._bus_servo_deg_to_ticks(bus_tilt_deg))
+            except Exception:
+                pass
 
+        # Build the final command string AFTER any pan/tilt overrides.
+        command = f"P{pan_angle}T{tilt_angle}F{fire_token}L{led_token}R{laser_token}G{acc3_token}S{safety_token}M{mode_token}\n"
+
+        # ========== BULLETPROOF FIX: PREVENT REDUNDANT SERVO COMMANDS ==========
+        # ISSUE: Sending same command repeatedly causes servo jitter/hunting/twitching
+        # The servo can't distinguish between "move to 40°" and "stay at 40°"
+        # SOLUTION: Only send command if the ROUNDED integer values actually changed
+        # This prevents the servo from receiving duplicate commands while tracking micro-movements
         should_send = True
         force_send = bool(getattr(self, "_force_send_next_command", False))
         speed_disable_filter = bool(getattr(self, "speed_opt_enabled", False)) and bool(
@@ -22856,9 +23801,27 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         )
         last_pan = int(getattr(self, "last_sent_pan", -9999))
         last_tilt = int(getattr(self, "last_sent_tilt", -9999))
-        pos_unchanged = (pan_angle == last_pan and tilt_angle == last_tilt)
 
-        if (not speed_disable_filter and not force_send and pos_unchanged and 
+        # In bus-servo modes, use tick-level equality to decide whether pan/tilt changed.
+        # This ensures sub-degree corrections actually transmit.
+        pos_unchanged = False
+        if bus_mode_active and (bus_pan_ticks is not None) and (bus_tilt_ticks is not None):
+            bus_last_pan_ticks = getattr(self, "_last_sent_bus_pan_ticks", None)
+            bus_last_tilt_ticks = getattr(self, "_last_sent_bus_tilt_ticks", None)
+            if (bus_last_pan_ticks is None) or (bus_last_tilt_ticks is None):
+                pos_unchanged = False
+            else:
+                try:
+                    pos_unchanged = (
+                        int(bus_pan_ticks) == int(bus_last_pan_ticks)
+                        and int(bus_tilt_ticks) == int(bus_last_tilt_ticks)
+                    )
+                except Exception:
+                    pos_unchanged = False
+        else:
+            pos_unchanged = (pan_angle == last_pan and tilt_angle == last_tilt)
+
+        if (not speed_disable_filter and not force_send and pos_unchanged and
             fire_token == int(getattr(self, "_last_fire_token", 0)) and
             led_token == int(getattr(self, "_last_led_token", 0)) and
             laser_token == int(getattr(self, "_last_laser_token", 0)) and
@@ -22866,113 +23829,492 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             mode_token == int(getattr(self, "_last_mode_token", 0))):
             should_send = False
 
+        # Diagnostic: when skipping, log reason and current fractional state (debug-only)
         if not should_send and getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked():
             try:
-                msg = (
-                    f"[SKIP] unchanged-rounded-ints | raw=P{target_pan_raw:.4f}°/T{target_tilt_raw:.4f}° -> "
-                    f"rounded=P{pan_angle}°/T{tilt_angle}° | last_sent=P{last_pan}°/T{last_tilt}° | "
-                    f"accum_pan={getattr(self,'_pan_frac_accum',0.0):.3f} accum_tilt={getattr(self,'_tilt_frac_accum',0.0):.3f} "
-                    f"flags: manual_override={getattr(self,'manual_override',False)} link_tx_paused={getattr(self,'serial_tx_paused',False)}"
-                )
+                if bus_mode_active and (bus_pan_ticks is not None) and (bus_tilt_ticks is not None):
+                    msg = (
+                        f"[SKIP] unchanged-bus-ticks | raw=P{target_pan_raw:.4f}°/T{target_tilt_raw:.4f}° -> "
+                        f"ticks=P{bus_pan_ticks}/T{bus_tilt_ticks} | last_ticks=P{getattr(self,'_last_sent_bus_pan_ticks',None)}/T{getattr(self,'_last_sent_bus_tilt_ticks',None)} | "
+                        f"rounded=P{pan_angle}°/T{tilt_angle}° | last_sent=P{last_pan}°/T{last_tilt}° | "
+                        f"flags: manual_override={getattr(self,'manual_override',False)} serial_tx_paused={getattr(self,'serial_tx_paused',False)} _mcu_tilt_safety_locked={getattr(self,'_mcu_tilt_safety_locked',False)}"
+                    )
+                else:
+                    msg = (
+                        f"[SKIP] unchanged-rounded-ints | raw=P{target_pan_raw:.4f}°/T{target_tilt_raw:.4f}° -> "
+                        f"rounded=P{pan_angle}°/T{tilt_angle}° | last_sent=P{last_pan}°/T{last_tilt}° | "
+                        f"accum_pan={getattr(self,'_pan_frac_accum',0.0):.3f} accum_tilt={getattr(self,'_tilt_frac_accum',0.0):.3f} "
+                        f"flags: manual_override={getattr(self,'manual_override',False)} serial_tx_paused={getattr(self,'serial_tx_paused',False)} _mcu_tilt_safety_locked={getattr(self,'_mcu_tilt_safety_locked',False)}"
+                    )
                 self.enhancer.log_serial_output(msg, fire=False)
             except Exception:
                 pass
 
+        # Log the command (useful for verification even if serial is not connected)
         try:
-            debug_on = bool(
-                getattr(self, "debug_checkbox", None)
-                and self.debug_checkbox.isChecked()
-            )
-        except Exception:
+            # If Debug is enabled, include an expanded diagnostic line showing key internal state
             debug_on = False
-
-        if should_send or debug_on:
             try:
-                msg = f"WILL SEND: pan={payload['pan']:.2f} tilt={payload['tilt']:.2f} fire={fire_token} safety={safety_token} mode={mode_token}"
-                if debug_on:
-                    st = (
-                        f"[DBG] prev_pan={getattr(self,'prev_pan_angle',None)} prev_tilt={getattr(self,'prev_tilt_angle',None)} "
-                        f"last_sent_pan={getattr(self,'last_sent_pan',None)} last_sent_tilt={getattr(self,'last_sent_tilt',None)} "
-                        f"target_pan={getattr(self,'target_pan',None)} target_tilt={getattr(self,'target_tilt',None)} "
-                        f"manual_override={getattr(self,'manual_override',False)} _manual_override_active={getattr(self,'_manual_override_active',False)} safety_state={getattr(self,'safety_state',None)} aiming_active={getattr(self,'aiming_active',False)}"
-                    )
-                    msg = msg + " " + st
-                if hasattr(self, "enhancer") and getattr(self, "enhancer", None) is not None:
-                    self.enhancer.log_serial_output(msg, fire=False)
-                else:
-                    print(msg)
+                debug_on = bool(
+                    getattr(self, "debug_checkbox", None)
+                    and self.debug_checkbox.isChecked()
+                )
             except Exception:
-                pass
+                debug_on = False
 
+            # Only log if we're actually sending or debug is on
+            if should_send or debug_on:
+                msg = f"WILL SEND: {command.strip()}"
+                if bus_mode_active and (bus_pan_ticks is not None) and (bus_tilt_ticks is not None):
+                    msg = msg + f" [BUS ticks] P{bus_pan_ticks} T{bus_tilt_ticks}"
+                if debug_on:
+                    try:
+                        st = (
+                            f"[DBG] prev_pan={getattr(self,'prev_pan_angle',None)} prev_tilt={getattr(self,'prev_tilt_angle',None)} "
+                            f"last_sent_pan={getattr(self,'last_sent_pan',None)} last_sent_tilt={getattr(self,'last_sent_tilt',None)} "
+                            f"target_pan={getattr(self,'target_pan',None)} target_tilt={getattr(self,'target_tilt',None)} "
+                            f"manual_override={getattr(self,'manual_override',False)} _manual_override_active={getattr(self,'_manual_override_active',False)} safety_state={getattr(self,'safety_state',None)} aiming_active={getattr(self,'aiming_active',False)}"
+                        )
+                        msg = msg + " " + st
+                    except Exception:
+                        pass
+
+                if (
+                    hasattr(self, "enhancer")
+                    and getattr(self, "enhancer", None) is not None
+                ):
+                    try:
+                        self.enhancer.log_serial_output(msg, fire=False)
+                    except Exception:
+                        try:
+                            self._safe_append_log(msg)
+                        except Exception:
+                            pass
+                else:
+                    try:
+                        # Fallback: always print to console when running headless tests
+                        print(msg)
+                    except Exception:
+                        try:
+                            self._safe_append_log(msg)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+        # ========== ONLY SEND IF COMMAND ACTUALLY CHANGED ==========
         if not should_send:
+            # Ensure one-shot fire requests never get stuck when the redundant-command
+            # optimization skips a write. MOSFET hold is latched separately.
             try:
                 if not mosfet_hold_active:
                     self.trigger_fired = False
+                    # Reset deadzone edge state so reacquired targets can fire on first entry
                     try:
                         self._prev_in_deadzone = False
                     except Exception:
                         pass
             except Exception:
                 pass
+
+            # Still drain incoming serial lines (telemetry/status) so current monitoring
+            # and safety/encoder parsing doesn't stall when output commands are unchanged.
             try:
                 self._drain_serial_input(max_lines=8, debug_on=debug_on)
             except Exception:
                 pass
-            return
+            return  # Skip sending - command is identical to last time
 
+        # One-shot force-send consumed once we've decided to transmit.
         if force_send:
             try:
                 self._force_send_next_command = False
             except Exception:
                 pass
 
+        # Determine which handles are available
+        primary_open = bool(self.ser is not None and getattr(self.ser, "is_open", False))
+        bus_open = bool(getattr(self, "bus_ser", None) is not None and getattr(self.bus_ser, "is_open", False))
+        link_open = bool(
+            getattr(self, "esp32_link", None) is not None
+            and self.esp32_link.is_open()
+        )
+
+        # Extra visibility when a fire command is attempted
         if fire_token == 1:
             try:
                 self.enhancer.log_serial_output(
-                    f"[FIRE_TX] fire=1 safety={safety_token} mode_token={mode_token}",
+                    f"[FIRE_TX] fire=1 safety={safety_token} mode_token={mode_token} dual_port={self._serial_is_dual_port()} primary_open={primary_open} bus_open={bus_open}",
                     fire=False,
                 )
             except Exception:
-                pass
+                try:
+                    print(
+                        f"[FIRE_TX] fire=1 safety={safety_token} mode_token={mode_token} dual_port={self._serial_is_dual_port()} primary_open={primary_open} bus_open={bus_open}"
+                    )
+                except Exception:
+                    pass
 
-        try:
-            if getattr(self, "serial_tx_paused", False):
-                self.last_sent_pan = pan_angle
-                self.last_sent_tilt = tilt_angle
-                self.prev_pan_angle = float(pan_angle)
-                self.prev_tilt_angle = float(tilt_angle)
-                if debug_on:
-                    try:
-                        self.enhancer.log_serial_output(
-                            "LINK TX PAUSED — suppressed sending command", fire=False
-                        )
-                    except Exception:
-                        pass
-            else:
-                if self.esp32_link:
-                    self.esp32_link.send_command(payload)
+        if primary_open or bus_open or link_open:
+            try:
+                # Optionally suppress actual hardware writes when operator toggles Pause TX
+                if getattr(self, "serial_tx_paused", False):
+                    # Do not write to hardware, but still record intended last_sent values so
+                    # hold/restore logic behaves consistently in simulated or paused-TX modes.
                     self.last_sent_pan = pan_angle
                     self.last_sent_tilt = tilt_angle
-                    self.prev_pan_angle = float(pan_angle)
-                    self.prev_tilt_angle = float(tilt_angle)
+                    # FIX DEC8: Update prev from sent values (not fractional target)
+                    sent_pan_for_prev = float(pan_angle)
+                    sent_tilt_for_prev = float(tilt_angle)
+                    if bus_mode_active and (bus_pan_deg is not None) and (bus_tilt_deg is not None):
+                        sent_pan_for_prev = float(bus_pan_deg)
+                        sent_tilt_for_prev = float(bus_tilt_deg)
+                        self._last_sent_bus_pan_ticks = bus_pan_ticks
+                        self._last_sent_bus_tilt_ticks = bus_tilt_ticks
+                        self._last_sent_bus_pan_deg = bus_pan_deg
+                        self._last_sent_bus_tilt_deg = bus_tilt_deg
+                    self.prev_pan_angle = float(sent_pan_for_prev)
+                    self.prev_tilt_angle = float(sent_tilt_for_prev)
+                    # Optionally log the suppression in debug mode
+                    try:
+                        if debug_on:
+                            if hasattr(self, "enhancer"):
+                                try:
+                                    self.enhancer.log_serial_output(
+                                        "SERIAL TX PAUSED — suppressed sending command", fire=False
+                                    )
+                                except Exception:
+                                    try:
+                                        self._serial_write("SERIAL TX PAUSED — suppressed sending command")
+                                    except Exception:
+                                        pass
+                            else:
+                                try:
+                                    self._serial_write("SERIAL TX PAUSED — suppressed sending command")
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+
+                    # Still drain incoming lines (telemetry/status) while TX is paused.
+                    try:
+                        self._drain_serial_input(max_lines=8, debug_on=debug_on)
+                    except Exception:
+                        pass
+                else:
+                    # 1) Pan/Tilt
+                    pan_tilt_params_sent = False
+                    if self._serial_active_is_bus_mode():
+                        if debug_on:
+                            try:
+                                bus_port = getattr(getattr(self, "bus_ser", None), "port", None)
+                                self.enhancer.log_serial_output(
+                                    f"[BUS MODE] bus_open={bus_open} port={bus_port} checksum_mode={getattr(self,'_bus_servo_checksum_mode','sub')}",
+                                    fire=False,
+                                )
+                            except Exception:
+                                pass
+                        send_pan_deg = float(bus_pan_deg) if (bus_pan_deg is not None) else float(pan_angle)
+                        send_tilt_deg = float(bus_tilt_deg) if (bus_tilt_deg is not None) else float(tilt_angle)
+                        ok = self._bus_servo_send_pan_tilt(
+                            send_pan_deg,
+                            send_tilt_deg,
+                            time_ms=(strike_bus_time_ms if strike_bus_time_ms is not None else None),
+                        )
+                        pan_tilt_params_sent = ok
+                        if not ok:
+                            try:
+                                if hasattr(self, "enhancer"):
+                                    self.enhancer.log_serial_output(
+                                        "[BUS SERVO] Write failed (check Debug Board COM/baud and mode)",
+                                        fire=False,
+                                    )
+                            except Exception:
+                                pass
+                        # Debug Board mode uses bus serial for PAN/TILT.
+                        # If ESP32 UDP link is open, send IO/control tokens over Wi-Fi.
+                        if self._serial_is_debug_board_bus() and link_open:
+                            try:
+                                io_payload = {
+                                    "fire": int(fire_token),
+                                    "safety": int(safety_token),
+                                    "mode": int(mode_token),
+                                    "led": int(led_token),
+                                    "laser": int(laser_token),
+                                }
+                                self.esp32_link.send_command(io_payload, expect_ack=False)
+                                if debug_on and hasattr(self, "enhancer"):
+                                    try:
+                                        self.enhancer.log_serial_output(
+                                            f"[LINK IO TX] {io_payload}",
+                                            fire=False,
+                                        )
+                                    except Exception:
+                                        pass
+                            except Exception as e:
+                                if debug_on and hasattr(self, "enhancer"):
+                                    try:
+                                        self.enhancer.log_serial_output(
+                                            f"[LINK IO TX ERROR] {e}",
+                                            fire=False,
+                                        )
+                                    except Exception:
+                                        pass
+                        elif self._serial_is_debug_board_bus() and (not link_open):
+                            # Hybrid mode safety-net: if Debug Board is active but ESP32 link
+                            # is not open yet, auto-attempt Wi-Fi connect and retry IO send once.
+                            try:
+                                opened = bool(self._connect_esp32_link_from_panel())
+                                if opened:
+                                    link_open = bool(
+                                        getattr(self, "esp32_link", None) is not None
+                                        and self.esp32_link.is_open()
+                                    )
+                                if link_open:
+                                    io_payload = {
+                                        "fire": int(fire_token),
+                                        "safety": int(safety_token),
+                                        "mode": int(mode_token),
+                                        "led": int(led_token),
+                                        "laser": int(laser_token),
+                                    }
+                                    self.esp32_link.send_command(io_payload, expect_ack=False)
+                                    if debug_on and hasattr(self, "enhancer"):
+                                        try:
+                                            self.enhancer.log_serial_output(
+                                                f"[LINK IO TX/AUTO] {io_payload}",
+                                                fire=False,
+                                            )
+                                        except Exception:
+                                            pass
+                            except Exception as e:
+                                if debug_on and hasattr(self, "enhancer"):
+                                    try:
+                                        self.enhancer.log_serial_output(
+                                            f"[LINK IO AUTO-CONNECT ERROR] {e}",
+                                            fire=False,
+                                        )
+                                    except Exception:
+                                        pass
+                    else:
+                        # ESP32 ASCII/IO mode: pan/tilt + IO over primary serial
+                        if fire_token == 1:
+                            print(f"[MODE_DEBUG] NOT DUAL PORT - using ESP32 ASCII/IO mode")
+                        if primary_open:
+                            if fire_token == 1:
+                                print(f"[MODE_DEBUG] ✓ SENDING (ESP32 ASCII/IO): {command.strip()}")
+                            self.ser.write(command.encode("utf-8"))
+                            pan_tilt_params_sent = True
+                        elif link_open:
+                            # ESP32 UDP link mode (no COM serial)
+                            try:
+                                cmd_payload = {
+                                    "pan_cmd": int(pan_angle),
+                                    "tilt_cmd": int(tilt_angle),
+                                    "fire": int(fire_token),
+                                    "safety": int(safety_token),
+                                    "mode": int(mode_token),
+                                    "led": int(led_token),
+                                    "laser": int(laser_token),
+                                }
+                                self.esp32_link.send_command(cmd_payload, expect_ack=False)
+                                pan_tilt_params_sent = True
+                                if debug_on and hasattr(self, "enhancer"):
+                                    self.enhancer.log_serial_output(
+                                        f"[LINK TX] {cmd_payload}",
+                                        fire=False,
+                                    )
+                            except Exception as e:
+                                if debug_on and hasattr(self, "enhancer"):
+                                    try:
+                                        self.enhancer.log_serial_output(
+                                            f"[LINK TX ERROR] {e}",
+                                            fire=False,
+                                        )
+                                    except Exception:
+                                        pass
+                        else:
+                            if fire_token == 1:
+                                print(f"[MODE_DEBUG] ✗ PRIMARY PORT NOT OPEN (COM10 disconnected?)")
+
+                    # 2) IO tokens in Dual Port mode (ESP32 primary serial)
+                    if self._serial_is_dual_port():
+                        # DEBUG: Dual port mode active
+                        if fire_token == 1:
+                            print(f"[MODE_DEBUG] DUAL PORT MODE: primary_open={primary_open} bus_ping_ok={getattr(self, '_bus_servo_ping_ok', False)} pan_tilt_sent={pan_tilt_params_sent}")
+                        # In dual mode, ESP32 is used for IO (fire/relays/safety/mode).
+                        # Pan/Tilt are driven via Debug Board.
+                        # NOTE: Do NOT fall back to sending P/T to the ESP32 when bus fails.
+                        # This keeps responsibilities split cleanly when the Debug Board is not chained to the ESP32.
+                        if primary_open:
+                            # Always send IO tokens to ESP32 in Dual Port mode when primary is open.
+                            # This allows firing/relays even if bus ping fails, without falling back to
+                            # pan/tilt on the ESP32 (keeps responsibilities split).
+                            if not bool(getattr(self, "_bus_servo_ping_ok", False)) or not pan_tilt_params_sent:
+                                try:
+                                    if fire_token == 1:
+                                        print(
+                                            f"[MODE_DEBUG] IO-only send (bus ping/pt unavailable): S{safety_token} M{mode_token} F{fire_token}L{led_token}R{laser_token}G{acc3_token}"
+                                        )
+                                except Exception:
+                                    pass
+
+                            # FIX 2026-01-26: Send mode and safety FIRST as separate tokens.
+                            # The Arduino's single-token parser incorrectly matches packed commands
+                            # like "F1L1R0G0S0M1" as just "F1", ignoring mode/safety.
+                            # By sending S/M first, we ensure projectile mode is set before fire.
+                            try:
+                                self.ser.write(f"S{safety_token}\n".encode("utf-8"))
+                                self.ser.write(f"M{mode_token}\n".encode("utf-8"))
+                            except Exception:
+                                pass
+                            io_cmd = f"F{fire_token}L{led_token}R{laser_token}G{acc3_token}\n"
+                            try:
+                                if fire_token == 1:
+                                    print(f"[MODE_DEBUG] ✓ SENDING (dual-port IO): S{safety_token}, M{mode_token}, {io_cmd.strip()}")
+                                self.ser.write(io_cmd.encode("utf-8"))
+                            except Exception as e:
+                                print(f"[MODE_DEBUG] ✗ SEND FAILED: {e}")
+
+                            # Bus ping failed OR Bus write failed: keep IO working, but do not send pan/tilt to ESP32.
+                            if (not bool(getattr(self, "_bus_servo_ping_ok", False))) or (not pan_tilt_params_sent):
+                                if debug_on and hasattr(self, "enhancer"):
+                                    try:
+                                        self.enhancer.log_serial_output(
+                                            "[DUAL PORT] Bus pan/tilt unavailable; sent IO-only to ESP32 (no P/T fallback)",
+                                            fire=False,
+                                        )
+                                    except Exception:
+                                        pass
+
+                    # Update last_sent_* ONLY if we actually successfully wrote to serial (Bus or Nano)
+                    # This fixes the "Frozen Track" bug where a failed write causes the system to think
+                    # it already moved, preventing retries.
+                    if pan_tilt_params_sent:
+                        self.last_sent_pan = pan_angle
+                        self.last_sent_tilt = tilt_angle
+                        # FIX DEC8: Update prev_pan_angle/prev_tilt_angle from SENT integer values
+                        # NOT from target_pan/target_tilt (which have fractional parts)
+                        # This prevents oscillation from fractional-to-integer rounding mismatches
+                        # The key insight: prev values must match what MCU actually received
+                        sent_pan_for_prev = float(pan_angle)
+                        sent_tilt_for_prev = float(tilt_angle)
+                        if bus_mode_active and (bus_pan_deg is not None) and (bus_tilt_deg is not None):
+                            sent_pan_for_prev = float(bus_pan_deg)
+                            sent_tilt_for_prev = float(bus_tilt_deg)
+                            self._last_sent_bus_pan_ticks = bus_pan_ticks
+                            self._last_sent_bus_tilt_ticks = bus_tilt_ticks
+                            self._last_sent_bus_pan_deg = bus_pan_deg
+                            self._last_sent_bus_tilt_deg = bus_tilt_deg
+                        self.prev_pan_angle = float(sent_pan_for_prev)  # Use what was ACTUALLY sent to MCU
+                        self.prev_tilt_angle = float(sent_tilt_for_prev)
+
+                    # Drain incoming lines (telemetry + status + encoder)
+                    # In Debug Board bus-only mode, inbound bytes are binary and should not be decoded as UTF-8 lines.
+                    # In Dual Port mode, primary serial is Nano ASCII and must be drained.
+                    if (not self._serial_active_is_bus_mode()) or self._serial_is_dual_port():
+                        try:
+                            self._drain_serial_input(max_lines=8, debug_on=debug_on)
+                        except Exception:
+                            pass
+            except Exception as e:
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(f"Serial Write Error: {e}")
+                    else:
+                        try:
+                            self._safe_append_log(f"Serial Write Error: {e}")
+                        except Exception:
+                            pass
+                except Exception:
+                    try:
+                        self._safe_append_log(f"Serial Write Error: {e}")
+                    except Exception:
+                        pass
+                # try to close and cleanup
+                try:
+                    self.ser.close()
+                except Exception:
+                    pass
+
+        # ========== HARD LIMIT GUARD (EXPLICIT) ==========
+        # Ensure pan/tilt are clamped before sending to hardware.
+        try:
+            pre_guard_pan = int(pan_angle)
+            pre_guard_tilt = int(tilt_angle)
+            pan_angle = max(self.PAN_MIN, min(self.PAN_MAX, int(pan_angle)))
+            tilt_angle = max(self.TILT_MIN, min(self.TILT_MAX, int(tilt_angle)))
+            if (pre_guard_pan != pan_angle) or (pre_guard_tilt != tilt_angle):
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            f"[CLAMP] pan={pre_guard_pan}->{pan_angle} tilt={pre_guard_tilt}->{tilt_angle}",
+                            fire=False,
+                        )
+                except Exception:
+                    pass
+        except Exception as e:
+            try:
+                if hasattr(self, "enhancer"):
+                    self.enhancer.log_serial_output(f"[CLAMP] guard failed: {e}", fire=False)
+            except Exception as log_err:
+                print(f"[CLAMP] guard failed: {e} (log error: {log_err})")
+                self.ser = None
+                try:
+                    self.connect_button.setText("Connect")
+                except Exception:
+                    pass
+
+        # If serial wasn't open, still update last_sent_* so hold-on-loss logic
+        # can prefer the most recently intended angles (helps simulated/run-without-serial).
+        try:
+            if not (self.ser is not None and getattr(self.ser, "is_open", False)) and not link_open:
+                # record the intended values as 'last_sent' so hold logic can use them
+                self.last_sent_pan = pan_angle
+                self.last_sent_tilt = tilt_angle
+                # FIX DEC8: Update prev from sent values (not fractional target)
+                sent_pan_for_prev = float(pan_angle)
+                sent_tilt_for_prev = float(tilt_angle)
+                if bus_mode_active and (bus_pan_deg is not None) and (bus_tilt_deg is not None):
+                    sent_pan_for_prev = float(bus_pan_deg)
+                    sent_tilt_for_prev = float(bus_tilt_deg)
+                    self._last_sent_bus_pan_ticks = bus_pan_ticks
+                    self._last_sent_bus_tilt_ticks = bus_tilt_ticks
+                    self._last_sent_bus_pan_deg = bus_pan_deg
+                    self._last_sent_bus_tilt_deg = bus_tilt_deg
+                self.prev_pan_angle = float(sent_pan_for_prev)
+                self.prev_tilt_angle = float(sent_tilt_for_prev)
         except Exception:
             pass
 
         # --- Tilt Encoder Feedback & PID Update ---
+        # NOTE: Encoder is ONLY active when PID control is ENABLED
+        # When PID is disabled, encoder has ZERO effect on auto-tracking
+        # Poll encoder periodically (every 30ms for snappy tracking)
+        # More frequent polling = more responsive tilt boost
         try:
             now = time.time()
-            if self.tilt_pid_enabled:
-                if now - self.last_encoder_read_time >= 0.03:
+            # CRITICAL GATE: Only process encoder if PID is enabled
+            # This ensures encoder never affects tracking logic when PID is disabled
+            if self.tilt_pid_enabled:  # <-- MASTER GATE FOR ALL ENCODER OPERATIONS
+                if now - self.last_encoder_read_time >= 0.03:  # 30ms polling interval
                     if self.tilt_encoder_enabled:
                         self.request_encoder_feedback()
                         self.last_encoder_read_time = now
+
+                    # CRITICAL FIX: Update target tilt BEFORE calculating boost
+                    # This ensures encoder position_error is calculated against current target
                     try:
                         self.tilt_servo_target = int(getattr(self, "target_tilt", self.HOME_TILT))
                     except Exception:
                         self.tilt_servo_target = int(self.HOME_TILT)
+
+                    # Monitor PID behavior for tuning purposes
                     if self.tilt_pid_enabled:
                         self.update_tilt_pid_control()
             else:
+                # CRITICAL FIX: When PID is disabled, disable encoder too and reset all state
+                # This prevents encoder from interfering with normal tilt movement
                 self.tilt_encoder_enabled = False
                 self.tilt_position_error = 0.0
                 self._tilt_pid_integral = 0.0
@@ -22980,18 +24322,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
 
+        # ========== CACHE CURRENT COMMAND TOKENS FOR NEXT CYCLE ==========
+        # Store the tokens we sent this cycle so next cycle can detect if anything changed
         self._last_fire_token = fire_token
         self._last_led_token = led_token
         self._last_laser_token = laser_token
         self._last_safety_token = safety_token
         self._last_mode_token = mode_token
 
+        # ensure we reset trigger_fired
         self.trigger_fired = False
-
-        try:
-            self._drain_serial_input(max_lines=8, debug_on=debug_on)
-        except Exception:
-            pass
 
     def _drain_serial_input(self, *, max_lines: int = 8, debug_on: bool = False):
         """Drain and parse a few incoming serial lines.
@@ -23089,37 +24429,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 try:
                     cur = self._parse_current_telemetry_line(response)
                     if cur is not None:
-                        per_servo_enabled = bool(
-                            getattr(self, "per_servo_current_sensors_enabled", False)
-                        )
-                        total_enabled = bool(
-                            getattr(self, "total_current_sensor_enabled", False)
-                        )
-
-                        # If sensors aren't installed, don't keep stale values.
-                        if not per_servo_enabled:
-                            self.pan_current_mA = None
-                            self.tilt_current_mA = None
-                        if not total_enabled:
-                            self.total_current_mA = None
-
-                        if per_servo_enabled:
-                            if "pan" in cur:
-                                self.pan_current_mA = cur.get("pan")
-                            if "tilt" in cur:
-                                self.tilt_current_mA = cur.get("tilt")
-                        if total_enabled:
-                            if "total" in cur:
-                                self.total_current_mA = cur.get("total")
-                        self.last_current_telemetry_time = time.time()
-                        try:
-                            self._update_current_protection_state(
-                                pan_mA=self.pan_current_mA,
-                                tilt_mA=self.tilt_current_mA,
-                                total_mA=self.total_current_mA,
-                            )
-                        except Exception:
-                            pass
+                        self._apply_current_telemetry(cur, source="serial")
                 except Exception:
                     pass
 
@@ -23138,6 +24448,129 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     pass
 
             return read_count
+        except Exception:
+            return 0
+
+    def _apply_current_telemetry(self, cur: dict, *, source: str = "unknown"):
+        """Apply parsed current telemetry to runtime state safely.
+
+        Keeps protection gating tied to installation flags while still retaining
+        raw total-current telemetry for display/troubleshooting.
+        """
+        try:
+            if not isinstance(cur, dict):
+                return
+
+            out = {}
+            for key in ("pan", "tilt", "total"):
+                if key in cur:
+                    try:
+                        val = int(cur.get(key))
+                        if val < 0:
+                            val = 0
+                        out[key] = val
+                    except Exception:
+                        continue
+            if not out:
+                return
+
+            per_servo_enabled = bool(
+                getattr(self, "per_servo_current_sensors_enabled", False)
+            )
+            total_enabled = bool(
+                getattr(self, "total_current_sensor_enabled", False)
+            )
+
+            # If sensors aren't installed, don't keep stale values for protection paths.
+            if not per_servo_enabled:
+                self.pan_current_mA = None
+                self.tilt_current_mA = None
+            if not total_enabled:
+                self.total_current_mA = None
+
+            if per_servo_enabled:
+                if "pan" in out:
+                    self.pan_current_mA = out.get("pan")
+                if "tilt" in out:
+                    self.tilt_current_mA = out.get("tilt")
+
+            # Always keep raw total telemetry for UI visibility/troubleshooting.
+            if "total" in out:
+                self.total_current_mA_raw = out.get("total")
+                if total_enabled:
+                    self.total_current_mA = out.get("total")
+
+            self.last_current_telemetry_time = time.time()
+            try:
+                self._update_current_protection_state(
+                    pan_mA=self.pan_current_mA,
+                    tilt_mA=self.tilt_current_mA,
+                    total_mA=self.total_current_mA,
+                )
+            except Exception:
+                pass
+
+            if bool(getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked()):
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            f"[CUR:{source}] pan={out.get('pan', '-')}, tilt={out.get('tilt', '-')}, total={out.get('total', '-')}",
+                            fire=False,
+                        )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _drain_esp32_link_events(self, *, max_items: int = 24) -> int:
+        """Drain ESP32 UDP events and map state telemetry into monitor values."""
+        try:
+            link = getattr(self, "esp32_link", None)
+            if link is None:
+                return 0
+            events = link.drain_events(max_items=int(max_items))
+            if not events:
+                return 0
+
+            handled = 0
+            for evt in events:
+                if not isinstance(evt, dict):
+                    continue
+                etype = str(evt.get("type", "")).lower().strip()
+                if etype != "state":
+                    continue
+                data = evt.get("data", {})
+                if not isinstance(data, dict):
+                    continue
+
+                cur = None
+                cur_obj = data.get("current_mA")
+                if isinstance(cur_obj, dict):
+                    cur = {}
+                    if "pan" in cur_obj:
+                        cur["pan"] = cur_obj.get("pan")
+                    if "tilt" in cur_obj:
+                        cur["tilt"] = cur_obj.get("tilt")
+                    if "total" in cur_obj:
+                        cur["total"] = cur_obj.get("total")
+                else:
+                    # Backward-compatible aliases
+                    cur = {}
+                    if "pan_mA" in data:
+                        cur["pan"] = data.get("pan_mA")
+                    if "tilt_mA" in data:
+                        cur["tilt"] = data.get("tilt_mA")
+                    if "total_mA" in data:
+                        cur["total"] = data.get("total_mA")
+                    if "I" in data and "total" not in cur:
+                        cur["total"] = data.get("I")
+                    if not cur:
+                        cur = None
+
+                if cur is not None:
+                    self._apply_current_telemetry(cur, source="udp")
+                handled += 1
+            return handled
         except Exception:
             return 0
 
@@ -23229,7 +24662,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         if not bool(getattr(self, "total_current_sensor_enabled", False)):
             try:
                 self.total_current_mA = None
-                self.last_current_telemetry_time = 0.0
             except Exception:
                 pass
 

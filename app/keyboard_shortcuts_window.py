@@ -29,7 +29,7 @@ class KeyboardShortcutsWindow(QDialog):
     def __init__(self, parent=None, main_app=None):
         super().__init__(parent)
         self.main_app = main_app
-        self.setWindowTitle("⌨️ Keyboard Shortcuts Manager")
+        self.setWindowTitle("Keyboard Shortcuts Manager")
         self.setGeometry(150, 150, 900, 700)
         self.setMinimumSize(700, 500)
         
@@ -81,7 +81,7 @@ class KeyboardShortcutsWindow(QDialog):
         layout.setSpacing(10)
         
         # Title
-        title = QLabel("⌨️ Keyboard Shortcuts Manager")
+        title = QLabel("Keyboard Shortcuts Manager")
         title_font = QFont()
         title_font.setPointSize(14)
         title_font.setBold(True)
@@ -98,9 +98,9 @@ class KeyboardShortcutsWindow(QDialog):
         self.menu_shortcuts_tab = self.create_menu_shortcuts_tab()
         self.special_functions_tab = self.create_special_functions_tab()
         
-        self.tabs.addTab(self.manual_control_tab, "🎮 Manual Control")
-        self.tabs.addTab(self.menu_shortcuts_tab, "📋 Menu & Windows")
-        self.tabs.addTab(self.special_functions_tab, "⚡ Special Functions")
+        self.tabs.addTab(self.manual_control_tab, "Manual Control")
+        self.tabs.addTab(self.menu_shortcuts_tab, "Menu & Windows")
+        self.tabs.addTab(self.special_functions_tab, "Special Functions")
         
         # Bottom buttons
         button_layout = QHBoxLayout()

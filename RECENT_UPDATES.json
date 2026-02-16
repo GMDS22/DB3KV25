@@ -3,44 +3,72 @@
   "max_items": 10,
   "items": [
     {
-      "date": "2026-02-11",
-      "title": "Workflow: Added Arduino CLI flash script and guide for ESP32 UDP firmware upload. Files: tools/flash_esp32_udp.ps1, ESP32_UDP_FLASH.md."
+      "date": "2026-02-16",
+      "title": "Current Telemetry Fix (ESP32 UDP): app now drains `esp32_link` state events each control cycle and maps `current_mA` payloads into Health Monitor telemetry. Added safe total-current display fallback when the install checkbox is off (shows live telemetry without auto-enabling protection). Also retained raw total telemetry cache to prevent blank monitor readings from stale checkbox state. Files: app/MAIN_FILE_SINGLE_CAM.py, app/ui_builder.py."
     },
     {
-      "date": "2026-02-11",
-      "title": "Firmware: Added ESP32 UDP link sketch for Arduino upload (DB3000_ESP32_UDP_Link.ino) with JSON+CRC protocol, pin map, and basic IO handling. File: arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino."
+      "date": "2026-02-16",
+      "title": "Manual control reliability + ESP32 command LED patterns: in Debug Board hybrid mode, app now auto-attempts ESP32 Wi-Fi link when sending IO (manual fire/accessories) if link is not yet open. UDP firmware now blinks onboard status LED with unique non-blocking pulse counts per command category: motion=1, fire=2, accessory=3, safety=4, mode=5. Files: app/MAIN_FILE_SINGLE_CAM.py, arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino."
     },
     {
-      "date": "2026-02-10",
-      "title": "Docs/UI: Updated Help -> Pin Assignments dialog to ESP32 DevKit v1 mapping and refreshed the pinout reference in CHANGE_IMPACT_REFERENCE.md. Files: app/MAIN_FILE_SINGLE_CAM.py, CHANGE_IMPACT_REFERENCE.md."
+      "date": "2026-02-16",
+      "title": "Connection Panel UI clarity update: renamed ESP32 fields to explicit UDP labels, clarified Local UDP Port purpose (0=Auto), added mode-based field visibility (ESP32 USB only / Debug+Wi-Fi hybrid / Dual Port), and made Connect button state mode-aware in Debug mode (Connect ESP32 Wi-Fi / Connect Debug Board / Disconnect). Files: app/MAIN_FILE_SINGLE_CAM.py."
     },
     {
-      "date": "2026-02-07",
-      "title": "Fix: Prevent settings overwrite during UI init by guarding save_settings with _loading_settings and clearing it after load. Idle Zones divisions now restore reliably (signal blocking + UI sync). Added multi-zone selection cycling and persistence. Added test_idle_zones_verification.py for end-to-end checks. Files: app/MAIN_FILE_SINGLE_CAM.py, app/idle_zones_widget.py, test_idle_zones_verification.py."
+      "date": "2026-02-16",
+      "title": "Hybrid Transport Fix: in Debug Board mode (COM9), Connect now also opens ESP32 UDP link from ESP32 Host/Port when provided, without requiring ESP32 USB serial. PAN/TILT stay on Debug Board bus serial, while IO/fire/relays/safety/mode are sent over ESP32 Wi-Fi link. Updated tooltip text to reflect this architecture. File: app/MAIN_FILE_SINGLE_CAM.py."
     },
     {
-      "date": "2026-02-07",
-      "title": "Feature: Added Idle Zones tab with a graphical pan/tilt range selector tied to live limits. Selected zone can be used as the target-loss return when idle mode is enabled (Rest behavior), with persisted divisions/selection settings. Files: app/MAIN_FILE_SINGLE_CAM.py, app/idle_zones_widget.py."
+      "date": "2026-02-16",
+      "title": "Connection State Sync Fix: centralized Connect button state refresh in app/MAIN_FILE_SINGLE_CAM.py so label/enabled state always follows real transport state (serial, debug-board bus, or ESP32 link), including startup after settings load and async connect callbacks. Prevents stale 'Disconnect' or stuck 'Connecting...' text when COM modes change (e.g., Debug Board on COM9)."
     },
     {
-      "date": "2026-02-07",
-      "title": "Critical Fix: Eliminated Auto-Tracking 'Snap-Back' by gating Target Lost hold/idle logic with tracking_active (prevents stale last_known_pan/tilt from overriding Go Home or Manual positions). Go Home and Manual no longer set _user_initiated_stop so auto-tracking can re-engage on new detections. Restored hold_window/time_since_seen locals and added test_snapback_fix.py to prevent regression. Files: app/MAIN_FILE_SINGLE_CAM.py, test_snapback_fix.py."
+      "date": "2026-02-16",
+      "title": "Connection Panel UX Fix: Connect button now supports ESP32 UDP-only mode when COM fields are blank (auto-connect/disconnect using ESP32 Host/Port/Local Port), shows a popup warning if the PC is not on ESP32 Wi-Fi subnet (192.168.4.x), and routes live control commands over ESP32 link when COM is disabled. Files: app/MAIN_FILE_SINGLE_CAM.py."
     },
     {
-      "date": "2026-02-07",
-      "title": "Critical Fix: Removed _complete_go_home unconditional re-enable callback. Fixed dual-port _home_step guard to check bus_ser too. Fixed duplicate IO send bug in dual-port (try/except/else was double-sending S/M/F/L/R/G to Nano). Bus servo failures now always logged (not gated by debug checkbox). Files: app/MAIN_FILE_SINGLE_CAM.py."
+      "date": "2026-02-16",
+      "title": "Dual Port Retarget: switched primary IO board assumptions from Nano to ESP32 (COM10) while keeping Debug Board on COM9, updated Serial Device UI labels/tooltips + connection/status wording, updated local defaults (`settings.json`), and retargeted `test_nano_io.py` defaults/messages to ESP32 IO board behavior. Added ESP32 USB-serial IO firmware sketch for dual-port accessory tokens: `arduino/DB3000_ESP32_IO_Telemetry_2026/DB3000_ESP32_IO_Telemetry_2026.ino`."
     },
     {
-      "date": "2026-02-07",
-      "title": "Finetuning: Increased 'Go Home' speed (5%→10% default) and speed limit (8→25 deg/sec) for better responsiveness. Updated default Home Tilt to 80° per user request."
+      "date": "2026-02-16",
+      "title": "Dual Board Restore: Re-enabled Nano+Debug Board serial architecture (COM-based) by restoring serial connection handlers, COM/baud + serial-device UI controls, dual-port command routing in send_serial_command (PAN/TILT -> Debug Board bus packets, IO tokens S/M/F/L/R/G -> Nano), and serial settings load/save keys. Also fixed dual-port IO duplicate-send regression risk by removing success-path fallback re-send. Files: app/MAIN_FILE_SINGLE_CAM.py, CHANGE_IMPACT_REFERENCE.md."
     },
     {
-      "date": "2026-02-07",
-      "title": "Finetuning: Improved auto-track stability with debounce (0.5s) on target loss. Added detailed debug logging for Bus Servo write failures in Dual Port mode."
+      "date": "2026-02-16",
+      "title": "Firmware/UI Compatibility: Updated arduino/DB3000_ESP32_DIRECT_DEBUGBOARD sketch to accept current app payloads/actions (config, mode, fire, fire_hold, led, laser, rapid_fire), drive local trigger/relay pins (GPIO27/GPIO13/GPIO32/GPIO33), and report matching state/caps; also synced Help -> ESP32 Pin Assignments table to UART2 debug-board topology (removed old GPIO25/26 pan/tilt PWM entries). Files: arduino/DB3000_ESP32_DIRECT_DEBUGBOARD/DB3000_ESP32_DIRECT_DEBUGBOARD.ino, app/MAIN_FILE_SINGLE_CAM.py."
     },
     {
-      "date": "2026-02-07",
-      "title": "Critical Fix: Stop Tracking is the only explicit stop. Auto-tracking re-engagement respects _user_initiated_stop and will not resume until Start Tracking clears it. Files: app/MAIN_FILE_SINGLE_CAM.py."
+      "date": "2026-02-12",
+      "title": "Firmware Fix: Fixed false CRC mismatches by copying the 'crc' string before removing it from the ArduinoJson document (prevents dangling-pointer compare). Restores reliable hb/cmd processing and ACK/state replies. File: arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino."
+    },
+    {
+      "date": "2026-02-12",
+      "title": "Firmware Fix: bus_ping now reports bridge-aware health (bridge_rx_ok) and returns ok=true when both pan/tilt channels show RX activity even without strict DS ping packet validation. File: arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino."
+    },
+    {
+      "date": "2026-02-12",
+      "title": "Firmware Fix: bus_ping UART2 baud scan now requires VALID servo ping packets before switching baud, preventing lock-on to noisy RX bytes (e.g., false 57600). If no valid ping is found, firmware reverts to default bus baud. File: arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino."
+    },
+    {
+      "date": "2026-02-12",
+      "title": "Fix: Reinstated ESP32-only control path from ESP32 BOARD UPDATE and hardened UDP control for one-way links by treating socket-open as active and sending movement commands with expect_ack=false. Files: app/MAIN_FILE_SINGLE_CAM.py, settings.json."
+    },
+    {
+      "date": "2026-02-12",
+      "title": "Firmware/Test: Added ESP32 bus-servo diagnostics and checksum auto-mode (SUB vs XOR) plus cmd(action=bus_ping) to confirm UART2/bus responsiveness; updated verifier to request bus_ping. Files: arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino, esp32_udp_command_verify.py."
+    },
+    {
+      "date": "2026-02-12",
+      "title": "Test: Added standalone ESP32 UDP communication test (hello/hb/encoder_request with CRC validation) to verify PC↔ESP32 link independent of the UI. File: esp32_udp_comm_test.py."
+    },
+    {
+      "date": "2026-02-12",
+      "title": "Fix: ESP32 Connect/Disconnect toggle now treats socket-open as an active link (even without replies), preventing repeated link threads and stale UI state. File: app/MAIN_FILE_SINGLE_CAM.py."
+    },
+    {
+      "date": "2026-02-12",
+      "title": "Fix: ESP32 UDP local port now defaults to ephemeral (0) if a privileged port is set; Connect button waits for real link status. Files: app/MAIN_FILE_SINGLE_CAM.py, settings.json."
     }
   ]
 }
