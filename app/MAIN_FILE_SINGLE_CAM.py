@@ -1425,6 +1425,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.cap = None
         self.tracking_active = False
         self.aiming_active = False
+        self._tracking_session_lock = False  # True after start_tracking(); only stop_tracking() should release
         self.manual_override = False
         self._user_initiated_stop = False # Flags explicitly stopped by user
         self.trigger_fired = False
@@ -10904,6 +10905,83 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
     # === AGENT-MANAGED BLOCK END ===
 
+    def _ensure_autotrack_autoaim_lock(self, reason: str = "") -> None:
+        """Keep tracking/aiming latched during an active tracking session.
+
+        This prevents incidental UI interactions (button clicks/settings changes)
+        from leaving tracking/aiming OFF unless the user explicitly pressed Stop.
+        """
+        try:
+            # Explicit user stop always wins.
+            if bool(getattr(self, "_user_initiated_stop", False)):
+                self._tracking_session_lock = False
+                return
+
+            # Manual/go-home ownership always wins; never fight these flows.
+            now_ts = time.time()
+            manual_suppress_active = bool(
+                float(getattr(self, "_manual_override_until", 0.0) or 0.0) > now_ts
+            )
+            if (
+                bool(getattr(self, "_in_go_home", False))
+                or bool(getattr(self, "manual_override", False))
+                or bool(getattr(self, "_manual_override_active", False))
+                or manual_suppress_active
+            ):
+                return
+
+            # Respect operator intent from the tracking toggle button.
+            # If user or a control flow turned it OFF (manual/go-home), do not re-enable.
+            tracking_btn_checked = None
+            try:
+                tracking_btn_checked = bool(
+                    self._safe_widget_method_return(
+                        "tracking_btn",
+                        "isChecked",
+                        bool(getattr(self, "tracking_active", False)),
+                    )
+                )
+            except Exception:
+                tracking_btn_checked = None
+
+            if tracking_btn_checked is False:
+                return
+
+            # Arm lock only when tracking is actually active (session started).
+            if bool(getattr(self, "tracking_active", False)):
+                self._tracking_session_lock = True
+
+            if not bool(getattr(self, "_tracking_session_lock", False)):
+                return
+
+            changed = False
+            if not bool(getattr(self, "tracking_active", False)):
+                self.tracking_active = True
+                changed = True
+            if not bool(getattr(self, "aiming_active", False)):
+                self.aiming_active = True
+                changed = True
+
+            if changed:
+                try:
+                    self._safe_widget_call("tracking_btn", "setChecked", True)
+                    self._safe_widget_call("tracking_btn", "setText", "Stop Tracking")
+                    self._safe_widget_call("aiming_btn", "setChecked", True)
+                    self._safe_widget_call("aiming_btn", "setText", "Stop Aiming")
+                except Exception:
+                    pass
+                try:
+                    if hasattr(self, "enhancer"):
+                        src = f" ({reason})" if reason else ""
+                        self.enhancer.log_serial_output(
+                            f"[STATE LOCK] Restored tracking+aiming{src}",
+                            fire=False,
+                        )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     def on_detection_mode_change(self, idx=None):
         # robust handler: accept index change signal or manual call
         try:
@@ -11055,6 +11133,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             self._safe_widget_call("aiming_btn", "setText", "Stop Aiming")
                         except Exception:
                             pass
+
+                    # Enforce session lock after mode changes to prevent unintended drop-outs.
+                    self._ensure_autotrack_autoaim_lock("mode-change")
                 except Exception:
                     pass
         except Exception as e:
@@ -13722,6 +13803,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 # best-effort save: ignore
                 print(f"Could not write settings to file: {e}")
             # self.serial_output.append("Settings saved.") # Too spammy for auto-save
+
+            # Keep active tracking/aiming latched even when frequent setting changes fire save callbacks.
+            try:
+                self._ensure_autotrack_autoaim_lock("settings-change")
+            except Exception:
+                pass
         except Exception as e:
             print(f"[WARN] Could not save settings: {e}")
             try:
@@ -15833,6 +15920,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
             # Persist settings
             self.save_settings()
+            try:
+                self._ensure_autotrack_autoaim_lock("preset-apply")
+            except Exception:
+                pass
             self.enhancer.log_serial_output(f"Applied preset: {name}", fire=False)
 
         except Exception as e:
@@ -19287,6 +19378,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self._safe_widget_call("aiming_btn", "setChecked", True)
                 except Exception:
                     pass
+
+            # Stronger lock: once a tracking session is active, keep both states latched
+            # unless user explicitly stops tracking.
+            self._ensure_autotrack_autoaim_lock("frame-loop")
         except Exception:
             try:
                 if getattr(self, "enhancer", None):
@@ -20056,6 +20151,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # applied here (host-side) so the detector remains simple.
             try:
                 if int(detection_mode) == 2 and boxes:
+                    pre_filter_boxes = list(boxes)
                     try:
                         min_area = int(
                             self._safe_int_widget_value("yolo_min_area_input", 0) or 0
@@ -20067,6 +20163,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             boxes = [
                                 b for b in boxes if (int(b[2]) * int(b[3])) >= min_area
                             ]
+                        except Exception:
+                            pass
+                        # Fail-safe: if area filter drops everything, keep original detections.
+                        # This avoids "YOLO looks dead" after an over-aggressive min-area setting.
+                        try:
+                            if (not boxes) and pre_filter_boxes:
+                                boxes = pre_filter_boxes
+                                now_warn = time.time()
+                                last_warn = float(getattr(self, "_yolo_min_area_warn_ts", 0.0) or 0.0)
+                                if now_warn - last_warn >= 2.0:
+                                    self._yolo_min_area_warn_ts = now_warn
+                                    if hasattr(self, "enhancer"):
+                                        self.enhancer.log_serial_output(
+                                            f"[YOLO] Min Area ({min_area}) filtered all boxes - using unfiltered detections",
+                                            fire=False,
+                                        )
                         except Exception:
                             pass
                     try:
@@ -25129,6 +25241,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     def start_tracking(self):
         """Enable tracking process."""
         self._user_initiated_stop = False  # Clear explicit stop flag
+        self._tracking_session_lock = True
         # CHANGE WARNING:
         # Modifications here affect tracking/aiming state ownership and command flow.
         # See CHANGE_IMPACT_REFERENCE.md → Code-Level Change Enforcement.
@@ -25314,8 +25427,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             if model_name:
                                 try:
                                     print(f"[YOLO-INIT] Starting model load in background: {model_name}")
-                                    self.yolo_detector.load_model(model_name)
-                                    print(f"[YOLO-INIT] Model loaded successfully")
+                                    ok = bool(self.yolo_detector.load_model(model_name))
+                                    if ok and bool(getattr(self.yolo_detector, "model_loaded", False)):
+                                        print(f"[YOLO-INIT] Model loaded successfully")
+                                    else:
+                                        print(f"[YOLO-INIT] Model load failed")
                                 except Exception as e:
                                     print(f"[YOLO-INIT] Error loading model: {e}")
                                     pass
@@ -25364,6 +25480,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     def stop_tracking(self):
         """Disable tracking process."""
         self._user_initiated_stop = True  # Set explicit stop flag to prevent auto-resume
+        self._tracking_session_lock = False
         self.tracking_active = False
         # CRITICAL FIX: Disable aiming when tracking stops (keep them in sync)
         self.aiming_active = False

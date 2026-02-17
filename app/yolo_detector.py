@@ -1,5 +1,8 @@
 import os
 import time
+import sys
+import site
+from pathlib import Path
 
 # CHANGE WARNING:
 # Keep this module's YOLO inference behavior in sync with
@@ -11,6 +14,61 @@ import time
 # drivers/PyTorch CUDA support may be missing (common on some AMD/Windows setups).
 YOLO = None
 _HAS_ULTRALYTICS = False
+
+
+def _prepare_windows_torch_dll_path() -> None:
+    """Best-effort DLL search path setup for torch on Windows.
+
+    Some environments fail with WinError 1114 while importing torch/ultralytics
+    unless torch's native DLL folder is explicitly added.
+    """
+    try:
+        if os.name != "nt":
+            return
+
+        candidate_dirs = []
+
+        # Interpreter-local venv path first
+        try:
+            exe = Path(sys.executable)
+            candidate_dirs.append(exe.parent.parent / "Lib" / "site-packages" / "torch" / "lib")
+        except Exception:
+            pass
+
+        # Site package locations
+        try:
+            for sp in list(site.getsitepackages()) + [site.getusersitepackages()]:
+                candidate_dirs.append(Path(sp) / "torch" / "lib")
+        except Exception:
+            pass
+
+        seen = set()
+        for dll_dir in candidate_dirs:
+            try:
+                p = str(Path(dll_dir).resolve())
+            except Exception:
+                p = str(dll_dir)
+            if not p or p in seen:
+                continue
+            seen.add(p)
+            if not os.path.isdir(p):
+                continue
+
+            try:
+                if hasattr(os, "add_dll_directory"):
+                    os.add_dll_directory(p)
+            except Exception:
+                pass
+
+            try:
+                cur_path = os.environ.get("PATH", "")
+                parts = cur_path.split(os.pathsep) if cur_path else []
+                if p not in parts:
+                    os.environ["PATH"] = p + os.pathsep + cur_path if cur_path else p
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 
 class YoloDetector:
@@ -57,43 +115,55 @@ class YoloDetector:
         # self.models_dir) or a full/relative path to a .pt file. If the
         # requested model matches the currently-loaded path, treat as a no-op.
         try:
+            try:
+                _prepare_windows_torch_dll_path()
+            except Exception:
+                pass
             # Lazy-import ultralytics here so we can control environment
             # variables (for example forcing CPU) before the import occurs.
             global YOLO, _HAS_ULTRALYTICS
-            # Respect an explicit environment opt-in to use the GPU. By
-            # default we force CPU-only to maximize compatibility on systems
-            # (like many AMD/Windows machines) where CUDA is not available.
+            # Respect explicit opt-in for GPU behavior.
             use_gpu = str(os.environ.get("TURRET_USE_GPU", "0")).lower() in (
                 "1",
                 "true",
                 "yes",
             )
             saved_cuda_vis = os.environ.get("CUDA_VISIBLE_DEVICES", None)
-            if not use_gpu:
-                # Force CPU-only import path for PyTorch by hiding CUDA devices.
-                os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
+            # Try normal import first (most stable on Windows/CPU-only setups).
+            import_exc = None
             try:
                 from ultralytics import YOLO as _YOLO  # type: ignore
 
                 YOLO = _YOLO
                 _HAS_ULTRALYTICS = True
             except Exception as e:
-                # Restore environment before returning
-                if saved_cuda_vis is None:
-                    os.environ.pop("CUDA_VISIBLE_DEVICES", None)
-                else:
-                    os.environ["CUDA_VISIBLE_DEVICES"] = saved_cuda_vis
-                print(f"[YOLO] ultralytics import failed: {e}")
+                import_exc = e
+
+            # Fallback: CPU-forced import path only when normal import failed.
+            if YOLO is None and (not use_gpu):
+                try:
+                    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+                    from ultralytics import YOLO as _YOLO  # type: ignore
+
+                    YOLO = _YOLO
+                    _HAS_ULTRALYTICS = True
+                    import_exc = None
+                except Exception as e:
+                    import_exc = e
+                finally:
+                    if saved_cuda_vis is None:
+                        os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+                    else:
+                        os.environ["CUDA_VISIBLE_DEVICES"] = saved_cuda_vis
+
+            if YOLO is None:
+                print(f"[YOLO] ultralytics import failed: {import_exc}")
                 self.model = None
                 self.model_name = None
                 self.model_loaded = False
                 self.model_path = None
                 return False
-            # restore original CUDA_VISIBLE_DEVICES now that import completed
-            if saved_cuda_vis is None:
-                os.environ.pop("CUDA_VISIBLE_DEVICES", None)
-            else:
-                os.environ["CUDA_VISIBLE_DEVICES"] = saved_cuda_vis
             # Determine candidate model path
             candidate = model_name or ""
             # If model_name looks like a path or the file exists as given, use it
@@ -166,13 +236,11 @@ class YoloDetector:
             if classes_str is None:
                 self.target_classes = []
                 return
-            # If caller passed a list/iterable of strings, handle that
             if isinstance(classes_str, (list, tuple, set)):
                 self.target_classes = [
                     str(c).strip().lower() for c in classes_str if str(c).strip()
                 ]
                 return
-            # Otherwise assume a comma-separated string
             s = str(classes_str)
             if not s.strip():
                 self.target_classes = []
@@ -181,37 +249,63 @@ class YoloDetector:
                     c.strip().lower() for c in s.split(",") if c.strip()
                 ]
         except Exception:
-            # On any error, fall back to empty list
             self.target_classes = []
 
     def detect(self, frame, confidence=0.5, ignore_target_classes=False, return_class_names=False):
-        """
-        Runs object detection on a single frame.
-
-        Args:
-            frame: The image frame to process.
-            confidence (float): The confidence threshold for detections.
-            ignore_target_classes (bool): If True, detects all objects regardless
-                                          of the self.target_classes list.
-            return_class_names (bool): If True, returns a tuple (detections, class_names).
-                                       If False (default), returns only the detections list
-                                       for backward compatibility.
-        """
+        """Run object detection on a single frame."""
         if self.model is None:
             return ([], []) if return_class_names else []
 
         results = self.model(frame, stream=True, verbose=False)
+
+        # Build a normalized set of class names available in the current model.
+        # If user-configured target classes do not exist in this model, fall back
+        # to all classes so detection never appears "dead" after model/settings changes.
+        use_class_filter = (not bool(ignore_target_classes)) and bool(self.target_classes)
+        target_class_set = set()
+        try:
+            model_names = getattr(self.model, "names", {})
+            if isinstance(model_names, dict):
+                available_class_set = {
+                    str(v).strip().lower() for v in model_names.values() if str(v).strip()
+                }
+            else:
+                available_class_set = {
+                    str(v).strip().lower() for v in model_names if str(v).strip()
+                }
+            target_class_set = {
+                str(v).strip().lower() for v in self.target_classes if str(v).strip()
+            }
+            if use_class_filter:
+                valid_target_set = target_class_set & available_class_set
+                if valid_target_set:
+                    target_class_set = valid_target_set
+                else:
+                    use_class_filter = False
+                    try:
+                        warn_key = (
+                            tuple(sorted(target_class_set)),
+                            tuple(sorted(available_class_set)),
+                        )
+                        if getattr(self, "_last_invalid_class_warn_key", None) != warn_key:
+                            self._last_invalid_class_warn_key = warn_key
+                            print(
+                                "[YOLO] Target classes not found in current model; "
+                                "falling back to all classes"
+                            )
+                    except Exception:
+                        pass
+        except Exception:
+            use_class_filter = False
+
         detections = []
         class_names_detected = []
         for r in results:
             for box in r.boxes:
-                # Get class name
                 cls_id = int(box.cls[0])
                 class_name = self.model.names[cls_id].lower()
-
-                # Filter by confidence and optionally by target class
                 if box.conf[0] > confidence:
-                    if ignore_target_classes or (not self.target_classes or class_name in self.target_classes):
+                    if (not use_class_filter) or (class_name in target_class_set):
                         x1, y1, x2, y2 = box.xyxy[0]
                         detections.append((int(x1), int(y1), int(x2 - x1), int(y2 - y1)))
                         class_names_detected.append(class_name)

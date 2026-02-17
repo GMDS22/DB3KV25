@@ -44,6 +44,26 @@ class QuietIOWrapper(io.TextIOWrapper):
 sys.stderr = QuietIOWrapper(sys.stderr)
 
 
+def _preload_torch_runtime() -> bool:
+    """Preload torch before Qt/OpenCV-heavy app imports.
+
+    On some Windows setups, importing torch after cv2/PyQt may fail with
+    WinError 1114 (c10.dll init). Preloading torch early in the launcher
+    stabilizes runtime loading without changing app logic.
+    """
+    try:
+        import torch  # noqa: F401
+
+        return True
+    except Exception as e:
+        try:
+            err = getattr(sys.stderr, "original", sys.__stderr__)
+            err.write(f"[BOOT] Torch preload failed: {e}\n")
+        except Exception:
+            pass
+        return False
+
+
 def _install_crash_logger() -> str:
     """Install a crash logger so PyQt slot exceptions produce a traceback."""
     repo_root = os.path.dirname(os.path.abspath(__file__))
@@ -101,6 +121,9 @@ print("=" * 60)
 
 # Install crash logger before running PyQt main
 crash_log_path = _install_crash_logger()
+
+# Preload torch runtime before app imports (import-order stability fix)
+_preload_torch_runtime()
 
 # Run main application
 if __name__ == "__main__":
