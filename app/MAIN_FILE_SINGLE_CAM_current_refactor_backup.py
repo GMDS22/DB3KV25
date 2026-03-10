@@ -926,8 +926,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.idle_zone_enable_checkbox.setChecked(
                         bool(getattr(self, "idle_zone_return_enabled", False))
                     )
-                    self.idle_zone_multi_select_checkbox.setChecked(True)
-                    self.idle_zones_widget.set_multi_select(True)
+                    idle_multi = bool(getattr(self, "idle_zone_multi_select_enabled", True))
+                    self.idle_zone_multi_select_checkbox.setChecked(idle_multi)
+                    self.idle_zones_widget.set_multi_select(idle_multi)
                 except Exception:
                     pass
 
@@ -1678,6 +1679,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.idle_zone_selected_pan = 1
         self.idle_zone_selected_tilt = 1
         self.idle_zone_selected_list = [(1, 1)]
+        self.idle_zone_multi_select_enabled = True
         self._idle_zone_cycle_index = 0
 
         # Manual control and overrides
@@ -1687,7 +1689,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.idle_modes = None
         self.idle_settings_window = None
         self.home_screen_timer = None
-        # Re-enabled after fixing recursion issue
         if IdleModes is not None and not getattr(self, "_disable_idle_modes", False):
             self.idle_modes = IdleModes()
         elif IdleModes is not None and getattr(self, "_disable_idle_modes", False):
@@ -1704,8 +1705,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.flip_pan_direction = False
         self.flip_tilt_direction = False
         # Internal guard to enforce indefinite hold behavior
-        # FIX-PERM: HOLD_ON_LOSS_v1 - Do not remove this guard
-        self._hold_infinite_active = False
         # Hold target when lost: seconds to hold last-known position before allowing idle behavior
         self.lost_hold_seconds = 5.0
         
@@ -1729,6 +1728,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.locked_pan_angle = None  # Authoritative world-locked pan angle for aim-lock
         self.locked_tilt_angle = None  # Authoritative world-locked tilt angle for aim-lock
         self.locked_target_box_size = (0, 0)  # (w, h) used to render the red aim-lock box
+        self._recently_fired_target_center = None
+        self._recently_fired_target_radius_px = 0.0
+        self._recently_fired_target_until = 0.0
         self._aim_lock_acquired_at = 0.0
         self.aim_lock_timeout_s = 2.5  # Auto-clear lock if aim goal does not complete in time
         self.aim_lock_suspend_detection_updates = False  # Fallback strategy; preferred default is live detection + ignored aim updates
@@ -7675,6 +7677,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     except Exception:
                         pass
 
+                # YOLO Trainer action
+                yolo_trainer_action = tools_menu.addAction("🤖 YOLO Trainer")
+                try:
+                    def open_yolo_trainer_menu():
+                        try:
+                            self.open_yolo_trainer()
+                        except Exception as e:
+                            try:
+                                if hasattr(self, "enhancer") and self.enhancer:
+                                    self.enhancer.log_serial_output(f"YOLO Trainer error: {e}", fire=False)
+                            except Exception:
+                                print(f"YOLO Trainer error: {e}")
+                    yolo_trainer_action.triggered.connect(open_yolo_trainer_menu)
+                except Exception:
+                    pass
+
                 # Dump logs action
                 self.dump_logs_action = cast(Any, tools_menu.addAction("Dump State Log to file..."))
 
@@ -13537,6 +13555,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 self.idle_zone_selected_list = cleaned
                     except Exception:
                         pass
+                    try:
+                        self.idle_zone_multi_select_enabled = bool(
+                            settings.get(
+                                "idle_zone_multi_select_enabled",
+                                getattr(self, "idle_zone_multi_select_enabled", True),
+                            )
+                        )
+                    except Exception:
+                        self.idle_zone_multi_select_enabled = bool(
+                            getattr(self, "idle_zone_multi_select_enabled", True)
+                        )
                     if not getattr(self, "idle_zone_selected_list", None):
                         self.idle_zone_selected_list = [(self.idle_zone_selected_pan, self.idle_zone_selected_tilt)]
 
@@ -13567,6 +13596,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     self.idle_zone_tilt_divisions_combo.blockSignals(False)
                                 except Exception:
                                     pass
+                        if getattr(self, "idle_zone_multi_select_checkbox", None) is not None:
+                            self.idle_zone_multi_select_checkbox.setChecked(
+                                bool(getattr(self, "idle_zone_multi_select_enabled", True))
+                            )
                     except Exception:
                         pass
 
@@ -13574,6 +13607,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         if getattr(self, "idle_zones_widget", None) is not None:
                             self.idle_zones_widget.set_limits(self.PAN_MIN, self.PAN_MAX, self.TILT_MIN, self.TILT_MAX)
                             self.idle_zones_widget.set_divisions(self.idle_zone_pan_divisions, self.idle_zone_tilt_divisions)
+                            self.idle_zones_widget.set_multi_select(
+                                bool(getattr(self, "idle_zone_multi_select_enabled", True))
+                            )
                             self.idle_zones_widget.set_selected_zones(
                                 list(getattr(self, "idle_zone_selected_list", []) or []),
                                 emit=False,
@@ -14165,6 +14201,13 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "idle_zone_selected_pan": int(getattr(self, "idle_zone_selected_pan", 1)),
                 "idle_zone_selected_tilt": int(getattr(self, "idle_zone_selected_tilt", 1)),
                 "idle_zone_selected_list": list(getattr(self, "idle_zone_selected_list", [])),
+                "idle_zone_multi_select_enabled": bool(
+                    val(
+                        "idle_zone_multi_select_checkbox",
+                        bool(getattr(self, "idle_zone_multi_select_enabled", True)),
+                        "checked",
+                    )
+                ),
                 # Rapid-fire MOSFET settings
                 "rapid_fire_rate_hz": val("rapid_fire_rate_spin", getattr(self, "rapid_fire_rate_hz", 1)),
                 "rapid_fire_enabled": val("rapid_fire_enable_checkbox", getattr(self, "rapid_fire_enabled", False), "checked"),
@@ -14234,6 +14277,36 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             return settings
 
         try:
+            try:
+                widget = getattr(self, "idle_zones_widget", None)
+                if widget is not None:
+                    try:
+                        selected_zones = list(widget.get_selected_zones())
+                    except Exception:
+                        selected_zones = []
+                    cleaned_zones = []
+                    for item in selected_zones:
+                        try:
+                            pan_idx, tilt_idx = item
+                            cleaned_zones.append((int(pan_idx), int(tilt_idx)))
+                        except Exception:
+                            pass
+                    if cleaned_zones:
+                        self.idle_zone_selected_list = cleaned_zones
+                        self.idle_zone_selected_pan, self.idle_zone_selected_tilt = cleaned_zones[-1]
+            except Exception:
+                pass
+            try:
+                self.idle_zone_multi_select_enabled = bool(
+                    self._safe_widget_method_return(
+                        "idle_zone_multi_select_checkbox",
+                        "isChecked",
+                        getattr(self, "idle_zone_multi_select_enabled", True),
+                    )
+                )
+            except Exception:
+                pass
+
             settings = get_settings_dict()
             settings_path = self.SETTINGS_FILE
             try:
@@ -17454,7 +17527,64 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             return False
 
+    def _clear_pending_fire_outputs(self, reason: str = "") -> None:
+        """Force fire-related outputs low before non-fire control changes are sent."""
+        try:
+            self.trigger_fired = False
+        except Exception:
+            pass
+        try:
+            self._firing_start_time = 0.0
+        except Exception:
+            pass
+        try:
+            if bool(getattr(self, "rapid_fire_timer_active", False)):
+                self.stop_rapid_fire()
+        except Exception:
+            pass
+        try:
+            self.mosfet_hold_active = False
+        except Exception:
+            pass
+        try:
+            btn = getattr(self, "mosfet_hold_btn", None)
+            if btn is not None:
+                try:
+                    btn.blockSignals(True)
+                except Exception:
+                    pass
+                try:
+                    btn.setChecked(False)
+                except Exception:
+                    pass
+                try:
+                    btn.setText("MOSFET: OFF")
+                except Exception:
+                    pass
+                try:
+                    btn.blockSignals(False)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            self._force_send_next_command = True
+        except Exception:
+            pass
+        try:
+            if reason and getattr(self, "enhancer", None) is not None:
+                self.enhancer.log_serial_output(
+                    f"[FIRE-SAFE] Cleared pending fire outputs ({reason})",
+                    fire=False,
+                )
+        except Exception:
+            pass
+
     def set_trigger_mode(self, index):
+        try:
+            self._clear_pending_fire_outputs("trigger-mode-change")
+        except Exception:
+            pass
         self.trigger_mode_bb = index == 1
         mode_text = (
             "Projectile (BB/Servo)" if self.trigger_mode_bb else "Water (MOSFET)"
@@ -17859,6 +17989,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         else:  # Called from old safety button
             self.safety_state = 1 - getattr(self, "safety_state", 1)
 
+        try:
+            self._clear_pending_fire_outputs("safety-toggle")
+        except Exception:
+            pass
+
         if self.safety_state == 1:  # LOCKED/SAFE
             self.safety_button.setText("Safety: LOCKED (No Fire)")
             self.safety_button.setChecked(False)  # Button appears unpressed when safe
@@ -17955,6 +18090,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         """Manual fire button (momentary). Only fires if safety allows it."""
         if state == 1:
             if self.safety_state == 0:
+                if not bool(self._ensure_fire_transport_ready()):
+                    return
                 self.trigger_fired = True
                 self.enhancer.log_serial_output("MANUAL FIRE: TRIGGERED", fire=True)
                 self.enhancer.play_fire()
@@ -18292,8 +18429,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
 
-    def _is_yellow_dot_in_deadzone(self) -> bool:
-        """True only when the active aiming target is within the deadzone radius."""
+    def _are_deadzones_overlapping(self) -> bool:
+        """True when the active aim-lock target center is inside the center deadzone."""
         try:
             target = self._get_active_aim_target_center()
             if not target:
@@ -18303,13 +18440,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             h = float(getattr(self, "frame_height", 480))
             cx = w / 2.0
             cy = h / 2.0
-            deadzone_val = float(self._safe_int_widget_value("deadzone_slider", 40))
+            deadzone_radius = float(self._safe_int_widget_value("deadzone_slider", 40))
 
             tx = float(target[0])
             ty = float(target[1])
 
-            dist = float(((tx - cx) ** 2 + (ty - cy) ** 2) ** 0.5)
-            return dist <= deadzone_val
+            distance = float(((tx - cx) ** 2 + (ty - cy) ** 2) ** 0.5)
+
+            return distance <= deadzone_radius
         except Exception:
             return False
 
@@ -18468,30 +18606,106 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             return None
 
     def _get_active_aim_target_center(self):
-        """Return the active aiming target center, preferring the projected world-lock marker."""
+        """Return the active world-lock target center used by aiming/trigger logic."""
+        try:
+            if not bool(getattr(self, "aim_lock_active", False)):
+                return None
+        except Exception:
+            return None
         try:
             world_target = self._get_world_lock_screen_target()
             if world_target is not None:
-                self.locked_target_center = (float(world_target[0]), float(world_target[1]))
-                return self.locked_target_center
+                return float(world_target[0]), float(world_target[1])
         except Exception:
             pass
         try:
-            if getattr(self, "last_target_center", None) and (
-                bool(getattr(self, "target_locked", False))
-                or bool(getattr(self, "last_detections", None))
-            ):
-                return (
-                    float(self.last_target_center[0]),
-                    float(self.last_target_center[1]),
-                )
+            locked_center = getattr(self, "locked_target_center", None)
+            if locked_center is not None:
+                return (float(locked_center[0]), float(locked_center[1]))
         except Exception:
             pass
         return None
 
+    def _get_active_aim_visual_center(self):
+        """Return the frozen screen-space center used to draw the red aim-lock box."""
+        try:
+            if not bool(getattr(self, "aim_lock_active", False)):
+                return None
+            locked_center = getattr(self, "locked_target_center", None)
+            if locked_center is None:
+                return None
+            return float(locked_center[0]), float(locked_center[1])
+        except Exception:
+            return None
+
+    def _get_recent_fire_relock_window_s(self) -> float:
+        """Return the short suppression window that blocks immediate re-lock after a shot."""
+        try:
+            cooldown_s = float(self._safe_float_widget_value("trigger_cooldown_input", 1.5))
+        except Exception:
+            cooldown_s = 1.5
+        try:
+            detection_pause_s = float(getattr(self, "detection_pause_ms", 0) or 0) / 1000.0
+        except Exception:
+            detection_pause_s = 0.0
+        return float(np.clip(max(1.5, cooldown_s, detection_pause_s), 1.5, 6.0))
+
+    def _mark_recently_fired_aim_target(self) -> None:
+        """Remember the just-fired lock so the same target does not instantly reacquire."""
+        try:
+            center = self._get_active_aim_visual_center()
+            if center is None:
+                center = self._get_active_aim_target_center()
+            if center is None:
+                return
+
+            try:
+                box_w, box_h = getattr(self, "locked_target_box_size", (0, 0))
+            except Exception:
+                box_w, box_h = (0, 0)
+            try:
+                deadzone_radius = float(self._safe_int_widget_value("deadzone_slider", 40))
+            except Exception:
+                deadzone_radius = 40.0
+
+            suppression_radius = max(
+                30.0,
+                deadzone_radius * 1.5,
+                float(box_w) * 0.75,
+                float(box_h) * 0.75,
+            )
+            self._recently_fired_target_center = (float(center[0]), float(center[1]))
+            self._recently_fired_target_radius_px = float(suppression_radius)
+            self._recently_fired_target_until = time.time() + self._get_recent_fire_relock_window_s()
+        except Exception:
+            pass
+
+    def _aim_lock_reacquire_blocked(self, cx: float, cy: float) -> bool:
+        """Return True when a new lock attempt is too close to a target we just fired at."""
+        try:
+            until = float(getattr(self, "_recently_fired_target_until", 0.0) or 0.0)
+            center = getattr(self, "_recently_fired_target_center", None)
+            radius = float(getattr(self, "_recently_fired_target_radius_px", 0.0) or 0.0)
+            if until <= 0.0 or center is None or radius <= 0.0:
+                return False
+            now = time.time()
+            if now > until:
+                self._recently_fired_target_center = None
+                self._recently_fired_target_radius_px = 0.0
+                self._recently_fired_target_until = 0.0
+                return False
+            dx = float(cx) - float(center[0])
+            dy = float(cy) - float(center[1])
+            distance = float((dx * dx + dy * dy) ** 0.5)
+            return bool(distance <= radius)
+        except Exception:
+            return False
+
     def _capture_aim_lock(self, cx: float, cy: float, w: float, h: float, reason: str = "") -> None:
         """Latch a world-locked aim target from the current selected detection."""
         try:
+            if bool(self._aim_lock_reacquire_blocked(float(cx), float(cy))):
+                return
             world_target = self._screen_target_to_world_angles(cx, cy)
             if world_target is None:
                 return
@@ -19326,6 +19540,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         pass
                 return False
 
+            if not bool(self._ensure_fire_transport_ready()):
+                return False
+
             cooldown = float(self._safe_float_widget_value("trigger_cooldown_input", 1.5))
             now = time.time()
             if (now - float(getattr(self, "last_trigger_time", 0.0) or 0.0)) < cooldown:
@@ -19340,43 +19557,42 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
             self.last_trigger_time = now
 
-            # Fire ON
-            self.trigger_fired = True
             try:
-                # Ensure the one-shot flag change is transmitted even if pan/tilt are unchanged.
                 self._force_send_next_command = True
             except Exception:
                 pass
             try:
-                self.send_serial_command()
+                self.set_fire_state(1)
             except Exception:
-                pass
+                try:
+                    self.trigger_fired = True
+                    self.send_serial_command()
+                except Exception:
+                    pass
             try:
                 if reason and hasattr(self, "enhancer"):
                     self.enhancer.log_serial_output(reason, fire=True)
             except Exception:
                 pass
-            try:
-                self._pulse_fire_indicator()
-            except Exception:
-                pass
 
-            # Schedule release (F0). Do not fight MOSFET Hold or Rapid-Fire timer.
             def _release() -> None:
                 try:
                     if bool(getattr(self, "mosfet_hold_active", False)):
                         return
                     if bool(getattr(self, "rapid_fire_timer_active", False)):
                         return
-                    self.trigger_fired = False
                     try:
                         self._force_send_next_command = True
                     except Exception:
                         pass
                     try:
-                        self.send_serial_command()
+                        self.set_fire_state(0)
                     except Exception:
-                        pass
+                        try:
+                            self.trigger_fired = False
+                            self.send_serial_command()
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 
@@ -19390,6 +19606,61 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     pass
 
             return True
+        except Exception:
+            return False
+
+    def _ensure_fire_transport_ready(self) -> bool:
+        """Return True only when a fire-capable transport is available right now."""
+        try:
+            if bool(getattr(self, "serial_tx_paused", False)):
+                try:
+                    if getattr(self, "enhancer", None) is not None:
+                        self.enhancer.log_serial_output(
+                            "[FIRE] Blocked: TX is paused.",
+                            fire=False,
+                        )
+                except Exception:
+                    pass
+                return False
+
+            primary_open = bool(self.ser is not None and getattr(self.ser, "is_open", False))
+            link_open = bool(
+                getattr(self, "esp32_link", None) is not None
+                and self.esp32_link.is_open()
+            )
+
+            if self._serial_is_dual_port():
+                transport_ready = bool(primary_open)
+                blocked_reason = "[FIRE] Blocked: Dual Port mode requires the primary IO serial connection for fire/IO tokens."
+            elif self._serial_is_debug_board_bus():
+                transport_ready = bool(link_open)
+                if not transport_ready:
+                    try:
+                        self._connect_esp32_link_from_panel()
+                    except Exception:
+                        pass
+                    transport_ready = bool(
+                        getattr(self, "esp32_link", None) is not None
+                        and self.esp32_link.is_open()
+                    )
+                blocked_reason = "[FIRE] Blocked: Debug Board mode sends fire/IO over the ESP32 link, not the bus-servo COM port."
+            else:
+                transport_ready = bool(primary_open or link_open)
+                blocked_reason = "[FIRE] Blocked: No ESP32 serial/UDP transport is open for fire/IO commands."
+
+            if transport_ready:
+                return True
+
+            now = time.time()
+            last = float(getattr(self, "_last_fire_transport_log_time", 0.0) or 0.0)
+            if (now - last) >= 1.0:
+                self._last_fire_transport_log_time = now
+                try:
+                    if getattr(self, "enhancer", None) is not None:
+                        self.enhancer.log_serial_output(blocked_reason, fire=False)
+                except Exception:
+                    pass
+            return False
         except Exception:
             return False
 
@@ -19441,18 +19712,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.rapid_fire_timer_active = True
 
             # Check if target is in deadzone before initial pulse
-            in_deadzone = bool(self._is_yellow_dot_in_deadzone())
+            in_deadzone = bool(self._are_deadzones_overlapping())
 
             # Only fire initial pulse if target is in deadzone
             if in_deadzone:
                 try:
-                    self._rapid_fire_on = True
-                    self.trigger_fired = True
-                    # send an immediate on-command
-                    try:
-                        self.send_serial_command()
-                    except Exception:
-                        pass
+                    if bool(self._ensure_fire_transport_ready()):
+                        self._rapid_fire_on = True
+                        self.trigger_fired = True
+                        # send an immediate on-command
+                        try:
+                            self.send_serial_command()
+                        except Exception:
+                            pass
+                    else:
+                        self._rapid_fire_on = False
+                        self.trigger_fired = False
                 except Exception:
                     pass
             else:
@@ -19529,7 +19804,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 return
 
             # First check if target is in deadzone before firing
-            in_deadzone = bool(self._is_yellow_dot_in_deadzone())
+            in_deadzone = bool(self._are_deadzones_overlapping())
 
             # Only proceed with firing cycle if target is in deadzone
             if not in_deadzone:
@@ -19571,12 +19846,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 else:
                     # OFF -> switch to ON (already verified target is in deadzone)
                     try:
-                        self._rapid_fire_on = True
-                        self.trigger_fired = True
-                        try:
-                            self.send_serial_command()
-                        except Exception:
-                            pass
+                        if bool(self._ensure_fire_transport_ready()):
+                            self._rapid_fire_on = True
+                            self.trigger_fired = True
+                            try:
+                                self.send_serial_command()
+                            except Exception:
+                                pass
+                        else:
+                            self._rapid_fire_on = False
+                            self.trigger_fired = False
                         # schedule next OFF after on interval
                         try:
                             next_ms = getattr(self, "_rapid_on_ms", 1)
@@ -20477,6 +20756,23 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             
             # Center dot
             cv2.circle(frame, (center_x, center_y), 3, crosshair_color, -1)
+
+            # Center white box: persistent scope reference marker around the deadzone.
+            try:
+                center_box_half = max(
+                    int(gap) + 4,
+                    int(max(12, self._safe_int_widget_value("deadzone_slider", 40))),
+                )
+            except Exception:
+                center_box_half = max(int(gap) + 4, 12)
+            cv2.rectangle(
+                frame,
+                (center_x - center_box_half, center_y - center_box_half),
+                (center_x + center_box_half, center_y + center_box_half),
+                HUD_WHITE,
+                1,
+                cv2.LINE_AA,
+            )
             
             # Scope ring
             scope_radius = int(min(h, w) * scope_radius_pct)
@@ -20499,8 +20795,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 cv2.line(frame, (cx - 15, cy), (cx + 15, cy), HUD_GRAY, 2)
                 cv2.line(frame, (cx, cy - 15), (cx, cy + 15), HUD_GRAY, 2)
             
-            # Distance rings
-            for radius in [scope_radius // 2, scope_radius * 3 // 4]:
+            # Distance rings: outer scope circle plus three internal grey guides.
+            for radius in [scope_radius // 4, scope_radius // 2, scope_radius * 3 // 4]:
                 cv2.circle(frame, (center_x, center_y), radius, (80, 80, 80), 1)
             
             # ========== HUD ELEMENTS (Grid Layout) ==========
@@ -20611,8 +20907,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             traceback.print_exc()
             return frame
 
-    def update_frame(self):
-        # Calculate FPS for Health Monitor
+    def _update_frame_update_perf_metrics(self) -> None:
         try:
             now_t = time.time()
             if hasattr(self, "_last_frame_perf_time"):
@@ -20622,6 +20917,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self._last_frame_perf_time = now_t
         except Exception:
             pass
+
+    def update_frame(self):
+        self._update_frame_update_perf_metrics()
+        self._update_frame_core_cycle()
+
+    def _update_frame_prepare_cycle_state(self):
 
         # CHANGE WARNING:
         # Modifications here affect frame processing, tracking flow, and runtime state.
@@ -21258,7 +21559,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             )
         except Exception:
             new_tilt = float(getattr(self, "prev_tilt_angle", 40))
+        return frame1, frame2, operator_hold_active, new_pan, new_tilt
 
+    def _update_frame_run_detection_pipeline(self, frame1, frame2):
         # --- Detection Mode Logic ---
         detection_mode = int(self._safe_current_index("detection_mode_combo", 0) or 0)
 
@@ -22709,7 +23012,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         )
                 except Exception:
                     pass
+        return (
+            detection_mode,
+            boxes,
+            prediction_yolo_required,
+            contours_raw,
+            contours_filtered,
+            fg_nonzero,
+            yolo_boxes_len,
+        )
 
+    def _update_frame_advance_home_return(self, new_pan, new_tilt):
         # If we're in a slow Go-Home sequence, progress an interpolation step
         try:
             if (
@@ -22792,16 +23105,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         pass
         except Exception:
             pass
+        return new_pan, new_tilt
 
-    # --- Unified Target Handling (applies to FrameDiff, BackSub, YOLO) ---
-        # Any detection mode that produced `boxes` should follow the same
-        # target selection, locking, smoothing, and hold-on-loss behavior.
-        # If the detection pipeline produced no boxes for this frame but
-        # there exists a recently-seen `last_detections` value, reuse it so
-        # downstream logic (locking / auto-fire) can operate on the most
-        # recently-observed detection. This is useful for tests that inject
-        # `last_detections` directly and for brief frames where the detector
-        # may have missed the object but recent state indicates a valid target.
+    def _tracking_reuse_recent_boxes(self, boxes):
+        # Reuse a recent detection briefly so downstream tracking can hold continuity.
         try:
             self._boxes_are_reused = False
             frozen_detections = [tuple(int(v) for v in d[:4]) for d in list(getattr(self, "last_detections", []) or [])]
@@ -22820,54 +23127,74 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     last_seen = 0.0
                     hold_window = 5.0
 
-                # Only reuse last_detections if it was seen recently (within hold window)
                 if (now_check - last_seen) <= hold_window:
                     boxes = list(frozen_detections)
-                    # Mark strictly as REUSED so we don't extend the hold window below
                     self._boxes_are_reused = True
-                else:
-                    self._boxes_are_reused = False
-
         except Exception:
-            # Fall through to the unified handling below
             self._boxes_are_reused = False
 
+        return boxes
+
+    def _tracking_update_detect_status_label(self, boxes):
         try:
-            # Update small detect status label if present so operator sees current counts
-            try:
-                if getattr(self, "yolo_detect_status_label", None) is not None:
-                    try:
-                        self.yolo_detect_status_label.setText(f"{len(boxes)} boxes")
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            # initialize locals so static analysis understands types
+            if getattr(self, "yolo_detect_status_label", None) is not None:
+                try:
+                    self.yolo_detect_status_label.setText(f"{len(boxes)} boxes")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _tracking_log_cycle_state(self, boxes):
+        try:
+            tracking_on = getattr(self, "tracking_active", False)
+            aiming_on = getattr(self, "aiming_active", False)
+            boxes_count = len(boxes) if boxes else 0
+            detection_mode_val = int(self._safe_current_index("detection_mode_combo", 0) or 0)
+
+            should_log = (
+                (getattr(self, "debug_checkbox", None) and getattr(self.debug_checkbox, "isChecked", lambda: False)())
+                or boxes_count == 0
+            )
+
+            if should_log and hasattr(self, "enhancer"):
+                self.enhancer.log_serial_output(
+                    f"[TRACKING DIAG] boxes={boxes_count} tracking={tracking_on} aiming={aiming_on} mode={detection_mode_val}",
+                    fire=False,
+                )
+        except Exception:
+            pass
+
+    def _update_frame_process_tracking_cycle(
+        self,
+        frame1,
+        boxes,
+        prediction_yolo_required,
+        operator_hold_active,
+    ):
+        boxes = self._tracking_reuse_recent_boxes(boxes)
+        self._tracking_update_detect_status_label(boxes)
+        self._tracking_log_cycle_state(boxes)
+        return self._tracking_run_tracking_cycle_impl(
+            frame1,
+            boxes,
+            prediction_yolo_required,
+            operator_hold_active,
+        )
+
+    def _tracking_run_tracking_cycle_impl(
+        self,
+        frame1,
+        boxes,
+        prediction_yolo_required,
+        operator_hold_active,
+    ):
+        try:
             err_x = 0.0
             err_y = 0.0
             gain = 0.0
             smoothing = 1.0
-
-            # COMPREHENSIVE DEBUG: Log state before entering boxes check
-            try:
-                tracking_on = getattr(self, "tracking_active", False)
-                aiming_on = getattr(self, "aiming_active", False)
-                boxes_count = len(boxes) if boxes else 0
-                detection_mode_val = int(self._safe_current_index("detection_mode_combo", 0) or 0)
-                
-                # Log this info whenever debug is on OR if we have no boxes (to diagnose detection loss)
-                should_log = (
-                    (getattr(self, "debug_checkbox", None) and getattr(self.debug_checkbox, "isChecked", lambda: False)())
-                    or boxes_count == 0
-                )
-                
-                if should_log and hasattr(self, "enhancer"):
-                    self.enhancer.log_serial_output(
-                        f"[TRACKING DIAG] boxes={boxes_count} tracking={tracking_on} aiming={aiming_on} mode={detection_mode_val}",
-                        fire=False
-                    )
-            except Exception:
-                pass
+            detection_mode = int(self._safe_current_index("detection_mode_combo", 0) or 0)
 
             if boxes:
                 # --- PATCH: Instantly interrupt sweep/guard on detection ---
@@ -23129,16 +23456,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 ):
                     try:
                         # Keep detection and aiming separate:
-                        # - `last_target_center` tracks the live detection (yellow box/dot)
+                        # - `last_target_center` tracks the live detection (yellow box)
                         # - aim-lock uses the fixed red box center while active
                         try:
-                            locked_screen_target = self._get_world_lock_screen_target()
-                            if suspend_detection_updates and locked_screen_target is not None:
-                                detection_center = (
-                                    float(locked_screen_target[0]),
-                                    float(locked_screen_target[1]),
-                                )
-                            elif getattr(self, "last_target_center", None):
+                            if getattr(self, "last_target_center", None):
                                 detection_center = (
                                     float(self.last_target_center[0]),
                                     float(self.last_target_center[1]),
@@ -23387,7 +23708,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                         self.safety_state == 0 and
                                         (getattr(self, "auto_fire_enabled", False) or 
                                          getattr(self, "rapid_fire_enabled", False))
-                                        and bool(self._is_yellow_dot_in_deadzone())
+                                        and bool(self._are_deadzones_overlapping())
                                     )
                                     
                                     if should_fire:
@@ -23658,7 +23979,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         # At max tilt and trying to go further up (err_y negative) - nudge down
                         new_tilt = self.TILT_MAX - 2.0
 
-                    # TRACKING GOAL: Keep yellow dot (target center) INSIDE the deadzone circle
+                    # TRACKING GOAL: Keep aim target within deadzone overlap distance
                     # Deadzone defines the pixel radius around frame center that we consider "good enough".
                     # If the dot is inside the deadzone, do not move. If outside, move to chase it.
                     deadzone_px = int(
@@ -24018,7 +24339,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             if 0 <= dist_to_deadzone <= 2.0:  # Within 2 pixels of entering deadzone
                                 if getattr(self, "debug_checkbox", None) and self.debug_checkbox.isChecked():
                                     self.enhancer.log_serial_output(
-                                        f"[PRECISION AIM] yellow_dot approaching deadzone: dist_to_edge={dist_to_deadzone:.1f}px err_x={err_x:.1f} err_y={err_y:.1f}",
+                                        f"[PRECISION AIM] aim target approaching deadzone overlap: dist_to_edge={dist_to_deadzone:.1f}px err_x={err_x:.1f} err_y={err_y:.1f}",
                                         fire=False
                                     )
                         except Exception:
@@ -24028,6 +24349,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         # If tilt delta is too large, gradually step toward target instead of jumping
                         try:
                             last_tilt = float(getattr(self, "last_sent_tilt", self.target_tilt))
+                            if last_tilt < -1000:
+                                last_tilt = float(
+                                    getattr(
+                                        self,
+                                        "prev_tilt_angle",
+                                        getattr(self, "target_tilt", self.HOME_TILT),
+                                    )
+                                )
                             tilt_delta = abs(self.target_tilt - last_tilt)
                             
                             # SMART RATE LIMITING: Reduce max_step when approaching limits
@@ -24570,7 +24899,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     pass
         except Exception:
             pass
+        return err_x, err_y, gain, smoothing
 
+    def _update_frame_render_cycle_outputs(
+        self,
+        frame1,
+        boxes,
+        err_x,
+        err_y,
+        gain,
+        smoothing,
+        detection_mode,
+        contours_raw,
+        contours_filtered,
+        fg_nonzero,
+        yolo_boxes_len,
+    ):
         try:
             h_f, w_f = frame1.shape[:2]
             cx, cy = w_f // 2, h_f // 2
@@ -24606,7 +24950,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         2,
                         cv2.LINE_AA,
                     )
-                    cv2.circle(frame1, (tx, ty), 5, color_box, -1, cv2.LINE_AA)
+                    # Yellow dot removed - no longer represents authoritative target
                     cv2.putText(
                         frame1,
                         label,
@@ -24629,26 +24973,24 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     )
 
             aim_target = self._get_active_aim_target_center()
-            if bool(getattr(self, "aim_lock_active", False)) and aim_target is not None:
+            aim_visual_target = self._get_active_aim_visual_center()
+            if aim_target is not None:
                 tx = int(aim_target[0])
                 ty = int(aim_target[1])
+                if aim_visual_target is not None:
+                    visual_tx = int(aim_visual_target[0])
+                    visual_ty = int(aim_visual_target[1])
+                else:
+                    visual_tx = tx
+                    visual_ty = ty
 
                 frame_center_x = float(getattr(self, "frame_width", 640)) / 2.0
                 frame_center_y = float(getattr(self, "frame_height", 480)) / 2.0
                 dist = ((tx - frame_center_x) ** 2 + (ty - frame_center_y) ** 2) ** 0.5
-                error_x = abs(float(tx) - frame_center_x)
-                error_y = abs(float(ty) - frame_center_y)
-                fire_align_threshold_x = 15.0
-                fire_align_threshold_y = 15.0
-                aligned_x = bool(error_x < fire_align_threshold_x)
-                aligned_y = bool(error_y < fire_align_threshold_y)
-                red_box_aligned = bool(aligned_x and aligned_y)
-                in_deadzone = bool(self._is_yellow_dot_in_deadzone())
+                in_deadzone = bool(self._are_deadzones_overlapping())
                 prev_in_deadzone = bool(getattr(self, "_prev_in_deadzone", False))
                 entered_deadzone = bool(in_deadzone and (not prev_in_deadzone))
                 self._prev_in_deadzone = bool(in_deadzone)
-
-                self._draw_corner_box(frame1, tx, ty, size, gap, (0, 0, 255), thickness)
 
                 cooldown = self._safe_float_widget_value(
                     "trigger_cooldown_input", 1.5
@@ -24657,8 +24999,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 fired_this_frame = False
                 stability_ok = True
                 try:
+                    stability_target = getattr(self, "locked_target_center", None)
+                    if stability_target is not None:
+                        stability_cx = float(stability_target[0])
+                        stability_cy = float(stability_target[1])
+                    else:
+                        stability_cx = float(tx)
+                        stability_cy = float(ty)
                     stability_ok = bool(
-                        self._fire_stability_allowed(float(tx), float(ty), bool(in_deadzone))
+                        self._fire_stability_allowed(stability_cx, stability_cy, bool(in_deadzone))
                     )
                 except Exception:
                     stability_ok = True
@@ -24703,35 +25052,29 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     except Exception:
                                         pass
                         elif getattr(self, "auto_fire_enabled", False) and (now - self.last_trigger_time >= cooldown):
-                            auto_fire_stability_ok = True
-                            try:
-                                auto_fire_stability_ok = bool(
-                                    self._fire_stability_allowed(float(tx), float(ty), bool(red_box_aligned))
-                                )
-                            except Exception:
-                                auto_fire_stability_ok = True
-
-                            if red_box_aligned and auto_fire_stability_ok and (not bool(getattr(self, "trigger_fired", False))):
-                                msg = (
-                                    f"[AUTO-FIRE] Red-box aligned -> FIRE "
-                                    f"(err_x={error_x:.1f}px, err_y={error_y:.1f}px, cooldown={cooldown:.2f}s)"
-                                )
+                            aiming_active = bool(getattr(self, "aiming_active", False))
+                            if entered_deadzone or (aiming_active and in_deadzone):
+                                if entered_deadzone:
+                                    msg = (
+                                        f"[AUTO-FIRE] Target centered -> FIRE (dist={dist:.1f}px, cooldown={cooldown:.2f}s)"
+                                    )
+                                else:
+                                    msg = (
+                                        f"[AUTO-FIRE] Aiming locked -> FIRE (dist={dist:.1f}px, cooldown={cooldown:.2f}s)"
+                                    )
                                 fired_this_frame = bool(self._request_trigger_pulse(msg))
 
                 try:
                     if bool(getattr(self, "aim_lock_active", False)):
                         if bool(fired_this_frame):
+                            self._mark_recently_fired_aim_target()
                             self._clear_aim_lock("fire-executed")
-                        elif bool(in_deadzone):
-                            self._clear_aim_lock("deadzone-reached")
-                        elif bool(self._aim_lock_timed_out(now)):
-                            self._clear_aim_lock("timeout")
                 except Exception:
                     pass
 
-            self._draw_corner_box(frame1, cx, cy, size, gap, color, thickness)
-            cv2.circle(frame1, (cx, cy), 3, (255, 255, 255), -1)
-            cv2.circle(frame1, (cx, cy), int(deadzone_val), (0, 200, 255), 1)
+                if bool(getattr(self, "aim_lock_active", False)):
+                    self._draw_corner_box(frame1, visual_tx, visual_ty, size, gap, (0, 0, 255), thickness)
+                    cv2.circle(frame1, (visual_tx, visual_ty), int(deadzone_val), (0, 0, 255), 1, cv2.LINE_AA)
 
             # FPS calculation and update
             if hasattr(self, "prev_frame_time"):
@@ -25144,6 +25487,42 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self.send_serial_command()
         except Exception:
             pass
+
+    def _update_frame_core_cycle(self):
+        cycle_state = self._update_frame_prepare_cycle_state()
+        if cycle_state is None:
+            return
+
+        frame1, frame2, operator_hold_active, new_pan, new_tilt = cycle_state
+        (
+            detection_mode,
+            boxes,
+            prediction_yolo_required,
+            contours_raw,
+            contours_filtered,
+            fg_nonzero,
+            yolo_boxes_len,
+        ) = self._update_frame_run_detection_pipeline(frame1, frame2)
+        new_pan, new_tilt = self._update_frame_advance_home_return(new_pan, new_tilt)
+        err_x, err_y, gain, smoothing = self._update_frame_process_tracking_cycle(
+            frame1,
+            boxes,
+            prediction_yolo_required,
+            operator_hold_active,
+        )
+        self._update_frame_render_cycle_outputs(
+            frame1,
+            boxes,
+            err_x,
+            err_y,
+            gain,
+            smoothing,
+            detection_mode,
+            contours_raw,
+            contours_filtered,
+            fg_nonzero,
+            yolo_boxes_len,
+        )
 
     def _update_idle_mode_positions(self):
         """Update turret positions based on active idle mode.
@@ -28637,6 +29016,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.running = False
         except Exception:
             pass
+        try:
+            self.save_notes()
+        except Exception:
+            pass
+        try:
+            self.save_settings()
+        except Exception as e:
+            try:
+                print(f"[CLOSE] save_settings failed before accept (ignored): {e}")
+            except Exception:
+                pass
 
         def _deferred_cleanup():
             try:
@@ -28651,11 +29041,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     pass
 
-                # Save notes/settings on close (best-effort)
-                try:
-                    self.save_notes()
-                except Exception:
-                    pass
+                # Save settings again after teardown-related state changes (best-effort)
                 try:
                     self.save_settings()
                 except Exception as e:
