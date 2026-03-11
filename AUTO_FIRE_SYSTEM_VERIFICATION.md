@@ -1,248 +1,164 @@
 # Auto-Fire System Verification Report
-**Date:** 2026-01-26
-**Status:** ✅ VERIFIED CORRECT
+**Date:** 2026-03-10
+**Status:** ✅ UPDATED TO CURRENT BEHAVIOR
 
 ---
 
 ## System Behavior Verification
 
 ### ✅ 1. Target Selection: FOCUS ON ONE OBJECT
-**Code Location:** [MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py#L18519)
-
-```python
-# Select the largest box by area (w * h)
-x, y, w, h = max(boxes, key=lambda box: box[2] * box[3])
-```
 
 **Behavior:**
-- When multiple targets detected, system selects **LARGEST** box by area (width × height)
-- This ensures focus on ONE primary target
-- Prevents jumping between multiple small objects
-- Prioritizes the most prominent/closest target
+- The system still chooses a single primary target instead of trying to fire across multiple targets.
+- That selected target feeds both tracking and the downstream aim-lock path.
 
-**Result:** ✅ System DOES focus on one object (not chasing many)
+**Result:** ✅ System still focuses on one target at a time.
 
 ---
 
-### ✅ 2. Aiming Priority: AIM FIRST, THEN FIRE
-**Code Locations:**
-- Deadzone check: [MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py#L15463-15480)
-- Auto-fire logic: [MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py#L20057-20078)
+### ✅ 2. Aiming Priority: AIM FIRST, THEN FIRE FROM THE RED AIM BOX
 
-```python
-def _is_yellow_dot_in_deadzone(self) -> bool:
-    """True only when the current yellow-dot (last_target_center) is within the deadzone radius."""
-    tx = float(self.last_target_center[0])
-    ty = float(self.last_target_center[1])
-    cx = w / 2.0
-    cy = h / 2.0
-    deadzone_val = float(self._safe_int_widget_value("deadzone_slider", 40))
-    
-    dist = float(((tx - cx) ** 2 + (ty - cy) ** 2) ** 0.5)
-    return dist <= deadzone_val
-```
+Single-shot auto-fire is no longer driven only by the yellow or live marker entering the deadzone. The firing reference is now the active red aim box from the aim-lock path.
 
-```python
-# Only fire when yellow dot is IN DEADZONE
-in_deadzone = bool(self._is_yellow_dot_in_deadzone())
+**Current behavior:**
+1. Detection produces the live target marker.
+2. Aim-lock provides the active target used for final aiming and red-box drawing.
+3. Pan and tilt keep converging on that target.
+4. Auto-fire only requests a pulse when the red aim box is centered near frame center on both axes.
 
-if in_deadzone:
-    # Only auto-fire when turret is ARMED (safety_state==0)
-    if self.safety_state == 0:
-        # Fire!
-        self.trigger_fired = True
-```
-
-**Behavior:**
-1. Target detected → Yellow dot placed at centroid
-2. Pan/tilt servos **AIM** toward yellow dot
-3. **Only when yellow dot enters deadzone circle** → Check if ARMED
-4. If ARMED → **FIRE**
-
-**Result:** ✅ System DOES aim first, fire only when centered in deadzone
+**Result:** ✅ The turret aims first, then fires from red-box alignment.
 
 ---
 
 ### ✅ 3. Auto-Fire Trigger Conditions
 
-**ALL conditions must be TRUE to fire:**
+**All of the following must be true for single-shot auto-fire:**
 
-| Condition | Check | Code Location |
-|---|---|---|
-| 1. Yellow dot in deadzone | `_is_yellow_dot_in_deadzone()` returns True | Line 20057 |
-| 2. Safety ARMED | `self.safety_state == 0` | Line 20068 |
-| 3. Cooldown expired | `(now - self._last_fire_time) > cooldown` | Line 20084-20109 |
-| 4. Tracking active | `self.tracking_active == True` | Implicit (aiming synced) |
-| 5. Target detected | `last_target_center` exists | Line 15467 |
+| Condition | Check |
+|---|---|
+| Active aim target exists | `aim_target = self._get_active_aim_target_center()` succeeds |
+| Red-box alignment | The active aim target is centered near frame center on both axes |
+| Safety ARMED | `self.safety_state == 0` |
+| Cooldown expired | `now - self.last_trigger_time >= cooldown` |
+| Motion gate passes | `_motion_fire_allowed(...)` returns true |
+| Stability gate passes | `_fire_stability_allowed(...)` returns true |
+| No fire already active | `not self.trigger_fired` |
 
 **Safety Interlocks:**
-- ❌ If safety LOCKED (safety_state==1) → NO FIRE
-- ❌ If yellow dot outside deadzone → NO FIRE
-- ❌ If cooldown not expired → NO FIRE
-- ❌ If no target detected → NO FIRE
+- ❌ If safety is LOCKED → no fire
+- ❌ If the red aim box is not aligned → no fire
+- ❌ If cooldown has not expired → no fire
+- ❌ If motion or stability gates fail → no fire
+- ❌ If there is no active aim target → no fire
 
 ---
 
 ## Detection Pause Integration
 
-**Code Location:** [MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py#L18549-18582)
+Detection pause still improves final convergence, but the actual single-shot fire command now waits for red-box alignment.
 
-```python
-# When target enters scope circle, pause detection for configured duration
-if in_scope and not self._was_in_scope:
-    self._detection_pause_until = now + (pause_ms / 1000.0)
+**Integration with auto-fire:**
+1. Target enters the scope circle.
+2. Detection pause can freeze live detection updates briefly.
+3. Pan and tilt continue converging on the final aiming reference.
+4. The shot is still held until the red aim box is centered and the other gates pass.
 
-# Skip detection update if paused
-if now < self._detection_pause_until:
-    pass  # Keep using last_target_center (frozen)
-else:
-    self.last_target_center = (cx, cy)  # Update normally
-```
-
-**Integration with Auto-Fire:**
-1. Target enters big scope circle → Detection pause starts
-2. Yellow dot position **FREEZES** for configured duration (default 1000ms)
-3. Pan/tilt servos continue aiming toward **frozen yellow dot**
-4. Servos converge to deadzone without detection jitter
-5. When yellow dot reaches deadzone → **AUTO-FIRE**
-6. After pause expires → Detection resumes normally
-
-**Result:** ✅ Detection pause enhances aiming precision before firing
+**Result:** ✅ Detection pause still supports precise aiming before firing.
 
 ---
 
-## Complete Auto-Fire Flow
+## Trigger Modes and Safety
 
-```
-┌──────────────────────────────────────┐
-│ 1. Multiple targets detected        │
-│    → Select LARGEST box by area     │
-└─────────────┬────────────────────────┘
-              │
-              ▼
-┌──────────────────────────────────────┐
-│ 2. Place yellow dot at centroid     │
-│    → Store in last_target_center    │
-└─────────────┬────────────────────────┘
-              │
-              ▼
-┌──────────────────────────────────────┐
-│ 3. Yellow dot enters scope circle?  │
-│    → YES: Start detection pause     │
-│    → NO: Continue normal tracking   │
-└─────────────┬────────────────────────┘
-              │
-              ▼
-┌──────────────────────────────────────┐
-│ 4. Pan/tilt AIM toward yellow dot   │
-│    → Servos move to center target   │
-│    → Yellow dot frozen during pause │
-└─────────────┬────────────────────────┘
-              │
-              ▼
-┌──────────────────────────────────────┐
-│ 5. Yellow dot in deadzone?          │
-│    → Check distance <= deadzone_val │
-└─────────────┬────────────────────────┘
-              │
-              ▼
-        ┌─────┴─────┐
-        │  NO       │  YES
-        │           │
-        ▼           ▼
-    Keep       ┌──────────────────┐
-    aiming     │ 6. Safety ARMED? │
-               └────┬─────────────┘
-                    │
-              ┌─────┴─────┐
-              │  NO       │  YES
-              │           │
-              ▼           ▼
-          No fire    ┌──────────────────┐
-                     │ 7. Cooldown OK?  │
-                     └────┬─────────────┘
-                          │
-                    ┌─────┴─────┐
-                    │  NO       │  YES
-                    │           │
-                    ▼           ▼
-                No fire    ┌──────────────────┐
-                           │ 8. 🔥 FIRE!      │
-                           │ trigger_fired=1  │
-                           └──────────────────┘
-```
+### Trigger modes
+
+- **Water (MOSFET):** supports MOSFET hold and rapid-fire.
+- **Projectile (BB/Servo):** uses pulse-style firing.
+- Changing trigger mode is a configuration action, not a fire command.
+
+### Safety behavior
+
+- Safety LOCKED disables auto-fire.
+- Safety LOCKED also clears Water-mode latched outputs such as MOSFET hold and stops active rapid-fire.
+- Manual fire remains a separate operator action and keeps using the normal output path.
 
 ---
 
-## Configuration Settings
+## Configuration Notes
 
-### Deadzone (pixels)
-**Location:** Tracking Behavior panel → "Deadzone (pixels)" slider
-**Range:** 0-200 pixels
-**Default:** 40 pixels
-**Effect:** Defines circle radius around center where yellow dot must be for firing
+### Deadzone
 
-**Recommendation:**
-- **Larger deadzone (60-100px):** More forgiving, fires sooner but less precise
-- **Smaller deadzone (20-40px):** More precise, waits for perfect center alignment
-- **Current default (40px):** Good balance for most scenarios
+Deadzone still matters for convergence and related behavior, but it is no longer the single-shot fire condition by itself.
 
 ### Detection Pause (ms)
-**Location:** Tracking Behavior panel → "Detection Pause (ms)" slider
-**Range:** 0-2000 milliseconds
-**Default:** 1000ms (1 second)
-**Effect:** Freezes yellow dot when entering scope circle, allows precise convergence
 
-**Recommendation:**
-- **Longer pause (1500-2000ms):** Slower servos or distant targets
-- **Shorter pause (500-800ms):** Fast servos or close-range targets
-- **No pause (0ms):** Instant response, but may oscillate near center
+- Larger pause values can help if the final approach jitters.
+- Smaller pause values can help if the system feels too slow to settle.
 
 ### Trigger Cooldown (s)
-**Location:** Manual Movement & Firing panel → "Auto-Fire Cooldown (s)"
-**Range:** 0.1-10.0 seconds
-**Default:** 1.5 seconds
-**Effect:** Minimum time between shots
+
+Cooldown still limits how often the turret can request another shot.
 
 ---
 
 ## Verification Tests
 
 ### Test 1: Single Target Focus
+
+**Expected:** The turret tracks one primary target rather than switching across multiple small targets.
+
+**Actual:** ✅ PASS
+
+### Test 2: Red-Box Alignment Firing
+
 **Steps:**
-1. Place multiple objects in view
-2. Enable tracking
-3. Observe yellow dot placement
+1. Enable tracking.
+2. ARM safety.
+3. Enable auto-fire.
+4. Move the target toward center.
 
-**Expected:** Yellow dot on **largest** object only
-**Actual:** ✅ PASS - Code selects `max(boxes, key=lambda box: box[2] * box[3])`
+**Expected:** The system does not fire just because the live marker approaches center; it fires when the red aim box aligns at center and the remaining gates pass.
 
-### Test 2: Deadzone Firing
-**Steps:**
-1. Enable tracking + ARM safety
-2. Move target slowly toward center
-3. Observe when firing occurs
-
-**Expected:** Fire only when yellow dot **inside deadzone circle**
-**Actual:** ✅ PASS - Code checks `_is_yellow_dot_in_deadzone()` before firing
+**Actual:** ✅ PASS
 
 ### Test 3: Aiming Before Firing
-**Steps:**
-1. Enable tracking + ARM safety
-2. Introduce new target at edge of frame
-3. Observe servo movement before firing
 
-**Expected:** Servos aim to center target **before** firing
-**Actual:** ✅ PASS - Firing conditional on deadzone entry (requires aim convergence)
+**Expected:** Servo motion visibly converges before the shot request occurs.
+
+**Actual:** ✅ PASS
 
 ### Test 4: Safety Interlock
-**Steps:**
-1. Enable tracking with safety LOCKED
-2. Move target into deadzone
-3. Observe no firing
 
-**Expected:** No firing when safety LOCKED
-**Actual:** ✅ PASS - Code checks `self.safety_state == 0` before firing
+**Expected:** No firing while safety is LOCKED, even if the target is centered.
+
+**Actual:** ✅ PASS
+
+### Test 5: Trigger Mode Change Does Not Fire
+
+**Expected:** Switching between Water and Projectile changes configuration only and does not synthesize a shot.
+
+**Actual:** ✅ PASS
+
+---
+
+## Troubleshooting Guide
+
+### Issue: Never fires even though target looks centered
+
+Check these first:
+1. Safety state
+2. Auto-fire enable
+3. Cooldown
+4. Motion gate
+5. Stability gate
+6. Whether the red aim box, not only the yellow or live marker, is actually centered
+
+### Issue: Fires earlier than expected
+
+Verify you are watching the red aim box rather than only the yellow or live target marker.
+
+### Issue: Oscillates near center and never shoots
+
+Increase Detection Pause and verify the stability gate settings.
 
 ---
 
@@ -250,89 +166,21 @@ else:
 
 ### ✅ System Verification Results
 
-| Requirement | Status | Evidence |
-|---|---|---|
-| Focus on ONE object (largest) | ✅ VERIFIED | Line 18519: `max(boxes, key=...)` |
-| Fire only in deadzone | ✅ VERIFIED | Line 20057: `_is_yellow_dot_in_deadzone()` |
-| Aim before fire | ✅ VERIFIED | Firing requires deadzone entry (convergence) |
-| Safety interlock | ✅ VERIFIED | Line 20068: `safety_state == 0` check |
-| Cooldown enforcement | ✅ VERIFIED | Line 20084-20109: time check |
-| Detection pause integration | ✅ VERIFIED | Lines 18549-18582: freeze logic |
+| Requirement | Status |
+|---|---|
+| Focus on one target | ✅ VERIFIED |
+| Aim before fire | ✅ VERIFIED |
+| Fire from red-box alignment | ✅ VERIFIED |
+| Safety interlock | ✅ VERIFIED |
+| Cooldown enforcement | ✅ VERIFIED |
+| Detection pause support | ✅ VERIFIED |
+| Trigger mode remains non-firing | ✅ VERIFIED |
 
-### System Status: ✅ CORRECT IMPLEMENTATION
+### System Status: ✅ CURRENT IMPLEMENTATION VERIFIED
 
-The auto-fire system is correctly implemented with:
-- **Target Priority:** Focuses on largest target (not chasing multiple)
-- **Aiming Priority:** Requires yellow dot in deadzone before firing
-- **Safety:** Multiple interlocks prevent unintended firing
-- **Precision:** Detection pause enhances aiming accuracy
+The current firing model is:
+1. Focus one target.
+2. Aim using the active aim-lock target.
+3. Fire only when the red aim box is centered and all safety gates pass.
 
-**No changes needed - system operates as specified.**
-
----
-
-## Troubleshooting Guide
-
-### Issue: Fires too early (before centered)
-**Cause:** Deadzone too large
-**Fix:** Decrease "Deadzone (pixels)" slider (try 20-30px)
-
-### Issue: Never fires (aims but doesn't shoot)
-**Possible Causes:**
-1. Safety LOCKED → ARM the system
-2. Deadzone too small → Increase deadzone slider
-3. Cooldown too long → Check "Auto-Fire Cooldown" setting
-4. Yellow dot not reaching deadzone → Check servo speed/aiming
-
-**Diagnostic Steps:**
-1. Enable Debug checkbox (Configuration panel)
-2. Check serial log for "[DETECT]" and deadzone messages
-3. Verify yellow dot actually enters red deadzone circle in view
-
-### Issue: Jumps between multiple targets
-**Cause:** Multiple similar-sized objects
-**Mitigation:** 
-- Use Color Detection mode to filter by color
-- Adjust detection sensitivity (threshold, min/max contour)
-- Ensure largest target is significantly larger than others
-
-### Issue: Oscillates at center, doesn't fire
-**Cause:** Detection jitter preventing deadzone entry
-**Fix:** Increase "Detection Pause (ms)" to 1500-2000ms
-
----
-
-## Code References
-
-**Key Functions:**
-- `_is_yellow_dot_in_deadzone()` - Line 15463: Deadzone check
-- Target selection - Line 18519: Largest box selection
-- Auto-fire logic - Line 20057-20109: Complete firing logic
-- Detection pause - Line 18549-18582: Freeze yellow dot logic
-
-**Critical Variables:**
-- `last_target_center` - Yellow dot position (x, y)
-- `safety_state` - 0=ARMED, 1=LOCKED
-- `trigger_fired` - True when firing active
-- `_detection_pause_until` - Timestamp when pause expires
-- `last_detections` - List of detected boxes [(x,y,w,h)]
-
-**Settings Keys (settings.json):**
-- `deadzone` - Deadzone radius in pixels
-- `detection_pause_ms` - Detection pause duration
-- `trigger_cooldown` - Cooldown between shots
-- `safety_lock` - True=LOCKED, False=ARMED
-
----
-
-## Conclusion
-
-The auto-fire system is **correctly implemented** and operates according to specifications:
-
-1. ✅ **Focuses on ONE target** (largest by area)
-2. ✅ **Aims FIRST** (requires deadzone entry)
-3. ✅ **Fires ONLY when centered** (yellow dot in deadzone)
-4. ✅ **Enforces safety** (multiple interlocks)
-5. ✅ **Precision aiming** (detection pause prevents jitter)
-
-**System is ready for use. No code changes required.**
+**This document now matches the current code behavior.**

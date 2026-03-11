@@ -38,3 +38,23 @@ Files changed
 - `app/TOOLTIPS_ADDITIONS.md` — added tooltip text for precision widgets.
 
 If you want, I can add an on-screen diagnostics widget showing refined centroid and PID outputs for live tuning.
+
+Recent Targeting and Firing Behavior Changes
+
+The operator-visible firing reference is now the red aim box during aim-lock.
+
+- Single-shot auto-fire waits for the red aim box to settle at center, not only for the live or yellow target marker to enter the deadzone.
+- The existing safety, cooldown, motion, and stability checks still apply before a shot is requested.
+- Manual fire is still a separate operator action and keeps using the normal fire output path.
+
+Trigger modes
+
+- `Water (MOSFET)`: supports MOSFET hold and rapid-fire.
+- `Projectile (BB Servo)`: uses pulse-style shots.
+- Changing trigger mode is a setup or configuration action. It should not itself fire the turret.
+
+Safety behavior
+
+- When Safety is `LOCKED`, auto-fire is disabled.
+- Locking safety also drops Water-mode latched outputs such as MOSFET hold and stops active rapid-fire.
+- If the turret appears aimed but does not fire, check Safety, Auto-Fire enable, cooldown, and whether the red aim box is actually centered.

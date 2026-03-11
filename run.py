@@ -17,6 +17,23 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 warnings.filterwarnings('ignore', message='.*QTextCursor.*')
 warnings.filterwarnings('ignore', message='.*Cannot queue arguments.*')
 
+
+def _configure_ml_runtime_env() -> None:
+    """Configure a stable CPU-first ML runtime environment on Windows.
+
+    Prevents common torch/ultralytics DLL init failures (WinError 1114) caused
+    by OpenMP/MKL runtime conflicts in mixed Qt/OpenCV environments.
+    """
+    try:
+        os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+        os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+        # CPU-first by default for maximum compatibility.
+        os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+    except Exception:
+        pass
+
 # Redirect Qt debug output to suppress non-critical messages
 class QuietIOWrapper(io.TextIOWrapper):
     """Suppresses Qt debug/warning messages but passes through real errors"""
@@ -122,11 +139,15 @@ print("=" * 60)
 # Install crash logger before running PyQt main
 crash_log_path = _install_crash_logger()
 
+# Configure runtime environment before any heavy ML imports.
+_configure_ml_runtime_env()
+
 # Preload torch runtime before app imports (import-order stability fix)
 _preload_torch_runtime()
 
 # Run main application
 if __name__ == "__main__":
+    
     try:
         runpy.run_path('MAIN_FILE_SINGLE_CAM.py', run_name='__main__')
     except SystemExit:

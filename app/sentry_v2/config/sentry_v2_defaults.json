@@ -1,0 +1,49 @@
+{
+  "target_filter": {
+    "allowed_classes": ["person"],
+    "class_priority": {
+      "person": 5.0,
+      "car": 3.0,
+      "dog": 2.0,
+      "cat": 2.0
+    },
+    "min_confidence": 0.45,
+    "min_size_ratio": 0.005,
+    "max_size_ratio": 0.0,
+    "engagement_zone": [0.0, 0.0, 1.0, 1.0]
+  },
+  "threat_scoring": {
+    "w_proximity": 0.25,
+    "w_size": 0.15,
+    "w_confidence": 0.10,
+    "w_class_priority": 0.20,
+    "w_speed": 0.10,
+    "w_persistence": 0.10,
+    "w_approach": 0.10,
+    "use_ml_model": false,
+    "ml_model_path": "config/sentry_v2_threat_model.pkl"
+  },
+  "engagement": {
+    "min_threat_score": 0.30,
+    "burst_count": 3,
+    "burst_interval_ms": 50,
+    "inter_target_cooldown": 0.8,
+    "cycle_cooldown": 2.0,
+    "max_queue_length": 5,
+    "optimize_slew_order": true,
+    "return_delay": 1.5,
+    "engagement_speed": 80
+  },
+  "guard": {
+    "guard_pan": 90.0,
+    "guard_tilt": 50.0,
+    "camera_hfov": 60.0,
+    "camera_vfov": 45.0,
+    "frame_width": 640,
+    "frame_height": 480
+  },
+  "show_overlay": true,
+  "show_threat_scores": true,
+  "show_engagement_zone": true,
+  "show_guard_crosshair": true
+}

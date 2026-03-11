@@ -188,6 +188,15 @@ except Exception as e:
     SentryTabWidget = None
     SENTRY_MODE_AVAILABLE = False
 
+# Smart Sentry v2 (AI-powered stationary guard with multi-target engagement)
+try:
+    from sentry_v2.sentry_v2_tab import SentryV2TabWidget
+    SENTRY_V2_AVAILABLE = True
+except Exception as e:
+    print(f"[SENTRY_V2] Import failed: {e}")
+    SentryV2TabWidget = None
+    SENTRY_V2_AVAILABLE = False
+
 # Try to register QTextCursor as a Qt metatype to avoid queued-argument warnings
 # Use a single guarded attempt to avoid duplicate registrations.
 try:
@@ -815,6 +824,51 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 traceback.print_exc()
                 self.sentry_tab = None
         # ========== END AGENT-MANAGED BLOCK: SENTRY MODE TAB ==========
+
+        # ========== AGENT-MANAGED BLOCK: SMART SENTRY V2 TAB ==========
+        # AI-powered stationary guard with multi-target engagement
+        # Added: Mar 2026 | See: app/sentry_v2/
+        self.sentry_v2_tab = None
+        self.sentry_v2_active = False
+        if SENTRY_V2_AVAILABLE and SentryV2TabWidget is not None:
+            try:
+                self.sentry_v2_tab = SentryV2TabWidget()
+                self.main_tab_widget.addTab(self.sentry_v2_tab, "Smart Sentry")
+
+                # Same signal interface as v1
+                self.sentry_v2_tab.turret_move_requested.connect(self._on_sentry_v2_turret_move)
+                self.sentry_v2_tab.fire_requested.connect(self._on_sentry_v2_fire)
+                self.sentry_v2_tab.sentry_enabled_changed.connect(self._on_sentry_v2_enabled_changed)
+
+                # Extended v2 signals
+                self.sentry_v2_tab.detection_mode_changed.connect(self._on_sentry_v2_detection_mode_changed)
+                self.sentry_v2_tab.trigger_mode_changed.connect(self._on_sentry_v2_trigger_mode_changed)
+                self.sentry_v2_tab.toggle_led_requested.connect(lambda on: self.toggle_relay(1, on))
+                self.sentry_v2_tab.toggle_laser_requested.connect(lambda on: self.toggle_relay(2, on))
+                self.sentry_v2_tab.toggle_safety_requested.connect(self.toggle_safety)
+                self.sentry_v2_tab.go_home_requested.connect(self.go_home)
+                self.sentry_v2_tab.manual_move_requested.connect(self._on_sentry_v2_manual_move)
+                self.sentry_v2_tab.manual_fire_requested.connect(self._on_sentry_v2_manual_fire)
+                self.sentry_v2_tab.auto_trigger_changed.connect(self._on_sentry_v2_auto_trigger_changed)
+
+                # Dock visibility management for sentry mode
+                self._sentry_v2_saved_dock_visibility = {}
+                self._sentry_v2_commanding = False
+
+                # Ensure tab-change handler is connected (v1 block may have been skipped)
+                try:
+                    self.main_tab_widget.currentChanged.disconnect(self._on_tab_changed)
+                except (TypeError, RuntimeError):
+                    pass
+                self.main_tab_widget.currentChanged.connect(self._on_tab_changed)
+
+                print("[SENTRY_V2] Smart Sentry v2 tab initialized successfully")
+            except Exception as e:
+                print(f"[SENTRY_V2] Failed to create tab: {e}")
+                import traceback
+                traceback.print_exc()
+                self.sentry_v2_tab = None
+        # ========== END AGENT-MANAGED BLOCK: SMART SENTRY V2 TAB ==========
 
         # === IDLE ZONES TAB ===
         self.idle_zones_tab = None
@@ -1730,6 +1784,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.locked_tilt_angle = None  # Authoritative world-locked tilt angle for aim-lock
         self.locked_target_box_size = (0, 0)  # (w, h) used to render the red aim-lock box
         self._aim_lock_acquired_at = 0.0
+        self._recently_fired_target_center = None
+        self._recently_fired_target_radius_px = 0.0
+        self._recently_fired_target_until = 0.0
         self.aim_lock_timeout_s = 2.5  # Auto-clear lock if aim goal does not complete in time
         self.aim_lock_suspend_detection_updates = False  # Fallback strategy; preferred default is live detection + ignored aim updates
         self.detection_pause_ms = 1000  # Milliseconds to pause detection when target enters scope
@@ -18492,6 +18549,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     def _capture_aim_lock(self, cx: float, cy: float, w: float, h: float, reason: str = "") -> None:
         """Latch a world-locked aim target from the current selected detection."""
         try:
+            if bool(self._aim_lock_reacquire_blocked(float(cx), float(cy))):
+                return
             world_target = self._screen_target_to_world_angles(cx, cy)
             if world_target is None:
                 return
@@ -18535,6 +18594,81 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             return False
 
+    def _get_active_aim_visual_center(self):
+        """Return the frozen screen-space center used to draw the red aim-lock box."""
+        try:
+            if not bool(getattr(self, "aim_lock_active", False)):
+                return None
+            locked_center = getattr(self, "locked_target_center", None)
+            if locked_center is None:
+                return None
+            return float(locked_center[0]), float(locked_center[1])
+        except Exception:
+            return None
+
+    def _get_recent_fire_relock_window_s(self) -> float:
+        """Return the short suppression window that blocks immediate re-lock after a shot."""
+        try:
+            cooldown_s = float(self._safe_float_widget_value("trigger_cooldown_input", 1.5))
+        except Exception:
+            cooldown_s = 1.5
+        try:
+            detection_pause_s = float(getattr(self, "detection_pause_ms", 0) or 0) / 1000.0
+        except Exception:
+            detection_pause_s = 0.0
+        return float(np.clip(max(1.5, cooldown_s, detection_pause_s), 1.5, 6.0))
+
+    def _mark_recently_fired_aim_target(self) -> None:
+        """Remember the just-fired lock so the same target does not instantly reacquire."""
+        try:
+            center = self._get_active_aim_visual_center()
+            if center is None:
+                center = self._get_active_aim_target_center()
+            if center is None:
+                return
+
+            try:
+                box_w, box_h = getattr(self, "locked_target_box_size", (0, 0))
+            except Exception:
+                box_w, box_h = (0, 0)
+            try:
+                deadzone_radius = float(self._safe_int_widget_value("deadzone_slider", 40))
+            except Exception:
+                deadzone_radius = 40.0
+
+            suppression_radius = max(
+                30.0,
+                deadzone_radius * 1.5,
+                float(box_w) * 0.75,
+                float(box_h) * 0.75,
+            )
+            self._recently_fired_target_center = (float(center[0]), float(center[1]))
+            self._recently_fired_target_radius_px = float(suppression_radius)
+            self._recently_fired_target_until = time.time() + self._get_recent_fire_relock_window_s()
+        except Exception:
+            pass
+
+    def _aim_lock_reacquire_blocked(self, cx: float, cy: float) -> bool:
+        """Return True when a new lock attempt is too close to a target we just fired at."""
+        try:
+            until = float(getattr(self, "_recently_fired_target_until", 0.0) or 0.0)
+            center = getattr(self, "_recently_fired_target_center", None)
+            radius = float(getattr(self, "_recently_fired_target_radius_px", 0.0) or 0.0)
+            if until <= 0.0 or center is None or radius <= 0.0:
+                return False
+            now = time.time()
+            if now > until:
+                self._recently_fired_target_center = None
+                self._recently_fired_target_radius_px = 0.0
+                self._recently_fired_target_until = 0.0
+                return False
+            dx = float(cx) - float(center[0])
+            dy = float(cy) - float(center[1])
+            distance = float((dx * dx + dy * dy) ** 0.5)
+            return bool(distance <= radius)
+        except Exception:
+            return False
+
     def _clear_aim_lock(self, reason: str = "") -> None:
         """Clear the fixed aim-lock target so the next detection can re-lock."""
         try:
@@ -18545,6 +18679,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.locked_tilt_angle = None
             self.locked_target_box_size = (0, 0)
             self._aim_lock_acquired_at = 0.0
+            self._prev_in_deadzone = False
+            self._fire_stability_prev_center = None
+            self._fire_stability_consecutive = 0
             if was_active and reason and getattr(self, "enhancer", None) is not None:
                 self.enhancer.log_serial_output(
                     f"[AIM-LOCK] Cleared reason={reason}",
@@ -24648,8 +24785,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 entered_deadzone = bool(in_deadzone and (not prev_in_deadzone))
                 self._prev_in_deadzone = bool(in_deadzone)
 
-                self._draw_corner_box(frame1, tx, ty, size, gap, (0, 0, 255), thickness)
-
                 cooldown = self._safe_float_widget_value(
                     "trigger_cooldown_input", 1.5
                 )
@@ -24703,31 +24838,44 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     except Exception:
                                         pass
                         elif getattr(self, "auto_fire_enabled", False) and (now - self.last_trigger_time >= cooldown):
+                            aiming_active = bool(getattr(self, "aiming_active", False))
+                            aim_solution_ready = bool(red_box_aligned or (aiming_active and in_deadzone))
                             auto_fire_stability_ok = True
                             try:
                                 auto_fire_stability_ok = bool(
-                                    self._fire_stability_allowed(float(tx), float(ty), bool(red_box_aligned))
+                                    self._fire_stability_allowed(float(tx), float(ty), bool(aim_solution_ready))
                                 )
                             except Exception:
                                 auto_fire_stability_ok = True
 
-                            if red_box_aligned and auto_fire_stability_ok and (not bool(getattr(self, "trigger_fired", False))):
-                                msg = (
-                                    f"[AUTO-FIRE] Red-box aligned -> FIRE "
-                                    f"(err_x={error_x:.1f}px, err_y={error_y:.1f}px, cooldown={cooldown:.2f}s)"
-                                )
+                            if aim_solution_ready and auto_fire_stability_ok and (not bool(getattr(self, "trigger_fired", False))):
+                                if red_box_aligned:
+                                    msg = (
+                                        f"[AUTO-FIRE] Red-box aligned -> FIRE "
+                                        f"(err_x={error_x:.1f}px, err_y={error_y:.1f}px, cooldown={cooldown:.2f}s)"
+                                    )
+                                elif entered_deadzone:
+                                    msg = (
+                                        f"[AUTO-FIRE] Target centered -> FIRE (dist={dist:.1f}px, cooldown={cooldown:.2f}s)"
+                                    )
+                                else:
+                                    msg = (
+                                        f"[AUTO-FIRE] Aiming locked -> FIRE (dist={dist:.1f}px, cooldown={cooldown:.2f}s)"
+                                    )
                                 fired_this_frame = bool(self._request_trigger_pulse(msg))
 
                 try:
                     if bool(getattr(self, "aim_lock_active", False)):
                         if bool(fired_this_frame):
+                            self._mark_recently_fired_aim_target()
                             self._clear_aim_lock("fire-executed")
-                        elif bool(in_deadzone):
-                            self._clear_aim_lock("deadzone-reached")
                         elif bool(self._aim_lock_timed_out(now)):
                             self._clear_aim_lock("timeout")
                 except Exception:
                     pass
+
+                if bool(getattr(self, "aim_lock_active", False)):
+                    self._draw_corner_box(frame1, tx, ty, size, gap, (0, 0, 255), thickness)
 
             self._draw_corner_box(frame1, cx, cy, size, gap, color, thickness)
             cv2.circle(frame1, (cx, cy), 3, (255, 255, 255), -1)
@@ -25135,6 +25283,53 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             print(f"[SENTRY] update error: {e}")
         # ========== END SENTRY MODE FRAME UPDATE ==========
 
+        # ========== SMART SENTRY V2 FRAME UPDATE ==========
+        try:
+            _v2_tab = getattr(self, "sentry_v2_tab", None)
+            _v2_cur_widget = self.main_tab_widget.currentWidget()
+            # Check tab visibility directly (more robust than relying on flag)
+            _v2_visible = (
+                _v2_tab is not None
+                and _v2_cur_widget is _v2_tab
+            )
+
+            # DIAGNOSTIC: throttled to ~1 per second (REMOVE after fix)
+            _v2_diag_now = time.time()
+            if _v2_diag_now - getattr(self, "_v2_diag_ts", 0) > 1.0:
+                self._v2_diag_ts = _v2_diag_now
+                _cur_idx = self.main_tab_widget.currentIndex()
+                _v2_idx = self.main_tab_widget.indexOf(_v2_tab) if _v2_tab else -1
+                _cur_cls = type(_v2_cur_widget).__name__ if _v2_cur_widget else "None"
+                _v2_cls = type(_v2_tab).__name__ if _v2_tab else "None"
+                _same = _v2_cur_widget is _v2_tab
+                print(f"[V2_DIAG] tab={_v2_tab is not None} cur_idx={_cur_idx} v2_idx={_v2_idx} "
+                      f"cur_class={_cur_cls} v2_class={_v2_cls} same_obj={_same} "
+                      f"visible={_v2_visible} frame1={frame1 is not None} "
+                      f"active_flag={getattr(self, 'sentry_v2_active', False)}")
+
+            # Also sync the active flag so other code can use it
+            if _v2_visible and not getattr(self, "sentry_v2_active", False):
+                self.sentry_v2_active = True
+            if _v2_visible and frame1 is not None:
+                v2_boxes = []
+                try:
+                    if boxes and len(boxes) > 0:
+                        for box in boxes:
+                            if len(box) >= 4:
+                                x, y, w, h = box[:4]
+                                score = float(box[4]) if len(box) >= 5 else 1.0
+                                cls_id = int(box[5]) if len(box) >= 6 else 0
+                                v2_boxes.append((int(x), int(y), int(w), int(h), score, cls_id))
+                except Exception as box_err:
+                    print(f"[SENTRY_V2] Box conversion error: {box_err}")
+                print(f"[V2_DIAG] >>> CALLING process_frame, frame shape={frame1.shape}")
+                self.sentry_v2_tab.process_frame(frame1, v2_boxes)
+        except Exception as e:
+            import traceback
+            print(f"[SENTRY_V2] update error: {e}")
+            traceback.print_exc()
+        # ========== END SMART SENTRY V2 FRAME UPDATE ==========
+
         # Output cadence:
         # Prefer the dedicated serial timer (higher Hz, decoupled from camera FPS).
         # Fall back to per-frame sending only if the timer is unavailable/inactive.
@@ -25469,6 +25664,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception as log_err:
                 print(f"[SENTRY] send_serial_command guard error: {e} (log error: {log_err})")
         # ========== END SENTRY MODE BLOCK ==========
+        # ========== SMART SENTRY V2 BLOCK ==========
+        try:
+            if getattr(self, "sentry_v2_active", False) and getattr(self, "sentry_v2_tab", None) is not None:
+                if self.sentry_v2_tab.is_enabled():
+                    # Allow sentry's own move/fire commands and manual override through
+                    if not getattr(self, "manual_override", False) and not getattr(self, "_sentry_v2_commanding", False):
+                        return
+        except Exception as e:
+            print(f"[SENTRY_V2] send_serial_command guard error: {e}")
+        # ========== END SMART SENTRY V2 BLOCK ==========
 
         # Drain ESP32 UDP events every cycle so current telemetry remains live
         # even when serial writes are skipped by redundant-command filtering.
@@ -28328,6 +28533,53 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # A mismatch here can make autotracking appear "ON" while servos never move.
         # See CHANGE_IMPACT_REFERENCE.md → Sections 10 and 12.
         try:
+            # --- Smart Sentry v2 tab detection ---
+            if getattr(self, "sentry_v2_tab", None) is not None:
+                v2_index = self.main_tab_widget.indexOf(self.sentry_v2_tab)
+                if index == v2_index:
+                    self.sentry_v2_active = True
+                    # Pause main tracking
+                    if getattr(self, "tracking_active", False):
+                        self._sentry_v2_previous_tracking_state = True
+                        try:
+                            if getattr(self, "state_manager", None) is not None:
+                                self.state_manager.ensure_tracking_disabled(reason="Smart Sentry v2 tab activated")
+                            else:
+                                self.tracking_active = False
+                                self.aiming_active = False
+                        except Exception:
+                            self.tracking_active = False
+                            self.aiming_active = False
+                    else:
+                        self._sentry_v2_previous_tracking_state = False
+                    # Hide irrelevant dock panels
+                    self._sentry_v2_hide_docks()
+                    # Sync accessory button states
+                    try:
+                        self.sentry_v2_tab.sync_accessory_states(
+                            bool(getattr(self, "relay1_state", 0)),
+                            bool(getattr(self, "relay2_state", 0)),
+                            int(getattr(self, "safety_state", 1)) == 0,
+                        )
+                    except Exception:
+                        pass
+                elif getattr(self, "sentry_v2_active", False):
+                    self.sentry_v2_active = False
+                    if self.sentry_v2_tab.is_enabled():
+                        self.sentry_v2_tab.set_enabled(False)
+                    if getattr(self, "_sentry_v2_previous_tracking_state", False):
+                        try:
+                            if getattr(self, "state_manager", None) is not None:
+                                self.state_manager.ensure_tracking_active(reason="Smart Sentry v2 tab deactivated")
+                            else:
+                                self.tracking_active = True
+                                self.aiming_active = True
+                        except Exception:
+                            self.tracking_active = True
+                            self.aiming_active = True
+                    # Restore hidden dock panels
+                    self._sentry_v2_restore_docks()
+
             if self.sentry_tab is None:
                 return
             
@@ -28620,6 +28872,254 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     
     # =========================================================================
     # END AGENT-MANAGED BLOCK: SENTRY MODE INTEGRATION
+    # =========================================================================
+
+    # =========================================================================
+    # AGENT-MANAGED BLOCK: SMART SENTRY V2 INTEGRATION (Mar 2026)
+    # =========================================================================
+
+    def _on_sentry_v2_enabled_changed(self, enabled: bool):
+        """Handle Smart Sentry v2 enable/disable toggle."""
+        try:
+            if enabled:
+                if getattr(self, "tracking_active", False):
+                    self._sentry_v2_previous_tracking_state = True
+                    try:
+                        if getattr(self, "state_manager", None) is not None:
+                            self.state_manager.ensure_tracking_disabled(reason="Smart Sentry v2 enabled")
+                        else:
+                            self.tracking_active = False
+                            self.aiming_active = False
+                    except Exception:
+                        self.tracking_active = False
+                        self.aiming_active = False
+                print("[SENTRY_V2] Smart Sentry ENABLED")
+            else:
+                if getattr(self, "_sentry_v2_previous_tracking_state", False):
+                    try:
+                        if getattr(self, "state_manager", None) is not None:
+                            self.state_manager.ensure_tracking_active(reason="Smart Sentry v2 disabled")
+                        else:
+                            self.tracking_active = True
+                            self.aiming_active = True
+                    except Exception:
+                        self.tracking_active = True
+                        self.aiming_active = True
+                print("[SENTRY_V2] Smart Sentry DISABLED")
+        except Exception as e:
+            print(f"[SENTRY_V2] enabled_changed error: {e}")
+
+    def _on_sentry_v2_turret_move(self, pan: float, tilt: float):
+        """Handle turret move request from Smart Sentry v2."""
+        try:
+            if not getattr(self, "sentry_v2_active", False):
+                return
+            pan = max(5, min(185, pan))
+            tilt = max(20, min(130, tilt))
+            self.target_pan = pan
+            self.target_tilt = tilt
+            try:
+                self._sentry_v2_commanding = True
+                self.send_serial_command()
+            except Exception:
+                pass
+            finally:
+                self._sentry_v2_commanding = False
+        except Exception as e:
+            print(f"[SENTRY_V2] Turret move error: {e}")
+
+    def _on_sentry_v2_fire(self, burst_count: int):
+        """Handle fire request from Smart Sentry v2."""
+        try:
+            if not getattr(self, "sentry_v2_active", False):
+                return
+            self._sentry_v2_commanding = True
+            if int(getattr(self, "safety_state", 1)) != 0:
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            "[SENTRY_V2] Fire blocked - SAFETY is LOCKED", fire=False
+                        )
+                except Exception:
+                    pass
+                return
+            try:
+                if (
+                    hasattr(self, "ser")
+                    and self.ser
+                    and getattr(self.ser, "is_open", False)
+                    and (not self._serial_is_debug_board_bus())
+                ):
+                    pan = int(getattr(self, "target_pan", 90))
+                    tilt = int(getattr(self, "target_tilt", 40))
+                    led_val = int(getattr(self, "relay1_state", 0))
+                    laser_val = int(getattr(self, "relay2_state", 0))
+                    # Respect trigger mode from sentry v2 config
+                    m_val = 0
+                    try:
+                        if self.sentry_v2_tab and self.sentry_v2_tab.config.engagement.trigger_mode_bb:
+                            m_val = 1
+                    except Exception:
+                        pass
+                    for i in range(burst_count):
+                        cmd = f"P{pan}T{tilt}F1L{led_val}R{laser_val}G0S0M{m_val}\n"
+                        self.ser.write(cmd.encode("utf-8"))
+                        time.sleep(0.05)
+                        cmd = f"P{pan}T{tilt}F0L{led_val}R{laser_val}G0S0M{m_val}\n"
+                        self.ser.write(cmd.encode("utf-8"))
+                        if i < burst_count - 1:
+                            time.sleep(0.05)
+                    try:
+                        if hasattr(self, "enhancer"):
+                            self.enhancer.log_serial_output(
+                                f"[SENTRY_V2] FIRE! Burst: {burst_count} shots", fire=True
+                            )
+                    except Exception:
+                        pass
+            except Exception as e:
+                print(f"[SENTRY_V2] Fire serial error: {e}")
+        except Exception as e:
+            print(f"[SENTRY_V2] Fire error: {e}")
+        finally:
+            self._sentry_v2_commanding = False
+        """Handle Smart Sentry v2 enable/disable."""
+        try:
+            if enabled:
+                self.sentry_v2_active = True
+                if getattr(self, "tracking_active", False):
+                    self._sentry_v2_previous_tracking_state = True
+                    try:
+                        if getattr(self, "state_manager", None) is not None:
+                            self.state_manager.ensure_tracking_disabled(reason="Smart Sentry v2 enabled")
+                        else:
+                            self.tracking_active = False
+                            self.aiming_active = False
+                    except Exception:
+                        self.tracking_active = False
+                        self.aiming_active = False
+                else:
+                    self._sentry_v2_previous_tracking_state = False
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            "[SENTRY_V2] Smart Sentry ENABLED - turret control transferred",
+                            fire=False
+                        )
+                except Exception:
+                    pass
+            else:
+                self.sentry_v2_active = False
+                if getattr(self, "_sentry_v2_previous_tracking_state", False):
+                    try:
+                        if getattr(self, "state_manager", None) is not None:
+                            self.state_manager.ensure_tracking_active(reason="Smart Sentry v2 disabled")
+                        else:
+                            self.tracking_active = True
+                            self.aiming_active = True
+                    except Exception:
+                        self.tracking_active = True
+                        self.aiming_active = True
+                try:
+                    if hasattr(self, "enhancer"):
+                        self.enhancer.log_serial_output(
+                            "[SENTRY_V2] Smart Sentry DISABLED", fire=False
+                        )
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"[SENTRY_V2] Enable change error: {e}")
+
+    # --- Dock panel management for Smart Sentry v2 ---
+
+    # Dock titles to hide when Smart Sentry v2 tab is active
+    _SENTRY_V2_HIDE_DOCKS = {
+        "Configuration & Connection",
+        "Home Position",
+        "Servo Limits",
+        "Accessories",
+        "Target Detection",
+        "Tracking Behavior",
+        "Manual Movement & Firing",
+        "System",
+        "System Health Monitor",
+        "Behavior Presets",
+    }
+
+    def _sentry_v2_hide_docks(self) -> None:
+        """Hide dock panels not applicable in Smart Sentry mode; save their state."""
+        try:
+            from PyQt5.QtWidgets import QDockWidget
+            saved = {}
+            for dock in self.findChildren(QDockWidget):
+                title = dock.windowTitle()
+                if title in self._SENTRY_V2_HIDE_DOCKS:
+                    saved[title] = dock.isVisible()
+                    dock.setVisible(False)
+            self._sentry_v2_saved_dock_visibility = saved
+        except Exception as e:
+            print(f"[SENTRY_V2] Dock hide error: {e}")
+
+    def _sentry_v2_restore_docks(self) -> None:
+        """Restore dock panels that were hidden when entering Smart Sentry mode."""
+        try:
+            from PyQt5.QtWidgets import QDockWidget
+            saved = getattr(self, "_sentry_v2_saved_dock_visibility", {})
+            if not saved:
+                return
+            for dock in self.findChildren(QDockWidget):
+                title = dock.windowTitle()
+                if title in saved:
+                    dock.setVisible(saved[title])
+            self._sentry_v2_saved_dock_visibility = {}
+        except Exception as e:
+            print(f"[SENTRY_V2] Dock restore error: {e}")
+
+    # --- Extended v2 signal handlers ---
+
+    def _on_sentry_v2_detection_mode_changed(self, mode: int):
+        """Sync detection mode from Smart Sentry v2 to main app combo box."""
+        try:
+            if hasattr(self, "detection_mode_combo"):
+                self.detection_mode_combo.setCurrentIndex(mode)
+        except Exception as e:
+            print(f"[SENTRY_V2] Detection mode sync error: {e}")
+
+    def _on_sentry_v2_trigger_mode_changed(self, is_bb: bool):
+        """Sync trigger mode from Smart Sentry v2."""
+        try:
+            self.trigger_mode_bb = is_bb
+            if hasattr(self, "trigger_mode_combo"):
+                self.trigger_mode_combo.setCurrentIndex(1 if is_bb else 0)
+        except Exception as e:
+            print(f"[SENTRY_V2] Trigger mode sync error: {e}")
+
+    def _on_sentry_v2_manual_move(self, pan_delta: int, tilt_delta: int):
+        """Handle manual D-pad movement from Smart Sentry v2."""
+        try:
+            self.move_manual(pan_delta, tilt_delta)
+        except Exception as e:
+            print(f"[SENTRY_V2] Manual move error: {e}")
+
+    def _on_sentry_v2_manual_fire(self, state: int):
+        """Handle manual fire press/release from Smart Sentry v2."""
+        try:
+            self.set_fire_state(state)
+        except Exception as e:
+            print(f"[SENTRY_V2] Manual fire error: {e}")
+
+    def _on_sentry_v2_auto_trigger_changed(self, enabled: bool):
+        """Handle auto-trigger toggle from Smart Sentry v2."""
+        try:
+            if hasattr(self, "enhancer"):
+                self.enhancer.log_serial_output(
+                    f"[SENTRY_V2] Auto-trigger {'ENABLED' if enabled else 'DISABLED'}",
+                    fire=False,
+                )
+        except Exception as e:
+            print(f"[SENTRY_V2] Auto-trigger change error: {e}")
+
+    # =========================================================================
+    # END AGENT-MANAGED BLOCK: SMART SENTRY V2 INTEGRATION
     # =========================================================================
 
     def closeEvent(self, a0):

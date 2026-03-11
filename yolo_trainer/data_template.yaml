@@ -1,0 +1,21 @@
+# Sample data.yaml for YOLO training
+# Copy this to your dataset folder and modify as needed
+
+# Dataset paths (relative to this file)
+train: images/train
+val: images/val
+test: images/test  # optional
+
+# Number of classes
+nc: 2
+
+# Class names
+names: ['person', 'vehicle']
+
+# Optional: Roboflow project details (if using Roboflow)
+# roboflow:
+#   workspace: your-workspace
+#   project: your-project
+#   version: 1
+#   license: CC BY 4.0
+#   url: https://app.roboflow.com/your-workspace/your-project/1

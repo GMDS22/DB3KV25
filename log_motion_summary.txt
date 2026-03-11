@@ -1,0 +1,16 @@
+﻿F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\Serial logs\serial_logCheck logs.txt|samples=2|panUnique=1|tiltUnique=2|panSpan=0|tiltSpan=20|panMinMax=90-90|tiltMinMax=40-60
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\link_log.txt|samples=193|panUnique=1|tiltUnique=2|panSpan=0|tiltSpan=10|panMinMax=90-90|tiltMinMax=80-90
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\link_log000000000.txt|samples=68|panUnique=1|tiltUnique=2|panSpan=0|tiltSpan=10|panMinMax=90-90|tiltMinMax=80-90
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\link_log2.txt|samples=86|panUnique=2|tiltUnique=2|panSpan=2|tiltSpan=10|panMinMax=88-90|tiltMinMax=80-90
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\link_log_20260212_041634.txt|samples=193|panUnique=1|tiltUnique=2|panSpan=0|tiltSpan=10|panMinMax=90-90|tiltMinMax=80-90
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\link_log_20260212_085459.txt|samples=86|panUnique=2|tiltUnique=2|panSpan=2|tiltSpan=10|panMinMax=88-90|tiltMinMax=80-90
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\link_log_20260212_092643.txt|samples=68|panUnique=1|tiltUnique=2|panSpan=0|tiltSpan=10|panMinMax=90-90|tiltMinMax=80-90
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\link_log_20260212_093254.txt|samples=92|panUnique=2|tiltUnique=2|panSpan=2|tiltSpan=10|panMinMax=88-90|tiltMinMax=80-90
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\link_log_20260212_100358.txt|samples=205|panUnique=1|tiltUnique=2|panSpan=0|tiltSpan=10|panMinMax=90-90|tiltMinMax=80-90
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\serial_log.txt|samples=3|panUnique=3|tiltUnique=2|panSpan=90|tiltSpan=60|panMinMax=0-90|tiltMinMax=0-60
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\serial_log_20251214_201715.txt|samples=8929|panUnique=88|tiltUnique=56|panSpan=91|tiltSpan=60|panMinMax=47-138|tiltMinMax=0-60
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\serial_log_20251214_202713.txt|samples=3|panUnique=3|tiltUnique=2|panSpan=90|tiltSpan=60|panMinMax=0-90|tiltMinMax=0-60
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\app\serial_log_analize.txt|samples=8929|panUnique=88|tiltUnique=56|panSpan=91|tiltSpan=60|panMinMax=47-138|tiltMinMax=0-60
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\serial_log_20251216_133142.txt|samples=16802|panUnique=216|tiltUnique=52|panSpan=220|tiltSpan=51|panMinMax=0-220|tiltMinMax=19-70
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\serial_log_20251216_133248.txt|samples=18569|panUnique=216|tiltUnique=52|panSpan=220|tiltSpan=51|panMinMax=0-220|tiltMinMax=19-70
+F:\DB3000V5.0 - ESP32\DB3000V4.1-main\serial_log_analize behaviour after- improvement for precission update.txt|samples=16802|panUnique=216|tiltUnique=52|panSpan=220|tiltSpan=51|panMinMax=0-220|tiltMinMax=19-70

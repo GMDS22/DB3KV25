@@ -3,6 +3,74 @@
   "max_items": 10,
   "items": [
     {
+      "date": "2026-03-10",
+      "title": "Auto-fire alignment update: single-shot auto-fire in app/MAIN_FILE_SINGLE_CAM.py now fires from the active red aim-box target being centered near frame center on both axes, while preserving the existing cooldown, motion gate, stability gate, and trigger-pulse path. Deadzone still supports convergence, but it is no longer the single-shot fire command by itself."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Trigger and safety behavior clarification: manual fire remains on the standard fire path, Safety LOCKED disables auto-fire and drops Water-mode latched outputs (MOSFET hold / rapid-fire), and trigger-mode switching stays a non-firing configuration change. Documentation updated in README.md, CHANGE_IMPACT_REFERENCE.md, AUTO_FIRE_SYSTEM_VERIFICATION.md, and app/USER_MANUAL_UPDATE.md."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Filtered Target Mode preset + pipeline fix: added a factory Tracking Behaviour preset for small gray targets, extended preset application so Filtered Target color/HSV/filter settings load from the preset dropdown, and corrected mode 10 so motion/color/area filters are applied to detector candidates before SmartTracker instead of behaving like the other hybrid modes."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Detection feature added: app/MAIN_FILE_SINGLE_CAM.py now includes Filtered Target Mode, an additive detection mode that gates candidate boxes through enabled motion overlap, HSV color overlap, and contour-area checks before sending the final box list into the existing SmartTracker pipeline. The mode-specific toggles live in app/color_detection/ui_components.py and persist in settings.json."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Color detection fix: strengthened app/color_detection/color_detector.py and app/color_detection/hybrid_fusion.py so color masks survive overly aggressive cleanup, stage-level debug stats report where detections are being dropped, and color hybrid AND fusion accepts meaningful overlap instead of relying only on strict IoU. app/MAIN_FILE_SINGLE_CAM.py now logs mask pixels, contour counts, and produced boxes for color modes before SmartTracker handoff."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Prediction validation continuity fix: app/MAIN_FILE_SINGLE_CAM.py now records passive prediction error samples only across continuous valid target tracking, discards target-switch / hold-reuse / stale-async-YOLO cases, resets pending prediction comparisons on target loss, and exposes a discarded-sample counter in the stats output and camera-feed overlay."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Detection fix: Hybrid Color + Frame Diff in app/MAIN_FILE_SINGLE_CAM.py now fuses color detections against the actual frame-difference motion mask instead of relying only on box IoU, which was too strict for motion contours and could suppress valid colored moving targets."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Prediction diagnostics overlay: app/MAIN_FILE_SINGLE_CAM.py now renders passive prediction validation statistics directly on the camera feed when speed_debug_prediction is enabled, showing sample count plus average, median, and worst prediction error using the existing HUD text/background style."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "UI responsiveness fix: floating dock drags no longer pause the camera frame timer. Updated app/MAIN_FILE_SINGLE_CAM.py so dock layout throttling applies only to real dock layout transitions and docked-widget relayouts, not when the floating Link / Log Output panel is moved around the desktop."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Camera stabilization follow-up: hardened camera backend acceptance and display rendering in app/MAIN_FILE_SINGLE_CAM.py by rejecting probe frames that open as black, detecting repeated all-black runtime frames for automatic recovery, and forcing QImage/QPixmap display copies to own frame memory instead of borrowing temporary buffers."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Camera black-screen fix: used app/link_log_31026.txt to confirm frames were still processing after camera open, then prevented REST-mode auto-hide from switching tabs/clearing the live video label while tracking, aiming, or camera capture is active. File: app/MAIN_FILE_SINGLE_CAM.py."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Camera pipeline stabilization: hardened capture open/read/recovery flow in app/MAIN_FILE_SINGLE_CAM.py with guarded async open, retry-on-read-failure, automatic reopen after repeated failures, invalid-frame checks, cached-frame display fallback during recovery, and optional disabled-by-default camera debug logging persisted in settings.json."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Passive diagnostics update: added optional prediction test session logging with `speed_prediction_test_mode`, automatic sample export to `logs/prediction_tests/`, and end-of-session summary statistics (sample count, average, median, worst prediction error). Files: app/MAIN_FILE_SINGLE_CAM.py, settings.json."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Documentation update: added Prediction Validation Test Guide with safe live-test steps for passive prediction diagnostics, required debug configuration, test scenarios, statistics collection via Ctrl+Shift+P, and baseline error interpretation. File: PREDICTION_VALIDATION_TEST_GUIDE.md."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Documentation update: added a Detection Freshness and Reuse Behavior section describing hold-window box reuse, async YOLO cache reuse, the meaning of the next processed aiming center, and how prediction diagnostics must be interpreted when inputs may be reused or cached. Files: CHANGE_IMPACT_REFERENCE.md, DETECTION_PIPELINE_PARITY_REQUIREMENT.md."
+    },
+    {
+      "date": "2026-03-10",
+      "title": "Documentation update: added Detection Pipeline Parity Requirement and a full detection-mode parity audit covering YOLO, FrameDiff, BackSub, Color, and Hybrid modes. Documented the shared convergence point before SmartTracker, identified stale-box reuse and async YOLO cache paths, and added a permanent Detection Change Impact Checklist. Files: CHANGE_IMPACT_REFERENCE.md, DETECTION_PIPELINE_PARITY_REQUIREMENT.md."
+    },
+    {
+      "date": "2026-03-09",
+      "title": "State ownership fix: separated go-home context to prevent collision between Manual Go Home and Target-Loss Home. Added `_go_home_context` (`manual`/`loss-home`), set context at each entry point, and gated completion restore so pre-home tracking/aiming snapshots are restored only for manual go-home. Target-loss home now clears motion state without restoring stale snapshot flags. File: app/MAIN_FILE_SINGLE_CAM.py."
+    },
+    {
       "date": "2026-02-16",
       "title": "Current Telemetry Fix (ESP32 UDP): app now drains `esp32_link` state events each control cycle and maps `current_mA` payloads into Health Monitor telemetry. Added safe total-current display fallback when the install checkbox is off (shows live telemetry without auto-enabling protection). Also retained raw total telemetry cache to prevent blank monitor readings from stale checkbox state. Files: app/MAIN_FILE_SINGLE_CAM.py, app/ui_builder.py."
     },

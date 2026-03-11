@@ -146,6 +146,7 @@ class ColorDetector:
         # Debug/diagnostic info
         self.last_mask: Optional[np.ndarray] = None
         self.last_detection_count: int = 0
+        self.last_debug_info: Dict[str, Any] = {}
     
     def set_active_colors(self, colors_str: str) -> None:
         """
@@ -270,40 +271,91 @@ class ColorDetector:
         
         try:
             # Apply Gaussian blur to reduce noise
-            blurred = cv2.GaussianBlur(frame, (self.blur_kernel, self.blur_kernel), 0)
+            if int(self.blur_kernel) > 1:
+                blurred = cv2.GaussianBlur(frame, (self.blur_kernel, self.blur_kernel), 0)
+            else:
+                blurred = frame
             
             # Convert to HSV color space
             hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
             
             # Create combined mask for all active colors
-            mask = self._create_color_mask(hsv)
+            raw_mask = self._create_color_mask(hsv)
+            raw_mask_pixels = int(np.count_nonzero(raw_mask))
+            mask = raw_mask.copy()
             
             # Morphological operations to clean up mask
-            kernel = np.ones((5, 5), np.uint8)
+            kernel = np.ones((3, 3), np.uint8)
+            morph_fallback_used = False
             if self.morph_iterations > 0:
-                # Opening to remove small noise
-                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, 
-                                        iterations=self.morph_iterations)
-                # Closing to fill small holes
-                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel,
-                                        iterations=self.morph_iterations)
+                # Opening can easily erase small valid targets, so keep it conservative.
+                cleaned_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
+                # Closing fills gaps and is usually safer to apply with the configured strength.
+                cleaned_mask = cv2.morphologyEx(
+                    cleaned_mask,
+                    cv2.MORPH_CLOSE,
+                    kernel,
+                    iterations=self.morph_iterations,
+                )
+                cleaned_mask_pixels = int(np.count_nonzero(cleaned_mask))
+                if raw_mask_pixels > 0 and cleaned_mask_pixels == 0:
+                    mask = raw_mask.copy()
+                    morph_fallback_used = True
+                else:
+                    mask = cleaned_mask
             
             # Store mask for debugging
             self.last_mask = mask.copy()
+            mask_pixels = int(np.count_nonzero(mask))
             
             # Find contours
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            raw_contour_count = len(contours)
             
             # Filter contours by area and create bounding boxes
             boxes = []
+            filtered_small = 0
+            filtered_large = 0
             for contour in contours:
                 area = cv2.contourArea(contour)
                 if self.min_contour_area <= area <= self.max_contour_area:
                     x, y, w, h = cv2.boundingRect(contour)
                     boxes.append((x, y, w, h))
+                elif area < self.min_contour_area:
+                    filtered_small += 1
+                else:
+                    filtered_large += 1
             
             # Update detection count
             self.last_detection_count = len(boxes)
+            drop_stage = "boxes"
+            if raw_mask_pixels <= 0:
+                drop_stage = "hsv_mask"
+            elif mask_pixels <= 0:
+                drop_stage = "morphology"
+            elif raw_contour_count <= 0:
+                drop_stage = "contours"
+            elif not boxes and filtered_small > 0 and filtered_large == 0:
+                drop_stage = "min_area"
+            elif not boxes and filtered_large > 0 and filtered_small == 0:
+                drop_stage = "max_area"
+            elif not boxes and (filtered_small > 0 or filtered_large > 0):
+                drop_stage = "area_filter"
+
+            self.last_debug_info = {
+                "hsv_valid": True,
+                "active_colors": list(self.active_colors),
+                "blur_kernel": int(self.blur_kernel),
+                "morph_iterations": int(self.morph_iterations),
+                "raw_mask_pixels": int(raw_mask_pixels),
+                "mask_pixels": int(mask_pixels),
+                "contour_count": int(raw_contour_count),
+                "filtered_small": int(filtered_small),
+                "filtered_large": int(filtered_large),
+                "boxes_produced": int(len(boxes)),
+                "drop_stage": str(drop_stage),
+                "morph_fallback_used": bool(morph_fallback_used),
+            }
             
             # Play detection sound if detections found
             self._play_detect_sound_if_needed(len(boxes) > 0)
@@ -314,6 +366,21 @@ class ColorDetector:
             
         except Exception as e:
             print(f"[COLOR] Detection error: {e}")
+            self.last_debug_info = {
+                "hsv_valid": False,
+                "active_colors": list(self.active_colors),
+                "blur_kernel": int(self.blur_kernel),
+                "morph_iterations": int(self.morph_iterations),
+                "raw_mask_pixels": 0,
+                "mask_pixels": 0,
+                "contour_count": 0,
+                "filtered_small": 0,
+                "filtered_large": 0,
+                "boxes_produced": 0,
+                "drop_stage": "exception",
+                "morph_fallback_used": False,
+                "error": str(e),
+            }
             if return_mask:
                 return [], None
             return []

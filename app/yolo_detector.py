@@ -16,6 +16,20 @@ YOLO = None
 _HAS_ULTRALYTICS = False
 
 
+def _prepare_windows_torch_runtime_env() -> None:
+    """Set conservative CPU/OpenMP environment defaults for torch stability."""
+    try:
+        if os.name != "nt":
+            return
+        os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+        os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+        os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+    except Exception:
+        pass
+
+
 def _prepare_windows_torch_dll_path() -> None:
     """Best-effort DLL search path setup for torch on Windows.
 
@@ -115,6 +129,10 @@ class YoloDetector:
         # self.models_dir) or a full/relative path to a .pt file. If the
         # requested model matches the currently-loaded path, treat as a no-op.
         try:
+            try:
+                _prepare_windows_torch_runtime_env()
+            except Exception:
+                pass
             try:
                 _prepare_windows_torch_dll_path()
             except Exception:

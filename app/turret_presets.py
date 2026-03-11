@@ -194,6 +194,97 @@ PRESETS = {
         "auto_strike_min_error_deg": 2.0,
     },
 
+    "Behavior / Still Until Detect (Fast Lock)": {
+        "tracking_speed": 85,
+        "movement_sensitivity": 62,
+        "smoothing_factor": 0.24,
+        "deadzone": 18,
+        "snap_threshold": 175,
+        "aim_aggression": 92,
+        "final_approach_boost": True,
+        "detection_pause_ms": 700,
+        "motion_fire_frames_required": 1,
+        "fire_stability_frames_required": 2,
+        "speed_profile_mode": "Aggressive",
+        "hold_seconds": 1.2,
+        "hold_infinite": False,
+        "home_return_mode": "Disabled",
+        "idle_behavior": "Rest",
+        "idle_mode_enabled": False,
+        "yolo_confidence": 0.9,
+        "yolo_min_area": 50000,
+        "yolo_max_results": 1,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Behavior / Moving Object Lock (Closest Persistent)": {
+        "detection_mode": "Background Subtraction",
+        "threshold": 28,
+        "blur_kernel": 5,
+        "dilate_iter": 2,
+        "min_contour": 2500,
+        "max_contour": 180000,
+        "backsub_warmup": 30,
+        "tracking_speed": 78,
+        "movement_sensitivity": 58,
+        "smoothing_factor": 0.45,
+        "deadzone": 20,
+        "snap_threshold": 170,
+        "aim_aggression": 84,
+        "final_approach_boost": True,
+        "detection_pause_ms": 450,
+        "motion_fire_frames_required": 2,
+        "fire_stability_frames_required": 3,
+        "speed_profile_mode": "Balanced",
+        "hold_seconds": 1.0,
+        "hold_infinite": False,
+        "home_return_mode": "Disabled",
+        "idle_behavior": "Rest",
+        "idle_mode_enabled": False,
+        "yolo_confidence": 0.9,
+        "yolo_min_area": 50000,
+        "yolo_max_results": 1,
+        **PRECISION_DEFAULTS,
+    },
+
+    "Target / Filtered Detection / Small / Gray Rat": {
+        "detection_mode": "Filtered Target Mode",
+        "threshold": 18,
+        "blur_kernel": 3,
+        "dilate_iter": 1,
+        "min_contour": 50,
+        "max_contour": 500,
+        "color_preset": "custom",
+        "color_h_min": 0,
+        "color_h_max": 179,
+        "color_s_min": 0,
+        "color_s_max": 65,
+        "color_v_min": 35,
+        "color_v_max": 185,
+        "color_min_area": 20,
+        "color_max_area": 12000,
+        "color_blur": 3,
+        "color_morph": 1,
+        "filtered_mode_motion_required": True,
+        "filtered_mode_color_required": True,
+        "filtered_mode_area_filter_enabled": True,
+        "filtered_mode_use_yolo": False,
+        "tracking_speed": 68,
+        "movement_sensitivity": 52,
+        "smoothing_factor": 0.28,
+        "deadzone": 10,
+        "snap_threshold": 120,
+        "aim_aggression": 86,
+        "final_approach_boost": True,
+        "detection_pause_ms": 260,
+        "motion_fire_frames_required": 1,
+        "fire_stability_frames_required": 1,
+        "speed_profile_mode": "Aggressive",
+        **PRECISION_DEFAULTS,
+        "precision_mode": False,
+        "precision_max_step": 1.8,
+    },
+
     # ----------------------------------------------------------------------
     # Target / Frame Difference (Mode 0)
     # ----------------------------------------------------------------------
@@ -874,6 +965,10 @@ def _apply_speed_profiles() -> None:
             profile = SPEED_BEHAVIOR_RESPONSIVE
         elif name_l.startswith("behavior / aggressive"):
             profile = SPEED_BEHAVIOR_AGGRESSIVE
+        elif name_l.startswith("behavior / still until detect"):
+            profile = SPEED_BEHAVIOR_RESPONSIVE
+        elif name_l.startswith("behavior / moving object lock"):
+            profile = SPEED_MOTION_BALANCED
         elif "yolo" in name_l:
             profile = SPEED_YOLO_FAST
         elif "color" in name_l:

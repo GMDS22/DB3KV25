@@ -199,7 +199,7 @@ Whenever you see the instruction "INITIATE SERVO UPGRADE", you MUST review this 
 ## AutoTracker System Change Impact Map
 
 > **Document Version:** 1.0  
-> **Last Updated:** 2026-02-06  
+> **Last Updated:** 2026-03-10  
 > **Maintainer:** AutoTracker Development Team
 
 ---
@@ -381,6 +381,82 @@ Processes video frames to detect targets using multiple algorithms (YOLO, Frame 
 7-9 = Color Hybrid modes
 ```
 
+### Detection Pipeline Parity Requirement
+
+Any modification affecting:
+- detection
+- centroid generation
+- bounding boxes
+- tracking
+- prediction
+- diagnostics
+- PID aiming inputs
+
+**MUST** be verified across **ALL** detection modes before merge.
+
+Detection modes that must always be tested:
+- YOLO
+- Frame Difference
+- Background Subtraction
+- Color detection
+- Hybrid modes combining YOLO with other detectors
+
+Authoritative audit reference:
+- [DETECTION_PIPELINE_PARITY_REQUIREMENT.md](DETECTION_PIPELINE_PARITY_REQUIREMENT.md)
+
+Unified convergence point for parity-sensitive changes:
+- Mode-specific detector outputs normalize into shared `boxes`
+- Shared stale-box / hold-window reuse may occur
+- Shared `SmartTracker.update_detections(...)` handoff begins at [app/MAIN_FILE_SINGLE_CAM.py](app/MAIN_FILE_SINGLE_CAM.py#L21690-L21698)
+- Shared centroid → prediction → PID flow continues from there
+
+Important parity warning:
+- A change that only works for one detection mode must **not** be merged until parity across all modes is confirmed.
+
+### Detection Freshness and Reuse Behavior
+
+#### Detection reuse paths
+
+- FrameDiff / BackSub / Color pipelines may reuse `boxes` through the `lost_hold_seconds` hold window.
+- The current default reuse window is up to **5 seconds**.
+
+#### Async YOLO caching
+
+- Threaded YOLO mode may reuse cached detection results.
+- Maximum cache age is typically around **0.35 seconds** unless configured otherwise.
+
+#### Tracking pipeline meaning
+
+- The runtime tracking pipeline operates on the **next processed aiming center**, not strictly the next fresh detector emission.
+
+#### Prediction diagnostics interpretation
+
+- Prediction error statistics measure **previous prediction vs next processed aiming sample**.
+- That sample may come from:
+        - fresh detector output
+        - reused hold-window detection
+        - cached YOLO detection
+
+#### Development rule
+
+- Improvements to prediction, diagnostics, or tracking must assume detection inputs may sometimes be reused or cached.
+- Fresh-frame assumptions must not be hardcoded unless a freshness flag is explicitly implemented.
+
+### Detection Change Impact Checklist
+
+- [ ] Does the change affect detector outputs?
+- [ ] Does the change affect centroid generation?
+- [ ] Does the change affect bounding box reuse or hold windows?
+- [ ] Does the change affect SmartTracker inputs?
+- [ ] Does the change affect prediction inputs?
+- [ ] Does the change affect PID error inputs?
+- [ ] Has the change been validated in **ALL** detection modes?
+        - [ ] YOLO
+        - [ ] FrameDiff
+        - [ ] BackSub
+        - [ ] Color
+        - [ ] Hybrid modes
+
 ### If You Change ANY of the Following
 
 #### Detection Thresholds (`threshold`, `min_contour`, `max_contour`)
@@ -427,6 +503,8 @@ You **MUST ALSO** check/update:
 4. **Color detection HSV vs BGR**: OpenCV uses BGR, color presets expect HSV
 5. **Hybrid mode order**: Some modes AND results, others OR - affects sensitivity
 6. **SmartTracker centroid**: Main app now uses `tracking_enhancements.SmartTracker` to smooth and persist centroid aiming. If removed or bypassed, the yellow-dot will drift and targeting will jump between detections.
+7. **Stale-box reuse parity**: Non-pure-YOLO modes may repopulate `boxes` from `last_detections` inside the hold window, so diagnostics and tracking changes must distinguish fresh detections from reused ones.
+8. **Async YOLO freshness parity**: YOLO-bearing modes may consume cached async results that are still inside the allowed max-age window, so "actual" samples are not always guaranteed to be fresh detector output.
 
 ### Common Failure Modes
 
@@ -446,6 +524,8 @@ You **MUST ALSO** check/update:
 3. Verify bounding boxes draw around correct objects
 4. Check serial log for detection coordinates
 5. Test detection loss behavior (target leaving frame)
+6. Verify parity of centroid / prediction / PID inputs across YOLO, FrameDiff, BackSub, Color, and Hybrid modes
+7. Verify any diagnostics or validation tooling distinguishes fresh detections from reused or cached detections
 
 ### Hybrid Mode 4/5 Threshold Semantics (INTENDED)
 
@@ -882,9 +962,14 @@ You **MUST ALSO** check/update:
 - [ ] ARM button state sync
 - [ ] Fire indicator pulse timing
 - [ ] Auto-fire enable flag
+- [ ] Active aim target selection (`_get_active_aim_target_center()` / aim-lock projection)
+- [ ] Red-box alignment thresholds for single-shot auto-fire
 - [ ] Motion-verified auto-fire gate (`motion_fire_*` settings + Tracking Behavior UI)
+- [ ] Fire stability gate (`_fire_stability_allowed(...)`)
+- [ ] Shared fire transport path: manual fire (`set_fire_state`) and auto-fire pulse (`_request_trigger_pulse`)
 - [ ] Rapid-fire duty cycle
 - [ ] Safety interlock checks
+- [ ] Trigger-mode change path must remain non-firing
 - [ ] Dual Port IO path: Nano must still receive IO tokens even if bus pan/tilt fails
 - [ ] Startup load: auto-fire must re-sync to Safety (ARM) state
 
@@ -897,6 +982,10 @@ You **MUST ALSO** check/update:
 5. **Tilt safety interlock**: MCU can report tilt locked - host must respect
 6. **Dual Port IO tokens**: In Dual Port, always send `S`/`M` and `F/L/R/G` tokens to Nano; do not rely on packed command parsing.
 7. **Auto-fire state**: On settings load, `auto_fire_enabled` must follow Safety (ARM) unless explicitly disabled.
+8. **Auto-fire reference point**: single-shot auto-fire now keys off the active red aim-box target being centered, not only the yellow/live target entering the deadzone.
+9. **Deadzone is not the single-shot fire command anymore**: deadzone still supports convergence and related gates, but changing deadzone alone should not redefine the red-box fire condition.
+10. **Trigger mode is configuration, not a trigger**: switching between Water (MOSFET) and Projectile (BB/Servo) must never synthesize a fire pulse.
+11. **Safety lock clears latched water-mode outputs**: when safety is locked, MOSFET hold must drop and rapid-fire must stop so stale IO state cannot continue driving output.
 
 ### Common Failure Modes
 
@@ -908,6 +997,9 @@ You **MUST ALSO** check/update:
 | Fire doesn't stop | Fire timeout not enforced, or flag stuck |
 | Commands appear in log but servo doesn't move | TX paused, or redundant filter blocking |
 | Auto-fire never triggers while ARMED | `auto_fire_enabled` not re-synced to Safety on load |
+| Auto-fire will not fire even though target looks centered | Red aim box is not actually centered within the alignment threshold, or cooldown/motion/stability gates are failing |
+| Auto-fire fires at the wrong point | Active aim target projection / aim-lock reference changed, or red-box alignment thresholds drifted |
+| Trigger mode switch causes a shot | Mode-change path is coupled to stale trigger or latched-output state and is no longer config-only |
 | Dual Port: Trigger does not fire | IO tokens not sent to Nano when bus ping/pt fails, or packed token parsing ignores `S/M` |
 | Dual Port: Nano telemetry/current never updates | Nano input not drained due to bus-mode decode gating |
 | Dual Port: pan/tilt moves stop when bus write fails | Incorrect fallback to Nano P/T when boards are not chained |
@@ -1448,6 +1540,7 @@ You **MUST ALSO** check/update:
 | 2025-12-19 | Copilot Agent | Fixed false tilt-safety latch that could suppress tilt on "OK" status messages (host parsing + explicit init) | Sections 5, 6, 13 |
 | 2025-12-20 | Copilot Agent | Documented Hybrid Mode 4/5 thresholds, idle auto-resume/guard defaults, and key Sentry constants/persistence couplings | Sections 3, 9, 12, Appendix A |
 | 2026-01-09 | Copilot Agent | Updated documentation workflow to prevent .md file accumulation - mandate RECENT_UPDATES.json for all changes, .md files only for complex cases | Section 1 |
+| 2026-03-10 | Copilot Agent | Documented red-box-based auto-fire alignment, shared fire-path constraints, and trigger or safety coupling updates | Section 6, Section 13, Appendix |
 
 ---
 
@@ -1541,6 +1634,45 @@ Previously, the Target Lost block wrote `target_pan/target_tilt` even when track
 
 ### Hidden coupling: `_complete_go_home` callback (REMOVED)
 The `_complete_go_home` QTimer.singleShot callback unconditionally set `tracking_active=True` after a delay, overriding all state guards. It was removed (2026-02-07) because the interpolation timer's own completion handler now handles cleanup and respects `_user_initiated_stop`.
+
+### Hidden coupling: Manual Go Home vs Target-Loss Home context (2026-03-09)
+`_in_go_home` can be entered from two different ownership flows:
+
+1) **Manual Go Home** (`go_home()` button flow)
+- Captures pre-home snapshots: `_go_home_prev_tracking`, `_go_home_prev_aiming`
+- Must restore those snapshots on completion (unless `_user_initiated_stop=True`)
+
+2) **Target-Loss Home** (Target Lost branch when hold expires and home mode is slow/immediate)
+- Must **not** capture manual snapshots
+- Must **not** restore stale `_go_home_prev_*` values on completion
+
+To prevent state collision, use `_go_home_context`:
+- `"manual"` when entering via `go_home()`
+- `"loss-home"` when entering via target-loss branch
+- Completion logic restores tracking/aiming only for `"manual"`
+- Always clear `_go_home_context` after completion
+
+If this context split is removed, target-loss homing can accidentally replay stale snapshot state and re-enable/disable tracking/aiming incorrectly.
+
+### Hidden coupling: aim-lock projection vs fire decision (2026-03-10)
+The single-shot auto-fire condition now uses the active aim target center from the aim-lock path, then checks whether that red-box target is centered near the frame midpoint.
+
+These pieces are coupled and must be reviewed together:
+- `_get_active_aim_target_center()`
+- any world-lock screen projection used by aim-lock
+- the red-box draw position shown to the operator
+- the auto-fire alignment thresholds and stability gate
+
+If one of those changes without the others, the operator can see a red box that no longer matches the actual fire decision.
+
+### Hidden coupling: manual fire path vs auto-fire pulse path (2026-03-10)
+Manual fire and auto-fire must remain transport-consistent even though they enter through different helpers:
+
+- Manual fire: `set_fire_state(1/0)`
+- Auto-fire: `_request_trigger_pulse(...)`
+- Both must still end up on the same downstream serial or IO output path
+
+Do not create a separate direct auto-fire transport path unless the same downstream safety, timeout, and output semantics are preserved.
 
 ### Hidden coupling: Dual Port `_home_step` serial guard
 `_home_step` must check BOTH `self.ser` and `self.bus_ser` before calling `send_serial_command()`. In Dual Port mode, pan/tilt routes through `bus_ser` while `self.ser` is Nano (IO only). If the guard only checks `self.ser`, homing silently fails when only `bus_ser` is open.

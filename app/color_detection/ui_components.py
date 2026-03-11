@@ -42,6 +42,7 @@ def build_color_detection_panel(app, parent_layout):
     app._color_advanced_widgets = []
     app._color_hybrid_widgets = []
     app._color_custom_hsv_widgets = []
+    app._color_filtered_mode_widgets = []
     
     # =========================================================================
     # COLOR PRESET DROPDOWN
@@ -308,6 +309,94 @@ def build_color_detection_panel(app, parent_layout):
     row += 1
     
     # Add to parent layout
+    separator5 = QFrame()
+    separator5.setFrameShape(QFrame.HLine)
+    separator5.setFrameShadow(QFrame.Sunken)
+    color_layout.addWidget(separator5, row, 0, 1, 2)
+    app._color_advanced_widgets.append(separator5)
+    app._color_filtered_mode_widgets.append(separator5)
+    row += 1
+
+    filtered_label = QLabel("Filtered Target Mode:")
+    filtered_label.setStyleSheet("font-weight: bold;")
+    color_layout.addWidget(filtered_label, row, 0, 1, 2)
+    app._color_advanced_widgets.append(filtered_label)
+    app._color_filtered_mode_widgets.append(filtered_label)
+    row += 1
+
+    app.filtered_mode_motion_required_checkbox = QCheckBox("Require motion overlap")
+    app.filtered_mode_motion_required_checkbox.setChecked(True)
+    app.filtered_mode_motion_required_checkbox.setToolTip(
+        "When enabled, Filtered Target Mode only accepts contours overlapping the motion mask."
+    )
+    color_layout.addWidget(app.filtered_mode_motion_required_checkbox, row, 0, 1, 2)
+    app._color_advanced_widgets.append(app.filtered_mode_motion_required_checkbox)
+    app._color_filtered_mode_widgets.append(app.filtered_mode_motion_required_checkbox)
+    row += 1
+
+    app.filtered_mode_color_required_checkbox = QCheckBox("Require color overlap")
+    app.filtered_mode_color_required_checkbox.setChecked(True)
+    app.filtered_mode_color_required_checkbox.setToolTip(
+        "When enabled, Filtered Target Mode only accepts contours overlapping the configured HSV color mask."
+    )
+    color_layout.addWidget(app.filtered_mode_color_required_checkbox, row, 0, 1, 2)
+    app._color_advanced_widgets.append(app.filtered_mode_color_required_checkbox)
+    app._color_filtered_mode_widgets.append(app.filtered_mode_color_required_checkbox)
+    row += 1
+
+    app.filtered_mode_area_filter_checkbox = QCheckBox("Enable contour area filter")
+    app.filtered_mode_area_filter_checkbox.setChecked(True)
+    app.filtered_mode_area_filter_checkbox.setToolTip(
+        "When enabled, Filtered Target Mode uses the main min/max contour thresholds before tracking."
+    )
+    color_layout.addWidget(app.filtered_mode_area_filter_checkbox, row, 0, 1, 2)
+    app._color_advanced_widgets.append(app.filtered_mode_area_filter_checkbox)
+    app._color_filtered_mode_widgets.append(app.filtered_mode_area_filter_checkbox)
+    row += 1
+
+    app.filtered_mode_use_yolo_checkbox = QCheckBox("Enable YOLO candidate source")
+    app.filtered_mode_use_yolo_checkbox.setChecked(False)
+    app.filtered_mode_use_yolo_checkbox.setToolTip(
+        "When enabled, Filtered Target Mode also lets YOLO contribute candidate boxes, but they still must pass the enabled motion/color/area filters before tracking."
+    )
+    color_layout.addWidget(app.filtered_mode_use_yolo_checkbox, row, 0, 1, 2)
+    app._color_advanced_widgets.append(app.filtered_mode_use_yolo_checkbox)
+    app._color_filtered_mode_widgets.append(app.filtered_mode_use_yolo_checkbox)
+    row += 1
+
+    filtered_preset_label = QLabel("Filtered Presets:")
+    color_layout.addWidget(filtered_preset_label, row, 0)
+    app._color_advanced_widgets.append(filtered_preset_label)
+    app._color_filtered_mode_widgets.append(filtered_preset_label)
+
+    preset_row = QHBoxLayout()
+    app.filtered_preset_gray_rat_btn = QPushButton("Gray Rat")
+    app.filtered_preset_gray_rat_btn.setToolTip(
+        "Apply a custom gray-color preset with small-object-friendly contour settings for Filtered Target Mode."
+    )
+    app.filtered_preset_dark_rat_btn = QPushButton("Dark Rat")
+    app.filtered_preset_dark_rat_btn.setToolTip(
+        "Apply a darker-gray preset for low-value rat targets while keeping motion and area filtering enabled."
+    )
+    preset_row.addWidget(app.filtered_preset_gray_rat_btn)
+    preset_row.addWidget(app.filtered_preset_dark_rat_btn)
+    preset_widget = QFrame()
+    preset_widget.setLayout(preset_row)
+    color_layout.addWidget(preset_widget, row, 1)
+    app._color_advanced_widgets.extend([
+        app.filtered_preset_gray_rat_btn,
+        app.filtered_preset_dark_rat_btn,
+        preset_widget,
+    ])
+    app._color_filtered_mode_widgets.extend([
+        filtered_preset_label,
+        app.filtered_preset_gray_rat_btn,
+        app.filtered_preset_dark_rat_btn,
+        preset_widget,
+    ])
+    row += 1
+
+    # Add to parent layout
     parent_layout.addWidget(color_group)
     
     # Store reference for visibility toggling
@@ -343,6 +432,20 @@ def set_color_hybrid_visible(app, visible: bool):
     """Show/hide the color-hybrid fusion widgets (modes 7-9 only)."""
     try:
         widgets = getattr(app, "_color_hybrid_widgets", [])
+        for w in list(widgets):
+            try:
+                if w is not None:
+                    w.setVisible(bool(visible))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def set_color_filtered_mode_visible(app, visible: bool):
+    """Show/hide widgets specific to Filtered Target Mode."""
+    try:
+        widgets = getattr(app, "_color_filtered_mode_widgets", [])
         for w in list(widgets):
             try:
                 if w is not None:
@@ -406,9 +509,151 @@ def connect_color_signals(app):
             app.color_show_mask_checkbox.stateChanged.connect(
                 lambda s, a=app: toggle_mask_display(a, s)
             )
+
+        for checkbox_name in [
+            "filtered_mode_motion_required_checkbox",
+            "filtered_mode_color_required_checkbox",
+            "filtered_mode_area_filter_checkbox",
+            "filtered_mode_use_yolo_checkbox",
+        ]:
+            checkbox = getattr(app, checkbox_name, None)
+            if checkbox:
+                checkbox.stateChanged.connect(lambda _s, a=app: getattr(a, "save_settings", lambda: None)())
+
+        if hasattr(app, "filtered_preset_gray_rat_btn"):
+            app.filtered_preset_gray_rat_btn.clicked.connect(
+                lambda: apply_filtered_target_preset(app, "gray_rat")
+            )
+        if hasattr(app, "filtered_preset_dark_rat_btn"):
+            app.filtered_preset_dark_rat_btn.clicked.connect(
+                lambda: apply_filtered_target_preset(app, "dark_rat")
+            )
             
     except Exception as e:
         print(f"[COLOR UI] Signal connection error: {e}")
+
+
+def apply_filtered_target_preset(app, preset_name: str) -> None:
+    """Apply a compact preset for Filtered Target Mode small gray targets."""
+    presets = {
+        "gray_rat": {
+            "h_min": 0,
+            "h_max": 179,
+            "s_min": 0,
+            "s_max": 65,
+            "v_min": 35,
+            "v_max": 185,
+            "min_contour": 40,
+            "max_contour": 5000,
+            "color_min_area": 35,
+            "color_max_area": 7000,
+            "color_blur": 3,
+            "color_morph": 1,
+            "threshold": 18,
+            "blur_kernel": 3,
+            "dilate_iter": 1,
+        },
+        "dark_rat": {
+            "h_min": 0,
+            "h_max": 179,
+            "s_min": 0,
+            "s_max": 75,
+            "v_min": 18,
+            "v_max": 125,
+            "min_contour": 35,
+            "max_contour": 4500,
+            "color_min_area": 30,
+            "color_max_area": 6500,
+            "color_blur": 3,
+            "color_morph": 1,
+            "threshold": 16,
+            "blur_kernel": 3,
+            "dilate_iter": 1,
+        },
+    }
+
+    try:
+        p = presets.get(str(preset_name).strip().lower())
+        if not isinstance(p, dict):
+            return
+
+        if hasattr(app, "detection_mode_combo") and app.detection_mode_combo is not None:
+            try:
+                idx = app.detection_mode_combo.findText("Filtered Target Mode")
+                if idx >= 0:
+                    app.detection_mode_combo.setCurrentIndex(idx)
+            except Exception:
+                pass
+
+        try:
+            app.color_preset_combo.setCurrentText("custom")
+        except Exception:
+            pass
+
+        for name, value in [
+            ("color_h_min", p["h_min"]),
+            ("color_h_max", p["h_max"]),
+            ("color_s_min", p["s_min"]),
+            ("color_s_max", p["s_max"]),
+            ("color_v_min", p["v_min"]),
+            ("color_v_max", p["v_max"]),
+            ("color_min_area_input", p["color_min_area"]),
+            ("color_max_area_input", p["color_max_area"]),
+            ("color_blur_input", p["color_blur"]),
+            ("color_morph_input", p["color_morph"]),
+            ("min_contour_input", p["min_contour"]),
+            ("max_contour_input", p["max_contour"]),
+            ("threshold_input", p["threshold"]),
+            ("blur_kernel_input", p["blur_kernel"]),
+            ("dilate_iter_input", p["dilate_iter"]),
+        ]:
+            try:
+                widget = getattr(app, name, None)
+                if widget is not None and hasattr(widget, "setValue"):
+                    widget.setValue(int(value))
+            except Exception:
+                pass
+
+        for checkbox_name in [
+            "filtered_mode_motion_required_checkbox",
+            "filtered_mode_color_required_checkbox",
+            "filtered_mode_area_filter_checkbox",
+            "filtered_mode_use_yolo_checkbox",
+        ]:
+            try:
+                widget = getattr(app, checkbox_name, None)
+                if widget is not None and hasattr(widget, "setChecked"):
+                    widget.setChecked(True)
+            except Exception:
+                pass
+
+        try:
+            update_custom_color(app)
+        except Exception:
+            pass
+        try:
+            update_detection_params(app)
+        except Exception:
+            pass
+        try:
+            adv_cb = getattr(app, "show_advanced_detection_checkbox", None)
+            adv = bool(getattr(adv_cb, "isChecked", lambda: False)())
+            set_color_custom_hsv_visible(app, bool(adv))
+        except Exception:
+            pass
+
+        if hasattr(app, "save_settings"):
+            app.save_settings()
+        try:
+            if hasattr(app, "enhancer"):
+                app.enhancer.log_serial_output(
+                    f"[FILTERED PRESET] Applied {preset_name.replace('_', ' ')} preset",
+                    fire=False,
+                )
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"[COLOR UI] Filtered preset error: {e}")
 
 
 def on_color_preset_change(app, preset_name: str):

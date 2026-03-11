@@ -28,10 +28,14 @@ def fuse_detections_and(boxes1: List[Tuple], boxes2: List[Tuple],
     
     fused = []
     used_b2 = set()
+
+    def _center_in_box(cx: float, cy: float, box: Tuple) -> bool:
+        x, y, w, h = box
+        return (x <= cx <= (x + w)) and (y <= cy <= (y + h))
     
     for b1 in boxes1:
         x1, y1, w1, h1 = b1
-        best_iou = 0
+        best_score = 0.0
         best_box = None
         best_idx = -1
         
@@ -49,14 +53,32 @@ def fuse_detections_and(boxes1: List[Tuple], boxes2: List[Tuple],
             
             if wi > 0 and hi > 0:
                 inter_area = wi * hi
-                union_area = w1 * h1 + w2 * h2 - inter_area
+                area1 = w1 * h1
+                area2 = w2 * h2
+                union_area = area1 + area2 - inter_area
                 iou = inter_area / union_area if union_area > 0 else 0
+                smaller_area = min(area1, area2)
+                overlap_small = inter_area / smaller_area if smaller_area > 0 else 0.0
+
+                c1x = x1 + (w1 * 0.5)
+                c1y = y1 + (h1 * 0.5)
+                c2x = x2 + (w2 * 0.5)
+                c2y = y2 + (h2 * 0.5)
+                center_match = _center_in_box(c1x, c1y, b2) or _center_in_box(c2x, c2y, b1)
+
+                matched = (
+                    iou >= overlap_threshold
+                    or overlap_small >= overlap_threshold
+                    or (center_match and overlap_small >= max(0.10, overlap_threshold * 0.5))
+                )
                 
-                if iou > best_iou and iou >= overlap_threshold:
-                    best_iou = iou
+                if matched:
+                    score = max(iou, overlap_small)
+                    if score > best_score:
+                        best_score = score
                     # Return the larger box
-                    best_box = b1 if w1 * h1 >= w2 * h2 else b2
-                    best_idx = idx
+                        best_box = b1 if area1 >= area2 else b2
+                        best_idx = idx
         
         if best_box is not None:
             fused.append(best_box)

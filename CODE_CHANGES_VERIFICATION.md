@@ -1,5 +1,26 @@
 # Serial Connection Async Fix - Code Verification
 
+## Addendum: Go-Home Context Collision Fix Verification (2026-03-09)
+
+**Status**: ✅ VERIFIED COMPLETE  
+**File**: app/MAIN_FILE_SINGLE_CAM.py  
+**Scope**: localized to go-home state handling only
+
+### What was verified
+
+- [x] Added `_go_home_context` initialization in `__init__()`
+- [x] Manual `go_home()` sets `_go_home_context = "manual"` and captures `_go_home_prev_tracking/_go_home_prev_aiming`
+- [x] Target-loss home paths set `_go_home_context = "loss-home"` without capturing snapshot flags
+- [x] Go-home completion restores snapshot flags only when context is `"manual"`
+- [x] Context is cleared after completion (`_go_home_context = None`)
+- [x] No edits to `send_serial_command()` or protocol/serial routing logic
+- [x] No edits to `_ensure_autotrack_autoaim_lock()` logic
+- [x] File diagnostics show no errors after patch
+
+### Safety outcome
+
+This prevents stale snapshot replay when target-loss homing finishes, while preserving expected restore behavior for operator-initiated manual Go Home.
+
 **Status**: ✅ VERIFIED COMPLETE  
 **File**: app/MAIN_FILE_SINGLE_CAM.py  
 **Total Changes**: 4 locations  

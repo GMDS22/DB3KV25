@@ -175,6 +175,26 @@ Tracking Behavior Panel (Right Dock)
 
 See `DETECTION_PAUSE_UI_LOCATION.md` for detailed usage guide and troubleshooting.
 
+## Auto-Fire and Trigger Behavior (March 2026)
+
+The firing reference during aim-lock is now the red aim box, while the yellow/live target marker remains the visual indicator for what the detector is currently tracking.
+
+- **Single-shot auto-fire** only requests a shot when safety is ARMED, auto-fire is enabled, cooldown has expired, motion and stability gates pass, and the red aim box is centered close to frame center on both axes.
+- **Deadzone entry alone is no longer the single-shot fire command.** Deadzone still helps convergence and some rapid-fire behavior, but the operator-visible red aim target is now the authoritative reference for auto-fire timing.
+- **Manual fire** remains a separate operator action and still uses the normal fire output path.
+
+### Trigger modes
+
+- **Water (MOSFET)**: supports MOSFET hold and rapid-fire.
+- **Projectile (BB/Servo)**: uses pulse-style firing.
+- Switching trigger mode is a configuration change only. It should not by itself request a shot.
+
+### Safety behavior
+
+- Locking safety immediately disables auto-fire.
+- Locking safety also drops latched Water-mode outputs such as MOSFET hold and stops active rapid-fire.
+- If nothing fires while the system appears centered, check safety state first, then auto-fire enable, cooldown, and whether the red aim box is actually centered.
+
 ## Next steps
 
 - If you want me to force a CPU-only ultralytics import inside the app, or add
