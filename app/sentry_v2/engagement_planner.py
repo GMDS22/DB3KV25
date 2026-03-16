@@ -67,16 +67,19 @@ class EngagementPlanner:
             t for t in targets if t.threat_score >= self.eng.min_threat_score
         ][: self.eng.max_queue_length]
 
+        if self.eng.single_target_only and qualified:
+            qualified = qualified[:1]
+
         if not qualified:
             return []
 
         # Convert each target to pan/tilt
         orders: List[EngagementOrder] = []
         for t in qualified:
-            pan, tilt = self._pixel_to_pantilt(t)
+            pan, tilt = self._pixel_to_pantilt(t, current_pan, current_tilt)
             orders.append(EngagementOrder(target=t, pan=pan, tilt=tilt, rank=0))
 
-        if self.eng.optimize_slew_order and len(orders) > 1:
+        if (not self.eng.single_target_only) and self.eng.optimize_slew_order and len(orders) > 1:
             orders = self._nearest_neighbour_order(orders, current_pan, current_tilt)
         else:
             # Keep threat-score order
@@ -89,27 +92,48 @@ class EngagementPlanner:
     # Pixel → Pan / Tilt conversion
     # ------------------------------------------------------------------ #
 
-    def _pixel_to_pantilt(self, target: TrackedTarget) -> Tuple[float, float]:
+    def pixel_error_to_angle_error(self, norm_cx: float, norm_cy: float) -> Tuple[float, float]:
+        """Convert a normalized detection center into pan/tilt angular error."""
+        g = self.guard
+        dx = float(norm_cx) - 0.5
+        dy = float(norm_cy) - 0.5
+        pan_err = dx * g.camera_hfov + g.pan_center_bias_deg
+        tilt_err = -(dy * g.camera_vfov) + g.tilt_center_bias_deg
+        return pan_err, tilt_err
+
+    def aim_from_normalized_center(
+        self,
+        norm_cx: float,
+        norm_cy: float,
+        current_pan: float,
+        current_tilt: float,
+    ) -> Tuple[float, float]:
+        """Convert a normalized detection center to absolute turret angles."""
+        g = self.guard
+        pan_err, tilt_err = self.pixel_error_to_angle_error(norm_cx, norm_cy)
+        pan = current_pan + pan_err
+        tilt = current_tilt + tilt_err
+        pan = max(g.pan_min, min(g.pan_max, pan))
+        tilt = max(g.tilt_min, min(g.tilt_max, tilt))
+        return pan, tilt
+
+    def _pixel_to_pantilt(
+        self, target: TrackedTarget, current_pan: float, current_tilt: float,
+    ) -> Tuple[float, float]:
         """
         Convert a normalised detection center to absolute pan/tilt degrees.
 
-        Assumes:
-          - guard_pan / guard_tilt = turret position when camera center = (0.5, 0.5)
-          - camera_hfov / camera_vfov = angular coverage
+        Uses the turret's *current* position as reference (not the guard
+        home position), since the camera shows what the turret is pointing
+        at right now.  A target at frame-center (0.5, 0.5) means the
+        turret is already aimed correctly → output == current position.
         """
-        g = self.guard
-        # Offset from frame center in normalised coords (-0.5 .. +0.5)
-        dx = target.det.norm_cx - 0.5
-        dy = target.det.norm_cy - 0.5
-
-        # Convert to degrees
-        pan = g.guard_pan + dx * g.camera_hfov
-        tilt = g.guard_tilt + dy * g.camera_vfov
-
-        # Clamp to safe servo range
-        pan = max(5.0, min(185.0, pan))
-        tilt = max(10.0, min(130.0, tilt))
-        return pan, tilt
+        return self.aim_from_normalized_center(
+            target.det.norm_cx,
+            target.det.norm_cy,
+            current_pan,
+            current_tilt,
+        )
 
     # ------------------------------------------------------------------ #
     # Minimum-slew ordering (nearest-neighbour TSP heuristic)

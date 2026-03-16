@@ -10,12 +10,86 @@ import runpy
 import warnings
 import io
 import traceback
+import subprocess
 from datetime import datetime
+import ctypes
+from ctypes import wintypes
 
 # Suppress PyQt5 warnings about unregistered signal types (non-critical)
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 warnings.filterwarnings('ignore', message='.*QTextCursor.*')
 warnings.filterwarnings('ignore', message='.*Cannot queue arguments.*')
+
+
+_single_instance_mutex = None
+
+
+def _is_child_of_same_launcher() -> bool:
+    if os.name != "nt":
+        return False
+    try:
+        parent_pid = int(os.getppid())
+    except Exception:
+        return False
+    if parent_pid <= 0:
+        return False
+
+    try:
+        current_path = os.path.normcase(os.path.abspath(__file__))
+        current_name = os.path.basename(current_path)
+        cmd = (
+            f'Get-CimInstance Win32_Process -Filter "ProcessId = {parent_pid}" | '
+            'Select-Object -ExpandProperty CommandLine | Out-String'
+        )
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", cmd],
+            capture_output=True,
+            text=True,
+            timeout=2.0,
+        )
+        parent_cmd = (proc.stdout or "").strip()
+        if not parent_cmd:
+            return False
+        parent_norm = os.path.normcase(parent_cmd)
+        return (current_path in parent_norm) or (current_name in parent_norm and "python" in parent_norm)
+    except Exception:
+        return False
+
+
+def _enforce_single_instance() -> None:
+    """Prevent duplicate Windows GUI instances from fighting over COM ports."""
+    global _single_instance_mutex
+    if os.name != "nt":
+        return
+    if _is_child_of_same_launcher():
+        try:
+            err = getattr(sys.stderr, "original", sys.__stderr__)
+            err.write("[BOOT] Duplicate child launcher detected. Exiting child run.py process.\n")
+        except Exception:
+            pass
+        raise SystemExit(0)
+    try:
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateMutexW.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR]
+        kernel32.CreateMutexW.restype = wintypes.HANDLE
+        mutex_name = "Local\\DB3000V4_MAIN_APP_SINGLE_INSTANCE"
+        ctypes.set_last_error(0)
+        handle = kernel32.CreateMutexW(None, False, mutex_name)
+        last_error = ctypes.get_last_error()
+        if not handle:
+            return
+        _single_instance_mutex = handle
+        if last_error == 183:
+            try:
+                err = getattr(sys.stderr, "original", sys.__stderr__)
+                err.write("[BOOT] Another DB3000 app instance is already running. Exiting duplicate launcher.\n")
+            except Exception:
+                pass
+            raise SystemExit(0)
+    except SystemExit:
+        raise
+    except Exception:
+        pass
 
 
 def _configure_ml_runtime_env() -> None:

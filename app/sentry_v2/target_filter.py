@@ -13,6 +13,9 @@ from typing import List, Optional, Tuple
 from .sentry_v2_config import TargetFilterConfig
 
 
+NON_SEMANTIC_CLASSES = {"motion", "foreground", "color"}
+
+
 @dataclass
 class DetectedObject:
     """A single YOLO detection normalised for sentry processing."""
@@ -22,6 +25,7 @@ class DetectedObject:
     bbox: Tuple[int, int, int, int]     # (x, y, w, h) in pixels
     center_x: float                     # Pixel center x
     center_y: float                     # Pixel center y
+    source: str = "yolo"
     frame_width: int = 640
     frame_height: int = 480
 
@@ -63,8 +67,14 @@ class TargetFilter:
 
     # ------------------------------------------------------------------ #
     def _passes(self, det: DetectedObject) -> bool:
+        is_non_semantic = det.class_name in NON_SEMANTIC_CLASSES
+
         # 1. Class whitelist
-        if self.cfg.allowed_classes and det.class_name not in self.cfg.allowed_classes:
+        if (
+            not is_non_semantic
+            and self.cfg.allowed_classes
+            and det.class_name not in self.cfg.allowed_classes
+        ):
             return False
 
         # 2. Confidence
@@ -72,11 +82,12 @@ class TargetFilter:
             return False
 
         # 3. Size
-        area = det.area_ratio
-        if area < self.cfg.min_size_ratio:
-            return False
-        if self.cfg.max_size_ratio > 0 and area > self.cfg.max_size_ratio:
-            return False
+        if not is_non_semantic:
+            area = det.area_ratio
+            if area < self.cfg.min_size_ratio:
+                return False
+            if self.cfg.max_size_ratio > 0 and area > self.cfg.max_size_ratio:
+                return False
 
         # 4. Engagement zone
         z = self.cfg.engagement_zone

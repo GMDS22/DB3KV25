@@ -7,6 +7,8 @@ Import SentryV2TabWidget and add it as a tab in the main app.
 
 from .sentry_v2_config import SentryV2Config
 from .sentry_v2_engine import SentryV2Engine, SentryV2State
+from .sentry_v2_comm import SentryV2Comm
+from .sentry_v2_detector import SentryV2Detector
 from .target_filter import TargetFilter, DetectedObject
 from .threat_scorer import ThreatScorer, TrackedTarget
 from .engagement_planner import EngagementPlanner, EngagementOrder

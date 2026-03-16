@@ -409,8 +409,7 @@ class AutotrackingStateManager:
         self.enable_logging = enable_logging
         self.transaction_log = []
         self._corruption_count = 0
-        self._last_state_check = 0
-    
+
     def set_tracking_state_synced(self, tracking_enabled, aiming_enabled=None):
         """Set tracking and aiming states in sync to prevent split-brain.
         
@@ -481,21 +480,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             "serial_connect_button": "Open or close the ESP32 wireless link.",
             "esp32_host_input": "ESP32 IP or hostname (e.g., 192.168.4.1).",
             "esp32_port_input": "ESP32 UDP port (default 9000).",
-            "esp32_local_port_input": "Local UDP port (0 = auto).",
-            "serial_output": "Link console — incoming and outgoing link messages appear here.",
-            "tracking_toggle": "Enable or disable the autotracking system.",
             "aiming_toggle": "Enable or disable automatic aiming assistance.",
-            "fire_button": "Manual fire control (use only when safe).",
-            "sound_checkbox": "Toggle UI sound effects (notifications and alerts).",
             "overshoot_input": "Percent overshoot applied to motion gain; positive = more aggressive.",
             "precision_mode_checkbox": "Enable sub-pixel precision aiming (host-side PID and ROI refinement).",
             "precision_roi_input": "ROI size in pixels used for contour/template refinement (larger = more stable, more CPU).",
             "precision_kp_input": "Precision PID proportional gain (small values).",
-            "precision_ki_input": "Precision PID integral gain (helps remove steady-state error).",
             "precision_kd_input": "Precision PID derivative gain (damps oscillation).",
             "precision_hfov_input": "Approximate camera horizontal field-of-view in degrees (used to convert pixels → degrees).",
             "precision_max_step_input": "Maximum degrees the precision PID may command per frame (safety clamp).",
-            "precision_frac_threshold_input": "Micro-step trigger threshold in degrees (smaller = more sensitive micro-steps).",
             "lost_hold_input": "When target is lost, keep aiming at the last known position for this many seconds (0 = disable).",
             "hold_infinite_checkbox": "Hold the last known target position indefinitely after loss (no timeout).",
             "aim_aggression_slider": "How aggressively the turret recenters on target: 0=conservative, 50=balanced, 100=very aggressive (may overshoot).",
@@ -830,44 +822,60 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # Added: Mar 2026 | See: app/sentry_v2/
         self.sentry_v2_tab = None
         self.sentry_v2_active = False
+        self._sentry_v2_window = None
+        self._sentry_v2_window_action = None
         if SENTRY_V2_AVAILABLE and SentryV2TabWidget is not None:
             try:
                 self.sentry_v2_tab = SentryV2TabWidget()
-                self.main_tab_widget.addTab(self.sentry_v2_tab, "Smart Sentry")
+                if hasattr(self.sentry_v2_tab, "set_host_main_window"):
+                    self.sentry_v2_tab.set_host_main_window(self)
 
-                # Same signal interface as v1
-                self.sentry_v2_tab.turret_move_requested.connect(self._on_sentry_v2_turret_move)
-                self.sentry_v2_tab.fire_requested.connect(self._on_sentry_v2_fire)
+                self._sentry_v2_window = QMainWindow()
+                self._sentry_v2_window.setWindowTitle("Smart Sentry v2")
+                self._sentry_v2_window.setObjectName("smart_sentry_v2_window")
+                self._sentry_v2_window.setCentralWidget(self.sentry_v2_tab)
+                self._sentry_v2_window.resize(1280, 860)
+
+                def _handle_sentry_v2_window_close(event):
+                    try:
+                        if getattr(self, "sentry_v2_tab", None) is not None and self.sentry_v2_tab.is_enabled():
+                            self.sentry_v2_tab.set_enabled(False)
+                    except Exception:
+                        pass
+                    try:
+                        self.sentry_v2_active = False
+                    except Exception:
+                        pass
+                    try:
+                        if getattr(self, "_sentry_v2_window_action", None) is not None:
+                            self._sentry_v2_window_action.setChecked(False)
+                    except Exception:
+                        pass
+                    try:
+                        if event is not None and hasattr(event, "accept"):
+                            event.accept()
+                    except Exception:
+                        pass
+                    return None
+
+                self._sentry_v2_window.closeEvent = _handle_sentry_v2_window_close
+
+                # Only signals that the main app still needs
                 self.sentry_v2_tab.sentry_enabled_changed.connect(self._on_sentry_v2_enabled_changed)
-
-                # Extended v2 signals
                 self.sentry_v2_tab.detection_mode_changed.connect(self._on_sentry_v2_detection_mode_changed)
-                self.sentry_v2_tab.trigger_mode_changed.connect(self._on_sentry_v2_trigger_mode_changed)
-                self.sentry_v2_tab.toggle_led_requested.connect(lambda on: self.toggle_relay(1, on))
-                self.sentry_v2_tab.toggle_laser_requested.connect(lambda on: self.toggle_relay(2, on))
-                self.sentry_v2_tab.toggle_safety_requested.connect(self.toggle_safety)
-                self.sentry_v2_tab.go_home_requested.connect(self.go_home)
-                self.sentry_v2_tab.manual_move_requested.connect(self._on_sentry_v2_manual_move)
-                self.sentry_v2_tab.manual_fire_requested.connect(self._on_sentry_v2_manual_fire)
-                self.sentry_v2_tab.auto_trigger_changed.connect(self._on_sentry_v2_auto_trigger_changed)
+                self.sentry_v2_tab.color_preset_changed.connect(
+                    lambda preset: setattr(self, "color_preset", preset) if hasattr(self, "color_preset") else None
+                )
 
-                # Dock visibility management for sentry mode
                 self._sentry_v2_saved_dock_visibility = {}
-                self._sentry_v2_commanding = False
 
-                # Ensure tab-change handler is connected (v1 block may have been skipped)
-                try:
-                    self.main_tab_widget.currentChanged.disconnect(self._on_tab_changed)
-                except (TypeError, RuntimeError):
-                    pass
-                self.main_tab_widget.currentChanged.connect(self._on_tab_changed)
-
-                print("[SENTRY_V2] Smart Sentry v2 tab initialized successfully")
+                print("[SENTRY_V2] Smart Sentry v2 window initialized successfully")
             except Exception as e:
                 print(f"[SENTRY_V2] Failed to create tab: {e}")
                 import traceback
                 traceback.print_exc()
                 self.sentry_v2_tab = None
+                self._sentry_v2_window = None
         # ========== END AGENT-MANAGED BLOCK: SMART SENTRY V2 TAB ==========
 
         # === IDLE ZONES TAB ===
@@ -1486,6 +1494,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.camera_recover_cooldown_s = 1.5
         self.camera_dark_frame_count = 0
         self.camera_dark_frame_threshold = 8
+        self.camera_corrupt_frame_count = 0
+        self.camera_corrupt_frame_threshold = 5
         self.camera_black_mean_threshold = 2.0
         self.camera_black_max_threshold = 8
         self._camera_last_recover_ts = 0.0
@@ -1792,6 +1802,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.detection_pause_ms = 1000  # Milliseconds to pause detection when target enters scope
         self._detection_pause_until = 0.0  # Timestamp when detection pause expires
         self._was_in_scope = False  # Track scope entry for edge detection
+        self.precision_hfov_auto = True
+        self._auto_precision_hfov = 78.0
 
         # ========== MOTION-VERIFIED AUTO-FIRE (Feb 2026) ==========
         # Optional gate to prevent firing on stationary targets.
@@ -2056,6 +2068,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         class _YoloStub:
             def __init__(self):
                 self.model_loaded = False
+                self.models_dir = "YOLO_MODELS"
+                self.model_name = None
+                self.model_path = None
 
             def find_models(self):
                 return []
@@ -2602,9 +2617,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
             
-            # ===== SET MODE 5 (BackSub+YOLO) AS DEFAULT ON FIRST RUN =====
+            # ===== SET BACKGROUND SUBTRACTION AS DEFAULT ON FIRST RUN =====
             # If detection mode is still at 0 (Frame Difference), user hasn't customized it yet.
-            # Set to Mode 5 (BackSub + YOLO) for best tracking performance.
+            # For small moving targets like hands, pure motion tracking is the safer default.
             try:
                 current_mode = self._safe_current_index("detection_mode_combo", 0)
                 # Check if settings file exists (not first run if it does)
@@ -2612,17 +2627,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 settings_exists = os.path.isfile(self.SETTINGS_FILE)
                 
                 if not settings_exists and current_mode == 0:
-                    # First run: set default to Mode 5 (BackSub + YOLO)
-                    self.detection_mode_combo.setCurrentIndex(5)
+                    # First run: set default to Mode 1 (Background Subtraction)
+                    self.detection_mode_combo.setCurrentIndex(1)
                     self.save_settings()  # Persist the new default
                     try:
                         if hasattr(self, "enhancer"):
                             self.enhancer.log_serial_output(
-                                "[INIT] First run: Set detection mode to Mode 5 (BackSub + YOLO - Best)",
+                                "[INIT] First run: Set detection mode to Mode 1 (Background Subtraction - Hand Tracking)",
                                 fire=False
                             )
                     except Exception:
-                        print("[INIT] First run: Set detection mode to Mode 5 (BackSub + YOLO - Best)")
+                        print("[INIT] First run: Set detection mode to Mode 1 (Background Subtraction - Hand Tracking)")
             except Exception:
                 pass
             
@@ -2635,6 +2650,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             try:
                 # Attempt to auto-load the preferred layout (if present)
                 self.auto_load_default_layout()
+            except Exception:
+                pass
+            try:
+                self._schedule_startup_auto_connect()
             except Exception:
                 pass
         except Exception as e:
@@ -3482,6 +3501,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
         settings_layout.addWidget(self.connect_button, 3, 0, 1, 2)
+        try:
+            self._refresh_connect_button_state()
+        except Exception:
+            pass
 
         if getattr(self, "sound_checkbox", None) is None:
             self.sound_checkbox = QCheckBox("Sound Effects")
@@ -4396,8 +4419,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         if getattr(self, "yolo_browse_btn", None) is None:
             self.yolo_browse_btn = QPushButton("Browse...")
 
+        if getattr(self, "yolo_folder_btn", None) is None:
+            self.yolo_folder_btn = QPushButton("Folder...")
+
+        if getattr(self, "yolo_models_dir_label", None) is None:
+            self.yolo_models_dir_label = QLabel()
+            self.yolo_models_dir_label.setWordWrap(True)
+            self.yolo_models_dir_label.setStyleSheet("color: #9ec4ff; font-size: 10px;")
+
         # Match browse button width to combo for visual balance
         self.yolo_browse_btn.setMinimumWidth(85)
+        self.yolo_folder_btn.setMinimumWidth(85)
 
         try:
             try:
@@ -4433,6 +4465,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # Connect the browse button (safe connect)
             try:
                 self._safe_connect("yolo_browse_btn", "clicked", self.browse_yolo_model)
+            except Exception:
+                pass
+            try:
+                self._safe_connect("yolo_folder_btn", "clicked", self.browse_yolo_models_directory)
             except Exception:
                 pass
         except Exception:
@@ -4473,6 +4509,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 pass
             h.addWidget(self.yolo_model_combo)
             h.addWidget(self.yolo_browse_btn)
+            h.addWidget(self.yolo_folder_btn)
             container.setLayout(h)
             # Place container spanning the two input columns so the browse button sits
             # directly next to the combo and doesn't float to the far right.
@@ -4484,6 +4521,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 yolo_layout.addWidget(self.yolo_browse_btn, y, 2)
             except Exception:
                 pass
+            try:
+                yolo_layout.addWidget(self.yolo_folder_btn, y, 3)
+            except Exception:
+                pass
+        y += 1
+        yolo_layout.addWidget(QLabel("Models Folder:"), y, 0)
+        try:
+            current_models_dir = str(getattr(self.yolo_detector, "models_dir", "YOLO_MODELS") or "YOLO_MODELS")
+        except Exception:
+            current_models_dir = "YOLO_MODELS"
+        self.yolo_models_dir_label.setText(current_models_dir)
+        yolo_layout.addWidget(self.yolo_models_dir_label, y, 1, 1, 2)
         y += 1
         # Add a button to open the external YOLO Trainer window
         try:
@@ -5202,7 +5251,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         try:
             self._safe_widget_call("precision_hfov_input", "setRange", 10.0, 200.0)
             self._safe_widget_call("precision_hfov_input", "setSingleStep", 1.0)
-            self._safe_widget_call("precision_hfov_input", "setValue", 90.0)
+            self._safe_widget_call("precision_hfov_input", "setValue", 78.0)
             self._safe_connect("precision_hfov_input", "valueChanged", self.save_settings)
         except Exception:
             pass
@@ -7460,6 +7509,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     code_fixer_action.triggered.connect(open_code_fixer)
                 except Exception:
                     pass
+
+                if getattr(self, "_sentry_v2_window", None) is not None:
+                    self._sentry_v2_window_action = cast(Any, tools_menu.addAction("Smart Sentry v2"))
+                    try:
+                        self._sentry_v2_window_action.setCheckable(True)
+                        self._sentry_v2_window_action.setChecked(False)
+                        self._sentry_v2_window_action.triggered.connect(self._toggle_sentry_v2_window)
+                    except Exception:
+                        pass
                 
                 # Floating Panel
                 panel_action = tools_menu.addAction("Floating Panel")
@@ -7992,7 +8050,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     scope_settings_action.setChecked(False)
                                 except Exception:
                                     pass
-                            scope_window.closeEvent = lambda event: (on_scope_window_closed(), event.accept())
+                            def _scope_close_event(event):
+                                try:
+                                    on_scope_window_closed()
+                                except Exception:
+                                    pass
+                                try:
+                                    if event is not None and hasattr(event, 'accept'):
+                                        event.accept()
+                                except Exception:
+                                    pass
+                                return None
+                            scope_window.closeEvent = _scope_close_event
                     except Exception:
                         pass
             except Exception:
@@ -9875,6 +9944,35 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             return False
 
+    def _is_corrupt_camera_frame(self, frame) -> bool:
+        """Heuristic for striped or decoder-corrupted camera frames."""
+        try:
+            if frame is None or not hasattr(frame, "shape"):
+                return True
+            arr = np.asarray(frame)
+            if arr.ndim != 3 or arr.shape[2] != 3 or arr.size <= 0:
+                return True
+
+            arrf = arr.astype(np.float32, copy=False)
+            row_mean = arrf.mean(axis=1)
+            if row_mean.shape[0] < 4:
+                return False
+
+            row_delta = np.abs(np.diff(row_mean, axis=0))
+            delta_mag = row_delta.mean(axis=1)
+            low_texture_rows = (arrf.std(axis=1).mean(axis=1) < 6.0)
+            hard_band_edges = delta_mag > 45.0
+
+            band_ratio = float(np.mean(hard_band_edges)) if hard_band_edges.size else 0.0
+            flat_ratio = float(np.mean(low_texture_rows)) if low_texture_rows.size else 0.0
+
+            channel_mean = arrf.mean(axis=(0, 1))
+            dominant = float(np.max(channel_mean) / max(np.mean(channel_mean), 1.0))
+
+            return (band_ratio > 0.08 and flat_ratio > 0.45) or (band_ratio > 0.18) or (dominant > 2.8 and flat_ratio > 0.55)
+        except Exception:
+            return False
+
     def _show_camera_frame(self, frame) -> bool:
         """Render a frame directly to the video label for recovery/fallback use."""
         try:
@@ -10021,12 +10119,19 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             if ok and frame is not None and hasattr(frame, "size") and int(frame.size) > 0:
                 if self._is_black_camera_frame(frame):
                     self.camera_dark_frame_count = int(getattr(self, "camera_dark_frame_count", 0) or 0) + 1
+                    self.camera_corrupt_frame_count = 0
                     self._camera_debug_log(
                         f"black frame detected; dark_count={self.camera_dark_frame_count}"
+                    )
+                elif self._is_corrupt_camera_frame(frame):
+                    self.camera_corrupt_frame_count = int(getattr(self, "camera_corrupt_frame_count", 0) or 0) + 1
+                    self._camera_debug_log(
+                        f"corrupt frame detected; corrupt_count={self.camera_corrupt_frame_count}"
                     )
                 else:
                     self.camera_fail_count = 0
                     self.camera_dark_frame_count = 0
+                    self.camera_corrupt_frame_count = 0
                     self._last_good_camera_frame = frame
                     return True, frame
             self.camera_fail_count = int(getattr(self, "camera_fail_count", 0) or 0) + 1
@@ -10047,9 +10152,17 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             dark_threshold = int(getattr(self, "camera_dark_frame_threshold", 8) or 8)
         except Exception:
             dark_threshold = 8
+        try:
+            corrupt_threshold = int(getattr(self, "camera_corrupt_frame_threshold", 5) or 5)
+        except Exception:
+            corrupt_threshold = 5
         if int(getattr(self, "camera_dark_frame_count", 0) or 0) > dark_threshold:
             self._trigger_camera_recovery(
                 f"dark frame threshold exceeded ({int(getattr(self, 'camera_dark_frame_count', 0) or 0)})"
+            )
+        if int(getattr(self, "camera_corrupt_frame_count", 0) or 0) > corrupt_threshold:
+            self._trigger_camera_recovery(
+                f"corrupt frame threshold exceeded ({int(getattr(self, 'camera_corrupt_frame_count', 0) or 0)})"
             )
         if int(getattr(self, "camera_fail_count", 0) or 0) > threshold:
             self._trigger_camera_recovery(
@@ -10072,12 +10185,35 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
     def _safe_open_serial(self, port, baud, **kwargs):
         """Open serial port safely with validation. Returns serial.Serial or None on failure."""
+        def _normalize_serial_port_name(raw_port):
+            try:
+                port_text = str(raw_port or "").strip()
+            except Exception:
+                port_text = ""
+            if not port_text:
+                return ""
+
+            port_upper = port_text.upper()
+            if port_upper.startswith("\\\\.\\COM"):
+                return "\\\\.\\COM" + port_text[8:].strip()
+
+            # Scan/list UIs may hand back labels like "COM20  - USB Serial Device".
+            token = port_text.split()[0].strip().rstrip(":")
+            token_upper = token.upper()
+            if token_upper.startswith("COM") and len(token) > 3:
+                suffix = token[3:].strip()
+                if suffix.isdigit():
+                    return f"COM{int(suffix)}"
+            if token.isdigit():
+                return f"COM{int(token)}"
+            return port_text
+
         try:
-            p = str(port).strip() if port is not None else ""
+            p = _normalize_serial_port_name(port)
             b = int(baud)
         except Exception:
             try:
-                p = str(port).strip()
+                p = _normalize_serial_port_name(port)
             except Exception:
                 p = ""
             try:
@@ -10143,7 +10279,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     pass
                 return None
 
-        # First, try the provided port string directly
+        # First, try the normalized port string directly
         ser = _try_open(p)
         if ser is not None:
             return ser
@@ -10193,6 +10329,94 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             return int(self._serial_device_type_index()) == 2
         except Exception:
             return False
+
+    def _bus_servo_reply_matches_servo(self, rx: bytes, servo_id: int) -> bool:
+        try:
+            data = bytes(rx or b"")
+            return len(data) >= 3 and data[0] == 0xFF and data[2] == (int(servo_id) & 0xFF)
+        except Exception:
+            return False
+
+    def _port_looks_like_debug_board(self, port, baud) -> bool:
+        try:
+            port_text = str(port or "").strip()
+        except Exception:
+            port_text = ""
+        if not port_text:
+            return False
+
+        try:
+            pan_id = int(getattr(self, "bus_pan_servo_id", 1) or 1)
+        except Exception:
+            pan_id = 1
+        try:
+            tilt_id = int(getattr(self, "bus_tilt_servo_id", 2) or 2)
+        except Exception:
+            tilt_id = 2
+
+        ser = self._safe_open_serial(port_text, baud, timeout=0.08, write_timeout=0.5)
+        if ser is None:
+            return False
+
+        original_mode = str(getattr(self, "_bus_servo_checksum_mode", "sub") or "sub")
+        try:
+            for mode in ("sub", "xor"):
+                self._bus_servo_checksum_mode = mode
+                for servo_id in (pan_id, tilt_id):
+                    rx = self._bus_servo_try_ping(ser, servo_id, timeout_s=0.08)
+                    if self._bus_servo_reply_matches_servo(rx, servo_id):
+                        return True
+            return False
+        finally:
+            try:
+                self._bus_servo_checksum_mode = original_mode
+            except Exception:
+                pass
+            try:
+                ser.close()
+            except Exception:
+                pass
+
+    def _maybe_autocorrect_serial_port_roles(self, primary_port, primary_baud, debug_port, debug_baud):
+        try:
+            primary_text = str(primary_port or "").strip()
+        except Exception:
+            primary_text = ""
+        try:
+            debug_text = str(debug_port or "").strip()
+        except Exception:
+            debug_text = ""
+
+        if not primary_text or not debug_text or primary_text == debug_text:
+            return primary_port, primary_baud, debug_port, debug_baud, False
+
+        debug_is_bus = self._port_looks_like_debug_board(debug_text, debug_baud)
+        if debug_is_bus:
+            return primary_port, primary_baud, debug_port, debug_baud, False
+
+        primary_is_bus = self._port_looks_like_debug_board(primary_text, primary_baud)
+        if not primary_is_bus:
+            return primary_port, primary_baud, debug_port, debug_baud, False
+
+        swapped_primary = debug_text
+        swapped_debug = primary_text
+        try:
+            self._safe_widget_call("com_port_input", "setText", swapped_primary)
+            self._safe_widget_call("debug_board_com_port_input", "setText", swapped_debug)
+        except Exception:
+            pass
+        try:
+            self._safe_enhancer_log(
+                f"[SERIAL] Auto-corrected swapped ports: ESP32={swapped_primary}, Debug Board={swapped_debug}",
+                fire=False,
+            )
+        except Exception:
+            pass
+        try:
+            self.save_settings()
+        except Exception:
+            pass
+        return swapped_primary, primary_baud, swapped_debug, debug_baud, True
 
     def _serial_is_nano_ascii(self) -> bool:
         # Backward-compatible helper name: index 0 is now ESP32 ASCII/IO mode.
@@ -11553,6 +11777,82 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             return False
 
+    def _refresh_yolo_model_combo(self, selected_model: str = "") -> str:
+        """Refresh the YOLO model combo from the currently configured models directory."""
+        try:
+            combo = getattr(self, "yolo_model_combo", None)
+            if combo is None:
+                return ""
+
+            try:
+                requested = str(selected_model or combo.currentText() or "").strip()
+            except Exception:
+                requested = ""
+
+            try:
+                models = list(self.yolo_detector.find_models() or [])
+            except Exception:
+                models = []
+
+            combo.blockSignals(True)
+            combo.clear()
+            if models:
+                combo.addItems(models)
+
+            resolved = ""
+            requested_base = os.path.basename(requested) if requested else ""
+            if requested in models:
+                resolved = requested
+            elif requested_base in models:
+                resolved = requested_base
+            elif models:
+                resolved = sorted(models)[0]
+
+            if requested and combo.findText(requested) == -1 and (os.path.isabs(requested) or os.path.exists(requested)):
+                combo.addItem(requested)
+                resolved = requested
+
+            if resolved:
+                idx = combo.findText(resolved)
+                if idx != -1:
+                    combo.setCurrentIndex(idx)
+                else:
+                    combo.setCurrentText(resolved)
+            combo.blockSignals(False)
+            return resolved
+        except Exception:
+            return ""
+
+    def _set_yolo_models_directory(self, models_dir: str, selected_model: str = "") -> str:
+        """Update the default YOLO models folder and refresh related UI state."""
+        try:
+            normalized_dir = os.path.normpath(str(models_dir or "").strip())
+        except Exception:
+            normalized_dir = ""
+        if not normalized_dir:
+            normalized_dir = "YOLO_MODELS"
+
+        try:
+            os.makedirs(normalized_dir, exist_ok=True)
+        except Exception:
+            pass
+
+        try:
+            self.yolo_detector.models_dir = normalized_dir
+        except Exception:
+            pass
+
+        try:
+            if getattr(self, "yolo_models_dir_label", None) is not None:
+                self.yolo_models_dir_label.setText(normalized_dir)
+                self.yolo_models_dir_label.setToolTip(normalized_dir)
+        except Exception:
+            pass
+
+        resolved_model = self._refresh_yolo_model_combo(selected_model)
+
+        return resolved_model
+
     def _resolve_valid_yolo_model_name(self, requested_model: str = "") -> str:
         """Resolve to a usable YOLO model name/path, falling back to installed models."""
         try:
@@ -11686,27 +11986,23 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             )
             if not path:
                 return
-            # Add the selected path to the combo if it's not already present so existing
-            # code that reads the combo's currentText continues to work.
+            selected_dir = os.path.dirname(path) or start_dir
+            selected_name = os.path.basename(path)
             try:
-                idx = self.yolo_model_combo.findText(path)
-                if idx == -1:
-                    self.yolo_model_combo.addItem(path)
-                    idx = self.yolo_model_combo.findText(path)
+                resolved_model = self._set_yolo_models_directory(selected_dir, selected_name) or selected_name
+                idx = self.yolo_model_combo.findText(resolved_model)
                 if idx != -1:
                     self.yolo_model_combo.setCurrentIndex(idx)
             except Exception:
                 try:
-                    # fallback: set text via safe method
-                    self._safe_widget_call("yolo_model_combo", "setCurrentText", path)
+                    self._safe_widget_call("yolo_model_combo", "setCurrentText", selected_name)
                 except Exception:
                     pass
-            # Attempt to load the model immediately and persist selection
             try:
-                self.yolo_detector.load_model(path)
+                self._request_yolo_model_load_async(selected_name)
                 try:
                     if hasattr(self, "enhancer"):
-                        self.enhancer.log_serial_output(f"Loaded YOLO model: {path}")
+                        self.enhancer.log_serial_output(f"Loaded YOLO model: {selected_name}")
                 except Exception:
                     pass
                 try:
@@ -11717,10 +12013,40 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 try:
                     if hasattr(self, "enhancer"):
                         self.enhancer.log_serial_output(
-                            f"Failed to load YOLO model {path}: {e}"
+                            f"Failed to load YOLO model {selected_name}: {e}"
                         )
                 except Exception:
                     pass
+        except Exception:
+            pass
+
+    def browse_yolo_models_directory(self):
+        """Select the default folder used to discover YOLO model files."""
+        try:
+            start_dir = str(getattr(self.yolo_detector, "models_dir", "YOLO_MODELS") or "YOLO_MODELS")
+            path = QFileDialog.getExistingDirectory(
+                self,
+                "Select YOLO models folder",
+                start_dir,
+            )
+            if not path:
+                return
+
+            resolved_model = self._set_yolo_models_directory(path)
+            try:
+                if hasattr(self, "enhancer"):
+                    if resolved_model:
+                        self.enhancer.log_serial_output(
+                            f"YOLO models folder set to: {path} (selected model: {resolved_model})",
+                            fire=False,
+                        )
+                    else:
+                        self.enhancer.log_serial_output(
+                            f"YOLO models folder set to: {path} (no .pt files found)",
+                            fire=False,
+                        )
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -12236,31 +12562,42 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         safe_call("esp32_host_input", "setText", "192.168.4.1")
         safe_call("esp32_port_input", "setValue", 9000)
         safe_call("esp32_local_port_input", "setValue", 0)
-        # Optimized smoothing for responsive tracking with minimal lag
-        safe_call("smoothing_input", "setValue", 0.65)
-        # Lowered default so small objects near the camera are detected
-        safe_call("min_contour_input", "setValue", 300)
-        safe_call("threshold_input", "setValue", 40)
+        # Hand-tracking defaults: favor responsiveness and smaller motion blobs.
+        safe_call("smoothing_input", "setValue", 0.18)
+        safe_call("min_contour_input", "setValue", 120)
+        safe_call("max_contour_input", "setValue", 90000)
+        safe_call("threshold_input", "setValue", 28)
         safe_call("trigger_cooldown_input", "setValue", 1.5)
-        # Camera orientation defaults (Dec 2025):
-        # Working setting for this hardware: flip OFF, invert_pan ON, invert_tilt OFF.
+        # Camera orientation defaults.
+        # Current hardware baseline: flip OFF, invert_pan OFF, invert_tilt OFF.
         # Do not change unless the camera mount/hardware changes.
         safe_call("flip_checkbox", "setChecked", False)
         safe_call("trigger_mode_combo", "setCurrentIndex", 0)  # MOSFET
-        # Optimized for smooth, precise tracking with quick response
-        safe_call("tracking_speed_slider", "setValue", 65)
-        safe_call("movement_sensitivity_slider", "setValue", 45)
+        safe_call("tracking_speed_slider", "setValue", 78)
+        safe_call("movement_sensitivity_slider", "setValue", 62)
         safe_call("blur_kernel_input", "setValue", 5)
         safe_call("dilate_iter_input", "setValue", 2)
         # Debug default: off
         safe_call("debug_checkbox", "setChecked", False)
-        # BackSub warmup default (frames to build background before emitting detections)
-        safe_call("backsub_warmup_input", "setValue", 30)
+        # Short warmup helps reacquire moving hands faster after startup.
+        safe_call("backsub_warmup_input", "setValue", 12)
         # overshoot default (0% = no overshoot)
         safe_call("overshoot_input", "setValue", 0)
         # Default to Background Subtraction for more robust stationary-camera detection
         # index 1 corresponds to "Background Subtraction"
         safe_call("detection_mode_combo", "setCurrentIndex", 1)
+        safe_call("deadzone_slider", "setValue", 6)
+        safe_call("snap_threshold_slider", "setValue", 24)
+        safe_call("detection_pause_slider", "setValue", 60)
+        safe_call("aim_aggression_slider", "setValue", 72)
+        safe_call("precision_mode_checkbox", "setChecked", True)
+        safe_call("precision_roi_input", "setValue", 20)
+        safe_call("precision_kp_input", "setValue", 0.04)
+        safe_call("precision_kd_input", "setValue", 0.01)
+        safe_call("precision_max_step_input", "setValue", 1.0)
+        safe_call("lost_hold_input", "setValue", 0.3)
+        safe_call("hold_infinite_checkbox", "setChecked", False)
+        safe_call("home_return_mode_combo", "setCurrentText", "Disabled")
         safe_call("relay1_button", "setChecked", False)
         if getattr(self, "relay1_button", None):
             try:
@@ -12281,8 +12618,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
         self.safety_state = 1  # Sync internal var (1 = locked/safe)
-        # Invert pan/tilt defaults (Dec 2025): invert PAN only
-        safe_call("invert_pan_checkbox", "setChecked", True)
+        # Invert pan/tilt defaults: no inversion on the current mount.
+        safe_call("invert_pan_checkbox", "setChecked", False)
         safe_call("invert_tilt_checkbox", "setChecked", False)
         safe_call("home_pan_input", "setValue", 90)
         safe_call("home_tilt_input", "setValue", 40)  # FIXED: Changed from 80 to match __init__ and Arduino
@@ -12835,12 +13172,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception:
                 pass
 
-            # Camera orientation defaults (Dec 2025):
-            # Working configuration for this build/hardware:
-            #   flip_image=False, invert_pan=True, invert_tilt=False
+            # Camera orientation defaults:
+            #   flip_image=False, invert_pan=False, invert_tilt=False
             # If keys are missing, fall back to these values.
             self._safe_widget_call(
-                "invert_pan_checkbox", "setChecked", settings.get("invert_pan", True)
+                "invert_pan_checkbox", "setChecked", settings.get("invert_pan", False)
             )
             self._safe_widget_call(
                 "invert_tilt_checkbox", "setChecked", settings.get("invert_tilt", False)
@@ -12893,8 +13229,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self._safe_widget_call(
                 "precision_hfov_input",
                 "setValue",
-                float(settings.get("precision_hfov", 90.0)),
+                float(settings.get("precision_hfov", 78.0)),
             )
+            self.precision_hfov_auto = bool(settings.get("precision_hfov_auto", True))
+            self._refresh_precision_hfov_auto()
             self._safe_widget_call(
                 "precision_max_step_input",
                 "setValue",
@@ -12990,6 +13328,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self._safe_widget_call(
                 "esp32_local_port_input", "setValue", int(settings.get("esp32_local_port", 0) or 0)
             )
+            try:
+                self.startup_auto_connect_enabled = bool(
+                    settings.get("startup_auto_connect_enabled", False)
+                )
+            except Exception:
+                self.startup_auto_connect_enabled = False
             self._safe_widget_call(
                 "smoothing_input", "setValue", settings.get("smoothing_factor", 0.5)
             )
@@ -13766,6 +14110,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 pass
 
             # --- Load YOLO Settings ---
+            yolo_models_dir = settings.get("yolo_models_dir", "YOLO_MODELS")
+            try:
+                resolved_dir = self._set_yolo_models_directory(str(yolo_models_dir or "YOLO_MODELS"))
+            except Exception:
+                resolved_dir = ""
             yolo_model = settings.get("yolo_model")
             selected_model = ""
             if yolo_model:
@@ -13774,6 +14123,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     selected_model = ""
                 try:
+                    refreshed_model = self._refresh_yolo_model_combo(selected_model)
+                    if refreshed_model:
+                        selected_model = refreshed_model
                     index = self.yolo_model_combo.findText(selected_model)
                     if index == -1 and selected_model:
                         self.yolo_model_combo.addItem(selected_model)
@@ -13782,6 +14134,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self.yolo_model_combo.setCurrentIndex(index)
                 except Exception:
                     pass
+            elif resolved_dir:
+                selected_model = str(resolved_dir)
             self.yolo_confidence_input.setValue(settings.get("yolo_confidence", 0.5))
             self.yolo_classes_input.setText(settings.get("yolo_classes", "person"))
             # Restore additional YOLO settings if present
@@ -14096,6 +14450,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "esp32_host": val("esp32_host_input", "192.168.4.1", "text"),
                 "esp32_port": val("esp32_port_input", 9000),
                 "esp32_local_port": val("esp32_local_port_input", 0),
+                "startup_auto_connect_enabled": bool(
+                    getattr(self, "startup_auto_connect_enabled", False)
+                ),
                 "smoothing_factor": val("smoothing_input", 0.5),
                 "movement_sensitivity": val("movement_sensitivity_slider", 50),
                 "detection_mode_index": val("detection_mode_combo", 0, "index"),
@@ -14142,7 +14499,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "precision_kp": val("precision_kp_input", 0.02),
                 "precision_ki": val("precision_ki_input", 0.001),
                 "precision_kd": val("precision_kd_input", 0.005),
-                "precision_hfov": val("precision_hfov_input", 90.0),
+                "precision_hfov": val("precision_hfov_input", 78.0),
+                "precision_hfov_auto": bool(getattr(self, "precision_hfov_auto", True)),
                 "precision_max_step": val("precision_max_step_input", 1.0),
                 "precision_frac_threshold": val("precision_frac_threshold_input", 0.25),
                 "manual_auto_fire": val("manual_auto_fire_checkbox", False, "checked"),
@@ -14273,6 +14631,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 "scope_radius_pct": val("scope_radius_percent_slider", 35),
                 "corner_size": val("corner_size_slider", 40),
                 "status_text_scale_x10": val("status_text_scale_slider", 12),
+                "yolo_models_dir": str(getattr(getattr(self, "yolo_detector", None), "models_dir", "YOLO_MODELS") or "YOLO_MODELS"),
                 # Save main window geometry and dock/widget state (base64 encoded)
                 "window_state": None,
                 "window_geometry": None,
@@ -14642,7 +15001,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             s['precision_kp'] = safe_float('precision_kp_input', 0.02)
             s['precision_ki'] = safe_float('precision_ki_input', 0.001)
             s['precision_kd'] = safe_float('precision_kd_input', 0.005)
-            s['precision_hfov'] = safe_float('precision_hfov_input', 90.0)
+            s['precision_hfov'] = safe_float('precision_hfov_input', 78.0)
+            s['precision_hfov_auto'] = bool(getattr(self, 'precision_hfov_auto', True))
             s['precision_max_step'] = safe_float('precision_max_step_input', 1.0)
             s['precision_frac_threshold'] = safe_float('precision_frac_threshold_input', 0.25)
 
@@ -15006,6 +15366,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 if 'precision_hfov' in preset and getattr(self, 'precision_hfov_input', None) is not None:
                     try:
                         self.precision_hfov_input.setValue(float(preset['precision_hfov']))
+                    except Exception:
+                        pass
+                if 'precision_hfov_auto' in preset:
+                    try:
+                        self.precision_hfov_auto = bool(preset['precision_hfov_auto'])
+                        self._refresh_precision_hfov_auto()
                     except Exception:
                         pass
                 if 'precision_max_step' in preset and getattr(self, 'precision_max_step_input', None) is not None:
@@ -15739,7 +16105,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         try:
             settings = {
                 "invert_pan": getattr(
-                    self.invert_pan_checkbox, "isChecked", lambda: True
+                    self.invert_pan_checkbox, "isChecked", lambda: False
                 )(),
                 "invert_tilt": getattr(
                     self.invert_tilt_checkbox, "isChecked", lambda: True
@@ -15749,18 +16115,20 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.detection_mode_combo, "currentIndex", lambda: 1
                 )(),
                 "smoothing_factor": getattr(
-                    self.smoothing_input, "value", lambda: 0.95
+                    self.smoothing_input, "value", lambda: 0.14
                 )(),
                 "movement_sensitivity": getattr(
-                    self.movement_sensitivity_slider, "value", lambda: 25
+                    self.movement_sensitivity_slider, "value", lambda: 70
                 )(),
-                "deadzone": getattr(self.deadzone_slider, "value", lambda: 20)(),
+                "deadzone": getattr(self.deadzone_slider, "value", lambda: 4)(),
                 "snap_threshold": getattr(
-                    self.snap_threshold_slider, "value", lambda: 80
+                    self.snap_threshold_slider, "value", lambda: 32
                 )(),
                 "tracking_speed": getattr(
-                    self.tracking_speed_slider, "value", lambda: 40
+                    self.tracking_speed_slider, "value", lambda: 92
                 )(),
+                "aim_aggression": getattr(self, "aim_aggression", 100),
+                "final_approach_boost": getattr(self, "final_approach_boost", True),
                 # Add ESP32 link and relay defaults
                 "esp32_host": getattr(self.esp32_host_input, "text", lambda: "192.168.4.1")(),
                 "esp32_port": getattr(self.esp32_port_input, "value", lambda: 9000)(),
@@ -15799,11 +16167,28 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 ],
                 # Precision mode default
                 "precision_mode": getattr(
-                    getattr(self, "precision_mode_checkbox", None), "isChecked", lambda: False
+                    getattr(self, "precision_mode_checkbox", None), "isChecked", lambda: True
+                )(),
+                "precision_roi": getattr(
+                    getattr(self, "precision_roi_input", None), "value", lambda: 20
+                )(),
+                "precision_kp": getattr(
+                    getattr(self, "precision_kp_input", None), "value", lambda: 0.04
+                )(),
+                "precision_kd": getattr(
+                    getattr(self, "precision_kd_input", None), "value", lambda: 0.01
+                )(),
+                "precision_max_step": getattr(
+                    getattr(self, "precision_max_step_input", None), "value", lambda: 1.6
                 )(),
                 # Detection pause default
                 "detection_pause_ms": getattr(
-                    getattr(self, "detection_pause_slider", None), "value", lambda: 1000
+                    getattr(self, "detection_pause_slider", None), "value", lambda: 60
+                )(),
+                "hold_seconds": getattr(self, "lost_hold_seconds", 0.3),
+                "hold_infinite": getattr(self, "hold_infinite", False),
+                "home_return_mode": getattr(
+                    getattr(self, "home_return_mode_combo", None), "currentText", lambda: "Disabled"
                 )(),
                 # Motion-verified auto-fire defaults
                 "motion_fire_enabled": getattr(
@@ -16013,6 +16398,26 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         )
                     except Exception:
                         pass
+                if "aim_aggression" in prefs:
+                    try:
+                        self.aim_aggression = int(prefs["aim_aggression"])
+                        self._safe_widget_call(
+                            "aim_aggression_slider",
+                            "setValue",
+                            int(prefs["aim_aggression"]),
+                        )
+                    except Exception:
+                        pass
+                if "final_approach_boost" in prefs:
+                    try:
+                        self.final_approach_boost = bool(prefs["final_approach_boost"])
+                        self._safe_widget_call(
+                            "final_approach_boost_checkbox",
+                            "setChecked",
+                            bool(prefs["final_approach_boost"]),
+                        )
+                    except Exception:
+                        pass
                 if "precision_mode" in prefs:
                     try:
                         self._safe_widget_call(
@@ -16022,12 +16427,39 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         )
                     except Exception:
                         pass
+                for key, widget in (
+                    ("precision_roi", "precision_roi_input"),
+                    ("precision_kp", "precision_kp_input"),
+                    ("precision_kd", "precision_kd_input"),
+                    ("precision_max_step", "precision_max_step_input"),
+                ):
+                    if key in prefs:
+                        try:
+                            self._safe_widget_call(widget, "setValue", prefs[key])
+                        except Exception:
+                            pass
                 if "detection_pause_ms" in prefs:
                     try:
                         self._safe_widget_call(
                             "detection_pause_slider",
                             "setValue",
                             int(prefs["detection_pause_ms"]),
+                        )
+                    except Exception:
+                        pass
+                if "hold_seconds" in prefs:
+                    try:
+                        self.lost_hold_seconds = float(prefs["hold_seconds"])
+                        self._safe_widget_call(
+                            "lost_hold_input", "setValue", float(prefs["hold_seconds"])
+                        )
+                    except Exception:
+                        pass
+                if "hold_infinite" in prefs:
+                    try:
+                        self.hold_infinite = bool(prefs["hold_infinite"])
+                        self._safe_widget_call(
+                            "hold_infinite_checkbox", "setChecked", self.hold_infinite
                         )
                     except Exception:
                         pass
@@ -16529,6 +16961,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self.precision_kd_input.setValue(float(preset["precision_kd"]))
                 if "precision_hfov" in preset and getattr(self, "precision_hfov_input", None) is not None:
                     self.precision_hfov_input.setValue(float(preset["precision_hfov"]))
+                if "precision_hfov_auto" in preset:
+                    self.precision_hfov_auto = bool(preset["precision_hfov_auto"])
+                    self._refresh_precision_hfov_auto()
                 if "precision_max_step" in preset and getattr(self, "precision_max_step_input", None) is not None:
                     self.precision_max_step_input.setValue(float(preset["precision_max_step"]))
                 if "precision_frac_threshold" in preset and getattr(self, "precision_frac_threshold_input", None) is not None:
@@ -16877,6 +17312,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     )
                 except Exception:
                     pass
+                try:
+                    self._refresh_connect_button_state()
+                except Exception:
+                    pass
 
                 # Best-effort protocol/servo presence probe (non-blocking):
                 # try PING using both checksum modes and keep the mode that replies.
@@ -16963,6 +17402,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     self._safe_enhancer_log(
                         f"✗ Debug Board connection FAILED: {result.get('error','Unknown error')}"
                     )
+                except Exception:
+                    pass
+                try:
+                    self._refresh_connect_button_state()
                 except Exception:
                     pass
         except Exception:
@@ -17105,6 +17548,47 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             error_msg = result.get('error', 'Unknown error')
             elapsed = result.get('elapsed_time', 0)
             self._safe_enhancer_log(f"✗ Connection FAILED: {error_msg}")
+
+            hybrid_wifi_ok = False
+            try:
+                hybrid_wifi_ok = bool(
+                    (self._serial_is_debug_board_bus() or self._serial_is_dual_port())
+                    and getattr(self, "bus_ser", None) is not None
+                    and getattr(self.bus_ser, "is_open", False)
+                    and getattr(self, "esp32_link", None) is not None
+                    and self.esp32_link.is_open()
+                )
+            except Exception:
+                hybrid_wifi_ok = False
+
+            if hybrid_wifi_ok:
+                try:
+                    self._safe_enhancer_log(
+                        "[LINK] ESP32 serial unavailable; continuing with Debug Board USB + ESP32 Wi-Fi.",
+                        fire=False,
+                    )
+                except Exception:
+                    pass
+                try:
+                    if hasattr(self, 'connection_status_label'):
+                        self.connection_status_label.setText(
+                            "✓ Hybrid connected: Debug Board USB + ESP32 Wi-Fi"
+                        )
+                        self.connection_status_label.setStyleSheet(
+                            "color: #00FF00; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                        )
+                except Exception:
+                    pass
+                if result.get('ser') is not None:
+                    try:
+                        result['ser'].close()
+                    except Exception:
+                        pass
+                try:
+                    self._refresh_connect_button_state()
+                except Exception:
+                    pass
+                return
             
             # Update button
             try:
@@ -17138,6 +17622,131 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self._refresh_connect_button_state()
         except Exception:
             pass
+
+    def _disconnect_main_app_transports(
+        self,
+        *,
+        close_camera: bool = True,
+        update_ui: bool = True,
+        write_safe_serial: bool = False,
+    ) -> bool:
+        """Close main-app transport handles without touching Smart Sentry v2 internals."""
+        ok = True
+
+        try:
+            self._serial_connection_in_progress = False
+        except Exception:
+            pass
+
+        try:
+            if getattr(self, "enhancer", None):
+                self.enhancer.update_serial_status(False)
+        except Exception:
+            pass
+
+        try:
+            ser_obj = getattr(self, "ser", None)
+            if ser_obj is not None and getattr(ser_obj, "is_open", False):
+                if write_safe_serial and (not self._serial_is_debug_board_bus()):
+                    try:
+                        safe_pan = int(getattr(self, "prev_pan_angle", 90) or 90)
+                    except Exception:
+                        safe_pan = 90
+                    try:
+                        safe_tilt = int(getattr(self, "prev_tilt_angle", 40) or 40)
+                    except Exception:
+                        safe_tilt = 40
+                    safe_cmd = f"P{safe_pan}T{safe_tilt}F0L0R0G0S1M0\n"
+                    try:
+                        ser_obj.write(safe_cmd.encode("utf-8"))
+                    except Exception:
+                        pass
+                    try:
+                        import time as _time
+                        _time.sleep(0.05)
+                    except Exception:
+                        pass
+                try:
+                    ser_obj.close()
+                except Exception:
+                    ok = False
+        except Exception:
+            ok = False
+        self.ser = None
+
+        try:
+            bus_obj = getattr(self, "bus_ser", None)
+            if bus_obj is not None and getattr(bus_obj, "is_open", False):
+                try:
+                    bus_obj.close()
+                except Exception:
+                    ok = False
+        except Exception:
+            ok = False
+        self.bus_ser = None
+
+        try:
+            if getattr(self, "esp32_link", None) is not None and self.esp32_link.is_open():
+                self.esp32_link.disconnect()
+        except Exception:
+            ok = False
+
+        if update_ui:
+            try:
+                self._safe_enhancer_log("Disconnected.")
+            except Exception:
+                pass
+            try:
+                self._refresh_connect_button_state()
+            except Exception:
+                pass
+            try:
+                if hasattr(self, "connection_status_label"):
+                    self.connection_status_label.setText("Disconnected")
+                    self.connection_status_label.setStyleSheet(
+                        "color: #999999; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                    )
+            except Exception:
+                pass
+
+        if close_camera:
+            try:
+                if (
+                    getattr(self, "cap", None) is not None
+                    and getattr(self.cap, "isOpened", lambda: False)()
+                ):
+                    try:
+                        self._cap_release()
+                    except Exception:
+                        pass
+                    try:
+                        self.cap = None
+                    except Exception:
+                        self.cap = None
+                    if update_ui:
+                        try:
+                            self.video_label.clear()
+                            self.video_label.setText("Camera Feed")
+                        except Exception:
+                            pass
+                        try:
+                            if getattr(self, "tracking_btn", None) is not None:
+                                self.tracking_btn.setEnabled(False)
+                                self.tracking_btn.setChecked(False)
+                                self.tracking_btn.setText("Start Tracking")
+                        except Exception:
+                            pass
+                        try:
+                            if getattr(self, "aiming_btn", None) is not None:
+                                self.aiming_btn.setEnabled(False)
+                                self.aiming_btn.setChecked(False)
+                                self.aiming_btn.setText("Start Aiming")
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+        return ok
 
     def connect_serial(self):
         """Handle serial connect/disconnect. Uses async connection to prevent GUI freeze.
@@ -17174,13 +17783,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             pass
 
-        # Debug Board mode hybrid behavior:
-        # - If Debug Board is connected but ESP32 Wi-Fi link is not, Connect should open Wi-Fi link.
-        # - If ESP32 Wi-Fi link is connected but Debug Board is not, Connect should open Debug Board COM.
-        if debug_board_mode and (not primary_open):
-            if bus_open and (not link_open):
-                return self._connect_esp32_link_from_panel()
-
         # If only ESP32 UDP link is active, pressing Connect acts as disconnect toggle.
         if link_open and (not primary_open) and (not bus_open) and (not debug_board_mode):
             return self._disconnect_esp32_link()
@@ -17205,18 +17807,34 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             selected_port = dbg_port if debug_board_mode else port
             selected_baud = dbg_baud if debug_board_mode else baud
             debug_wifi_requested = False
+            hybrid_wifi_requested = False
             try:
-                if debug_board_mode:
+                if debug_board_mode or dual_mode:
                     esp32_host = str(
                         self._safe_widget_method_return("esp32_host_input", "text", "")
                         or ""
                     ).strip()
-                    debug_wifi_requested = bool(esp32_host)
+                    hybrid_wifi_requested = bool(esp32_host)
+                    if debug_board_mode:
+                        debug_wifi_requested = hybrid_wifi_requested
             except Exception:
                 debug_wifi_requested = False
+                hybrid_wifi_requested = False
             print(
                 f"[DEBUG] Port={port}, Baud={baud}, Dual={dual_mode}, DBG_Port={dbg_port}, DBG_Baud={dbg_baud}"
             )
+
+            if str(port).strip() and str(dbg_port).strip():
+                try:
+                    port, baud, dbg_port, dbg_baud, ports_swapped = self._maybe_autocorrect_serial_port_roles(
+                        port, baud, dbg_port, dbg_baud
+                    )
+                    if ports_swapped:
+                        print(
+                            f"[DEBUG] Auto-corrected port roles: ESP32={port}, DebugBoard={dbg_port}"
+                        )
+                except Exception:
+                    pass
 
             # ESP32 UDP-only mode (no COM ports selected): auto-connect ESP32 link.
             wifi_only_requested = (not str(port).strip()) and (not str(dbg_port).strip())
@@ -17225,23 +17843,36 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
             # If switching into serial-only mode, close UDP link first.
             # Keep ESP32 link active for Debug Board + Wi-Fi hybrid operation.
-            if link_open and (not debug_wifi_requested):
+            if link_open and (not debug_wifi_requested) and (not hybrid_wifi_requested):
                 try:
                     self._disconnect_esp32_link()
                 except Exception:
                     pass
 
             if dual_mode:
-                if (not port or port.strip() == "") or (
-                    not dbg_port or dbg_port.strip() == ""
-                ):
+                if not dbg_port or dbg_port.strip() == "":
                     self._safe_enhancer_log(
-                        "Dual Port mode requires BOTH COM ports (ESP32 + Debug Board)."
+                        "Dual Port requires Debug Board COM. For ESP32, use either COM or Wi-Fi host."
                     )
                     try:
                         if hasattr(self, "connection_status_label"):
                             self.connection_status_label.setText(
-                                "✗ Dual Port requires both COM ports"
+                                "✗ Dual Port requires Debug Board COM"
+                            )
+                            self.connection_status_label.setStyleSheet(
+                                "color: #FF6666; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
+                            )
+                    except Exception:
+                        pass
+                    return False
+                if (not port or port.strip() == "") and (not hybrid_wifi_requested):
+                    self._safe_enhancer_log(
+                        "Dual Port requires an ESP32 COM port or an ESP32 Wi-Fi host."
+                    )
+                    try:
+                        if hasattr(self, "connection_status_label"):
+                            self.connection_status_label.setText(
+                                "✗ Dual Port requires ESP32 COM or Wi-Fi host"
                             )
                             self.connection_status_label.setStyleSheet(
                                 "color: #FF6666; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
@@ -17281,9 +17912,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             try:
                 if hasattr(self, "connection_status_label"):
                     if dual_mode:
-                        self.connection_status_label.setText(
-                            f"Connecting: ESP32={port} and DebugBoard={dbg_port}..."
-                        )
+                        if hybrid_wifi_requested and (not str(port).strip()):
+                            self.connection_status_label.setText(
+                                f"Connecting: DebugBoard={dbg_port} + ESP32 Wi-Fi..."
+                            )
+                        elif hybrid_wifi_requested:
+                            self.connection_status_label.setText(
+                                f"Connecting: ESP32={port}, DebugBoard={dbg_port}, Wi-Fi backup..."
+                            )
+                        else:
+                            self.connection_status_label.setText(
+                                f"Connecting: ESP32={port} and DebugBoard={dbg_port}..."
+                            )
                     else:
                         if debug_board_mode:
                             self.connection_status_label.setText(
@@ -17311,8 +17951,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 pass
 
             if dual_mode:
-                self._connect_serial_async(port, baud)
+                started_primary_async = False
+                if str(port).strip():
+                    self._connect_serial_async(port, baud)
+                    started_primary_async = True
                 self._connect_bus_serial_async(dbg_port, dbg_baud)
+                if hybrid_wifi_requested and (not link_open):
+                    try:
+                        self._connect_esp32_link_from_panel()
+                    except Exception:
+                        pass
+                if not started_primary_async:
+                    self._serial_connection_in_progress = False
+                    try:
+                        self._refresh_connect_button_state()
+                    except Exception:
+                        pass
             else:
                 self._connect_serial_async(selected_port, selected_baud)
                 if debug_wifi_requested and (not link_open):
@@ -17322,92 +17976,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         pass
             return
 
-        ok = True
-        try:
-            if getattr(self, "enhancer", None):
-                self.enhancer.update_serial_status(False)
-        except Exception:
-            pass
-
-        try:
-            if self.ser is not None:
-                try:
-                    self.ser.close()
-                except Exception:
-                    ok = False
-        except Exception:
-            ok = False
-        self.ser = None
-
-        try:
-            if getattr(self, "bus_ser", None) is not None:
-                try:
-                    self.bus_ser.close()
-                except Exception:
-                    ok = False
-        except Exception:
-            ok = False
-        self.bus_ser = None
-
-        try:
-            if getattr(self, "esp32_link", None) is not None and self.esp32_link.is_open():
-                self.esp32_link.disconnect()
-        except Exception:
-            pass
-
-        try:
-            self._safe_enhancer_log("Disconnected.")
-        except Exception:
-            pass
-        try:
-            self._refresh_connect_button_state()
-        except Exception:
-            pass
-        try:
-            if hasattr(self, "connection_status_label"):
-                self.connection_status_label.setText("Disconnected")
-                self.connection_status_label.setStyleSheet(
-                    "color: #999999; background-color: #2d2d2d; padding: 4px; border-radius: 3px;"
-                )
-        except Exception:
-            pass
-
-        try:
-            if (
-                getattr(self, "cap", None) is not None
-                and getattr(self.cap, "isOpened", lambda: False)()
-            ):
-                try:
-                    self._cap_release()
-                except Exception:
-                    pass
-                try:
-                    self.cap = None
-                except Exception:
-                    self.cap = None
-                try:
-                    self.video_label.clear()
-                    self.video_label.setText("Camera Feed")
-                except Exception:
-                    pass
-                try:
-                    if getattr(self, "tracking_btn", None) is not None:
-                        self.tracking_btn.setEnabled(False)
-                        self.tracking_btn.setChecked(False)
-                        self.tracking_btn.setText("Start Tracking")
-                except Exception:
-                    pass
-                try:
-                    if getattr(self, "aiming_btn", None) is not None:
-                        self.aiming_btn.setEnabled(False)
-                        self.aiming_btn.setChecked(False)
-                        self.aiming_btn.setText("Start Aiming")
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-        return ok
+        return self._disconnect_main_app_transports(
+            close_camera=True,
+            update_ui=True,
+            write_safe_serial=False,
+        )
 
     def _refresh_connect_button_state(self):
         """Synchronize connect button text from actual transport state."""
@@ -17433,21 +18006,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             if in_progress:
                 btn.setText("Connecting...")
                 btn.setEnabled(False)
-                return
-
-            mode_idx = int(self._serial_device_type_index())
-
-            # Debug Board hybrid mode: expose partial-connect actions clearly.
-            if mode_idx == 1:
-                if bus_open and link_open:
-                    btn.setText("Disconnect")
-                elif bus_open and (not link_open):
-                    btn.setText("Connect ESP32 Wi-Fi")
-                elif link_open and (not bus_open):
-                    btn.setText("Connect Debug Board")
-                else:
-                    btn.setText("Connect")
-                btn.setEnabled(True)
                 return
 
             if primary_open or bus_open or link_open:
@@ -17567,15 +18125,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 try_indices = list(range(0, 5))
 
         backend_order = [
+            (None, "DEFAULT"),
             (cv2.CAP_DSHOW, "DSHOW"),
             (cv2.CAP_MSMF, "MSMF"),
-            (cv2.CAP_ANY, "AUTO"),
         ]
 
         for idx in try_indices:
             for backend, backend_name in backend_order:
                 try:
-                    cap = cv2.VideoCapture(int(idx), backend)
+                    if backend is None:
+                        cap = cv2.VideoCapture(int(idx))
+                    else:
+                        cap = cv2.VideoCapture(int(idx), backend)
 
                     # Allow device a moment to initialize before querying properties
                     # Increased to 1.0s to ensure consistent DSHOW initialization on all webcams
@@ -17622,7 +18183,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         for _ in range(3):
                             ret_probe, frame_probe = cap.read()
                             if ret_probe and frame_probe is not None and hasattr(frame_probe, "shape"):
-                                if not self._is_black_camera_frame(frame_probe):
+                                if not self._is_black_camera_frame(frame_probe) and not self._is_corrupt_camera_frame(frame_probe):
                                     break
                             ret_probe, frame_probe = False, None
                             time.sleep(0.05)
@@ -17633,7 +18194,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 actual_h = int(delivered_h)
                         else:
                             self._camera_debug_log(
-                                f"rejecting backend {backend_name} on index {idx}: probe frame invalid/black"
+                                f"rejecting backend {backend_name} on index {idx}: probe frame invalid/black/corrupt"
                             )
                             try:
                                 cap.release()
@@ -17662,6 +18223,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     # This is the ONLY place (other than __init__) where these values should be modified.
                     self.frame_width = actual_w if actual_w > 0 else width
                     self.frame_height = actual_h if actual_h > 0 else height
+                    self._refresh_precision_hfov_auto(frame_w=self.frame_width, frame_h=self.frame_height)
 
                     try:
                         if getattr(self, "state_logger", None):
@@ -17712,6 +18274,66 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception as e:
             print(f"[DEBUG] handle_connect_sound error: {e}")  # DEBUG
             pass
+
+    def _schedule_startup_auto_connect(self) -> None:
+        try:
+            if not bool(getattr(self, "startup_auto_connect_enabled", False)):
+                return
+        except Exception:
+            return
+
+        try:
+            if bool(getattr(self, "_startup_auto_connect_scheduled", False)):
+                return
+        except Exception:
+            pass
+
+        try:
+            primary_port = str(self._safe_widget_method_return("com_port_input", "text", "") or "").strip()
+        except Exception:
+            primary_port = ""
+        try:
+            debug_port = str(self._safe_widget_method_return("debug_board_com_port_input", "text", "") or "").strip()
+        except Exception:
+            debug_port = ""
+        try:
+            esp32_host = str(self._safe_widget_method_return("esp32_host_input", "text", "") or "").strip()
+        except Exception:
+            esp32_host = ""
+
+        if not (primary_port or debug_port or esp32_host):
+            return
+
+        try:
+            self._startup_auto_connect_scheduled = True
+        except Exception:
+            pass
+
+        def _do_connect():
+            try:
+                primary_open = bool(self.ser is not None and getattr(self.ser, "is_open", False))
+                bus_open = bool(
+                    getattr(self, "bus_ser", None) is not None
+                    and getattr(self.bus_ser, "is_open", False)
+                )
+                link_open = bool(
+                    getattr(self, "esp32_link", None) is not None
+                    and self.esp32_link.is_open()
+                )
+                if primary_open or bus_open or link_open:
+                    return
+                try:
+                    self._safe_enhancer_log("[STARTUP] Auto-connect using saved connection settings...", fire=False)
+                except Exception:
+                    pass
+                self.connect_serial()
+            except Exception:
+                pass
+
+        try:
+            QTimer.singleShot(1200, _do_connect)
+        except Exception:
+            _do_connect()
 
     def _get_esp32_link_panel_values(self):
         """Read ESP32 UDP link host/port/local-port values from connection panel."""
@@ -18235,6 +18857,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             old_height = self.frame_height
             self.frame_width = width
             self.frame_height = height
+            self._refresh_precision_hfov_auto(frame_w=width, frame_h=height)
             
             print(f"[RES-CHANGE] Updated frame dimensions: {old_width}x{old_height} -> {width}x{height}")
             print(f"[RES-CHANGE] self.frame_width={self.frame_width}, self.frame_height={self.frame_height}")
@@ -18429,9 +19052,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             frame_h = 480.0
         try:
-            hfov = float(self._safe_float_widget_value("precision_hfov_input", 90.0))
+            if bool(getattr(self, "precision_hfov_auto", True)):
+                hfov = float(self._estimate_auto_precision_hfov(frame_w=frame_w, frame_h=frame_h))
+            else:
+                hfov = float(self._safe_float_widget_value("precision_hfov_input", 78.0))
         except Exception:
-            hfov = 90.0
+            hfov = 78.0
         hfov = float(np.clip(hfov, 10.0, 200.0))
         try:
             vfov = hfov * (frame_h / max(1.0, frame_w))
@@ -18439,6 +19065,54 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             vfov = 85.0
         vfov = float(np.clip(vfov, 10.0, 170.0))
         return hfov, vfov
+
+    def _estimate_auto_precision_hfov(self, frame_w: float | None = None, frame_h: float | None = None) -> float:
+        """Estimate a practical HFOV from the delivered stream geometry when exact lens calibration is unavailable."""
+        try:
+            if frame_w is None:
+                frame_w = float(getattr(self, "frame_width", 640) or 640)
+            else:
+                frame_w = float(frame_w)
+            if frame_h is None:
+                frame_h = float(getattr(self, "frame_height", 480) or 480)
+            else:
+                frame_h = float(frame_h)
+            aspect = frame_w / max(1.0, frame_h)
+            if aspect >= 1.70:
+                hfov = 78.0
+            elif aspect >= 1.50:
+                hfov = 74.0
+            elif aspect >= 1.30:
+                hfov = 68.0
+            else:
+                hfov = 62.0
+            return float(np.clip(hfov, 50.0, 110.0))
+        except Exception:
+            return 78.0
+
+    def _refresh_precision_hfov_auto(self, frame_w: float | None = None, frame_h: float | None = None) -> None:
+        """Keep the HFOV widget synchronized with the current auto-estimated stream geometry."""
+        try:
+            if not bool(getattr(self, "precision_hfov_auto", True)):
+                return
+            estimated = float(self._estimate_auto_precision_hfov(frame_w=frame_w, frame_h=frame_h))
+            self._auto_precision_hfov = estimated
+            widget = getattr(self, "precision_hfov_input", None)
+            if widget is not None:
+                try:
+                    widget.blockSignals(True)
+                except Exception:
+                    pass
+                try:
+                    widget.setValue(estimated)
+                except Exception:
+                    pass
+                try:
+                    widget.blockSignals(False)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def _get_target_pixel_error(self, cx: float, cy: float, frame_w: float = None, frame_h: float = None):
         """Return signed pixel error from the current frame center."""
@@ -18525,7 +19199,22 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             return None
 
     def _get_active_aim_target_center(self):
-        """Return the active aiming target center, preferring the projected world-lock marker."""
+        """Return the active aiming target center, preferring fresh live detections over stale world-lock projection."""
+        try:
+            if (
+                getattr(self, "last_target_center", None)
+                and not bool(getattr(self, "_boxes_are_reused", False))
+                and (
+                    bool(getattr(self, "target_locked", False))
+                    or bool(getattr(self, "last_detections", None))
+                )
+            ):
+                return (
+                    float(self.last_target_center[0]),
+                    float(self.last_target_center[1]),
+                )
+        except Exception:
+            pass
         try:
             world_target = self._get_world_lock_screen_target()
             if world_target is not None:
@@ -18549,7 +19238,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     def _capture_aim_lock(self, cx: float, cy: float, w: float, h: float, reason: str = "") -> None:
         """Latch a world-locked aim target from the current selected detection."""
         try:
-            if bool(self._aim_lock_reacquire_blocked(float(cx), float(cy))):
+            was_active = bool(getattr(self, "aim_lock_active", False))
+            if (not was_active) and bool(self._aim_lock_reacquire_blocked(float(cx), float(cy))):
                 return
             world_target = self._screen_target_to_world_angles(cx, cy)
             if world_target is None:
@@ -18562,7 +19252,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self.locked_target_box_size = (lock_w, lock_h)
             self.aim_lock_active = True
             self._aim_lock_acquired_at = time.time()
-            if reason and getattr(self, "enhancer", None) is not None:
+            if (not was_active) and reason and getattr(self, "enhancer", None) is not None:
                 self.enhancer.log_serial_output(
                     f"[AIM-LOCK] Locked world target pan={self.locked_pan_angle:.2f} tilt={self.locked_tilt_angle:.2f} reason={reason}",
                     fire=False,
@@ -18689,6 +19379,41 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 )
         except Exception:
             pass
+
+    def _clear_operator_target_state(self, reason: str = "operator") -> None:
+        """Flush stale target state after manual or home actions without pausing live detection."""
+        current_pan = float(
+            getattr(
+                self,
+                "target_pan",
+                getattr(self, "last_sent_pan", getattr(self, "prev_pan_angle", self.HOME_PAN)),
+            )
+        )
+        current_tilt = float(
+            getattr(
+                self,
+                "target_tilt",
+                getattr(self, "last_sent_tilt", getattr(self, "prev_tilt_angle", self.HOME_TILT)),
+            )
+        )
+
+        now_ts = time.time()
+        self.last_detections = []
+        self.last_target_center = None
+        self._boxes_are_reused = False
+        self.target_locked = False
+        self.target_x = None
+        self.target_y = None
+        self.last_seen_time = now_ts
+        self.last_known_pan = current_pan
+        self.last_known_tilt = current_tilt
+        self._speed_last_target_center = None
+        self._speed_prediction_last_target_center = None
+        self._motion_fire_prev_center = None
+        self._motion_fire_prev_ts = None
+        self._motion_fire_last_move_ts = None
+        self._motion_fire_consecutive = 0
+        self._clear_aim_lock(f"{reason}-reset")
 
     def _update_motion_fire_state(self, cx: float, cy: float, now: float | None = None) -> None:
         """Update motion gate state from the latest target center."""
@@ -19179,6 +19904,31 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     base_lead_ms = 0.0
             else:
                 base_lead_ms = 0.0
+
+            # Predictive lead is useful for fire-ahead logic, but it degrades visual centering.
+            # When we already have an active target lock / aim state, keep aiming on the live center.
+            try:
+                if (
+                    bool(getattr(self, "target_locked", False))
+                    or bool(getattr(self, "aiming_active", False))
+                    or bool(getattr(self, "aim_lock_active", False))
+                ):
+                    if debug_prediction:
+                        try:
+                            self._speed_last_prediction_debug = {
+                                "base_lead_ms": float(base_lead_ms),
+                                "effective_lead_ms": 0.0,
+                                "vx": float(vx),
+                                "vy": float(vy),
+                                "predicted_x": float(px),
+                                "predicted_y": float(py),
+                                "prediction_offset_px": 0.0,
+                            }
+                        except Exception:
+                            pass
+                    return float(px), float(py)
+            except Exception:
+                pass
 
             if not self._speed_opt_active():
                 if debug_prediction:
@@ -19900,6 +20650,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         self.target_tilt = float(
             np.clip(self.target_tilt, encoder_aware_tilt_min, encoder_aware_tilt_max)
         )
+        try:
+            self._clear_operator_target_state("manual")
+        except Exception:
+            pass
         
         # Log the clamping if it occurred
         if self.target_tilt != float(np.clip(self.target_tilt, self.TILT_MIN, self.TILT_MAX)):
@@ -19994,10 +20748,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             frame_width = getattr(self, "frame_width", 640)
             frame_height = getattr(self, "frame_height", 480)
             
-            # Convert pixel coordinates to pan/tilt angles
-            # Use same FOV settings as normal tracking for consistency
-            horizontal_fov = 110.0  # degrees
-            vertical_fov = 85.0  # degrees
+            # Convert pixel coordinates to pan/tilt angles using the same FOV path as normal tracking.
+            horizontal_fov, vertical_fov = self._get_world_lock_fov_degrees()
             
             # Calculate pixel deviation from frame center
             pixel_deviation_x = target_x - (frame_width / 2.0)
@@ -20175,8 +20927,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # BULLETPROOF FIX: PRESERVE DETECTION HISTORY
             # Keep last_detections so if target is still visible, we can re-lock immediately
             # DISABLED clearing: if hasattr(self, "last_detections"): self.last_detections.clear()
+            self._clear_operator_target_state("go-home")
             
-            # Only clear current target position, not history
+            # Clear current target position while homing.
             self.target_x = None
             self.target_y = None
             self.target_locked = False
@@ -20604,16 +21357,48 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             corner_slider = getattr(self, 'corner_size_slider', None)
             corner_size = corner_slider.value() if corner_slider else 40
             
+            def _draw_reticle_line(p1, p2):
+                p1 = tuple(int(v) for v in p1)
+                p2 = tuple(int(v) for v in p2)
+                shadow_thickness = max(crosshair_thickness + 2, 3)
+                highlight_thickness = max(1, crosshair_thickness - 1)
+                cv2.line(frame, p1, p2, HUD_BLACK, shadow_thickness, cv2.LINE_AA)
+                cv2.line(frame, p1, p2, crosshair_color, crosshair_thickness, cv2.LINE_AA)
+                cv2.line(frame, p1, p2, HUD_WHITE, highlight_thickness, cv2.LINE_AA)
+
+            inner_ring_radius = max(6, gap - 2)
+            accent_radius = max(inner_ring_radius + 9, int(min(w, h) * 0.024))
+            tick_gap = max(6, gap // 2)
+            tick_length = max(12, min(26, crosshair_length // 4))
+            center_diamond = max(4, crosshair_thickness + 2)
+
             # Horizontal lines
-            cv2.line(frame, (center_x - crosshair_length, center_y), (center_x - gap, center_y), crosshair_color, crosshair_thickness)
-            cv2.line(frame, (center_x + gap, center_y), (center_x + crosshair_length, center_y), crosshair_color, crosshair_thickness)
-            
+            _draw_reticle_line((center_x - crosshair_length, center_y), (center_x - gap, center_y))
+            _draw_reticle_line((center_x + gap, center_y), (center_x + crosshair_length, center_y))
+
             # Vertical lines
-            cv2.line(frame, (center_x, center_y - crosshair_length), (center_x, center_y - gap), crosshair_color, crosshair_thickness)
-            cv2.line(frame, (center_x, center_y + gap), (center_x, center_y + crosshair_length), crosshair_color, crosshair_thickness)
-            
-            # Center dot
-            cv2.circle(frame, (center_x, center_y), 3, crosshair_color, -1)
+            _draw_reticle_line((center_x, center_y - crosshair_length), (center_x, center_y - gap))
+            _draw_reticle_line((center_x, center_y + gap), (center_x, center_y + crosshair_length))
+
+            # Center ring and accent ticks
+            cv2.circle(frame, (center_x, center_y), inner_ring_radius, HUD_BLACK, crosshair_thickness + 2, cv2.LINE_AA)
+            cv2.circle(frame, (center_x, center_y), inner_ring_radius, crosshair_color, crosshair_thickness, cv2.LINE_AA)
+            cv2.circle(frame, (center_x, center_y), accent_radius, (90, 90, 90), 1, cv2.LINE_AA)
+
+            _draw_reticle_line((center_x - accent_radius - tick_length, center_y), (center_x - accent_radius - tick_gap, center_y))
+            _draw_reticle_line((center_x + accent_radius + tick_gap, center_y), (center_x + accent_radius + tick_length, center_y))
+            _draw_reticle_line((center_x, center_y - accent_radius - tick_length), (center_x, center_y - accent_radius - tick_gap))
+            _draw_reticle_line((center_x, center_y + accent_radius + tick_gap), (center_x, center_y + accent_radius + tick_length))
+
+            diamond_pts = np.array([
+                (center_x, center_y - center_diamond),
+                (center_x + center_diamond, center_y),
+                (center_x, center_y + center_diamond),
+                (center_x - center_diamond, center_y),
+            ], dtype=np.int32)
+            cv2.polylines(frame, [diamond_pts], True, HUD_BLACK, max(crosshair_thickness + 1, 2), cv2.LINE_AA)
+            cv2.polylines(frame, [diamond_pts], True, crosshair_color, max(crosshair_thickness, 1), cv2.LINE_AA)
+            cv2.circle(frame, (center_x, center_y), max(1, crosshair_thickness - 1), HUD_WHITE, -1, cv2.LINE_AA)
             
             # Scope ring
             scope_radius = int(min(h, w) * scope_radius_pct)
@@ -21399,13 +22184,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # --- Detection Mode Logic ---
         detection_mode = int(self._safe_current_index("detection_mode_combo", 0) or 0)
 
-        # BULLETPROOF FIX: NEVER SUPPRESS DETECTION
-        # Detection should ALWAYS run - even during home moves
-        # This ensures immediate re-acquisition when turret stops moving
-        # The suppression variables are DEPRECATED and should be removed
         boxes = []
-        # Detection always runs now - no suppression windows
-        suppressed = False  # Always run detection
+        suppressed = False
         # diagnostics for counts (used in throttled logging)
         contours_raw = 0
         contours_filtered = 0
@@ -23184,7 +23964,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 if not suspend_detection_updates:
                     self.last_target_center = (float(detection_cx), float(detection_cy))
 
-                if not bool(getattr(self, "aim_lock_active", False)):
+                if not suspend_detection_updates and not bool(getattr(self, "_boxes_are_reused", False)):
+                    self._capture_aim_lock(
+                        detection_cx,
+                        detection_cy,
+                        w,
+                        h,
+                        "target-acquired" if not bool(getattr(self, "aim_lock_active", False)) else "",
+                    )
+                elif not bool(getattr(self, "aim_lock_active", False)):
                     self._capture_aim_lock(detection_cx, detection_cy, w, h, "target-acquired")
 
                 aim_target = self._get_active_aim_target_center()
@@ -23415,6 +24203,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 gain = gain * aggression_mult
                                 if getattr(self, "aiming_active", False):
                                     gain = gain * 1.35
+                                if bool(getattr(self, "target_locked", False)) or bool(getattr(self, "aim_lock_active", False)):
+                                    gain = gain * 1.25
                             except Exception:
                                 pass
                             
@@ -23432,20 +24222,28 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 # Calculate distance from center using both error components
                                 total_error = (abs(err_x)**2 + abs(err_y)**2)**0.5
                                 
+                                tracking_lock_active = bool(
+                                    getattr(self, "aiming_active", False)
+                                    or getattr(self, "target_locked", False)
+                                    or getattr(self, "aim_lock_active", False)
+                                )
+
                                 # Define zone boundaries
                                 final_approach_threshold = deadzone_val * 1.5  # Very close
                                 near_threshold = deadzone_val * 3.0  # Getting close
                                 
                                 if total_error <= final_approach_threshold:
-                                    # ZONE 3: FINAL APPROACH - Aggressive centering
+                                    # ZONE 3: FINAL APPROACH - reduce gain so the final settle does not overshoot.
                                     if getattr(self, "final_approach_boost", True):
-                                        gain = gain * 2.5  # Strong boost for precise centering
+                                        gain = gain * 0.55
                                     else:
-                                        gain = gain * 1.8  # Moderate boost if disabled
+                                        gain = gain * 0.70
                                 elif total_error <= near_threshold:
-                                    # ZONE 2: NEAR - Moderate boost
-                                    gain = gain * 1.5
-                                # ZONE 1: FAR - No boost (default gain)
+                                    # ZONE 2: NEAR - keep motion assertive but calmer than far pursuit.
+                                    gain = gain * 0.85
+                                elif tracking_lock_active:
+                                    # ZONE 1: FAR with an active lock - allow a mild boost to close distance quickly.
+                                    gain = gain * 1.10
                                 
                             except Exception:
                                 pass  # If zone calc fails, use unmodified gain
@@ -23466,6 +24264,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             try:
                                 if bool(getattr(self, "aiming_active", False)):
                                     gain = float(np.clip(gain, 0.0001, 0.10))
+                                elif bool(getattr(self, "target_locked", False)) or bool(getattr(self, "aim_lock_active", False)):
+                                    gain = float(np.clip(gain, 0.0001, 0.08))
                             except Exception:
                                 pass
                         except Exception:
@@ -23815,18 +24615,20 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     # When aiming_active=True, force aggressive movement toward deadzone
                     # This overrides the normal "deadzone hold" logic to ensure target entry
                     aiming_active = getattr(self, "aiming_active", False)
-                    if aiming_active:
-                        deadzone_px = max(2, int(deadzone_px * 0.6))
+                    pursuit_active = bool(aiming_active or getattr(self, "target_locked", False) or getattr(self, "aim_lock_active", False))
+                    if pursuit_active:
+                        deadzone_px = max(2, int(deadzone_px * 0.45))
+                        snap_px = max(deadzone_px * 2, int(snap_px * 0.65))
                     
                     # If target is inside deadzone AND aiming is NOT active, hold current position (no aiming)
-                    if abs(err_x) <= deadzone_px and abs(err_y) <= deadzone_px and not aiming_active:
+                    if abs(err_x) <= deadzone_px and abs(err_y) <= deadzone_px and not pursuit_active:
                         target_pan_val = prev_pan
                         target_tilt_val = prev_tilt
                     else:
                         # ========== EMERGENCY SNAP FOR AIMING FAR TARGETS ==========
                         # When aiming_active and target is far (>5x deadzone), snap directly
                         # This ensures fast target acquisition during active aiming
-                        if aiming_active and (abs(err_x) > snap_px * 1.5 or abs(err_y) > snap_px * 1.5):
+                        if pursuit_active and (abs(err_x) > snap_px * 1.25 or abs(err_y) > snap_px * 1.25):
                             # Snap directly to target without smoothing for fast acquisition
                             target_pan_val = new_pan
                             target_tilt_val = new_tilt
@@ -23840,7 +24642,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 _ts = float(self._safe_int_widget_value("tracking_speed_slider", 50))
                             except Exception:
                                 _ts = 50.0
-                            if aiming_active:
+                            if pursuit_active:
                                 _ts = min(100.0, _ts + 20.0)
                             max_pan_step = float(np.clip(4.0 + (_ts / 100.0) * 10.0, 3.0, 14.0))
                             max_tilt_step = float(np.clip(4.0 + (_ts / 100.0) * 10.0, 3.0, 14.0))
@@ -23865,7 +24667,9 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             # - gradual increase/decrease (ease-in/out) so it doesn't overshoot
                             # Smoothing slider semantics here: higher = smoother (more damping / inertia).
                             adaptive_smoothing = float(smoothing)
-                            if aiming_active:
+                            if pursuit_active:
+                                adaptive_smoothing = min(adaptive_smoothing, 0.08)
+                            elif aiming_active:
                                 adaptive_smoothing = min(adaptive_smoothing, 0.12)
 
                             # Compute a 0..1 proximity factor based on pixel error.
@@ -23884,7 +24688,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
                             # Ease-out near center (reduce delta as we approach target)
                             # Keep a small floor so we don't stall just outside deadzone.
-                            ease_scale = 0.20 + 0.80 * float(ease)
+                            ease_scale = 0.35 + 0.65 * float(ease) if pursuit_active else 0.20 + 0.80 * float(ease)
                             desired_pan_delta *= ease_scale
                             desired_tilt_delta *= ease_scale
 
@@ -23894,18 +24698,24 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                 self._track_pan_vel = 0.0
                             if not hasattr(self, "_track_tilt_vel"):
                                 self._track_tilt_vel = 0.0
-                            self._track_pan_vel = float(self._track_pan_vel) * adaptive_smoothing + desired_pan_delta * (1.0 - adaptive_smoothing)
-                            self._track_tilt_vel = float(self._track_tilt_vel) * adaptive_smoothing + desired_tilt_delta * (1.0 - adaptive_smoothing)
+                            current_pan_vel = float(self._track_pan_vel)
+                            current_tilt_vel = float(self._track_tilt_vel)
+                            if current_pan_vel * desired_pan_delta < 0.0:
+                                current_pan_vel *= 0.20
+                            if current_tilt_vel * desired_tilt_delta < 0.0:
+                                current_tilt_vel *= 0.20
+                            self._track_pan_vel = current_pan_vel * adaptive_smoothing + desired_pan_delta * (1.0 - adaptive_smoothing)
+                            self._track_tilt_vel = current_tilt_vel * adaptive_smoothing + desired_tilt_delta * (1.0 - adaptive_smoothing)
 
                             # Clamp per-frame move to avoid violent jumps.
                             try:
                                 _ts = float(self._safe_int_widget_value("tracking_speed_slider", 50))
                             except Exception:
                                 _ts = 50.0
-                            if aiming_active:
+                            if pursuit_active:
                                 _ts = min(100.0, _ts + 20.0)
-                            max_pan_step = float(np.clip(3.0 + (_ts / 100.0) * 10.0, 2.0, 14.0))
-                            max_tilt_step = float(np.clip(3.0 + (_ts / 100.0) * 10.0, 2.0, 14.0))
+                            max_pan_step = float(np.clip(4.0 + (_ts / 100.0) * 11.0, 3.0, 16.0))
+                            max_tilt_step = float(np.clip(4.0 + (_ts / 100.0) * 11.0, 3.0, 16.0))
                             self._track_pan_vel = float(np.clip(self._track_pan_vel, -max_pan_step, max_pan_step))
                             self._track_tilt_vel = float(np.clip(self._track_tilt_vel, -max_tilt_step, max_tilt_step))
 
@@ -23919,7 +24729,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             # Larger deadzones get stronger push; smaller deadzones get gentler control.
                             # When aiming: 3x threshold ensures aggressive final push from further away
                             # When passive: 2x threshold for normal precision
-                            threshold_for_push = deadzone_px * 3.0 if aiming_active else deadzone_px * 2.0
+                            threshold_for_push = deadzone_px * 3.5 if pursuit_active else (deadzone_px * 3.0 if aiming_active else deadzone_px * 2.0)
                             
                             # FIX DEC8b #3: Gradient-based micro-adjustment instead of fixed min_push
                             # Old approach: min_push override caused overshooting when error was small
@@ -23995,12 +24805,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                                     and (abs(err_x) > deadzone_px or abs(err_y) > deadzone_px)
                                 ):
                                     # Convert pixel error to degrees using HFOV
-                                    hfov = float(self._safe_float_widget_value("precision_hfov_input", 90.0))
+                                    hfov, vfov = self._get_world_lock_fov_degrees()
                                     frame_w = float(self.frame_width)
-                                    deg_per_px = hfov / max(1.0, frame_w)
+                                    frame_h = float(self.frame_height)
+                                    pan_deg_per_px = hfov / max(1.0, frame_w)
+                                    tilt_deg_per_px = vfov / max(1.0, frame_h)
 
-                                    pan_err_deg = err_x * deg_per_px
-                                    tilt_err_deg = err_y * deg_per_px
+                                    pan_err_deg = err_x * pan_deg_per_px
+                                    tilt_err_deg = err_y * tilt_deg_per_px
 
                                     # Initialize PID state
                                     if not hasattr(self, "_precision_pid_pan"):
@@ -25286,44 +26098,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # ========== SMART SENTRY V2 FRAME UPDATE ==========
         try:
             _v2_tab = getattr(self, "sentry_v2_tab", None)
-            _v2_cur_widget = self.main_tab_widget.currentWidget()
-            # Check tab visibility directly (more robust than relying on flag)
+            _v2_window = getattr(self, "_sentry_v2_window", None)
             _v2_visible = (
                 _v2_tab is not None
-                and _v2_cur_widget is _v2_tab
+                and _v2_window is not None
+                and _v2_window.isVisible()
             )
+            _v2_feed_active = _v2_tab is not None and _v2_tab.is_enabled()
 
-            # DIAGNOSTIC: throttled to ~1 per second (REMOVE after fix)
-            _v2_diag_now = time.time()
-            if _v2_diag_now - getattr(self, "_v2_diag_ts", 0) > 1.0:
-                self._v2_diag_ts = _v2_diag_now
-                _cur_idx = self.main_tab_widget.currentIndex()
-                _v2_idx = self.main_tab_widget.indexOf(_v2_tab) if _v2_tab else -1
-                _cur_cls = type(_v2_cur_widget).__name__ if _v2_cur_widget else "None"
-                _v2_cls = type(_v2_tab).__name__ if _v2_tab else "None"
-                _same = _v2_cur_widget is _v2_tab
-                print(f"[V2_DIAG] tab={_v2_tab is not None} cur_idx={_cur_idx} v2_idx={_v2_idx} "
-                      f"cur_class={_cur_cls} v2_class={_v2_cls} same_obj={_same} "
-                      f"visible={_v2_visible} frame1={frame1 is not None} "
-                      f"active_flag={getattr(self, 'sentry_v2_active', False)}")
-
-            # Also sync the active flag so other code can use it
-            if _v2_visible and not getattr(self, "sentry_v2_active", False):
-                self.sentry_v2_active = True
-            if _v2_visible and frame1 is not None:
-                v2_boxes = []
-                try:
-                    if boxes and len(boxes) > 0:
-                        for box in boxes:
-                            if len(box) >= 4:
-                                x, y, w, h = box[:4]
-                                score = float(box[4]) if len(box) >= 5 else 1.0
-                                cls_id = int(box[5]) if len(box) >= 6 else 0
-                                v2_boxes.append((int(x), int(y), int(w), int(h), score, cls_id))
-                except Exception as box_err:
-                    print(f"[SENTRY_V2] Box conversion error: {box_err}")
-                print(f"[V2_DIAG] >>> CALLING process_frame, frame shape={frame1.shape}")
-                self.sentry_v2_tab.process_frame(frame1, v2_boxes)
+            if _v2_feed_active and frame1 is not None:
+                self.sentry_v2_tab.process_frame(frame1, None, use_internal_detector=True)
         except Exception as e:
             import traceback
             print(f"[SENTRY_V2] update error: {e}")
@@ -25668,9 +26452,8 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         try:
             if getattr(self, "sentry_v2_active", False) and getattr(self, "sentry_v2_tab", None) is not None:
                 if self.sentry_v2_tab.is_enabled():
-                    # Allow sentry's own move/fire commands and manual override through
-                    if not getattr(self, "manual_override", False) and not getattr(self, "_sentry_v2_commanding", False):
-                        return
+                    # Sentry v2 has its own serial connection — block main app commands
+                    return
         except Exception as e:
             print(f"[SENTRY_V2] send_serial_command guard error: {e}")
         # ========== END SMART SENTRY V2 BLOCK ==========
@@ -26460,16 +27243,64 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             except Exception as e:
                                 print(f"[MODE_DEBUG] ✗ SEND FAILED: {e}")
 
-                            # Bus ping failed OR Bus write failed: keep IO working, but do not send pan/tilt to ESP32.
-                            if (not bool(getattr(self, "_bus_servo_ping_ok", False))) or (not pan_tilt_params_sent):
+                        elif link_open:
+                            try:
+                                io_payload = {
+                                    "fire": int(fire_token),
+                                    "safety": int(safety_token),
+                                    "mode": int(mode_token),
+                                    "led": int(led_token),
+                                    "laser": int(laser_token),
+                                }
+                                self.esp32_link.send_command(io_payload, expect_ack=False)
                                 if debug_on and hasattr(self, "enhancer"):
                                     try:
                                         self.enhancer.log_serial_output(
-                                            "[DUAL PORT] Bus pan/tilt unavailable; sent IO-only to ESP32 (no P/T fallback)",
+                                            f"[DUAL WIFI IO TX] {io_payload}",
                                             fire=False,
                                         )
                                     except Exception:
                                         pass
+                            except Exception as e:
+                                if debug_on and hasattr(self, "enhancer"):
+                                    try:
+                                        self.enhancer.log_serial_output(
+                                            f"[DUAL WIFI IO TX ERROR] {e}",
+                                            fire=False,
+                                        )
+                                    except Exception:
+                                        pass
+
+                        elif (not primary_open):
+                            try:
+                                opened = bool(self._connect_esp32_link_from_panel())
+                                if opened:
+                                    link_open = bool(
+                                        getattr(self, "esp32_link", None) is not None
+                                        and self.esp32_link.is_open()
+                                    )
+                                if link_open:
+                                    io_payload = {
+                                        "fire": int(fire_token),
+                                        "safety": int(safety_token),
+                                        "mode": int(mode_token),
+                                        "led": int(led_token),
+                                        "laser": int(laser_token),
+                                    }
+                                    self.esp32_link.send_command(io_payload, expect_ack=False)
+                            except Exception:
+                                pass
+
+                            # Bus ping failed OR Bus write failed: keep IO working, but do not send pan/tilt to ESP32.
+                        if (primary_open or link_open) and ((not bool(getattr(self, "_bus_servo_ping_ok", False))) or (not pan_tilt_params_sent)):
+                            if debug_on and hasattr(self, "enhancer"):
+                                try:
+                                    self.enhancer.log_serial_output(
+                                        "[DUAL PORT] Bus pan/tilt unavailable; sent IO-only to ESP32 (no P/T fallback)",
+                                        fire=False,
+                                    )
+                                except Exception:
+                                    pass
 
                     # Update last_sent_* ONLY if we actually successfully wrote to serial (Bus or Nano)
                     # This fixes the "Frozen Track" bug where a failed write causes the system to think
@@ -28536,7 +29367,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             # --- Smart Sentry v2 tab detection ---
             if getattr(self, "sentry_v2_tab", None) is not None:
                 v2_index = self.main_tab_widget.indexOf(self.sentry_v2_tab)
-                if index == v2_index:
+                if v2_index >= 0 and index == v2_index:
                     self.sentry_v2_active = True
                     # Pause main tracking
                     if getattr(self, "tracking_active", False):
@@ -28554,16 +29385,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self._sentry_v2_previous_tracking_state = False
                     # Hide irrelevant dock panels
                     self._sentry_v2_hide_docks()
-                    # Sync accessory button states
-                    try:
-                        self.sentry_v2_tab.sync_accessory_states(
-                            bool(getattr(self, "relay1_state", 0)),
-                            bool(getattr(self, "relay2_state", 0)),
-                            int(getattr(self, "safety_state", 1)) == 0,
-                        )
-                    except Exception:
-                        pass
-                elif getattr(self, "sentry_v2_active", False):
+                elif v2_index >= 0 and getattr(self, "sentry_v2_active", False):
                     self.sentry_v2_active = False
                     if self.sentry_v2_tab.is_enabled():
                         self.sentry_v2_tab.set_enabled(False)
@@ -28878,10 +29700,42 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     # AGENT-MANAGED BLOCK: SMART SENTRY V2 INTEGRATION (Mar 2026)
     # =========================================================================
 
+    def _show_sentry_v2_window(self):
+        """Show the standalone Smart Sentry v2 window."""
+        try:
+            window = getattr(self, "_sentry_v2_window", None)
+            if window is None:
+                return
+            window.show()
+            try:
+                window.raise_()
+                window.activateWindow()
+            except Exception:
+                pass
+            if getattr(self, "_sentry_v2_window_action", None) is not None:
+                self._sentry_v2_window_action.setChecked(True)
+        except Exception as e:
+            print(f"[SENTRY_V2] show window error: {e}")
+
+    def _toggle_sentry_v2_window(self, checked: bool):
+        """Toggle the standalone Smart Sentry v2 window."""
+        try:
+            window = getattr(self, "_sentry_v2_window", None)
+            if window is None:
+                return
+            if checked:
+                self._show_sentry_v2_window()
+            else:
+                window.close()
+        except Exception as e:
+            print(f"[SENTRY_V2] toggle window error: {e}")
+
     def _on_sentry_v2_enabled_changed(self, enabled: bool):
         """Handle Smart Sentry v2 enable/disable toggle."""
         try:
+            self.sentry_v2_active = bool(enabled)
             if enabled:
+                self._show_sentry_v2_window()
                 if getattr(self, "tracking_active", False):
                     self._sentry_v2_previous_tracking_state = True
                     try:
@@ -28905,133 +29759,25 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     except Exception:
                         self.tracking_active = True
                         self.aiming_active = True
+                if getattr(self, "_sentry_v2_window_action", None) is not None:
+                    self._sentry_v2_window_action.setChecked(
+                        getattr(self, "_sentry_v2_window", None) is not None
+                        and self._sentry_v2_window.isVisible()
+                    )
                 print("[SENTRY_V2] Smart Sentry DISABLED")
         except Exception as e:
             print(f"[SENTRY_V2] enabled_changed error: {e}")
 
-    def _on_sentry_v2_turret_move(self, pan: float, tilt: float):
-        """Handle turret move request from Smart Sentry v2."""
+    def _on_sentry_v2_detection_mode_changed(self, mode: int):
+        """Sync detection mode from Smart Sentry v2 to main app combo box."""
         try:
-            if not getattr(self, "sentry_v2_active", False):
-                return
-            pan = max(5, min(185, pan))
-            tilt = max(20, min(130, tilt))
-            self.target_pan = pan
-            self.target_tilt = tilt
-            try:
-                self._sentry_v2_commanding = True
-                self.send_serial_command()
-            except Exception:
-                pass
-            finally:
-                self._sentry_v2_commanding = False
+            if hasattr(self, "detection_mode_combo"):
+                self.detection_mode_combo.setCurrentIndex(mode)
         except Exception as e:
-            print(f"[SENTRY_V2] Turret move error: {e}")
-
-    def _on_sentry_v2_fire(self, burst_count: int):
-        """Handle fire request from Smart Sentry v2."""
-        try:
-            if not getattr(self, "sentry_v2_active", False):
-                return
-            self._sentry_v2_commanding = True
-            if int(getattr(self, "safety_state", 1)) != 0:
-                try:
-                    if hasattr(self, "enhancer"):
-                        self.enhancer.log_serial_output(
-                            "[SENTRY_V2] Fire blocked - SAFETY is LOCKED", fire=False
-                        )
-                except Exception:
-                    pass
-                return
-            try:
-                if (
-                    hasattr(self, "ser")
-                    and self.ser
-                    and getattr(self.ser, "is_open", False)
-                    and (not self._serial_is_debug_board_bus())
-                ):
-                    pan = int(getattr(self, "target_pan", 90))
-                    tilt = int(getattr(self, "target_tilt", 40))
-                    led_val = int(getattr(self, "relay1_state", 0))
-                    laser_val = int(getattr(self, "relay2_state", 0))
-                    # Respect trigger mode from sentry v2 config
-                    m_val = 0
-                    try:
-                        if self.sentry_v2_tab and self.sentry_v2_tab.config.engagement.trigger_mode_bb:
-                            m_val = 1
-                    except Exception:
-                        pass
-                    for i in range(burst_count):
-                        cmd = f"P{pan}T{tilt}F1L{led_val}R{laser_val}G0S0M{m_val}\n"
-                        self.ser.write(cmd.encode("utf-8"))
-                        time.sleep(0.05)
-                        cmd = f"P{pan}T{tilt}F0L{led_val}R{laser_val}G0S0M{m_val}\n"
-                        self.ser.write(cmd.encode("utf-8"))
-                        if i < burst_count - 1:
-                            time.sleep(0.05)
-                    try:
-                        if hasattr(self, "enhancer"):
-                            self.enhancer.log_serial_output(
-                                f"[SENTRY_V2] FIRE! Burst: {burst_count} shots", fire=True
-                            )
-                    except Exception:
-                        pass
-            except Exception as e:
-                print(f"[SENTRY_V2] Fire serial error: {e}")
-        except Exception as e:
-            print(f"[SENTRY_V2] Fire error: {e}")
-        finally:
-            self._sentry_v2_commanding = False
-        """Handle Smart Sentry v2 enable/disable."""
-        try:
-            if enabled:
-                self.sentry_v2_active = True
-                if getattr(self, "tracking_active", False):
-                    self._sentry_v2_previous_tracking_state = True
-                    try:
-                        if getattr(self, "state_manager", None) is not None:
-                            self.state_manager.ensure_tracking_disabled(reason="Smart Sentry v2 enabled")
-                        else:
-                            self.tracking_active = False
-                            self.aiming_active = False
-                    except Exception:
-                        self.tracking_active = False
-                        self.aiming_active = False
-                else:
-                    self._sentry_v2_previous_tracking_state = False
-                try:
-                    if hasattr(self, "enhancer"):
-                        self.enhancer.log_serial_output(
-                            "[SENTRY_V2] Smart Sentry ENABLED - turret control transferred",
-                            fire=False
-                        )
-                except Exception:
-                    pass
-            else:
-                self.sentry_v2_active = False
-                if getattr(self, "_sentry_v2_previous_tracking_state", False):
-                    try:
-                        if getattr(self, "state_manager", None) is not None:
-                            self.state_manager.ensure_tracking_active(reason="Smart Sentry v2 disabled")
-                        else:
-                            self.tracking_active = True
-                            self.aiming_active = True
-                    except Exception:
-                        self.tracking_active = True
-                        self.aiming_active = True
-                try:
-                    if hasattr(self, "enhancer"):
-                        self.enhancer.log_serial_output(
-                            "[SENTRY_V2] Smart Sentry DISABLED", fire=False
-                        )
-                except Exception:
-                    pass
-        except Exception as e:
-            print(f"[SENTRY_V2] Enable change error: {e}")
+            print(f"[SENTRY_V2] Detection mode sync error: {e}")
 
     # --- Dock panel management for Smart Sentry v2 ---
 
-    # Dock titles to hide when Smart Sentry v2 tab is active
     _SENTRY_V2_HIDE_DOCKS = {
         "Configuration & Connection",
         "Home Position",
@@ -29046,7 +29792,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     }
 
     def _sentry_v2_hide_docks(self) -> None:
-        """Hide dock panels not applicable in Smart Sentry mode; save their state."""
+        """Hide dock panels not applicable in Smart Sentry mode."""
         try:
             from PyQt5.QtWidgets import QDockWidget
             saved = {}
@@ -29060,7 +29806,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             print(f"[SENTRY_V2] Dock hide error: {e}")
 
     def _sentry_v2_restore_docks(self) -> None:
-        """Restore dock panels that were hidden when entering Smart Sentry mode."""
+        """Restore dock panels hidden by Smart Sentry mode."""
         try:
             from PyQt5.QtWidgets import QDockWidget
             saved = getattr(self, "_sentry_v2_saved_dock_visibility", {})
@@ -29073,50 +29819,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             self._sentry_v2_saved_dock_visibility = {}
         except Exception as e:
             print(f"[SENTRY_V2] Dock restore error: {e}")
-
-    # --- Extended v2 signal handlers ---
-
-    def _on_sentry_v2_detection_mode_changed(self, mode: int):
-        """Sync detection mode from Smart Sentry v2 to main app combo box."""
-        try:
-            if hasattr(self, "detection_mode_combo"):
-                self.detection_mode_combo.setCurrentIndex(mode)
-        except Exception as e:
-            print(f"[SENTRY_V2] Detection mode sync error: {e}")
-
-    def _on_sentry_v2_trigger_mode_changed(self, is_bb: bool):
-        """Sync trigger mode from Smart Sentry v2."""
-        try:
-            self.trigger_mode_bb = is_bb
-            if hasattr(self, "trigger_mode_combo"):
-                self.trigger_mode_combo.setCurrentIndex(1 if is_bb else 0)
-        except Exception as e:
-            print(f"[SENTRY_V2] Trigger mode sync error: {e}")
-
-    def _on_sentry_v2_manual_move(self, pan_delta: int, tilt_delta: int):
-        """Handle manual D-pad movement from Smart Sentry v2."""
-        try:
-            self.move_manual(pan_delta, tilt_delta)
-        except Exception as e:
-            print(f"[SENTRY_V2] Manual move error: {e}")
-
-    def _on_sentry_v2_manual_fire(self, state: int):
-        """Handle manual fire press/release from Smart Sentry v2."""
-        try:
-            self.set_fire_state(state)
-        except Exception as e:
-            print(f"[SENTRY_V2] Manual fire error: {e}")
-
-    def _on_sentry_v2_auto_trigger_changed(self, enabled: bool):
-        """Handle auto-trigger toggle from Smart Sentry v2."""
-        try:
-            if hasattr(self, "enhancer"):
-                self.enhancer.log_serial_output(
-                    f"[SENTRY_V2] Auto-trigger {'ENABLED' if enabled else 'DISABLED'}",
-                    fire=False,
-                )
-        except Exception as e:
-            print(f"[SENTRY_V2] Auto-trigger change error: {e}")
 
     # =========================================================================
     # END AGENT-MANAGED BLOCK: SMART SENTRY V2 INTEGRATION
@@ -29135,6 +29837,14 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             pass
         try:
             self.running = False
+        except Exception:
+            pass
+
+        # Stop sentry v2 timers immediately (prevents grab-frame during teardown)
+        try:
+            _v2 = getattr(self, "sentry_v2_tab", None)
+            if _v2 is not None:
+                _v2.cleanup()
         except Exception:
             pass
 
@@ -29176,32 +29886,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         cap_obj.release()
                 except Exception:
                     pass
-
-                # Close serial safely
                 try:
-                    ser_obj = getattr(self, "ser", None)
-                    if ser_obj is not None and getattr(ser_obj, "is_open", False):
-                        try:
-                            safe_cmd = (
-                                f"P{getattr(self, 'prev_pan_angle', 90)}"
-                                f"T{getattr(self, 'prev_tilt_angle', 40)}"
-                                "F0L0R0G0S1M0\n"
-                            )
-                            try:
-                                ser_obj.write(safe_cmd.encode("utf-8"))
-                            except Exception:
-                                pass
-                            try:
-                                import time as _time
-                                _time.sleep(0.1)
-                            except Exception:
-                                pass
-                            try:
-                                ser_obj.close()
-                            except Exception:
-                                pass
-                        except Exception:
-                            pass
+                    self.cap = None
+                except Exception:
+                    pass
+
+                # Close all main-app transports, including Debug Board and ESP32 UDP.
+                try:
+                    self._disconnect_main_app_transports(
+                        close_camera=False,
+                        update_ui=False,
+                        write_safe_serial=True,
+                    )
                 except Exception:
                     pass
             except Exception as e:
