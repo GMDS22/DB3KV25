@@ -10,8 +10,8 @@ Connection Modes:
                                       IO tokens on ESP32 COM  (2 USB cables)
     2  ESP32 WiFi + Debug Board USB → bus servo pan/tilt on Debug Board COM,
                                       IO tokens over UDP       (1 USB cable)
-    3  ESP32 WiFi + Debug Board on ESP32 → full ASCII protocol over UDP
-                                           (no USB — fully wireless)
+    3  ESP32 WiFi + Debug Board on ESP32 UART2 → full ASCII protocol over UDP
+                                                 (no runtime USB)
 
 ESP32 ASCII protocol: ``P{pan}T{tilt}F{fire}L{led}R{laser}G{acc3}S{safety}M{mode}\\n``
 Bus servo protocol:    Yahboom-style register write (0xFF 0xFF ID LEN INST REG …)
@@ -25,19 +25,26 @@ import socket
 import threading
 import time
 import zlib
-from typing import Optional
+from typing import Any, Callable, Dict, Optional
 
 import serial as _serial
 import serial.tools.list_ports as _list_ports
+
+from .sentry_v2_config import (
+    SENTRY_PAN_MAX,
+    SENTRY_PAN_MIN,
+    SENTRY_TILT_MAX,
+    SENTRY_TILT_MIN,
+)
 
 
 class SentryV2Comm:
     """Self-contained ESP32 + Debug Board communication for Smart Sentry v2."""
 
-    PAN_OUTPUT_MIN = 0.0
-    PAN_OUTPUT_MAX = 220.0
-    TILT_OUTPUT_MIN = 0.0
-    TILT_OUTPUT_MAX = 130.0
+    PAN_OUTPUT_MIN = SENTRY_PAN_MIN
+    PAN_OUTPUT_MAX = SENTRY_PAN_MAX
+    TILT_OUTPUT_MIN = SENTRY_TILT_MIN
+    TILT_OUTPUT_MAX = SENTRY_TILT_MAX
 
     # --- Connection mode constants ---
     MODE_ESP32_USB = 0           # Single USB — full ASCII to ESP32
@@ -49,7 +56,7 @@ class SentryV2Comm:
         "ESP32 USB",
         "ESP32 USB + Debug Board USB",
         "ESP32 WiFi + Debug Board USB",
-        "ESP32 WiFi (wireless, no USB)",
+        "ESP32 WiFi + Debug Board on ESP32 UART",
     ]
 
     def __init__(self) -> None:
@@ -78,12 +85,16 @@ class SentryV2Comm:
         self.pan_servo_id: int = 1
         self.tilt_servo_id: int = 2
         self.bus_servo_time_ms: int = 20
-        self._bus_checksum_mode: str = "sub"  # "sub" or "xor"
+        self._bus_checksum_mode: str = "auto"  # "auto", "sub", or "xor"
+        self._bus_servo_ping_ok: bool = False
 
         # Diagnostics
         self._last_cmd: str = ""
         self._last_error: str = ""
         self._udp_seq: int = 0
+        
+        # PIR event callback (called when sensor data is received)
+        self._on_pir_event: Optional[Callable[[int, float], None]] = None
 
     # ------------------------------------------------------------------ #
     #  Port scanning
@@ -126,7 +137,14 @@ class SentryV2Comm:
             elif self._mode == self.MODE_DUAL_USB:
                 ok_bus = self._open_serial(debug_port, debug_baud, primary=False)
                 bus_err = self._last_error
-                self._connect_details["Debug Board"] = (ok_bus, debug_port if ok_bus else bus_err)
+                if ok_bus:
+                    checksum_mode = self._probe_bus_servo_checksum(self._bus_ser)
+                    if checksum_mode is not None:
+                        self._connect_details["Debug Board"] = (True, f"{debug_port} ({checksum_mode} checksum)")
+                    else:
+                        self._connect_details["Debug Board"] = (True, f"{debug_port} (auto checksum fallback)")
+                else:
+                    self._connect_details["Debug Board"] = (False, bus_err)
 
                 ok_esp = self._open_serial(esp32_port, esp32_baud, primary=True)
                 esp_err = self._last_error
@@ -143,7 +161,14 @@ class SentryV2Comm:
             elif self._mode == self.MODE_WIFI_DEBUG_USB:
                 ok_bus = self._open_serial(debug_port, debug_baud, primary=False)
                 bus_err = self._last_error
-                self._connect_details["Debug Board"] = (ok_bus, debug_port if ok_bus else bus_err)
+                if ok_bus:
+                    checksum_mode = self._probe_bus_servo_checksum(self._bus_ser)
+                    if checksum_mode is not None:
+                        self._connect_details["Debug Board"] = (True, f"{debug_port} ({checksum_mode} checksum)")
+                    else:
+                        self._connect_details["Debug Board"] = (True, f"{debug_port} (auto checksum fallback)")
+                else:
+                    self._connect_details["Debug Board"] = (False, bus_err)
 
                 ok_udp = self._open_udp(udp_host, udp_port)
                 udp_err = self._last_error
@@ -244,24 +269,80 @@ class SentryV2Comm:
             self._last_error = str(e)
             return False
 
+    @staticmethod
+    def _compact_json(obj: Dict[str, Any]) -> bytes:
+        return json.dumps(obj, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+    def _build_udp_packet(self, payload: Dict[str, Any]) -> bytes:
+        with self._lock:
+            self._udp_seq = (self._udp_seq + 1) & 0x7FFFFFFF
+            if self._udp_seq == 0:
+                self._udp_seq = 1
+            seq = self._udp_seq
+        msg = {
+            "v": 1,
+            "t": "cmd",
+            "seq": seq,
+            "ts": int(time.time() * 1000),
+            "p": payload,
+        }
+        raw = self._compact_json(msg)
+        msg["crc"] = f"{(zlib.crc32(raw) & 0xFFFFFFFF):08x}"
+        return self._compact_json(msg)
+
+    def _send_udp_payload(self, payload: Dict[str, Any], *, label: str) -> bool:
+        with self._lock:
+            sock = self._sock
+            udp_target = self._udp_target
+        try:
+            if sock is None or udp_target is None:
+                return False
+            data = self._build_udp_packet(payload)
+            sock.sendto(data, udp_target)
+            self._last_cmd = label
+            return True
+        except Exception as e:
+            self._last_error = str(e)
+            return False
+
+    def _safe_close_serial(self, ser: Optional[_serial.Serial]) -> None:
+        if ser is None:
+            return
+        try:
+            cancel_read = getattr(ser, "cancel_read", None)
+            if callable(cancel_read):
+                cancel_read()
+        except Exception:
+            pass
+        try:
+            cancel_write = getattr(ser, "cancel_write", None)
+            if callable(cancel_write):
+                cancel_write()
+        except Exception:
+            pass
+        try:
+            ser.close()
+        except Exception:
+            pass
+
     def disconnect(self) -> None:
         """Close all open connections."""
         with self._lock:
-            for s in (self._ser, self._bus_ser):
-                if s is not None:
-                    try:
-                        s.close()
-                    except Exception:
-                        pass
+            ser = self._ser
+            bus_ser = self._bus_ser
+            sock = self._sock
             self._ser = None
             self._bus_ser = None
-            if self._sock is not None:
-                try:
-                    self._sock.close()
-                except Exception:
-                    pass
-                self._sock = None
-                self._udp_target = None
+            self._sock = None
+            self._udp_target = None
+
+        self._safe_close_serial(ser)
+        self._safe_close_serial(bus_ser)
+        if sock is not None:
+            try:
+                sock.close()
+            except Exception:
+                pass
 
     def is_connected(self) -> bool:
         m = self._mode
@@ -312,6 +393,25 @@ class SentryV2Comm:
             max(self.TILT_OUTPUT_MIN, min(self.TILT_OUTPUT_MAX, tilt_out)),
         )
 
+    # ------------------------------------------------------------------ #
+    # PIR sensor event interface  
+    # ------------------------------------------------------------------ #
+
+    def set_on_pir_event(self, callback: Optional[Callable[[int, float], None]]) -> None:
+        """
+        Register a callback to be called when PIR sensor data is received.
+        Callback signature: on_pir_event(sensor_id: int, timestamp: float)
+        """
+        self._on_pir_event = callback
+
+    def inject_pir_event(self, sensor_id: int) -> None:
+        """
+        Manually inject a PIR sensor event (useful for testing).
+        In production, this would be called when parsing telemetry from ESP32.
+        """
+        if self._on_pir_event is not None:
+            self._on_pir_event(sensor_id, time.time())
+
     def send_command(
         self,
         pan: float,
@@ -333,7 +433,30 @@ class SentryV2Comm:
             ok_io = self._send_io_udp(fire)
             return ok_bus and ok_io
         elif m == self.MODE_WIFI_FULL:
-            return self._send_ascii(pan_out, tilt_out, fire, via_serial=False)
+            return self._send_wifi_full(pan_out, tilt_out, fire, move_time_ms=move_time_ms)
+        return False
+
+    def send_movement(
+        self,
+        pan: float,
+        tilt: float,
+        *,
+        move_time_ms: Optional[int] = None,
+    ) -> bool:
+        """Send pan/tilt movement without coupling bus-servo motion to IO delivery.
+
+        In Debug Board modes, motion should continue even when ESP32 IO state is unchanged.
+        """
+        pan_out, tilt_out = self._normalize_output_angles(pan, tilt)
+        m = self._mode
+        if m == self.MODE_ESP32_USB:
+            return self._send_ascii(pan_out, tilt_out, fire=0, via_serial=True)
+        if m == self.MODE_DUAL_USB:
+            return self._send_bus_servo(pan_out, tilt_out, move_time_ms=move_time_ms)
+        if m == self.MODE_WIFI_DEBUG_USB:
+            return self._send_bus_servo(pan_out, tilt_out, move_time_ms=move_time_ms)
+        if m == self.MODE_WIFI_FULL:
+            return self._send_wifi_full(pan_out, tilt_out, fire=0, move_time_ms=move_time_ms)
         return False
 
     def send_fire_burst(
@@ -366,8 +489,9 @@ class SentryV2Comm:
     # ------------------------------------------------------------------ #
 
     def _build_ascii(self, pan: float, tilt: float, fire: int = 0) -> str:
-        p = int(max(0, min(220, round(pan))))
-        t = int(max(0, min(130, round(tilt))))
+        p = int(max(self.PAN_OUTPUT_MIN, min(self.PAN_OUTPUT_MAX, round(pan))))
+        t = int(max(self.TILT_OUTPUT_MIN, min(self.TILT_OUTPUT_MAX, round(tilt))))
+        print(f"DEBUG: SERIALIZED: P{p} T{t} (from pan={pan:.3f}, tilt={tilt:.3f})")
         f = int(bool(fire))
         led = 1 if self.led_on else 0
         laser = 1 if self.laser_on else 0
@@ -377,22 +501,51 @@ class SentryV2Comm:
 
     def _send_ascii(self, pan: float, tilt: float, fire: int, *, via_serial: bool) -> bool:
         cmd = self._build_ascii(pan, tilt, fire)
+        print(f"DEBUG: USB SEND: {cmd.rstrip()}")
         with self._lock:
-            try:
-                if via_serial:
-                    if self._ser and self._ser.is_open:
-                        self._ser.write(cmd.encode("utf-8"))
-                        self._last_cmd = cmd.rstrip()
-                        return True
-                else:
-                    if self._sock and self._udp_target:
-                        self._sock.sendto(cmd.encode("utf-8"), self._udp_target)
-                        self._last_cmd = cmd.rstrip()
-                        return True
-                return False
-            except Exception as e:
-                self._last_error = str(e)
-                return False
+            ser = self._ser
+            sock = self._sock
+            udp_target = self._udp_target
+        try:
+            if via_serial:
+                if ser and ser.is_open:
+                    ser.write(cmd.encode("utf-8"))
+                    self._last_cmd = cmd.rstrip()
+                    return True
+            else:
+                if sock and udp_target:
+                    sock.sendto(cmd.encode("utf-8"), udp_target)
+                    self._last_cmd = cmd.rstrip()
+                    return True
+            return False
+        except Exception as e:
+            self._last_error = str(e)
+            return False
+
+    def _send_wifi_full(
+        self,
+        pan: float,
+        tilt: float,
+        fire: int,
+        *,
+        move_time_ms: Optional[int] = None,
+    ) -> bool:
+        payload: Dict[str, Any] = {
+            "pan_cmd": int(max(self.PAN_OUTPUT_MIN, min(self.PAN_OUTPUT_MAX, round(pan)))),
+            "tilt_cmd": int(max(self.TILT_OUTPUT_MIN, min(self.TILT_OUTPUT_MAX, round(tilt)))),
+            "fire": int(bool(fire)),
+            "safety": 0 if self.safety_armed else 1,
+            "mode": 1 if self.trigger_mode_bb else 0,
+            "led": 1 if self.led_on else 0,
+            "laser": 1 if self.laser_on else 0,
+        }
+        if move_time_ms is not None:
+            payload["move_time_ms"] = int(max(0, min(5000, int(move_time_ms))))
+        label = (
+            f"UDP P{payload['pan_cmd']}T{payload['tilt_cmd']}F{payload['fire']}"
+            f"L{payload['led']}R{payload['laser']}S{payload['safety']}M{payload['mode']}"
+        )
+        return self._send_udp_payload(payload, label=label)
 
     # ------------------------------------------------------------------ #
     #  Bus servo protocol  (modes 1, 2)
@@ -408,6 +561,72 @@ class SentryV2Comm:
         if self._bus_checksum_mode == "xor":
             return (0xFF ^ s) & 0xFF
         return (0xFF - s) & 0xFF
+
+    def _build_ping_packet(self, servo_id: int) -> bytes:
+        sid = int(servo_id) & 0xFF
+        payload = bytes([sid, 0x02, 0x01])
+        chk = self._bus_checksum(payload)
+        return b"\xFF\xFF" + payload + bytes([chk])
+
+    def _bus_servo_reply_matches_servo(self, rx: bytes, servo_id: int) -> bool:
+        try:
+            data = bytes(rx or b"")
+            return len(data) >= 3 and data[0] == 0xFF and data[2] == (int(servo_id) & 0xFF)
+        except Exception:
+            return False
+
+    def _try_ping(self, active_ser: Optional[_serial.Serial], servo_id: int, *, timeout_s: float = 0.12) -> bytes:
+        try:
+            if active_ser is None or not active_ser.is_open:
+                return b""
+            try:
+                active_ser.reset_input_buffer()
+            except Exception:
+                pass
+            active_ser.write(self._build_ping_packet(servo_id))
+            try:
+                active_ser.flush()
+            except Exception:
+                pass
+
+            end = time.time() + float(timeout_s)
+            buf = bytearray()
+            while time.time() < end and len(buf) < 64:
+                try:
+                    chunk = active_ser.read(64)
+                except Exception:
+                    chunk = b""
+                if chunk:
+                    buf.extend(chunk)
+                    if len(buf) >= 4:
+                        break
+                else:
+                    time.sleep(0.01)
+            return bytes(buf)
+        except Exception:
+            return b""
+
+    def _probe_bus_servo_checksum(self, active_ser: Optional[_serial.Serial]) -> Optional[str]:
+        if active_ser is None or not active_ser.is_open:
+            self._bus_servo_ping_ok = False
+            self._bus_checksum_mode = "auto"
+            return None
+
+        original_mode = str(self._bus_checksum_mode or "auto")
+        try:
+            for mode in ("sub", "xor"):
+                self._bus_checksum_mode = mode
+                for servo_id in (self.pan_servo_id, self.tilt_servo_id):
+                    rx = self._try_ping(active_ser, servo_id)
+                    if self._bus_servo_reply_matches_servo(rx, servo_id):
+                        self._bus_servo_ping_ok = True
+                        return mode
+            self._bus_servo_ping_ok = False
+            self._bus_checksum_mode = "auto"
+            return None
+        finally:
+            if self._bus_checksum_mode not in ("sub", "xor"):
+                self._bus_checksum_mode = original_mode if original_mode in ("auto", "sub", "xor") else "auto"
 
     def _build_servo_packet(self, servo_id: int, pos_ticks: int, time_ms: int) -> bytes:
         """Build a write-position packet (register 0x2A)."""
@@ -430,28 +649,46 @@ class SentryV2Comm:
     ) -> bool:
         """Send pan/tilt to debug board via bus servo binary packets."""
         with self._lock:
-            try:
-                if self._bus_ser is None or not self._bus_ser.is_open:
-                    return False
-                move_time = int(self.bus_servo_time_ms if move_time_ms is None else move_time_ms)
-                move_time = max(0, min(1000, move_time))
-                pan_pkt = self._build_servo_packet(
-                    self.pan_servo_id,
-                    self._deg_to_ticks(pan),
-                    move_time,
-                )
-                tilt_pkt = self._build_servo_packet(
-                    self.tilt_servo_id,
-                    self._deg_to_ticks(tilt),
-                    move_time,
-                )
-                self._bus_ser.write(pan_pkt)
-                self._bus_ser.write(tilt_pkt)
-                self._last_cmd = f"BUS P{pan:.0f} T{tilt:.0f} @{move_time}ms"
-                return True
-            except Exception as e:
-                self._last_error = str(e)
+            bus_ser = self._bus_ser
+            pan_servo_id = self.pan_servo_id
+            tilt_servo_id = self.tilt_servo_id
+            checksum_mode = str(self._bus_checksum_mode or "auto").lower()
+            default_move_time = self.bus_servo_time_ms
+        try:
+            if bus_ser is None or not bus_ser.is_open:
                 return False
+            move_time = int(default_move_time if move_time_ms is None else move_time_ms)
+            move_time = max(0, min(1000, move_time))
+            pan_ticks = self._deg_to_ticks(pan)
+            tilt_ticks = self._deg_to_ticks(tilt)
+
+            def _write_pair(candidate_mode: str) -> None:
+                original_mode = self._bus_checksum_mode
+                self._bus_checksum_mode = candidate_mode
+                try:
+                    pan_pkt = self._build_servo_packet(pan_servo_id, pan_ticks, move_time)
+                    tilt_pkt = self._build_servo_packet(tilt_servo_id, tilt_ticks, move_time)
+                finally:
+                    self._bus_checksum_mode = original_mode
+                bus_ser.write(pan_pkt)
+                bus_ser.write(tilt_pkt)
+                try:
+                    bus_ser.flush()
+                except Exception:
+                    pass
+
+            if checksum_mode == "auto":
+                for candidate_mode in ("sub", "xor"):
+                    _write_pair(candidate_mode)
+                    time.sleep(0.002)
+            else:
+                _write_pair(checksum_mode)
+
+            self._last_cmd = f"BUS P{pan:.0f} T{tilt:.0f} @{move_time}ms [{checksum_mode}]"
+            return True
+        except Exception as e:
+            self._last_error = str(e)
+            return False
 
     # ------------------------------------------------------------------ #
     #  IO token sending  (modes 1, 2)
@@ -469,43 +706,30 @@ class SentryV2Comm:
     def _send_io_serial(self, fire: int = 0) -> bool:
         """Send IO tokens to ESP32 via USB serial (mode 1)."""
         with self._lock:
-            try:
-                if self._ser is None or not self._ser.is_open:
-                    return False
-                io = self._build_io_tokens(fire)
-                self._ser.write(f"S{io['safety']}\n".encode("utf-8"))
-                self._ser.write(f"M{io['mode']}\n".encode("utf-8"))
-                self._ser.write(
-                    f"F{io['fire']}L{io['led']}R{io['laser']}G0\n".encode("utf-8")
-                )
-                self._last_cmd += f" | IO F{io['fire']}L{io['led']}R{io['laser']}"
-                return True
-            except Exception as e:
-                self._last_error = str(e)
+            ser = self._ser
+        try:
+            if ser is None or not ser.is_open:
                 return False
+            io = self._build_io_tokens(fire)
+            ser.write(f"S{io['safety']}\n".encode("utf-8"))
+            ser.write(f"M{io['mode']}\n".encode("utf-8"))
+            ser.write(
+                f"F{io['fire']}L{io['led']}R{io['laser']}G0\n".encode("utf-8")
+            )
+            self._last_cmd += f" | IO F{io['fire']}L{io['led']}R{io['laser']}"
+            return True
+        except Exception as e:
+            self._last_error = str(e)
+            return False
 
     def _send_io_udp(self, fire: int = 0) -> bool:
         """Send IO tokens to ESP32 via WiFi UDP (mode 2)."""
-        with self._lock:
-            try:
-                if self._sock is None or self._udp_target is None:
-                    return False
-                io = self._build_io_tokens(fire)
-                self._udp_seq += 1
-                msg = {
-                    "v": 1, "t": "cmd",
-                    "seq": self._udp_seq,
-                    "ts": int(time.time() * 1000),
-                    "p": io,
-                }
-                raw = json.dumps(msg, separators=(",", ":")).encode("utf-8")
-                crc = zlib.crc32(raw) & 0xFFFFFFFF
-                msg["crc"] = f"{crc:08x}"
-                data = json.dumps(msg, separators=(",", ":")).encode("utf-8")
-                self._sock.sendto(data, self._udp_target)
-                self._last_cmd += f" | UDP IO F{io['fire']}L{io['led']}R{io['laser']}"
-                return True
-            except Exception as e:
-                self._last_error = str(e)
-                return False
+        io = self._build_io_tokens(fire)
+        ok = self._send_udp_payload(
+            io,
+            label=f"UDP IO F{io['fire']}L{io['led']}R{io['laser']}S{io['safety']}M{io['mode']}",
+        )
+        if ok:
+            self._last_cmd += f" | UDP IO F{io['fire']}L{io['led']}R{io['laser']}"
+        return ok
 

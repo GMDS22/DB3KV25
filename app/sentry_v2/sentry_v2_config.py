@@ -13,6 +13,20 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 
+SENTRY_PAN_MIN = 0.0
+SENTRY_PAN_MAX = 270.0
+SENTRY_TILT_MIN = 0.0
+SENTRY_TILT_MAX = 110.0
+SENTRY_HOME_PAN = (SENTRY_PAN_MIN + SENTRY_PAN_MAX) / 2.0
+SENTRY_HOME_TILT = (SENTRY_TILT_MIN + SENTRY_TILT_MAX) / 2.0
+SENTRY_SWEEP_PAN_MIN = SENTRY_PAN_MIN
+SENTRY_SWEEP_PAN_MAX = SENTRY_PAN_MAX
+SENTRY_RANDOM_PAN_MIN = SENTRY_PAN_MIN
+SENTRY_RANDOM_PAN_MAX = SENTRY_PAN_MAX
+SENTRY_RANDOM_TILT_MIN = SENTRY_TILT_MIN
+SENTRY_RANDOM_TILT_MAX = SENTRY_TILT_MAX
+
+
 # Full COCO class list (80 classes) — same order as YOLOv8 default
 YOLO_COCO_CLASSES: List[str] = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
@@ -45,6 +59,7 @@ class DetectionModeConfig:
     min_contour_area: float = 250.0
     max_contour_area: float = 250000.0
     # --- YOLO-specific (modes 2,4,5,9,10) ---
+    yolo_model_name: str = "ratdogcat.pt"
     yolo_min_area: int = 0
     yolo_confidence: float = 0.45
     # --- Color detection (modes 6,7,8,9) ---
@@ -62,7 +77,7 @@ class DetectionModeConfig:
     custom_v_max: int = 255
     # Ignore motion detections briefly after turret movement so the camera
     # does not engage its own scene shift.
-    motion_ignore_after_move_s: float = 0.12
+    motion_ignore_after_move_s: float = 0.08
     # --- Motion gate threshold % (modes 4,5) ---
     motion_gate_threshold: float = 1.0
 
@@ -78,6 +93,7 @@ class TargetFilterConfig:
         "car": 3.0,
         "dog": 2.0,
         "cat": 2.0,
+        "rat": 2.2,
     })
     # Minimum YOLO confidence to consider
     min_confidence: float = 0.45
@@ -150,21 +166,21 @@ class EngagementConfig:
     precision_kd: float = 0.01
     # Max correction step per frame (degrees)
     precision_max_step: float = 0.85
-    precision_deadzone_pan_deg: float = 0.30
-    precision_deadzone_tilt_deg: float = 0.25
-    precision_error_ema: float = 0.35
+    precision_deadzone_pan_deg: float = 0.18
+    precision_deadzone_tilt_deg: float = 0.15
+    precision_error_ema: float = 0.40
     precision_max_pan_step: float = 0.90
     precision_max_tilt_step: float = 0.75
     precision_reversal_brake: float = 0.30
     fire_micro_adjust_enabled: bool = True
     fire_micro_adjust_max_pan_step: float = 0.25
     fire_micro_adjust_max_tilt_step: float = 0.20
-    fire_recenter_pan_tolerance: float = 1.20
-    fire_recenter_tilt_tolerance: float = 1.00
-    fire_trigger_enter_pan_tolerance: float = 0.55
-    fire_trigger_enter_tilt_tolerance: float = 0.45
-    fire_trigger_exit_pan_tolerance: float = 0.85
-    fire_trigger_exit_tilt_tolerance: float = 0.65
+    fire_recenter_pan_tolerance: float = 0.85
+    fire_recenter_tilt_tolerance: float = 0.70
+    fire_trigger_enter_pan_tolerance: float = 0.35
+    fire_trigger_enter_tilt_tolerance: float = 0.28
+    fire_trigger_exit_pan_tolerance: float = 0.55
+    fire_trigger_exit_tilt_tolerance: float = 0.42
     fire_trigger_max_pan_rate: float = 2.0
     fire_trigger_max_tilt_rate: float = 1.7
     fire_trigger_hold_time: float = 0.10
@@ -173,23 +189,26 @@ class EngagementConfig:
     fire_trigger_min_persistence: float = 0.12
     # Auto-fire requires a stable aim lock in precision mode.
     fire_requires_lock: bool = True
-    aim_lock_pan_tolerance: float = 0.9
-    aim_lock_tilt_tolerance: float = 0.8
-    aim_lock_required_frames: int = 4
+    aim_lock_pan_tolerance: float = 0.65
+    aim_lock_tilt_tolerance: float = 0.55
+    aim_lock_required_frames: int = 5
     aim_lock_timeout: float = 1.3
-    target_loss_timeout: float = 0.6
+    target_loss_timeout: float = 0.55
+    # Keep engaging/holding last known target area when target is temporarily lost
+    # instead of advancing queue and returning to guard.
+    continuous_hunt_on_loss: bool = False
 
 
 @dataclass
 class GuardConfig:
     """Guard position and behaviour."""
     # Guard position — where turret rests (degrees)
-    guard_pan: float = 90.0
-    guard_tilt: float = 50.0
-    pan_min: float = 5.0
-    pan_max: float = 185.0
-    tilt_min: float = 10.0
-    tilt_max: float = 130.0
+    guard_pan: float = SENTRY_HOME_PAN
+    guard_tilt: float = SENTRY_HOME_TILT
+    pan_min: float = SENTRY_PAN_MIN
+    pan_max: float = SENTRY_PAN_MAX
+    tilt_min: float = SENTRY_TILT_MIN
+    tilt_max: float = SENTRY_TILT_MAX
     # Horizontal field-of-view of camera (degrees) — used for px→° conversion
     camera_hfov: float = 78.0
     # Vertical field-of-view (degrees)
@@ -203,21 +222,87 @@ class GuardConfig:
     # 0=Static, 1=Slow Sweep, 2=Waypoint Patrol, 3=Random Scan
     guard_mode: int = 0
     # Sweep settings (mode 1)
-    sweep_pan_min: float = 45.0
-    sweep_pan_max: float = 135.0
-    sweep_tilt: float = 50.0
+    sweep_pan_min: float = SENTRY_SWEEP_PAN_MIN
+    sweep_pan_max: float = SENTRY_SWEEP_PAN_MAX
+    sweep_tilt: float = SENTRY_HOME_TILT
     sweep_speed: float = 8.0        # degrees per second (slow & smooth)
     # Waypoint patrol settings (mode 2)
     patrol_waypoints: List[Tuple[float, float]] = field(default_factory=list)
     patrol_dwell: float = 2.0       # seconds to pause at each waypoint
     patrol_speed: float = 10.0      # degrees per second between waypoints
     # Random scan settings (mode 3)
-    random_pan_min: float = 45.0
-    random_pan_max: float = 135.0
-    random_tilt_min: float = 30.0
-    random_tilt_max: float = 70.0
+    random_pan_min: float = SENTRY_RANDOM_PAN_MIN
+    random_pan_max: float = SENTRY_RANDOM_PAN_MAX
+    random_tilt_min: float = SENTRY_RANDOM_TILT_MIN
+    random_tilt_max: float = SENTRY_RANDOM_TILT_MAX
     random_dwell: float = 3.0       # seconds to pause at each random point
     random_speed: float = 8.0       # degrees per second
+
+
+@dataclass
+class NoFireMaskVertex:
+    pan: float
+    tilt: float
+
+
+@dataclass
+class NoFireMaskConfig:
+    id: str = ""
+    name: str = "No-Fire Mask"
+    enabled: bool = True
+    visible: bool = True
+    vertices: List[NoFireMaskVertex] = field(default_factory=list)
+    source_frame_width: int = 0
+    source_frame_height: int = 0
+    source_hfov: float = 0.0
+    source_vfov: float = 0.0
+    anchor_pan: float = 0.0
+    anchor_tilt: float = 0.0
+    notes: str = ""
+
+
+@dataclass
+class PIRSensorConfig:
+    """Individual PIR sensor settings."""
+    # GPIO index or identifier on ESP32
+    pin_id: int = 0
+    # Pan angle in degrees (0-270) to look when this sensor triggers
+    cue_pan: float = 0.0
+    # Tilt angle in degrees (0-110) to look when this sensor triggers
+    cue_tilt: float = 55.0
+    # Debounce time in milliseconds to avoid repeated triggers
+    debounce_ms: int = 500
+    # Enable/disable this particular sensor
+    enabled: bool = False
+
+
+@dataclass
+class PIRGuardConfig:
+    """PIR sensor integration for blind-spot detection."""
+    # Master enable/disable for all PIR features
+    pir_enabled: bool = False
+    # Number of PIR sensors (typically 3)
+    pir_count: int = 3
+    # Individual sensor configs
+    sensors: List[PIRSensorConfig] = field(default_factory=lambda: [
+        PIRSensorConfig(pin_id=0, cue_pan=270.0, cue_tilt=55.0, enabled=False),
+        PIRSensorConfig(pin_id=1, cue_pan=150.0, cue_tilt=55.0, enabled=False),
+        PIRSensorConfig(pin_id=2, cue_pan=30.0, cue_tilt=55.0, enabled=False),
+    ])
+    # Enable adaptive scan when PIR fires but camera doesn't detect
+    scan_on_no_detect: bool = True
+    # Pan sweep range (degrees left/right from cue point)
+    scan_pan_range: float = 25.0
+    # Tilt sweep range (degrees up/down from cue point)
+    scan_tilt_range: float = 15.0
+    # Scan movement speed (degrees per second)
+    scan_speed: float = 12.0
+    # Time to wait for camera detection after initial slew (seconds)
+    confirmation_timeout: float = 1.0
+    # Number of points in scan grid per axis (3x3 = 9 points)
+    scan_grid_resolution: int = 3
+    # Data timeout: discard PIR data older than this (milliseconds)
+    data_timeout_ms: int = 5000
 
 
 @dataclass
@@ -230,9 +315,9 @@ class ConnectionConfig:
         2  ESP32 WiFi + Debug Board USB (1 COM + UDP)
         3  ESP32 WiFi (fully wireless)  (UDP only)
     """
-    connection_type: int = 0
+    connection_type: int = 3
     # ESP32 serial (modes 0, 1)
-    esp32_port: str = "COM10"
+    esp32_port: str = ""
     esp32_baud: int = 115200
     # Debug board serial (modes 1, 2)
     debug_port: str = ""
@@ -248,7 +333,7 @@ class ConnectionConfig:
     invert_pan: bool = False
     invert_tilt: bool = False
     # Camera
-    camera_source: str = ""        # Blank uses main app feed; set index/URL for a secondary source
+    camera_source: str = "0"       # Standalone default camera index; may also be a URL or file path
     camera_width: int = 1280
     camera_height: int = 720
 
@@ -262,12 +347,18 @@ class SentryV2Config:
     threat_scoring: ThreatScoringConfig = field(default_factory=ThreatScoringConfig)
     engagement: EngagementConfig = field(default_factory=EngagementConfig)
     guard: GuardConfig = field(default_factory=GuardConfig)
+    no_fire_masks: List[NoFireMaskConfig] = field(default_factory=list)
+    pir_guard: PIRGuardConfig = field(default_factory=PIRGuardConfig)
 
     # --- Overlay / HUD ---
     show_overlay: bool = True
     show_threat_scores: bool = False
     show_engagement_zone: bool = False
     show_guard_crosshair: bool = True
+    show_no_fire_masks: bool = True
+    scope_view_enabled: bool = False
+    scope_radius_pct: int = 35
+    scope_vignette_opacity: int = 60
     settings_panel_width: int = 420
 
     # --- Persistence ---
@@ -279,9 +370,47 @@ class SentryV2Config:
     def to_dict(self) -> dict:
         return asdict(self)
 
+    @staticmethod
+    def _sanitize_guard_config(guard: GuardConfig) -> GuardConfig:
+        pan_min = float(min(SENTRY_PAN_MAX, max(SENTRY_PAN_MIN, guard.pan_min)))
+        pan_max = float(min(SENTRY_PAN_MAX, max(SENTRY_PAN_MIN, guard.pan_max)))
+        tilt_min = float(min(SENTRY_TILT_MAX, max(SENTRY_TILT_MIN, guard.tilt_min)))
+        tilt_max = float(min(SENTRY_TILT_MAX, max(SENTRY_TILT_MIN, guard.tilt_max)))
+        if pan_min > pan_max:
+            pan_min, pan_max = pan_max, pan_min
+        if tilt_min > tilt_max:
+            tilt_min, tilt_max = tilt_max, tilt_min
+        if pan_min == pan_max:
+            pan_min, pan_max = SENTRY_PAN_MIN, SENTRY_PAN_MAX
+        if tilt_min == tilt_max:
+            tilt_min, tilt_max = SENTRY_TILT_MIN, SENTRY_TILT_MAX
+
+        guard.pan_min = pan_min
+        guard.pan_max = pan_max
+        guard.tilt_min = tilt_min
+        guard.tilt_max = tilt_max
+        guard.guard_pan = float(min(pan_max, max(pan_min, guard.guard_pan)))
+        guard.guard_tilt = float(min(tilt_max, max(tilt_min, guard.guard_tilt)))
+        guard.sweep_pan_min = float(min(pan_max, max(pan_min, guard.sweep_pan_min)))
+        guard.sweep_pan_max = float(min(pan_max, max(pan_min, guard.sweep_pan_max)))
+        if guard.sweep_pan_min > guard.sweep_pan_max:
+            guard.sweep_pan_min, guard.sweep_pan_max = guard.sweep_pan_max, guard.sweep_pan_min
+        guard.sweep_tilt = float(min(tilt_max, max(tilt_min, guard.sweep_tilt)))
+        guard.random_pan_min = float(min(pan_max, max(pan_min, guard.random_pan_min)))
+        guard.random_pan_max = float(min(pan_max, max(pan_min, guard.random_pan_max)))
+        if guard.random_pan_min > guard.random_pan_max:
+            guard.random_pan_min, guard.random_pan_max = guard.random_pan_max, guard.random_pan_min
+        guard.random_tilt_min = float(min(tilt_max, max(tilt_min, guard.random_tilt_min)))
+        guard.random_tilt_max = float(min(tilt_max, max(tilt_min, guard.random_tilt_max)))
+        if guard.random_tilt_min > guard.random_tilt_max:
+            guard.random_tilt_min, guard.random_tilt_max = guard.random_tilt_max, guard.random_tilt_min
+        return guard
+
     @classmethod
     def from_dict(cls, d: dict) -> "SentryV2Config":
         cn = ConnectionConfig(**d.get("connection", {}))
+        if not str(cn.camera_source).strip():
+            cn.camera_source = "0"
         dm = DetectionModeConfig(**d.get("detection_mode", {}))
         tf = TargetFilterConfig(**d.get("target_filter", {}))
         ts = ThreatScoringConfig(**d.get("threat_scoring", {}))
@@ -293,6 +422,31 @@ class SentryV2Config:
                 (float(p[0]), float(p[1])) for p in gd_raw["patrol_waypoints"]
             ]
         gd = GuardConfig(**gd_raw)
+        gd = cls._sanitize_guard_config(gd)
+        masks_raw = list(d.get("no_fire_masks", []))
+        masks: List[NoFireMaskConfig] = []
+        for entry in masks_raw:
+            mask_data = dict(entry or {})
+            vertices_raw = list(mask_data.pop("vertices", []))
+            vertices = [
+                NoFireMaskVertex(
+                    pan=float(v.get("pan", 0.0)),
+                    tilt=float(v.get("tilt", 0.0)),
+                )
+                for v in vertices_raw
+                if isinstance(v, dict)
+            ]
+            masks.append(NoFireMaskConfig(vertices=vertices, **mask_data))
+        
+        # Load PIR guard config
+        pir_raw = dict(d.get("pir_guard", {}))
+        sensors_raw = list(pir_raw.pop("sensors", []))
+        sensors: List[PIRSensorConfig] = []
+        for sensor_data in sensors_raw:
+            if isinstance(sensor_data, dict):
+                sensors.append(PIRSensorConfig(**sensor_data))
+        pir_cfg = PIRGuardConfig(sensors=sensors, **pir_raw)
+        
         return cls(
             connection=cn,
             detection_mode=dm,
@@ -300,10 +454,16 @@ class SentryV2Config:
             threat_scoring=ts,
             engagement=eg,
             guard=gd,
+            no_fire_masks=masks,
+            pir_guard=pir_cfg,
             show_overlay=d.get("show_overlay", True),
-            show_threat_scores=d.get("show_threat_scores", True),
-            show_engagement_zone=d.get("show_engagement_zone", True),
+            show_threat_scores=d.get("show_threat_scores", False),
+            show_engagement_zone=d.get("show_engagement_zone", False),
             show_guard_crosshair=d.get("show_guard_crosshair", True),
+            show_no_fire_masks=d.get("show_no_fire_masks", True),
+            scope_view_enabled=d.get("scope_view_enabled", False),
+            scope_radius_pct=d.get("scope_radius_pct", 35),
+            scope_vignette_opacity=d.get("scope_vignette_opacity", 60),
             settings_panel_width=d.get("settings_panel_width", 420),
             config_path=d.get("config_path", "app/config/sentry_v2_settings.json"),
         )

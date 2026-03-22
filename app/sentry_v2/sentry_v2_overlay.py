@@ -12,6 +12,7 @@ import time
 from typing import Optional
 
 from .sentry_v2_config import SentryV2Config
+from .sentry_v2_no_fire_masks import project_mask_to_frame
 from .sentry_v2_engine import SentryV2Engine, SentryV2State
 from .threat_scorer import TrackedTarget
 
@@ -30,6 +31,7 @@ _COL_RETICLE_GREEN = (90, 255, 180)
 _COL_RETICLE_RED = (70, 95, 255)
 _COL_RETICLE_YELLOW = (110, 230, 255)
 _COL_RETICLE_GRAY = (150, 150, 150)
+_COL_FIRE_FLASH = (40, 90, 255)      # BGR: bright orange-red used during fire events
 _COL_PANEL_FILL = (16, 18, 24)
 _COL_PANEL_BORDER = (82, 88, 98)
 _COL_PANEL_TEXT = (228, 232, 238)
@@ -55,7 +57,13 @@ class SentryV2Overlay:
     # Main draw call
     # ------------------------------------------------------------------ #
 
-    def draw(self, frame: np.ndarray, engine: SentryV2Engine) -> np.ndarray:
+    def draw(
+        self,
+        frame: np.ndarray,
+        engine: SentryV2Engine,
+        *,
+        include_target_boxes: bool = True,
+    ) -> np.ndarray:
         """Draw all overlays onto *frame* (mutates in place, also returns it)."""
         if not self.cfg.show_overlay:
             return frame
@@ -66,7 +74,11 @@ class SentryV2Overlay:
         if self.cfg.show_guard_crosshair:
             self._draw_guard_crosshair(frame, w, h, engine)
 
-        primary = self._get_primary_target(engine)
+        if self.cfg.show_no_fire_masks and self.cfg.no_fire_masks:
+            self._draw_no_fire_masks(frame, engine, w, h)
+
+        primary = self._get_primary_target(engine) if include_target_boxes else None
+        self._draw_detection_size_tag(frame, primary)
         if primary is not None:
             self._draw_primary_target(frame, primary, engine)
 
@@ -76,6 +88,179 @@ class SentryV2Overlay:
         self._draw_fire_feedback(frame, w, h)
 
         return frame
+
+    def _draw_detection_size_tag(self, frame: np.ndarray, target: Optional[TrackedTarget]) -> None:
+        """Draw a pixel size tag for the current primary target only."""
+        if target is None:
+            return
+
+        det = target.det
+        _, fw = frame.shape[:2]
+        bx, by, bw, bh = det.bbox
+        area_px = max(0, int(bw) * int(bh))
+        label = f"{det.class_name}:{int(bw)}x{int(bh)} ({area_px}px2)"
+
+        x1 = max(4, int(bx))
+        y2 = max(18, int(by) - 6)
+        y1 = max(2, y2 - 16)
+        x2 = min(fw - 4, x1 + max(160, min(340, 10 + (len(label) * 7))))
+        if x2 <= x1 + 12:
+            return
+
+        self._draw_panel(frame, x1, y1, x2, y2, _COL_CYAN)
+        cv2.putText(
+            frame,
+            label,
+            (x1 + 6, y2 - 4),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.40,
+            _COL_PANEL_TEXT,
+            1,
+            cv2.LINE_AA,
+        )
+
+    def apply_scope_view(self, frame: np.ndarray, engine: SentryV2Engine) -> np.ndarray:
+        """Apply a display-only round scope view during engaging mode."""
+        if not bool(getattr(self.cfg, "scope_view_enabled", False)):
+            return frame
+        if engine.state != SentryV2State.ENGAGING:
+            return frame
+
+        h, w = frame.shape[:2]
+        center_x = w // 2
+        center_y = h // 2
+        radius_pct = float(np.clip(getattr(self.cfg, "scope_radius_pct", 35), 20, 60)) / 100.0
+        scope_radius = max(36, int(min(h, w) * radius_pct))
+        vignette_opacity = float(np.clip(getattr(self.cfg, "scope_vignette_opacity", 60), 0, 100)) / 100.0
+        if vignette_opacity <= 0.0:
+            vignette_opacity = 0.0
+
+        yy, xx = np.ogrid[:h, :w]
+        dist = np.sqrt(((xx - center_x) ** 2) + ((yy - center_y) ** 2))
+        feather = max(12.0, float(scope_radius) * 0.18)
+        alpha = np.clip((dist - float(scope_radius)) / feather, 0.0, 1.0) * vignette_opacity
+
+        scoped = frame.astype(np.float32)
+        scoped *= (1.0 - alpha[..., None])
+        scoped = np.clip(scoped, 0, 255).astype(np.uint8)
+
+        flash = self._fire_flash_strength()
+        ring_color = _COL_FIRE_FLASH if flash > 0.0 else self._get_crosshair_color(engine)
+
+        # Outer ring (scope boundary)
+        cv2.circle(scoped, (center_x, center_y), scope_radius + 2, _COL_BLACK, 4, cv2.LINE_AA)
+        cv2.circle(scoped, (center_x, center_y), scope_radius + 2, ring_color, 2, cv2.LINE_AA)
+
+        # Fire-flash: pulsing expanded ring
+        if flash > 0.0:
+            flash_r = scope_radius + 6 + int(round(flash * 10.0))
+            cv2.circle(scoped, (center_x, center_y), flash_r, _COL_BLACK, 3, cv2.LINE_AA)
+            cv2.circle(scoped, (center_x, center_y), flash_r, _COL_FIRE_FLASH,
+                       1 + int(round(flash * 2.0)), cv2.LINE_AA)
+            # Subtle red fill tint inside scope
+            tint = scoped.copy()
+            cv2.circle(tint, (center_x, center_y), scope_radius - 2, _COL_FIRE_FLASH, -1, cv2.LINE_AA)
+            cv2.addWeighted(tint, 0.07 * flash, scoped, 1.0, 0.0, scoped)
+
+        # Scope crosshair lines with center gap
+        gap = max(10, scope_radius // 10)
+        arm_end = scope_radius - 2
+        arm_color = ring_color
+
+        def _scope_arm(p1: tuple, p2: tuple) -> None:
+            cv2.line(scoped, p1, p2, _COL_BLACK, 3, cv2.LINE_AA)
+            cv2.line(scoped, p1, p2, arm_color, 1, cv2.LINE_AA)
+
+        _scope_arm((center_x - arm_end, center_y), (center_x - gap, center_y))
+        _scope_arm((center_x + gap, center_y), (center_x + arm_end, center_y))
+        _scope_arm((center_x, center_y - arm_end), (center_x, center_y - gap))
+        _scope_arm((center_x, center_y + gap), (center_x, center_y + arm_end))
+
+        # Tick marks at 1/3 and 2/3 along each arm
+        tick_h = max(4, scope_radius // 14)
+        for tick_d in (scope_radius // 3, (2 * scope_radius) // 3):
+            # Horizontal arm ticks
+            for tx in (center_x - tick_d, center_x + tick_d):
+                cv2.line(scoped, (tx, center_y - tick_h), (tx, center_y + tick_h),
+                         _COL_BLACK, 2, cv2.LINE_AA)
+                cv2.line(scoped, (tx, center_y - tick_h), (tx, center_y + tick_h),
+                         arm_color, 1, cv2.LINE_AA)
+            # Vertical arm ticks
+            for ty in (center_y - tick_d, center_y + tick_d):
+                cv2.line(scoped, (center_x - tick_h, ty), (center_x + tick_h, ty),
+                         _COL_BLACK, 2, cv2.LINE_AA)
+                cv2.line(scoped, (center_x - tick_h, ty), (center_x + tick_h, ty),
+                         arm_color, 1, cv2.LINE_AA)
+
+        # Center dot
+        dot_r = max(6, scope_radius // 18)
+        cv2.circle(scoped, (center_x, center_y), dot_r, _COL_BLACK, 3, cv2.LINE_AA)
+        cv2.circle(scoped, (center_x, center_y), dot_r, ring_color if flash > 0.0 else _COL_WHITE, 1, cv2.LINE_AA)
+
+        # Phase label
+        engage_phase = str(getattr(engine, "_engage_phase", ""))
+        if flash > 0.0:
+            phase_label = "FIRING"
+            label_color = _COL_FIRE_FLASH
+        elif engage_phase == "precision":
+            phase_label = "ALIGNING"
+            label_color = _COL_PANEL_TEXT
+        else:
+            phase_label = "SCOPE VIEW"
+            label_color = _COL_PANEL_TEXT
+
+        cv2.putText(
+            scoped,
+            phase_label,
+            (max(12, center_x - 52), max(24, center_y - scope_radius - 14)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            label_color,
+            1,
+            cv2.LINE_AA,
+        )
+        return scoped
+
+    def _draw_no_fire_masks(self, frame: np.ndarray, engine: SentryV2Engine, w: int, h: int) -> None:
+        overlay = frame.copy()
+        active_mask_name = str(getattr(engine, "_last_no_fire_mask_name", "") or "")
+        for mask in self.cfg.no_fire_masks:
+            if not bool(mask.visible) or len(mask.vertices) < 3:
+                continue
+            points = project_mask_to_frame(
+                mask,
+                engine.current_pan,
+                engine.current_tilt,
+                self.cfg.guard.camera_hfov,
+                self.cfg.guard.camera_vfov,
+                w,
+                h,
+            )
+            if len(points) < 3:
+                continue
+
+            poly = np.array(points, dtype=np.int32)
+            fill = (30, 60, 180)
+            stroke = (70, 120, 255)
+            if active_mask_name and str(mask.name) == active_mask_name:
+                fill = (40, 40, 220)
+                stroke = (90, 90, 255)
+
+            cv2.fillPoly(overlay, [poly], fill)
+            cv2.polylines(frame, [poly], True, stroke, 2, cv2.LINE_AA)
+            label_pt = tuple(poly[0])
+            cv2.putText(
+                frame,
+                str(mask.name or "NO-FIRE"),
+                (int(label_pt[0]) + 8, int(label_pt[1]) - 8),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.46,
+                _COL_PANEL_TEXT,
+                1,
+                cv2.LINE_AA,
+            )
+
+        cv2.addWeighted(overlay, 0.18, frame, 0.82, 0.0, dst=frame)
 
     # ------------------------------------------------------------------ #
     # Primitives
@@ -153,6 +338,9 @@ class SentryV2Overlay:
     def _draw_guard_crosshair(self, frame: np.ndarray, w: int, h: int, engine: SentryV2Engine) -> None:
         cx, cy = w // 2, h // 2
         color = self._get_crosshair_color(engine)
+        flash = self._fire_flash_strength()
+        if flash > 0.0:
+            color = _COL_FIRE_FLASH
         radius = max(16, min(w, h) // 32)
         pulse = self._pulse_strength(engine)
         outer_radius = radius + 12 + int(round(pulse * 4.0))
@@ -166,9 +354,20 @@ class SentryV2Overlay:
             pulse_radius = outer_radius + 6 + int(round(pulse * 5.0))
             cv2.circle(frame, (cx, cy), pulse_radius, color, 1, cv2.LINE_AA)
 
+        # Fire-flash: expanding ring that fades out
+        if flash > 0.0:
+            fire_ring_r = outer_radius + 8 + int(round(flash * 14.0))
+            cv2.circle(frame, (cx, cy), fire_ring_r, _COL_BLACK, 3, cv2.LINE_AA)
+            cv2.circle(frame, (cx, cy), fire_ring_r, _COL_FIRE_FLASH,
+                       1 + int(round(flash * 2.0)), cv2.LINE_AA)
+
         cv2.circle(frame, (cx, cy), radius, _COL_BLACK, 4, cv2.LINE_AA)
         cv2.circle(frame, (cx, cy), radius, color, 2, cv2.LINE_AA)
-        cv2.circle(frame, (cx, cy), max(2, radius // 4), _COL_WHITE, -1, cv2.LINE_AA)
+
+        # Center dot — larger and fire-colored during flash
+        dot_r = max(2, radius // 4) + int(round(flash * 3.0))
+        dot_col = _COL_FIRE_FLASH if flash > 0.5 else _COL_WHITE
+        cv2.circle(frame, (cx, cy), dot_r, dot_col, -1, cv2.LINE_AA)
 
         self._draw_reticle_segment(frame, (cx - arm_len, cy), (cx - arm_gap, cy), color)
         self._draw_reticle_segment(frame, (cx + arm_gap, cy), (cx + arm_len, cy), color)
@@ -192,6 +391,12 @@ class SentryV2Overlay:
 
     def _get_primary_target(self, engine: SentryV2Engine) -> Optional[TrackedTarget]:
         if engine.active_order is not None:
+            active_track_id = int(engine.active_order.target.det.track_id)
+            for target in engine.last_targets:
+                if int(target.det.track_id) == active_track_id:
+                    return target
+            if engine.state == SentryV2State.ENGAGING:
+                return None
             return engine.active_order.target
         if engine.last_targets:
             return engine.last_targets[0]
@@ -304,10 +509,13 @@ class SentryV2Overlay:
 
     def _draw_tracking_debug(self, frame: np.ndarray, engine: SentryV2Engine) -> None:
         stats = engine.get_engagement_stats()
+        engage_phase = str(stats.get("engage_phase", ""))
         lines = [
             f"ERR  pan {stats['last_err_pan_deg']:+.2f}   tilt {stats['last_err_tilt_deg']:+.2f}",
             f"LOCK {stats['aim_lock_frames']}   QUEUE {stats['queue_position'] + 1}/{max(1, stats['queue_length'])}",
         ]
+        if engage_phase:
+            lines.append(f"PHASE {engage_phase.upper()}")
         if stats.get("reacquire_recent") and stats.get("reacquire_note"):
             lines.append(f"REACQ {stats['reacquire_note']}")
 

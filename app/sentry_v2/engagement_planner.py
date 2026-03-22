@@ -15,7 +15,8 @@ import math
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from .sentry_v2_config import EngagementConfig, GuardConfig
+from .sentry_v2_config import EngagementConfig, GuardConfig, NoFireMaskConfig
+from .sentry_v2_no_fire_masks import find_blocking_mask
 from .threat_scorer import TrackedTarget
 
 
@@ -37,13 +38,25 @@ class EngagementPlanner:
         orders = planner.plan(scored_targets, current_pan, current_tilt)
     """
 
-    def __init__(self, eng_cfg: EngagementConfig, guard_cfg: GuardConfig):
+    def __init__(
+        self,
+        eng_cfg: EngagementConfig,
+        guard_cfg: GuardConfig,
+        no_fire_masks: Optional[List[NoFireMaskConfig]] = None,
+    ):
         self.eng = eng_cfg
         self.guard = guard_cfg
+        self.no_fire_masks = list(no_fire_masks or [])
 
-    def update_config(self, eng_cfg: EngagementConfig, guard_cfg: GuardConfig) -> None:
+    def update_config(
+        self,
+        eng_cfg: EngagementConfig,
+        guard_cfg: GuardConfig,
+        no_fire_masks: Optional[List[NoFireMaskConfig]] = None,
+    ) -> None:
         self.eng = eng_cfg
         self.guard = guard_cfg
+        self.no_fire_masks = list(no_fire_masks or [])
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -77,6 +90,8 @@ class EngagementPlanner:
         orders: List[EngagementOrder] = []
         for t in qualified:
             pan, tilt = self._pixel_to_pantilt(t, current_pan, current_tilt)
+            if find_blocking_mask(self.no_fire_masks, pan, tilt) is not None:
+                continue
             orders.append(EngagementOrder(target=t, pan=pan, tilt=tilt, rank=0))
 
         if (not self.eng.single_target_only) and self.eng.optimize_slew_order and len(orders) > 1:

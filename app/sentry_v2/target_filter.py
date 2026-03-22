@@ -13,7 +13,7 @@ from typing import List, Optional, Tuple
 from .sentry_v2_config import TargetFilterConfig
 
 
-NON_SEMANTIC_CLASSES = {"motion", "foreground", "color"}
+NON_SEMANTIC_CLASSES = {"motion", "foreground", "color", "moving_object"}
 
 
 @dataclass

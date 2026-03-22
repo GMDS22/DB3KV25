@@ -41,18 +41,31 @@ COLOR_PRESETS: Dict[str, Dict[str, Any]] = {
     "any": {"ranges": []},
     "red": {
         "ranges": [
-            {"lower": (0, 100, 100), "upper": (10, 255, 255)},
-            {"lower": (160, 100, 100), "upper": (179, 255, 255)},
+            {"lower": (0, 80, 80), "upper": (10, 255, 255)},
+            {"lower": (165, 80, 80), "upper": (179, 255, 255)},
         ],
     },
-    "orange": {"ranges": [{"lower": (10, 100, 100), "upper": (25, 255, 255)}]},
-    "yellow": {"ranges": [{"lower": (25, 100, 100), "upper": (35, 255, 255)}]},
-    "green": {"ranges": [{"lower": (35, 100, 100), "upper": (85, 255, 255)}]},
-    "blue": {"ranges": [{"lower": (85, 100, 100), "upper": (130, 255, 255)}]},
-    "purple": {"ranges": [{"lower": (130, 100, 100), "upper": (160, 255, 255)}]},
-    "cyan": {"ranges": [{"lower": (80, 100, 100), "upper": (100, 255, 255)}]},
-    "white": {"ranges": [{"lower": (0, 0, 200), "upper": (179, 40, 255)}]},
-    "black": {"ranges": [{"lower": (0, 0, 0), "upper": (179, 255, 40)}]},
+    "orange": {"ranges": [{"lower": (10, 80, 90), "upper": (25, 255, 255)}]},
+    "yellow": {"ranges": [{"lower": (20, 85, 100), "upper": (36, 255, 255)}]},
+    "green": {"ranges": [{"lower": (35, 75, 80), "upper": (80, 255, 255)}]},
+    "blue": {"ranges": [{"lower": (100, 80, 80), "upper": (126, 255, 255)}]},
+    "purple": {"ranges": [{"lower": (130, 80, 80), "upper": (160, 255, 255)}]},
+    "cyan": {"ranges": [{"lower": (81, 80, 80), "upper": (99, 255, 255)}]},
+    "white": {"ranges": [{"lower": (0, 0, 185), "upper": (179, 55, 255)}]},
+    "black": {"ranges": [{"lower": (0, 0, 0), "upper": (179, 140, 70)}]},
+        "grey": {"ranges": [{"lower": (0, 0, 45), "upper": (179, 45, 190)}]},
+}
+
+COLOR_TOLERANCE_BY_PRESET: Dict[str, Dict[str, int]] = {
+    "red": {"s": 28, "v": 28},
+    "orange": {"s": 18, "v": 20},
+    "yellow": {"s": 16, "v": 18},
+    "green": {"s": 16, "v": 16},
+    "blue": {"s": 24, "v": 24},
+    "purple": {"s": 28, "v": 28},
+    "cyan": {"s": 26, "v": 24},
+    "white": {"s": 18, "v": 18},
+    "black": {"s": 10, "v": 10},
 }
 
 
@@ -89,6 +102,7 @@ class SentryV2Detector:
         self.color_morph_iters: int = 2
         self.color_min_area: float = 300.0
         self.color_max_area: float = 500_000.0
+        self.color_fusion_strategy: str = "AND"
         self.custom_hsv_lower: Tuple[int, int, int] = (0, 100, 100)
         self.custom_hsv_upper: Tuple[int, int, int] = (179, 255, 255)
 
@@ -96,6 +110,7 @@ class SentryV2Detector:
         self.motion_gate_threshold: float = 1.0
         self.color_fusion_overlap: int = 15
         self._motion_suppressed_until: float = 0.0
+        self._last_color_gate_status: Dict[str, Any] = {}
 
     # ------------------------------------------------------------------ #
     #  YOLO management
@@ -103,9 +118,12 @@ class SentryV2Detector:
 
     def load_yolo(self, model_path: str) -> bool:
         """Load a YOLO model from *model_path*. Returns True on success."""
+        model_path = os.path.abspath(model_path)
         if self._yolo_loaded and self._yolo_model_path == model_path:
             return True
         try:
+            if not os.path.isfile(model_path):
+                raise FileNotFoundError(model_path)
             # Environment prep for Windows
             if os.name == "nt":
                 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
@@ -139,6 +157,8 @@ class SentryV2Detector:
         """
         if frame is None:
             return []
+        if mode not in (6, 7, 8, 9, 10):
+            self._last_color_gate_status = {}
         if mode == 0:
             return self._detect_frame_diff(frame)
         elif mode == 1:
@@ -152,7 +172,14 @@ class SentryV2Detector:
         elif mode == 5:
             return self._detect_hybrid_backsub_yolo(frame)
         elif mode == 6:
-            return self._detect_color(frame)
+            result = self._detect_color(frame)
+            self._set_color_gate_status(
+                mode=6,
+                color_boxes=len(result),
+                gate_boxes=len(result),
+                final_boxes=len(result),
+            )
+            return result
         elif mode == 7:
             return self._detect_hybrid_color_diff(frame)
         elif mode == 8:
@@ -168,6 +195,9 @@ class SentryV2Detector:
             self._motion_suppressed_until,
             time.time() + max(0.0, seconds),
         )
+
+    def get_last_color_gate_status(self) -> Dict[str, Any]:
+        return dict(self._last_color_gate_status)
 
     def _motion_detection_suppressed(self) -> bool:
         return time.time() < self._motion_suppressed_until
@@ -259,37 +289,135 @@ class SentryV2Detector:
     #  Color Detection  (mode 6)
     # ------------------------------------------------------------------ #
 
-    def _detect_color(self, frame: np.ndarray) -> list:
+    def _color_range_with_tolerance(
+        self,
+        lower: Tuple[int, int, int],
+        upper: Tuple[int, int, int],
+        *,
+        tolerant: bool,
+    ) -> Tuple[Tuple[int, int, int], Tuple[int, int, int]]:
+        if not tolerant:
+            return lower, upper
+
+        lo_h, lo_s, lo_v = lower
+        hi_h, hi_s, hi_v = upper
+        preset = str(self.color_preset or "").strip().lower()
+        tol = COLOR_TOLERANCE_BY_PRESET.get(preset, {"s": 18, "v": 18})
+        s_tol = int(tol.get("s", 18))
+        v_tol = int(tol.get("v", 18))
+
+        if preset == "white":
+            lo_v = max(0, lo_v - v_tol)
+            hi_s = min(255, hi_s + s_tol)
+        elif preset == "black":
+            hi_v = min(255, hi_v + v_tol)
+            hi_s = min(255, hi_s + s_tol)
+        else:
+            lo_s = max(0, lo_s - s_tol)
+            lo_v = max(0, lo_v - v_tol)
+
+        return (lo_h, lo_s, lo_v), (hi_h, hi_s, hi_v)
+
+    def _build_color_mask(self, hsv: np.ndarray, *, tolerant: bool) -> np.ndarray:
+        combined_mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
+
         if self.color_preset in ("", "any"):
-            return []
+            lower = np.array((0, 55, 35), dtype=np.uint8)
+            upper = np.array((179, 255, 255), dtype=np.uint8)
+            return cv2.inRange(hsv, lower, upper)
+        if self.color_preset == "custom":
+            lower = np.array(self.custom_hsv_lower, dtype=np.uint8)
+            upper = np.array(self.custom_hsv_upper, dtype=np.uint8)
+            return cv2.inRange(hsv, lower, upper)
+        if self.color_preset in COLOR_PRESETS:
+            preset = COLOR_PRESETS[self.color_preset]
+            for range_cfg in preset["ranges"]:
+                lower, upper = self._color_range_with_tolerance(
+                    tuple(range_cfg["lower"]),
+                    tuple(range_cfg["upper"]),
+                    tolerant=tolerant,
+                )
+                m = cv2.inRange(
+                    hsv,
+                    np.array(lower, dtype=np.uint8),
+                    np.array(upper, dtype=np.uint8),
+                )
+                combined_mask = cv2.bitwise_or(combined_mask, m)
+        return combined_mask
+
+    def _extract_color_boxes(
+        self,
+        cleaned: np.ndarray,
+        *,
+        frame_shape: Tuple[int, int, int],
+        fill_ratio_min: float,
+    ) -> list:
+        contours, _ = cv2.findContours(cleaned, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        frame_area = float(max(1, frame_shape[0] * frame_shape[1]))
+        boxes: list = []
+        for c in contours:
+            area = float(cv2.contourArea(c))
+            if not (self.color_min_area < area < self.color_max_area):
+                continue
+            x, y, w, h = cv2.boundingRect(c)
+            if w <= 1 or h <= 1:
+                continue
+            if self.color_preset == "black":
+                touches = sum(
+                    (
+                        x <= 1,
+                        y <= 1,
+                        (x + w) >= (frame_shape[1] - 1),
+                        (y + h) >= (frame_shape[0] - 1),
+                    )
+                )
+                if area >= (frame_area * 0.55):
+                    continue
+                if touches >= 2 and area >= (frame_area * 0.15):
+                    continue
+            roi = cleaned[y:y + h, x:x + w]
+            if roi.size <= 0:
+                continue
+            filled = float(cv2.countNonZero(roi)) / float(w * h)
+            if filled < fill_ratio_min:
+                continue
+            boxes.append((int(x), int(y), int(w), int(h), 0.85, CLASS_ID_COLOR))
+        return boxes
+
+    def _detect_color(self, frame: np.ndarray) -> list:
         k = self.color_blur | 1
         blurred = cv2.GaussianBlur(frame, (k, k), 0)
         hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
 
-        combined_mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
-
-        if self.color_preset == "custom":
-            lower = np.array(self.custom_hsv_lower, dtype=np.uint8)
-            upper = np.array(self.custom_hsv_upper, dtype=np.uint8)
-            combined_mask = cv2.inRange(hsv, lower, upper)
-        elif self.color_preset in COLOR_PRESETS:
-            preset = COLOR_PRESETS[self.color_preset]
-            for r in preset["ranges"]:
-                lower = np.array(r["lower"], dtype=np.uint8)
-                upper = np.array(r["upper"], dtype=np.uint8)
-                m = cv2.inRange(hsv, lower, upper)
-                combined_mask = cv2.bitwise_or(combined_mask, m)
-
         kernel = np.ones((3, 3), np.uint8)
+        combined_mask = self._build_color_mask(hsv, tolerant=False)
         cleaned = cv2.morphologyEx(combined_mask, cv2.MORPH_OPEN, kernel, iterations=1)
         cleaned = cv2.morphologyEx(cleaned, cv2.MORPH_CLOSE, kernel, iterations=self.color_morph_iters)
 
-        contours, _ = cv2.findContours(cleaned, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        return self._contours_to_boxes(contours,
-                                       min_area=self.color_min_area,
-                                       max_area=self.color_max_area,
-                                       score=0.85,
-                                       class_id=CLASS_ID_COLOR)
+        # Reduce false positives by ensuring enough of each contour box is
+        # actually filled by selected-color mask pixels.
+        fill_ratio_min = 0.12 if self.color_preset in ("", "any") else 0.22
+        boxes = self._extract_color_boxes(
+            cleaned,
+            frame_shape=frame.shape,
+            fill_ratio_min=fill_ratio_min,
+        )
+        if boxes or self.color_preset in ("", "any", "custom"):
+            return boxes
+
+        tolerant_mask = self._build_color_mask(hsv, tolerant=True)
+        tolerant_cleaned = cv2.morphologyEx(tolerant_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        tolerant_cleaned = cv2.morphologyEx(
+            tolerant_cleaned,
+            cv2.MORPH_CLOSE,
+            kernel,
+            iterations=self.color_morph_iters,
+        )
+        return self._extract_color_boxes(
+            tolerant_cleaned,
+            frame_shape=frame.shape,
+            fill_ratio_min=max(0.16, fill_ratio_min - 0.04),
+        )
 
     # ------------------------------------------------------------------ #
     #  Hybrid modes
@@ -307,37 +435,128 @@ class SentryV2Detector:
         return score > (self.motion_gate_threshold / 100.0)
 
     def _detect_hybrid_diff_backsub(self, frame: np.ndarray) -> list:
-        diff_boxes = self._detect_frame_diff(frame)
         backsub_boxes = self._detect_backsub(frame)
-        return self._merge_boxes(diff_boxes, backsub_boxes)
+        diff_boxes = self._detect_frame_diff(frame)
+        return self._gate_primary_boxes(backsub_boxes, diff_boxes, min_overlap=0.10)
 
     def _detect_hybrid_diff_yolo(self, frame: np.ndarray) -> list:
         diff_boxes = self._detect_frame_diff(frame)
         if not diff_boxes:
             return []
-        return self._detect_yolo(frame) or diff_boxes
+        yolo_boxes = self._detect_yolo(frame)
+        return self._gate_primary_boxes(yolo_boxes, diff_boxes, min_overlap=0.12)
 
     def _detect_hybrid_backsub_yolo(self, frame: np.ndarray) -> list:
         backsub_boxes = self._detect_backsub(frame)
         if not backsub_boxes:
             return []
-        return self._detect_yolo(frame) or backsub_boxes
+        yolo_boxes = self._detect_yolo(frame)
+        return self._gate_primary_boxes(yolo_boxes, backsub_boxes, min_overlap=0.12)
 
     def _detect_hybrid_color_diff(self, frame: np.ndarray) -> list:
         color_boxes = self._detect_color(frame)
         diff_boxes = self._detect_frame_diff(frame)
-        return self._merge_boxes(color_boxes, diff_boxes)
+        if self.color_preset not in ("", "any"):
+            # In specific-color mode, motion must overlap the selected color.
+            result = self._gate_primary_boxes(
+                diff_boxes,
+                color_boxes,
+                min_overlap=max(0.08, self.color_fusion_overlap / 100.0),
+            )
+            self._set_color_gate_status(
+                mode=7,
+                color_boxes=len(color_boxes),
+                gate_boxes=len(diff_boxes),
+                final_boxes=len(result),
+            )
+            return result
+        result = self._fuse_boxes_by_strategy(
+            color_boxes,
+            diff_boxes,
+            min_overlap=max(0.08, self.color_fusion_overlap / 100.0),
+        )
+        self._set_color_gate_status(
+            mode=7,
+            color_boxes=len(color_boxes),
+            gate_boxes=len(diff_boxes),
+            final_boxes=len(result),
+        )
+        return result
 
     def _detect_hybrid_color_backsub(self, frame: np.ndarray) -> list:
         color_boxes = self._detect_color(frame)
         backsub_boxes = self._detect_backsub(frame)
-        return self._merge_boxes(color_boxes, backsub_boxes)
+        if self.color_preset not in ("", "any"):
+            # In specific-color mode, foreground motion must overlap selected color.
+            result = self._gate_primary_boxes(
+                backsub_boxes,
+                color_boxes,
+                min_overlap=max(0.08, self.color_fusion_overlap / 100.0),
+            )
+            self._set_color_gate_status(
+                mode=8,
+                color_boxes=len(color_boxes),
+                gate_boxes=len(backsub_boxes),
+                final_boxes=len(result),
+            )
+            return result
+        result = self._fuse_boxes_by_strategy(
+            color_boxes,
+            backsub_boxes,
+            min_overlap=max(0.08, self.color_fusion_overlap / 100.0),
+        )
+        self._set_color_gate_status(
+            mode=8,
+            color_boxes=len(color_boxes),
+            gate_boxes=len(backsub_boxes),
+            final_boxes=len(result),
+        )
+        return result
 
     def _detect_hybrid_color_yolo(self, frame: np.ndarray) -> list:
         color_boxes = self._detect_color(frame)
         if not color_boxes:
+            self._set_color_gate_status(mode=9, color_boxes=0, gate_boxes=0, final_boxes=0)
             return []
-        return self._detect_yolo(frame) or color_boxes
+        yolo_boxes = self._detect_yolo(frame)
+        if not yolo_boxes:
+            # Keep color tracking functional when YOLO is unavailable.
+            self._set_color_gate_status(
+                mode=9,
+                color_boxes=len(color_boxes),
+                gate_boxes=0,
+                final_boxes=len(color_boxes),
+            )
+            return color_boxes
+        min_overlap = max(0.08, self.color_fusion_overlap / 100.0)
+        if self.color_preset not in ("", "any"):
+            # In specific-color mode, always require YOLO overlap with selected color.
+            result = self._gate_primary_boxes(yolo_boxes, color_boxes, min_overlap=min_overlap)
+            self._set_color_gate_status(
+                mode=9,
+                color_boxes=len(color_boxes),
+                gate_boxes=len(yolo_boxes),
+                final_boxes=len(result),
+            )
+            return result
+        strategy = (self.color_fusion_strategy or "AND").strip().upper()
+        if strategy == "OR":
+            result = self._merge_boxes(yolo_boxes, color_boxes)
+            self._set_color_gate_status(
+                mode=9,
+                color_boxes=len(color_boxes),
+                gate_boxes=len(yolo_boxes),
+                final_boxes=len(result),
+            )
+            return result
+        result = self._gate_primary_boxes(yolo_boxes, color_boxes, min_overlap=min_overlap)
+        self._set_color_gate_status(
+            mode=9,
+            color_boxes=len(color_boxes),
+            gate_boxes=len(yolo_boxes),
+            final_boxes=len(result),
+        )
+        return result
 
     def _detect_motion_locked_filtered(self, frame: np.ndarray) -> list:
         motion_boxes = self._merge_boxes(
@@ -350,11 +569,7 @@ class SentryV2Detector:
         require_color = self.color_preset not in ("", "any")
         color_boxes = self._detect_color(frame) if require_color else []
 
-        if not self._yolo_loaded or self._yolo_model is None:
-            return []
-        yolo_boxes = self._detect_yolo(frame)
-        if not yolo_boxes:
-            return []
+        yolo_boxes = self._detect_yolo(frame) if (self._yolo_loaded and self._yolo_model is not None) else []
 
         filtered: list = []
         for motion_box in motion_boxes:
@@ -364,8 +579,11 @@ class SentryV2Detector:
             if require_color:
                 color_match = False
                 for color_box in color_boxes:
-                    overlap = self._bbox_overlap_ratio(motion_rect, color_box[:4])
-                    if overlap >= max(0.05, self.color_fusion_overlap / 100.0):
+                    if self._boxes_overlap(
+                        motion_rect,
+                        color_box[:4],
+                        min_overlap=max(0.05, self.color_fusion_overlap / 100.0),
+                    ):
                         color_match = True
                         break
                 if not color_match:
@@ -374,11 +592,16 @@ class SentryV2Detector:
             best_cls = None
             best_overlap = 0.0
             for yolo_box in yolo_boxes:
-                overlap = self._bbox_overlap_ratio(motion_rect, yolo_box[:4])
+                overlap = max(
+                    self._bbox_overlap_ratio(motion_rect, yolo_box[:4]),
+                    self._bbox_overlap_ratio(yolo_box[:4], motion_rect),
+                )
                 if overlap >= 0.15 and overlap > best_overlap:
                     best_overlap = overlap
                     best_cls = yolo_box
             if best_cls is None:
+                # Fallback to motion/color box if YOLO is unavailable for this frame.
+                filtered.append((mx, my, mw, mh, float(motion_score), CLASS_ID_MOVING_OBJECT))
                 continue
 
             yx, yy, yw, yh = (int(best_cls[0]), int(best_cls[1]), int(best_cls[2]), int(best_cls[3]))
@@ -388,8 +611,31 @@ class SentryV2Detector:
             # Motion gates whether the target is eligible; YOLO supplies the
             # box used for aiming because it is materially more stable.
             filtered.append((yx, yy, yw, yh, score, class_id))
-
+        self._set_color_gate_status(
+            mode=10,
+            color_boxes=len(color_boxes),
+            gate_boxes=len(motion_boxes),
+            final_boxes=len(filtered),
+        )
         return filtered
+
+    def _set_color_gate_status(
+        self,
+        *,
+        mode: int,
+        color_boxes: int,
+        gate_boxes: int,
+        final_boxes: int,
+    ) -> None:
+        self._last_color_gate_status = {
+            "mode": int(mode),
+            "preset": str(self.color_preset or "any"),
+            "strategy": str(self.color_fusion_strategy or "AND"),
+            "color_boxes": int(color_boxes),
+            "gate_boxes": int(gate_boxes),
+            "final_boxes": int(final_boxes),
+            "timestamp": time.time(),
+        }
 
     # ------------------------------------------------------------------ #
     #  Helpers
@@ -408,6 +654,52 @@ class SentryV2Detector:
                 x, y, w, h = cv2.boundingRect(c)
                 boxes.append((x, y, w, h, score, class_id))
         return boxes
+
+    def _gate_primary_boxes(
+        self,
+        primary_boxes: list,
+        gate_boxes: list,
+        *,
+        min_overlap: float,
+    ) -> list:
+        if not primary_boxes or not gate_boxes:
+            return []
+
+        gated = []
+        for primary_box in primary_boxes:
+            if any(self._boxes_overlap(primary_box[:4], gate_box[:4], min_overlap=min_overlap) for gate_box in gate_boxes):
+                gated.append(primary_box)
+        return gated
+
+    def _fuse_boxes_by_strategy(
+        self,
+        primary_boxes: list,
+        gate_boxes: list,
+        *,
+        min_overlap: float,
+    ) -> list:
+        strategy = (self.color_fusion_strategy or "AND").strip().upper()
+        if strategy == "OR":
+            if not primary_boxes and not gate_boxes:
+                return []
+            if not primary_boxes:
+                return list(gate_boxes)
+            if not gate_boxes:
+                return list(primary_boxes)
+            return self._merge_boxes(primary_boxes, gate_boxes)
+        return self._gate_primary_boxes(primary_boxes, gate_boxes, min_overlap=min_overlap)
+
+    def _boxes_overlap(
+        self,
+        a: tuple,
+        b: tuple,
+        *,
+        min_overlap: float,
+    ) -> bool:
+        return (
+            self._bbox_overlap_ratio(a, b) >= min_overlap
+            or self._bbox_overlap_ratio(b, a) >= min_overlap
+        )
 
     @staticmethod
     def _merge_boxes(a: list, b: list) -> list:
@@ -451,3 +743,4 @@ class SentryV2Detector:
         self._prev_frame = None
         self._back_sub = None
         self._backsub_warmup = 0
+        self._last_color_gate_status = {}

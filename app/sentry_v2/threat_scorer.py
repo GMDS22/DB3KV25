@@ -48,6 +48,15 @@ class TrackedTarget:
     persistence: float = 0.0    # seconds since first seen
     approach_rate: float = 0.0  # closing speed toward center (positive = approaching)
 
+    @property
+    def id(self) -> int:
+        """Compatibility alias for older call sites that still expect target.id."""
+        return int(self.det.track_id)
+
+    @property
+    def target_id(self) -> int:
+        return int(self.det.track_id)
+
 
 class ThreatScorer:
     """
@@ -61,9 +70,11 @@ class ThreatScorer:
         self,
         scoring_cfg: ThreatScoringConfig,
         filter_cfg: TargetFilterConfig,
+        ml_logger: Optional[object] = None,
     ):
         self.scoring = scoring_cfg
         self.filter_cfg = filter_cfg
+        self.ml_logger = ml_logger  # Optional training logger
 
         # Per-track history: track_id → list of (timestamp, norm_cx, norm_cy)
         self._history: Dict[int, List[Tuple[float, float, float]]] = defaultdict(list)
@@ -101,6 +112,12 @@ class ThreatScorer:
     ) -> None:
         self.scoring = scoring_cfg
         self.filter_cfg = filter_cfg
+        
+        # Hot-reload ML model if enabled and path changed or toggled on
+        if scoring_cfg.use_ml_model and _HAS_SKLEARN:
+            self._load_ml_model(scoring_cfg.ml_model_path)
+        else:
+            self._ml_model = None
 
     # ------------------------------------------------------------------ #
     # Internal scoring

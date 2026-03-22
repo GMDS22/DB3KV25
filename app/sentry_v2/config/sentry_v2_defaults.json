@@ -43,6 +43,9 @@
     "frame_height": 480
   },
   "show_overlay": true,
+  "scope_view_enabled": false,
+  "scope_radius_pct": 35,
+  "scope_vignette_opacity": 60,
   "show_threat_scores": true,
   "show_engagement_zone": true,
   "show_guard_crosshair": true

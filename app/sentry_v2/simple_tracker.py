@@ -23,8 +23,8 @@ class SimpleBBoxTracker:
     def __init__(self) -> None:
         self._tracks: Dict[int, _TrackState] = {}
         self._next_track_id: int = 1
-        self.max_match_distance_px: float = 160.0
-        self.max_track_age_s: float = 1.2
+        self.max_match_distance_px: float = 220.0
+        self.max_track_age_s: float = 1.8
 
     def reset(self) -> None:
         self._tracks.clear()
