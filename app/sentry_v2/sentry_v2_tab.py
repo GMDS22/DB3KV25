@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import sys
 import threading
 import time
 from pathlib import Path
@@ -29,13 +30,14 @@ from typing import List, Optional, Tuple
 import cv2
 import numpy as np
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QCheckBox, QSlider, QGroupBox, QFrame, QSizePolicy,
     QSpacerItem, QScrollArea, QDoubleSpinBox, QSpinBox,
     QComboBox, QListWidget, QListWidgetItem, QAbstractItemView,
     QTabWidget, QTextEdit, QGridLayout, QLineEdit, QSplitter, QMessageBox,
+    QFileDialog,
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject, QProcess, QProcessEnvironment
 from PyQt5.QtGui import QImage, QPixmap
 
 from .sentry_v2_config import (
@@ -51,6 +53,12 @@ from .sentry_v2_overlay import SentryV2Overlay
 from .sentry_v2_comm import SentryV2Comm
 from .sentry_v2_detector import SentryV2Detector
 from .sentry_v2_no_fire_masks import angular_vertex_from_normalized_point, project_mask_to_frame
+from .prompted_targets import (
+    PromptedMediaSelectionDialog,
+    PromptedSelection,
+    PromptedTargetLibrary,
+    PromptedTargetMatcher,
+)
 from .sentry_v2_video_canvas import SentryV2VideoCanvas
 from .simple_tracker import SimpleBBoxTracker
 from .sentry_v2_tooltips import SENTRY_V2_TOOLTIPS
@@ -84,6 +92,21 @@ DETECTION_MODES: List[str] = [
     "Hybrid: Color + BackSub",     # 8
     "Hybrid: Color + YOLO",        # 9
     "Motion-Locked Filtered Target",  # 10
+]
+
+STANDARD_CAMERA_RESOLUTIONS: List[Tuple[int, int]] = [
+    (320, 240),
+    (424, 240),
+    (640, 360),
+    (640, 480),
+    (800, 600),
+    (960, 540),
+    (1024, 576),
+    (1280, 720),
+    (1280, 800),
+    (1280, 960),
+    (1600, 900),
+    (1920, 1080),
 ]
 
 # Color presets available
@@ -306,6 +329,25 @@ DETECTION_PRESETS = {
             "motion_gate_threshold": 1.35,
         },
     },
+    "observer_motion_watch": {
+        "label": "Observer Motion Watch",
+        "description": "Wide-motion observer mode for tiny and far movers, even when YOLO cannot classify them.",
+        "tooltip_key": "preset_detection_observer_motion_watch",
+        "settings": {
+            "detection_mode": 1,
+            "min_contour_area": 36.0,
+            "max_contour_area": 120000.0,
+            "yolo_min_area": 0,
+            "yolo_confidence": 0.18,
+            "color_preset": "any",
+            "color_min_area": 24,
+            "color_max_area": 240000,
+            "color_fusion_strategy": "OR",
+            "color_fusion_overlap": 8,
+            "motion_ignore_after_move_s": 0.02,
+            "motion_gate_threshold": 0.35,
+        },
+    },
     "dog_follow": {
         "label": "Dog Follow",
         "description": "Motion-locked YOLO tuned for medium/large moving dogs with stable center follow.",
@@ -365,20 +407,20 @@ DETECTION_PRESETS = {
     },
     "person_yolo": {
         "label": "Person YOLO",
-        "description": "Pure YOLO detection tuned for upright person-class detections. No motion gate required — YOLO class confidence is the sole trigger, so even stationary people are tracked continuously.",
+        "description": "Pure YOLO detection tuned for person-class tracking at any range. Lower confidence gate catches partially occluded and distant subjects. Minimum-area gate filters noise while still allowing a person at 8–10 m. No motion gate — YOLO confidence is the sole trigger so stationary people are tracked continuously.",
         "tooltip_key": "preset_detection_person_yolo",
         "settings": {
             "detection_mode": 2,
             "min_contour_area": 2340.0,
-            "max_contour_area": 46800.0,
-            "yolo_min_area": 300,
-            "yolo_confidence": 0.52,
+            "max_contour_area": 0.0,
+            "yolo_min_area": 1200,
+            "yolo_confidence": 0.44,
             "color_preset": "any",
             "color_min_area": 160,
             "color_max_area": 60000,
             "color_fusion_strategy": "AND",
             "color_fusion_overlap": 15,
-            "motion_ignore_after_move_s": 0.05,
+            "motion_ignore_after_move_s": 0.08,
             "motion_gate_threshold": 1.0,
         },
     },
@@ -444,15 +486,52 @@ TARGET_FILTER_PRESETS = {
             "max_size_ratio": 0.15,
         },
     },
+    "observer_all_movers": {
+        "label": "Observer All Movers",
+        "description": "Observation filter that accepts any moving object and keeps tiny or far targets in play.",
+        "tooltip_key": "preset_filter_observer_all_movers",
+        "settings": {
+            "allowed_classes": [],
+            "min_confidence": 0.18,
+            "min_size_ratio": 0.0,
+            "max_size_ratio": 0.0,
+            "shape_filter_enabled": False,
+            "shape_profile_name": "",
+            "semantic_min_confirm_frames": 1,
+            "semantic_min_confirm_confidence": 0.0,
+            "semantic_confirm_ttl_s": 0.6,
+        },
+    },
     "human_focus": {
         "label": "Human Focus",
-        "description": "Rejects everything except strong person detections.",
+        "description": "Rejects everything except person-class detections. Confidence gate lowered to accept partially visible or side-on subjects while the shape filter still rejects any box wider than it is tall.",
         "tooltip_key": "preset_filter_human_focus",
         "settings": {
             "allowed_classes": ["person"],
-            "min_confidence": 0.62,
+            "min_confidence": 0.52,
             "min_size_ratio": 0.001,
             "max_size_ratio": 0.35,
+            "shape_filter_enabled": True,
+            "shape_profile_name": "person",
+            "semantic_min_confirm_frames": 2,
+            "semantic_min_confirm_confidence": 0.58,
+            "semantic_confirm_ttl_s": 0.8,
+        },
+    },
+    "car_focus": {
+        "label": "Car Focus",
+        "description": "Single-class car filter with shape and confirmation safety.",
+        "tooltip_key": "preset_filter_car_focus",
+        "settings": {
+            "allowed_classes": ["car"],
+            "min_confidence": 0.54,
+            "min_size_ratio": 0.003,
+            "max_size_ratio": 0.0,
+            "shape_filter_enabled": True,
+            "shape_profile_name": "car",
+            "semantic_min_confirm_frames": 2,
+            "semantic_min_confirm_confidence": 0.60,
+            "semantic_confirm_ttl_s": 0.8,
         },
     },
     "vehicle_watch": {
@@ -497,6 +576,11 @@ TARGET_FILTER_PRESETS = {
             "min_confidence": 0.40,
             "min_size_ratio": 0.0003,
             "max_size_ratio": 0.10,
+            "shape_filter_enabled": True,
+            "shape_profile_name": "dog",
+            "semantic_min_confirm_frames": 2,
+            "semantic_min_confirm_confidence": 0.48,
+            "semantic_confirm_ttl_s": 0.8,
         },
     },
     "cat_focus": {
@@ -508,6 +592,27 @@ TARGET_FILTER_PRESETS = {
             "min_confidence": 0.34,
             "min_size_ratio": 0.00015,
             "max_size_ratio": 0.06,
+            "shape_filter_enabled": True,
+            "shape_profile_name": "cat",
+            "semantic_min_confirm_frames": 2,
+            "semantic_min_confirm_confidence": 0.42,
+            "semantic_confirm_ttl_s": 0.8,
+        },
+    },
+    "bird_focus": {
+        "label": "Bird Focus",
+        "description": "Class-locked bird tracking with shape and confirmation safety.",
+        "tooltip_key": "preset_filter_bird_focus",
+        "settings": {
+            "allowed_classes": ["bird", "birds"],
+            "min_confidence": 0.34,
+            "min_size_ratio": 0.00008,
+            "max_size_ratio": 0.05,
+            "shape_filter_enabled": True,
+            "shape_profile_name": "bird",
+            "semantic_min_confirm_frames": 2,
+            "semantic_min_confirm_confidence": 0.42,
+            "semantic_confirm_ttl_s": 0.8,
         },
     },
     "rat_like_motion": {
@@ -519,17 +624,27 @@ TARGET_FILTER_PRESETS = {
             "min_confidence": 0.18,
             "min_size_ratio": 0.00005,
             "max_size_ratio": 0.04,
+            "shape_filter_enabled": True,
+            "shape_profile_name": "rat",
+            "semantic_min_confirm_frames": 3,
+            "semantic_min_confirm_confidence": 0.72,
+            "semantic_confirm_ttl_s": 0.8,
         },
     },
     "person_focus_closest": {
         "label": "Person — Closest First",
-        "description": "Strict person-class lock. No upper size limit so the closest (largest) person filling most of the frame is still tracked. Confidence gate of 0.50 keeps false detections out.",
+        "description": "Person-class lock with no upper size limit so the closest person filling most of the frame is still tracked. Confidence gate is permissive enough to keep walking, crouching, or partially occluded subjects in play. Confirm in a single strong frame for fast-walking responsiveness.",
         "tooltip_key": "preset_filter_person_focus_closest",
         "settings": {
             "allowed_classes": ["person"],
-            "min_confidence": 0.50,
-            "min_size_ratio": 0.001,
+            "min_confidence": 0.44,
+            "min_size_ratio": 0.0015,
             "max_size_ratio": 0.0,
+            "shape_filter_enabled": True,
+            "shape_profile_name": "person",
+            "semantic_min_confirm_frames": 1,
+            "semantic_min_confirm_confidence": 0.48,
+            "semantic_confirm_ttl_s": 1.0,
         },
     },
     "sniper_small_motion": {
@@ -574,6 +689,11 @@ TARGET_FILTER_PRESETS = {
             "min_confidence": 0.30,
             "min_size_ratio": 0.00005,
             "max_size_ratio": 0.04,
+            "shape_filter_enabled": True,
+            "shape_profile_name": "rat",
+            "semantic_min_confirm_frames": 3,
+            "semantic_min_confirm_confidence": 0.68,
+            "semantic_confirm_ttl_s": 0.8,
         },
     },
     "sniper_medium_pet": {
@@ -589,13 +709,18 @@ TARGET_FILTER_PRESETS = {
     },
     "sniper_large_person": {
         "label": "Sniper Large Person",
-        "description": "Class-locked sniper filter for person targets with no upper size ceiling.",
+        "description": "Class-locked sniper filter for person targets with no upper size ceiling. Stricter than person_focus_closest — requires two consecutive confirmed frames before the target is live, making it appropriate for precision fire contexts.",
         "tooltip_key": "preset_filter_sniper_large_person",
         "settings": {
             "allowed_classes": ["person"],
-            "min_confidence": 0.56,
-            "min_size_ratio": 0.001,
+            "min_confidence": 0.50,
+            "min_size_ratio": 0.0015,
             "max_size_ratio": 0.0,
+            "shape_filter_enabled": True,
+            "shape_profile_name": "person",
+            "semantic_min_confirm_frames": 2,
+            "semantic_min_confirm_confidence": 0.56,
+            "semantic_confirm_ttl_s": 0.9,
         },
     },
 }
@@ -624,12 +749,12 @@ BUS_SERVO_TIME_PRESETS = {
 MASTER_PROFILE_PRESETS = {
     "demo_observer": {
         "label": "Demo Observer",
-        "description": "Slowest whole-stack profile for observing aim corrections and settle timing.",
+        "description": "Wide-net observer profile for spotting tiny and far moving objects without class lock or auto-fire.",
         "tooltip_key": "preset_master_demo_observer",
-        "detection": "motion_locked",
-        "filter": "wide_net",
-        "threat": "crosshair_snap",
-        "engagement": "demo_track",
+        "detection": "observer_motion_watch",
+        "filter": "observer_all_movers",
+        "threat": "small_target_follow",
+        "engagement": "demo_track_multi",
         "servo": "smooth",
     },
     "indoor_precision": {
@@ -714,7 +839,7 @@ MASTER_PROFILE_PRESETS = {
     },
     "person_track_fire": {
         "label": "Person Track + Fire",
-        "description": "Full coordinated person profile. YOLO-only detection, person-class filter (no max size so very close subjects are never dropped), closest-person threat scoring (size-dominant), and persistent tracking that fires once centered. The closest person in frame wins priority.",
+        "description": "Full person-tracking pipeline. YOLO-only detection catches still and moving people alike. Person-class filter rejects non-human detections and has no upper size limit for close-range subjects. Closest-person scoring keeps the nearest adult prioritised. Person-scale engagement tolerances maintain aim lock through natural body sway and brief occlusions.",
         "tooltip_key": "preset_master_person_track_fire",
         "detection": "person_yolo",
         "filter": "person_focus_closest",
@@ -952,15 +1077,15 @@ THREAT_AI_PRESETS = {
     },
     "person_closest_center": {
         "label": "Person — Closest + Center",
-        "description": "Prioritises the closest (largest bounding box) person in the frame. Size is the dominant weight so a nearby person always outranks a centered-but-distant one. Secondary center bias keeps the turret well-aimed.",
+        "description": "Prioritises the closest (largest) person in frame with strong size dominance and solid center bias. Speed and persistence are weighted so a walking person stays tracked through directional changes. Class priority weight is intentionally lean because the filter already enforces person-only.",
         "tooltip_key": "preset_threat_person_closest_center",
         "weights": {
-            "w_proximity": 0.28,
-            "w_size": 0.42,
-            "w_confidence": 0.10,
-            "w_class_priority": 0.14,
-            "w_speed": 0.02,
-            "w_persistence": 0.02,
+            "w_proximity": 0.30,
+            "w_size": 0.34,
+            "w_confidence": 0.12,
+            "w_class_priority": 0.08,
+            "w_speed": 0.06,
+            "w_persistence": 0.08,
             "w_approach": 0.02,
         },
         "use_ml_model": False,
@@ -1045,6 +1170,40 @@ ENGAGEMENT_PRESETS = {
             "fire_recenter_pan_tolerance": 0.24,
             "fire_recenter_tilt_tolerance": 0.20,
             "target_loss_timeout": 1.90,
+        },
+    },
+    "demo_track_multi": {
+        "label": "Demo Track Observer x5",
+        "description": "Tracking-only observer preset that keeps up to five moving candidates visible while staying slow and non-firing.",
+        "tooltip_key": "preset_engage_demo_track_multi",
+        "settings": {
+            "auto_trigger_enabled": False,
+            "trigger_mode_bb": False,
+            "min_threat_score": 0.08,
+            "burst_count": 1,
+            "burst_interval_ms": 120,
+            "inter_target_cooldown": 0.40,
+            "cycle_cooldown": 0.60,
+            "max_queue_length": 5,
+            "optimize_slew_order": False,
+            "engagement_speed": 24,
+            "precision_aim_enabled": True,
+            "precision_settle_time": 0.80,
+            "precision_max_step": 0.28,
+            "precision_deadzone_pan_deg": 0.10,
+            "precision_deadzone_tilt_deg": 0.08,
+            "precision_error_ema": 0.55,
+            "fire_requires_lock": True,
+            "aim_lock_pan_tolerance": 0.28,
+            "aim_lock_tilt_tolerance": 0.24,
+            "aim_lock_required_frames": 4,
+            "fire_trigger_enter_pan_tolerance": 0.18,
+            "fire_trigger_enter_tilt_tolerance": 0.15,
+            "fire_trigger_exit_pan_tolerance": 0.28,
+            "fire_trigger_exit_tilt_tolerance": 0.22,
+            "fire_recenter_pan_tolerance": 0.24,
+            "fire_recenter_tilt_tolerance": 0.20,
+            "target_loss_timeout": 1.20,
         },
     },
     "indoor_precision": {
@@ -1321,37 +1480,37 @@ ENGAGEMENT_PRESETS = {
     },
     "person_track_fire": {
         "label": "Person Track + Fire",
-        "description": "Person-optimised engagement: centers on the person, holds tracking as long as they are in the frame (2.5 s loss tolerance), then fires. Expects the companion Threat and Filter presets so the closest person always scores highest.",
+        "description": "Person-scale engagement profile. Servo speed and correction step are tuned for a walking adult. Lock tolerances are wider than pet presets so the turret holds aim through natural body sway. Extended loss timeout (3 s) keeps tracking through brief occlusions such as a door frame or another person walking in front.",
         "tooltip_key": "preset_engage_person_track_fire",
         "settings": {
             "auto_trigger_enabled": True,
             "trigger_mode_bb": True,
-            "min_threat_score": 0.28,
+            "min_threat_score": 0.26,
             "burst_count": 2,
             "burst_interval_ms": 80,
             "inter_target_cooldown": 1.50,
             "cycle_cooldown": 2.50,
             "max_queue_length": 1,
             "optimize_slew_order": False,
-            "engagement_speed": 62,
+            "engagement_speed": 68,
             "precision_aim_enabled": True,
-            "precision_settle_time": 0.45,
-            "precision_max_step": 0.65,
+            "precision_settle_time": 0.38,
+            "precision_max_step": 0.80,
             "precision_deadzone_pan_deg": 0.10,
             "precision_deadzone_tilt_deg": 0.08,
-            "precision_error_ema": 0.48,
+            "precision_error_ema": 0.50,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.35,
-            "aim_lock_tilt_tolerance": 0.28,
-            "aim_lock_required_frames": 6,
-            "fire_trigger_enter_pan_tolerance": 0.20,
-            "fire_trigger_enter_tilt_tolerance": 0.16,
-            "fire_trigger_exit_pan_tolerance": 0.30,
-            "fire_trigger_exit_tilt_tolerance": 0.24,
-            "fire_recenter_pan_tolerance": 0.32,
-            "fire_recenter_tilt_tolerance": 0.26,
-            "target_loss_timeout": 2.50,
-            "aim_lock_timeout": 2.00,
+            "aim_lock_pan_tolerance": 0.40,
+            "aim_lock_tilt_tolerance": 0.32,
+            "aim_lock_required_frames": 5,
+            "fire_trigger_enter_pan_tolerance": 0.24,
+            "fire_trigger_enter_tilt_tolerance": 0.19,
+            "fire_trigger_exit_pan_tolerance": 0.36,
+            "fire_trigger_exit_tilt_tolerance": 0.28,
+            "fire_recenter_pan_tolerance": 0.38,
+            "fire_recenter_tilt_tolerance": 0.30,
+            "target_loss_timeout": 3.00,
+            "aim_lock_timeout": 2.50,
         },
     },
     "sniper_small_center": {
@@ -1582,7 +1741,8 @@ QWidget#sentryV2Root QPushButton {
     color: #edf5fb;
     border: 1px solid #35516a;
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: 7px 12px;
+    min-height: 34px;
 }
 QWidget#sentryV2Root QPushButton:hover {
     background-color: #294159;
@@ -1595,6 +1755,86 @@ QWidget#sentryV2Root QPushButton:checked {
     background-color: #1f6f57;
     border-color: #2aa87d;
     color: #f6fffb;
+}
+QWidget#sentryV2Root QPushButton:disabled {
+    background-color: #19232d;
+    color: #6f7d8a;
+    border-color: #2a3745;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="primary"] {
+    background-color: #1c4f78;
+    border-color: #2f7fb9;
+    color: #f5fbff;
+    font-weight: 700;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="primary"]:hover {
+    background-color: #23608f;
+    border-color: #4c97cc;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="primary"]:pressed {
+    background-color: #173f5f;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="preset"] {
+    background-color: #24364a;
+    border-color: #41627f;
+    color: #f0f7fc;
+    font-weight: 600;
+    padding: 8px 12px;
+    min-height: 38px;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="preset"]:hover {
+    background-color: #2b4259;
+    border-color: #5c85a8;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="utility"] {
+    background-color: #1e2b38;
+    border-color: #31495f;
+    color: #dce7f2;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="utility"]:hover {
+    background-color: #243545;
+    border-color: #44627e;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="dpad"] {
+    background-color: #2a3d52;
+    border: 1px solid #5b84aa;
+    border-radius: 12px;
+    color: #f4fbff;
+    font-weight: 700;
+    font-size: 18px;
+    min-height: 56px;
+    padding: 10px 14px;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="dpad"]:hover {
+    background-color: #334b64;
+    border-color: #79a8d4;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="dpad"]:pressed {
+    background-color: #223446;
+    border-color: #4f7599;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="mode"] {
+    background-color: #234033;
+    border-color: #366a53;
+    color: #eefbf4;
+    font-weight: 600;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="mode"]:hover {
+    background-color: #2b4c3e;
+    border-color: #4d8569;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="danger"] {
+    background-color: #5a2a2a;
+    border-color: #a54a4a;
+    color: #fff8f8;
+    font-weight: 700;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="danger"]:hover {
+    background-color: #703232;
+    border-color: #c85b5b;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="danger"]:pressed {
+    background-color: #472020;
 }
 QWidget#sentryV2Root QLineEdit,
 QWidget#sentryV2Root QComboBox,
@@ -1738,6 +1978,14 @@ class SentryV2TabWidget(QWidget):
     sentry_enabled_changed = pyqtSignal(bool)
     detection_mode_changed = pyqtSignal(int)
     color_preset_changed = pyqtSignal(str)
+    pir_event_received = pyqtSignal(int, float)
+    # Thread-safe camera open result signals (emitted from bg thread, handled on main thread)
+    _cam_bg_opened = pyqtSignal(object, str, str, int, int, bool)   # cap, src_text, kind, rw, rh, rfs
+    _cam_bg_failed = pyqtSignal(str)                                 # src_text
+    _cam_url_error = pyqtSignal(str)                                 # error message from URL-open bg thread
+    _cam_url_ready = pyqtSignal(str, str, int, int, int)             # display_label, source_text, w, h, gen
+    _cam_url_status = pyqtSignal(str)                                # live status text from URL-open bg thread
+    _yolo_load_result = pyqtSignal(bool, str, str)                   # ok, model_name, error_text
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -1751,6 +1999,7 @@ class SentryV2TabWidget(QWidget):
         self._comm.invert_pan = self.config.connection.invert_pan
         self._comm.invert_tilt = self.config.connection.invert_tilt
         self._comm.trigger_mode_bb = self.config.engagement.trigger_mode_bb
+        self._comm.set_on_pir_event(self._emit_comm_pir_event)
 
         # Standalone detector
         self._detector = SentryV2Detector()
@@ -1772,12 +2021,27 @@ class SentryV2TabWidget(QWidget):
         # Track accessory states locally for button text
         self._led_on = False
         self._laser_on = False
+        self._acc_on = False
+        self._spare_on = False
         self._safety_armed = False
 
         # Own camera
         self._cap: Optional[cv2.VideoCapture] = None
+        self._local_source_kind: str = ""
+        self._local_source_label: str = ""
+        self._test_media_image_frame: Optional[np.ndarray] = None
+        self._test_media_last_frame: Optional[np.ndarray] = None
+        self._test_media_paused: bool = False
+        self._test_media_loop_enabled: bool = True
         self._grab_fail_count: int = 0
         self._MAX_GRAB_FAILS: int = 30  # auto-close after ~1s of failures
+        self._startup_retry_count: int = -1  # tracks auto-open retries
+        # Wire thread-safe camera open result signals
+        self._cam_bg_opened.connect(self._finish_camera_open)
+        self._cam_bg_failed.connect(self._on_camera_open_failed)
+        self._cam_url_error.connect(self._on_url_open_error)
+        self._cam_url_ready.connect(self._on_url_ready)
+        self._cam_url_status.connect(self._on_url_status_update)
         self._cam_timer = QTimer(self)
         self._cam_timer.timeout.connect(self._grab_frame)
 
@@ -1799,8 +2063,16 @@ class SentryV2TabWidget(QWidget):
         self._last_mask_trace_snapshot: str = ""
         self._last_scope_view_active: bool = False
         self._last_detected_objects: List[DetectedObject] = []
+        self._last_display_frame: Optional[np.ndarray] = None
+        self._last_raw_frame: Optional[np.ndarray] = None
+        self._last_camera_source_text: str = str(self.config.connection.camera_source or "").strip() or "0"
+        self._last_camera_width: int = int(self.config.connection.camera_width)
+        self._last_camera_height: int = int(self.config.connection.camera_height)
         self._mask_capture_active: bool = False
         self._mask_draft_vertices: List[NoFireMaskVertex] = []
+        self._prompted_capture_active: bool = False
+        self._prompted_list_syncing: bool = False
+        self._prompted_detail_syncing: bool = False
         self._show_video_feed: bool = True  # Toggle to hide video display
         self._applying_master_preset: bool = False
         self._applying_servo_preset: bool = False
@@ -1821,17 +2093,29 @@ class SentryV2TabWidget(QWidget):
         self._detector_pending_frame: Optional[np.ndarray] = None
         self._detector_worker_stop = threading.Event()
         self._detector_worker_busy: bool = False
+        # URL stream reader thread state (background thread owns the cap for HTTP streams)
+        self._url_stream_active: bool = False
+        self._url_stream_stop: threading.Event = threading.Event()
+        self._url_stream_frame: Optional[np.ndarray] = None
+        self._url_stream_frame_lock: threading.Lock = threading.Lock()
+        self._url_stream_gen: int = 0  # incremented each open so old threads self-terminate
         self._detector_worker = threading.Thread(target=self._detector_worker_loop, name="sentry-v2-detector-worker", daemon=True)
         self._detector_worker.start()
         self._yolo_auto_load_pending: bool = False
         self._yolo_model_entries: list[tuple[str, str]] = []
+        self._prompted_target_library = self._load_prompted_target_library()
+        self._prompted_matcher = PromptedTargetMatcher(self._prompted_target_library)
         self._custom_master_profiles: dict[str, dict] = {}
         self._active_master_profile_name: Optional[str] = None
         self._selected_custom_master_profile_name: Optional[str] = None
+        self._responsive_button_grids: list[QGridLayout] = []
         self._load_custom_master_profiles()
         self.connection_operation_finished.connect(self._on_connection_operation_finished)
         self.detection_result_ready.connect(self._on_detection_result_ready)
         self.command_result_ready.connect(self._on_command_result_ready)
+        self.pir_event_received.connect(self._on_comm_pir_event_received)
+        self._yolo_load_result.connect(self._on_yolo_load_result)
+        self._yolo_loading: bool = False
 
         # Build UI
         self._build_ui()
@@ -1842,31 +2126,51 @@ class SentryV2TabWidget(QWidget):
         self._status_timer.timeout.connect(self._refresh_status)
         self._status_timer.start(500)
         self._schedule_auto_yolo_load(1200)
+        QTimer.singleShot(800, self._auto_open_camera_on_startup)
 
     def _load_settings_config(self) -> SentryV2Config:
-        """Load settings from canonical path, migrating legacy path if newer."""
+        """Load settings from the canonical path and only fall back to legacy once if needed."""
         canonical = SENTRY_V2_SETTINGS_PATH
         legacy = LEGACY_SENTRY_V2_SETTINGS_PATH
 
-        selected = canonical
-        if canonical.exists() and legacy.exists():
-            try:
-                selected = legacy if legacy.stat().st_mtime > canonical.stat().st_mtime else canonical
-            except Exception:
-                selected = canonical
-        elif legacy.exists() and not canonical.exists():
-            selected = legacy
+        selected = canonical if canonical.exists() else legacy
 
         cfg = SentryV2Config.load(str(selected))
-        cfg.config_path = str(canonical)
+        cfg.config_path = "app/config/sentry_v2_settings.json"
+        prompted = Path(str(cfg.prompted_library_path or "app/config/sentry_v2_prompted_targets.json"))
+        if prompted.is_absolute():
+            cfg.prompted_library_path = self._portable_path_string(prompted)
 
-        if selected != canonical:
+        if selected == legacy and legacy.exists():
             try:
                 cfg.save(str(canonical))
             except Exception:
                 pass
 
         return cfg
+
+    def _portable_path_string(self, path_obj: Path) -> str:
+        """Prefer repo-relative paths so settings stay portable across machines."""
+        repo_root = self._repo_root_path().resolve()
+        try:
+            return path_obj.resolve().relative_to(repo_root).as_posix()
+        except Exception:
+            return str(path_obj)
+
+    def _auto_open_camera_on_startup(self, _retry: int = 0) -> None:
+        self._log(f"[CAM-DEBUG] _auto_open_camera_on_startup called: retry={_retry}, closing={self._closing}, has_source={self._has_local_source()}")
+        if self._closing or self._has_local_source():
+            return
+        self._startup_retry_count = _retry
+        try:
+            self._toggle_camera()
+        except Exception as exc:
+            self._lbl_cam_status.setText(f"Auto-open failed: {exc}")
+            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._log(f"[CAM-DEBUG] Auto-open exception (attempt {_retry+1}): {exc}")
+            if not self._closing and not self._has_local_source() and _retry < 3:
+                delay = 1500 * (_retry + 1)
+                QTimer.singleShot(delay, lambda r=_retry+1: self._auto_open_camera_on_startup(r))
 
     def cleanup(self) -> None:
         """Stop timers and release all resources. Safe to call multiple times."""
@@ -1925,8 +2229,14 @@ class SentryV2TabWidget(QWidget):
         self._video_label.setMinimumSize(480, 360)
         self._video_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._video_label.setStyleSheet("background-color: #0b1016; color: #6f7d8a;")
+        logo_path = Path(__file__).resolve().parents[1] / "LOGO.png"
+        if logo_path.is_file():
+            self._video_label.set_placeholder_pixmap(QPixmap(str(logo_path)))
+            self._video_label.set_placeholder_text("Camera Off\nOpen Camera to Start")
+            self._video_label.set_placeholder_enabled(False)
         self._video_label.frameClicked.connect(self._on_video_frame_clicked)
         self._video_label.frameRightClicked.connect(self._on_video_frame_right_clicked)
+        self._video_label.roiSelected.connect(self._on_video_roi_selected)
         self._main_splitter.addWidget(self._video_label)
 
         # --- Right: controls in scrollable panel ---
@@ -1961,6 +2271,7 @@ class SentryV2TabWidget(QWidget):
         settings_tabs.addTab(self._build_connection_tab(), "Connection")
         settings_tabs.addTab(self._build_master_profiles_tab(), "Master Profiles")
         settings_tabs.addTab(self._build_detection_tab(), "Detection")
+        settings_tabs.addTab(self._build_prompted_targets_tab(), "Prompted Targets")
         settings_tabs.addTab(self._build_filter_tab(), "Target Filter")
         settings_tabs.addTab(self._build_scoring_tab(), "Threat AI")
         settings_tabs.addTab(self._build_engagement_tab(), "Engage")
@@ -1980,6 +2291,7 @@ class SentryV2TabWidget(QWidget):
         root.addWidget(self._main_splitter)
 
         QTimer.singleShot(0, self._apply_saved_panel_width)
+        QTimer.singleShot(0, self._reflow_all_responsive_button_grids)
 
         self._apply_all_tooltips()
         self._disable_wheel_scroll_on_all_inputs()
@@ -2007,21 +2319,68 @@ class SentryV2TabWidget(QWidget):
         
         disable_recursive(self)
 
-    def _normalize_preset_grid_button_widths(self, grid: QGridLayout) -> None:
-        """Set all preset buttons in a grid to the same width using the longest label."""
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._reflow_all_responsive_button_grids()
+
+    def _set_button_role(self, button: Optional[QPushButton], role: str) -> None:
+        if button is None:
+            return
+        button.setProperty("buttonRole", role)
+        button.style().unpolish(button)
+        button.style().polish(button)
+        button.update()
+
+    def _style_button_row(self, buttons: list[QPushButton], role: str = "utility") -> None:
+        for button in buttons:
+            self._set_button_role(button, role)
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+    def _responsive_button_grid_columns(self, grid: QGridLayout, button_count: int) -> int:
+        parent = grid.parentWidget()
+        available_width = parent.width() if parent is not None else int(self.config.settings_panel_width)
+        if available_width <= 0:
+            available_width = int(self.config.settings_panel_width)
+        if button_count <= 1:
+            return 1
+        return 1 if available_width < 520 else 2
+
+    def _register_responsive_button_grid(self, grid: QGridLayout) -> None:
+        if grid not in self._responsive_button_grids:
+            self._responsive_button_grids.append(grid)
+
+    def _reflow_responsive_button_grid(self, grid: QGridLayout) -> None:
         buttons: List[QPushButton] = []
-        max_width = 0
+        while grid.count():
+            item = grid.takeAt(0)
+            widget = item.widget() if item is not None else None
+            if isinstance(widget, QPushButton):
+                buttons.append(widget)
+        if not buttons:
+            return
+
+        columns = self._responsive_button_grid_columns(grid, len(buttons))
+        for index, button in enumerate(buttons):
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            grid.addWidget(button, index // columns, index % columns)
+        for column in range(columns):
+            grid.setColumnStretch(column, 1)
+
+    def _reflow_all_responsive_button_grids(self) -> None:
+        for grid in list(self._responsive_button_grids):
+            self._reflow_responsive_button_grid(grid)
+
+    def _normalize_preset_grid_button_widths(self, grid: QGridLayout) -> None:
+        """Make preset buttons responsive to the available panel width."""
         for i in range(grid.count()):
             item = grid.itemAt(i)
             widget = item.widget() if item is not None else None
             if isinstance(widget, QPushButton):
-                buttons.append(widget)
-                max_width = max(max_width, int(widget.sizeHint().width()))
-        if not buttons or max_width <= 0:
-            return
-        for button in buttons:
-            button.setFixedWidth(max_width)
-            button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+                self._set_button_role(widget, "preset")
+                widget.setMinimumHeight(38)
+                widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._register_responsive_button_grid(grid)
+        self._reflow_responsive_button_grid(grid)
 
     def _build_panel_width_group(self) -> QGroupBox:
         grp = QGroupBox("Panel Layout")
@@ -2058,8 +2417,7 @@ class SentryV2TabWidget(QWidget):
         widget_map = {
             self._chk_enable: "enable_sentry",
             self._edit_cam_source: "camera_source",
-            self._spin_cam_w: "camera_width",
-            self._spin_cam_h: "camera_height",
+            self._combo_cam_resolution: "camera_width",
             self._btn_cam: "camera_toggle",
             self._combo_conn_type: "connection_mode",
             self._edit_esp32_port: "esp32_port",
@@ -2212,9 +2570,11 @@ class SentryV2TabWidget(QWidget):
         self._combo_custom_master_profiles.currentIndexChanged.connect(self._on_custom_master_profile_selected)
         select_row.addWidget(self._combo_custom_master_profiles, 1)
         btn_use_active_custom = QPushButton("Use Active")
+        self._set_button_role(btn_use_active_custom, "utility")
         btn_use_active_custom.clicked.connect(self._select_active_custom_master_profile_for_edit)
         select_row.addWidget(btn_use_active_custom)
         btn_new_custom = QPushButton("New")
+        self._set_button_role(btn_new_custom, "utility")
         btn_new_custom.clicked.connect(self._clear_custom_master_profile_editor)
         select_row.addWidget(btn_new_custom)
         save_lay.addLayout(select_row)
@@ -2225,9 +2585,11 @@ class SentryV2TabWidget(QWidget):
         self._edit_custom_master_name.setPlaceholderText("Example: Yellow Indoor Sniper")
         save_row.addWidget(self._edit_custom_master_name, 1)
         self._btn_update_custom_master = QPushButton("Update Selected")
+        self._set_button_role(self._btn_update_custom_master, "utility")
         self._btn_update_custom_master.clicked.connect(self._update_selected_custom_master_profile)
         save_row.addWidget(self._btn_update_custom_master)
         btn_save_custom = QPushButton("Save As New")
+        self._set_button_role(btn_save_custom, "utility")
         btn_save_custom.clicked.connect(self._save_new_custom_master_profile)
         save_row.addWidget(btn_save_custom)
         save_lay.addLayout(save_row)
@@ -2273,31 +2635,120 @@ class SentryV2TabWidget(QWidget):
         self._apply_tooltip(self._edit_cam_source, "camera_source")
         cam_lay.addWidget(self._edit_cam_source, 0, 1)
 
-        cam_lay.addWidget(QLabel("Width:"), 1, 0)
-        self._spin_cam_w = QSpinBox()
-        self._spin_cam_w.setRange(160, 3840)
-        self._spin_cam_w.setSingleStep(160)
-        self._spin_cam_w.setValue(self.config.connection.camera_width)
-        self._apply_tooltip(self._spin_cam_w, "camera_width")
-        cam_lay.addWidget(self._spin_cam_w, 1, 1)
+        cam_lay.addWidget(QLabel("Resolution:"), 1, 0)
+        self._combo_cam_resolution = QComboBox()
+        self._populate_camera_resolution_combo(self.config.connection.camera_width, self.config.connection.camera_height)
+        self._apply_tooltip(self._combo_cam_resolution, "camera_width")
+        self._combo_cam_resolution.currentIndexChanged.connect(self._on_camera_resolution_changed)
+        cam_lay.addWidget(self._combo_cam_resolution, 1, 1)
 
-        cam_lay.addWidget(QLabel("Height:"), 2, 0)
-        self._spin_cam_h = QSpinBox()
-        self._spin_cam_h.setRange(120, 2160)
-        self._spin_cam_h.setSingleStep(120)
-        self._spin_cam_h.setValue(self.config.connection.camera_height)
-        self._apply_tooltip(self._spin_cam_h, "camera_height")
-        cam_lay.addWidget(self._spin_cam_h, 2, 1)
+        cam_lay.addWidget(QLabel("Webcam zoom:"), 2, 0)
+        webcam_zoom_row = QHBoxLayout()
+        self._slider_webcam_zoom = QSlider(Qt.Horizontal)
+        self._slider_webcam_zoom.setRange(40, 200)
+        self._slider_webcam_zoom.setSingleStep(5)
+        self._slider_webcam_zoom.setPageStep(10)
+        self._slider_webcam_zoom.setValue(int(getattr(self.config.connection, "webcam_zoom_pct", 100)))
+        self._slider_webcam_zoom.valueChanged.connect(self._on_source_zoom_changed)
+        webcam_zoom_row.addWidget(self._slider_webcam_zoom, 1)
+        self._lbl_webcam_zoom = QLabel("")
+        self._lbl_webcam_zoom.setMinimumWidth(70)
+        webcam_zoom_row.addWidget(self._lbl_webcam_zoom)
+        cam_lay.addLayout(webcam_zoom_row, 2, 1)
+
+        cam_lay.addWidget(QLabel("Test source zoom:"), 3, 0)
+        test_zoom_row = QHBoxLayout()
+        self._slider_test_zoom = QSlider(Qt.Horizontal)
+        self._slider_test_zoom.setRange(25, 200)
+        self._slider_test_zoom.setSingleStep(5)
+        self._slider_test_zoom.setPageStep(10)
+        self._slider_test_zoom.setValue(int(getattr(self.config.connection, "test_source_zoom_pct", 100)))
+        self._slider_test_zoom.valueChanged.connect(self._on_source_zoom_changed)
+        test_zoom_row.addWidget(self._slider_test_zoom, 1)
+        self._lbl_test_zoom = QLabel("")
+        self._lbl_test_zoom.setMinimumWidth(70)
+        test_zoom_row.addWidget(self._lbl_test_zoom)
+        cam_lay.addLayout(test_zoom_row, 3, 1)
 
         self._btn_cam = QPushButton("Open Camera")
-        self._btn_cam.setStyleSheet("font-weight: bold; padding: 4px;")
+        self._set_button_role(self._btn_cam, "primary")
         self._btn_cam.clicked.connect(self._toggle_camera)
         self._apply_tooltip(self._btn_cam, "camera_toggle")
-        cam_lay.addWidget(self._btn_cam, 3, 0, 1, 2)
+        cam_lay.addWidget(self._btn_cam, 4, 0, 1, 2)
+
+        self._btn_test_media = QPushButton("Open Test Media...")
+        self._set_button_role(self._btn_test_media, "utility")
+        self._btn_test_media.clicked.connect(self._browse_test_media)
+        cam_lay.addWidget(self._btn_test_media, 5, 0, 1, 2)
+
+        cam_lay.addWidget(QLabel("Video URL:"), 6, 0)
+        self._edit_video_url = QLineEdit()
+        self._edit_video_url.setPlaceholderText("Paste a YouTube or direct video URL")
+        cam_lay.addWidget(self._edit_video_url, 6, 1)
+
+        self._btn_open_video_url = QPushButton("Open URL")
+        self._set_button_role(self._btn_open_video_url, "utility")
+        self._btn_open_video_url.clicked.connect(self._open_video_url)
+        cam_lay.addWidget(self._btn_open_video_url, 7, 0, 1, 2)
+
+        resolution_action_row = QHBoxLayout()
+        self._btn_apply_camera_resolution = QPushButton("Apply Resolution")
+        self._set_button_role(self._btn_apply_camera_resolution, "utility")
+        self._btn_apply_camera_resolution.clicked.connect(self._apply_camera_resolution)
+        resolution_action_row.addWidget(self._btn_apply_camera_resolution)
+
+        self._btn_restart_app = QPushButton("Restart App")
+        self._set_button_role(self._btn_restart_app, "utility")
+        self._btn_restart_app.clicked.connect(self._restart_application)
+        resolution_action_row.addWidget(self._btn_restart_app)
+        cam_lay.addLayout(resolution_action_row, 8, 0, 1, 2)
+
+        media_ctrl_row = QHBoxLayout()
+        self._btn_test_media_play = QPushButton("Play")
+        self._set_button_role(self._btn_test_media_play, "utility")
+        self._btn_test_media_play.clicked.connect(self._play_test_media)
+        media_ctrl_row.addWidget(self._btn_test_media_play)
+
+        self._btn_test_media_pause = QPushButton("Pause")
+        self._set_button_role(self._btn_test_media_pause, "utility")
+        self._btn_test_media_pause.clicked.connect(self._pause_test_media)
+        media_ctrl_row.addWidget(self._btn_test_media_pause)
+
+        self._btn_test_media_step = QPushButton("Next Frame")
+        self._set_button_role(self._btn_test_media_step, "utility")
+        self._btn_test_media_step.clicked.connect(self._step_test_media_frame)
+        media_ctrl_row.addWidget(self._btn_test_media_step)
+
+        self._btn_test_media_restart = QPushButton("Restart")
+        self._set_button_role(self._btn_test_media_restart, "utility")
+        self._btn_test_media_restart.clicked.connect(self._restart_test_media)
+        media_ctrl_row.addWidget(self._btn_test_media_restart)
+
+        self._chk_test_media_loop = QCheckBox("Loop")
+        self._chk_test_media_loop.setChecked(True)
+        self._chk_test_media_loop.toggled.connect(self._on_test_media_loop_toggled)
+        media_ctrl_row.addWidget(self._chk_test_media_loop)
+        self._style_button_row(
+            [self._btn_test_media_play, self._btn_test_media_pause, self._btn_test_media_step, self._btn_test_media_restart],
+            "utility",
+        )
+        cam_lay.addLayout(media_ctrl_row, 9, 0, 1, 2)
+
+        # One-click return to webcam after a test video/image session ends
+        self._btn_return_to_camera = QPushButton("\u21a9 Back to Camera")
+        self._set_button_role(self._btn_return_to_camera, "primary")
+        self._btn_return_to_camera.clicked.connect(self._return_to_camera)
+        self._btn_return_to_camera.setEnabled(False)
+        self._btn_return_to_camera.setToolTip(
+            "Close the current test source and reopen the last webcam"
+        )
+        cam_lay.addWidget(self._btn_return_to_camera, 10, 0, 1, 2)
 
         self._lbl_cam_status = QLabel("Camera closed")
         self._lbl_cam_status.setStyleSheet("color: #888; font-size: 10px;")
-        cam_lay.addWidget(self._lbl_cam_status, 4, 0, 1, 2)
+        cam_lay.addWidget(self._lbl_cam_status, 11, 0, 1, 2)
+        self._on_source_zoom_changed()
+        self._update_test_media_controls()
 
         lay.addWidget(cam_grp)
 
@@ -2315,6 +2766,7 @@ class SentryV2TabWidget(QWidget):
         self._lbl_mode_hint.setStyleSheet("color: #aaa; font-size: 10px;")
         type_lay.addWidget(self._lbl_mode_hint)
         self._btn_wifi_pinout = QPushButton("Show Full WiFi Pinout")
+        self._set_button_role(self._btn_wifi_pinout, "utility")
         self._btn_wifi_pinout.clicked.connect(self._show_full_wifi_pinout)
         self._apply_tooltip(self._btn_wifi_pinout, "wifi_pinout")
         type_lay.addWidget(self._btn_wifi_pinout)
@@ -2329,7 +2781,7 @@ class SentryV2TabWidget(QWidget):
         self._apply_tooltip(self._edit_esp32_port, "esp32_port")
         esp_lay.addWidget(self._edit_esp32_port, 0, 1)
         btn_scan_esp = QPushButton("Scan")
-        btn_scan_esp.setFixedWidth(50)
+        self._set_button_role(btn_scan_esp, "utility")
         btn_scan_esp.clicked.connect(lambda: self._scan_ports("esp32"))
         self._apply_tooltip(btn_scan_esp, "scan_esp32_ports")
         esp_lay.addWidget(btn_scan_esp, 0, 2)
@@ -2360,7 +2812,7 @@ class SentryV2TabWidget(QWidget):
         self._apply_tooltip(self._edit_debug_port, "debug_port")
         dbg_lay.addWidget(self._edit_debug_port, 0, 1)
         btn_scan_dbg = QPushButton("Scan")
-        btn_scan_dbg.setFixedWidth(50)
+        self._set_button_role(btn_scan_dbg, "utility")
         btn_scan_dbg.clicked.connect(lambda: self._scan_ports("debug"))
         self._apply_tooltip(btn_scan_dbg, "scan_debug_ports")
         dbg_lay.addWidget(btn_scan_dbg, 0, 2)
@@ -2459,9 +2911,7 @@ class SentryV2TabWidget(QWidget):
         # Connect / disconnect
         btn_row = QHBoxLayout()
         self._btn_connect = QPushButton("Connect")
-        self._btn_connect.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px; }"
-        )
+        self._set_button_role(self._btn_connect, "primary")
         self._btn_connect.clicked.connect(self._toggle_connection)
         self._apply_tooltip(self._btn_connect, "connect_toggle")
         btn_row.addWidget(self._btn_connect)
@@ -2527,6 +2977,7 @@ class SentryV2TabWidget(QWidget):
         preset_row.addWidget(self._combo_target_size_preset)
 
         btn_apply_size = QPushButton("Apply")
+        self._set_button_role(btn_apply_size, "utility")
         btn_apply_size.clicked.connect(self._apply_selected_target_size_preset)
         preset_row.addWidget(btn_apply_size)
         preset_lay.addLayout(preset_row)
@@ -2579,11 +3030,11 @@ class SentryV2TabWidget(QWidget):
         self._combo_yolo_model.currentIndexChanged.connect(self._on_yolo_model_selection_changed)
         self._apply_tooltip(self._combo_yolo_model, "yolo_model")
         yolo_lay.addWidget(self._combo_yolo_model, 0, 1)
-        btn_load_yolo = QPushButton("Load")
-        btn_load_yolo.setFixedWidth(50)
-        btn_load_yolo.clicked.connect(self._load_yolo_model)
-        self._apply_tooltip(btn_load_yolo, "load_yolo_model")
-        yolo_lay.addWidget(btn_load_yolo, 0, 2)
+        self._btn_load_yolo = QPushButton("Load")
+        self._set_button_role(self._btn_load_yolo, "utility")
+        self._btn_load_yolo.clicked.connect(self._load_yolo_model)
+        self._apply_tooltip(self._btn_load_yolo, "load_yolo_model")
+        yolo_lay.addWidget(self._btn_load_yolo, 0, 2)
 
         yolo_lay.addWidget(QLabel("Classes:"), 1, 0)
         self._edit_yolo_classes = QLineEdit(", ".join(self.config.target_filter.allowed_classes))
@@ -2706,6 +3157,128 @@ class SentryV2TabWidget(QWidget):
         self._set_detection_preset_label(self._match_detection_preset_name())
         return w
 
+    def _build_prompted_targets_tab(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(4, 4, 4, 4)
+        lay.setSpacing(6)
+
+        intro = QLabel(
+            "Create reusable prompted targets from the live feed, an image, or a video clip. "
+            "The saved target library auto-loads and runs alongside the normal detector stack."
+        )
+        intro.setWordWrap(True)
+        intro.setStyleSheet("color: #aaa; font-size: 11px;")
+        lay.addWidget(intro)
+
+        runtime_grp = QGroupBox("Prompted Runtime")
+        runtime_lay = QVBoxLayout(runtime_grp)
+        self._chk_prompted_enabled = QCheckBox("Enable Prompted Targets")
+        self._chk_prompted_enabled.setChecked(bool(self.config.prompted_targets_enabled))
+        self._chk_prompted_enabled.toggled.connect(self._on_prompted_settings_changed)
+        runtime_lay.addWidget(self._chk_prompted_enabled)
+        self._chk_prompted_auto_fire = QCheckBox("Allow Auto-Fire For Prompted Matches")
+        self._chk_prompted_auto_fire.setChecked(bool(self.config.prompted_allow_auto_fire))
+        self._chk_prompted_auto_fire.toggled.connect(self._on_prompted_settings_changed)
+        runtime_lay.addWidget(self._chk_prompted_auto_fire)
+        self._chk_prompted_append_selected = QCheckBox("Append imports to selected target")
+        runtime_lay.addWidget(self._chk_prompted_append_selected)
+        lay.addWidget(runtime_grp)
+
+        naming_grp = QGroupBox("Target Naming")
+        naming_lay = QHBoxLayout(naming_grp)
+        naming_lay.addWidget(QLabel("Base name:"))
+        self._edit_prompted_name = QLineEdit()
+        self._edit_prompted_name.setPlaceholderText("Example: Yellow Drill")
+        naming_lay.addWidget(self._edit_prompted_name, 1)
+        lay.addWidget(naming_grp)
+
+        import_grp = QGroupBox("Create Targets")
+        import_lay = QGridLayout(import_grp)
+        self._btn_prompted_live = QPushButton("Add From Live")
+        self._set_button_role(self._btn_prompted_live, "primary")
+        self._btn_prompted_live.clicked.connect(self._toggle_prompted_live_capture)
+        import_lay.addWidget(self._btn_prompted_live, 0, 0)
+        self._btn_prompted_image = QPushButton("Browse Image")
+        self._set_button_role(self._btn_prompted_image, "utility")
+        self._btn_prompted_image.clicked.connect(self._browse_prompted_image)
+        import_lay.addWidget(self._btn_prompted_image, 0, 1)
+        self._btn_prompted_video = QPushButton("Browse Video")
+        self._set_button_role(self._btn_prompted_video, "utility")
+        self._btn_prompted_video.clicked.connect(self._browse_prompted_video)
+        import_lay.addWidget(self._btn_prompted_video, 0, 2)
+        self._lbl_prompted_status = QLabel("")
+        self._lbl_prompted_status.setWordWrap(True)
+        self._lbl_prompted_status.setStyleSheet("color: #888; font-size: 10px;")
+        import_lay.addWidget(self._lbl_prompted_status, 1, 0, 1, 3)
+        lay.addWidget(import_grp)
+
+        library_grp = QGroupBox("Prompted Target Library")
+        library_lay = QVBoxLayout(library_grp)
+        self._prompted_target_list = QListWidget()
+        self._prompted_target_list.itemChanged.connect(self._on_prompted_target_item_changed)
+        self._prompted_target_list.itemSelectionChanged.connect(self._on_prompted_target_selected)
+        library_lay.addWidget(self._prompted_target_list)
+
+        detail_grid = QGridLayout()
+        detail_grid.addWidget(QLabel("Min score:"), 0, 0)
+        self._spin_prompted_min_score = QDoubleSpinBox()
+        self._spin_prompted_min_score.setDecimals(2)
+        self._spin_prompted_min_score.setRange(0.05, 0.99)
+        self._spin_prompted_min_score.setSingleStep(0.01)
+        self._spin_prompted_min_score.valueChanged.connect(self._on_prompted_profile_settings_changed)
+        detail_grid.addWidget(self._spin_prompted_min_score, 0, 1)
+
+        detail_grid.addWidget(QLabel("Confirm hits:"), 0, 2)
+        self._spin_prompted_confirm_hits = QSpinBox()
+        self._spin_prompted_confirm_hits.setRange(1, 10)
+        self._spin_prompted_confirm_hits.valueChanged.connect(self._on_prompted_profile_settings_changed)
+        detail_grid.addWidget(self._spin_prompted_confirm_hits, 0, 3)
+
+        detail_grid.addWidget(QLabel("Lost timeout:"), 1, 0)
+        self._spin_prompted_lost_timeout = QDoubleSpinBox()
+        self._spin_prompted_lost_timeout.setDecimals(2)
+        self._spin_prompted_lost_timeout.setRange(0.10, 10.0)
+        self._spin_prompted_lost_timeout.setSingleStep(0.10)
+        self._spin_prompted_lost_timeout.valueChanged.connect(self._on_prompted_profile_settings_changed)
+        detail_grid.addWidget(self._spin_prompted_lost_timeout, 1, 1)
+
+        detail_grid.addWidget(QLabel("Search padding:"), 1, 2)
+        self._spin_prompted_search_padding = QSpinBox()
+        self._spin_prompted_search_padding.setRange(16, 512)
+        self._spin_prompted_search_padding.setSingleStep(8)
+        self._spin_prompted_search_padding.valueChanged.connect(self._on_prompted_profile_settings_changed)
+        detail_grid.addWidget(self._spin_prompted_search_padding, 1, 3)
+
+        detail_grid.addWidget(QLabel("Global scan every:"), 2, 0)
+        self._spin_prompted_global_interval = QSpinBox()
+        self._spin_prompted_global_interval.setRange(1, 30)
+        self._spin_prompted_global_interval.valueChanged.connect(self._on_prompted_profile_settings_changed)
+        detail_grid.addWidget(self._spin_prompted_global_interval, 2, 1)
+
+        self._lbl_prompted_examples = QLabel("Examples: 0")
+        detail_grid.addWidget(self._lbl_prompted_examples, 2, 2, 1, 2)
+        library_lay.addLayout(detail_grid)
+
+        button_row = QHBoxLayout()
+        self._btn_prompted_rename = QPushButton("Rename")
+        self._set_button_role(self._btn_prompted_rename, "utility")
+        self._btn_prompted_rename.clicked.connect(self._rename_selected_prompted_target)
+        button_row.addWidget(self._btn_prompted_rename)
+        self._btn_prompted_remove_last_example = QPushButton("Remove Last Example")
+        self._set_button_role(self._btn_prompted_remove_last_example, "utility")
+        self._btn_prompted_remove_last_example.clicked.connect(self._remove_last_prompted_example)
+        button_row.addWidget(self._btn_prompted_remove_last_example)
+        self._btn_prompted_remove = QPushButton("Remove")
+        self._set_button_role(self._btn_prompted_remove, "utility")
+        self._btn_prompted_remove.clicked.connect(self._remove_selected_prompted_target)
+        button_row.addWidget(self._btn_prompted_remove)
+        library_lay.addLayout(button_row)
+        lay.addWidget(library_grp, 1)
+
+        self._rebuild_prompted_target_list()
+        return w
+
     # ------------------------------------------------------------------ #
     #  Target Filter Tab
     # ------------------------------------------------------------------ #
@@ -2764,6 +3337,7 @@ class SentryV2TabWidget(QWidget):
         btn_all.clicked.connect(self._select_all_classes)
         btn_none = QPushButton("None")
         btn_none.clicked.connect(self._select_no_classes)
+        self._style_button_row([btn_all, btn_none], "utility")
         self._apply_tooltip(btn_all, "select_all_classes")
         self._apply_tooltip(btn_none, "select_no_classes")
         btn_row.addWidget(btn_all)
@@ -2929,11 +3503,9 @@ class SentryV2TabWidget(QWidget):
         btn_stats.setToolTip("Show summary of logged engagement data")
         ml_btn_lay.addWidget(btn_stats)
 
-        ml_buttons = [btn_train, btn_save, btn_clear, btn_stats]
-        ml_max_width = max(int(btn.sizeHint().width()) for btn in ml_buttons)
-        for btn in ml_buttons:
-            btn.setFixedWidth(ml_max_width)
-            btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self._style_button_row([btn_train], "primary")
+        self._style_button_row([btn_save, btn_stats], "utility")
+        self._style_button_row([btn_clear], "danger")
 
         ml_btn_lay.addStretch()
         
@@ -3131,6 +3703,7 @@ class SentryV2TabWidget(QWidget):
         preset_row.addWidget(QLabel("Preset:"))
         for preset_name, preset in AIM_LOCK_FIRE_GATE_PRESETS.items():
             btn = QPushButton(preset["label"])
+            self._set_button_role(btn, "utility")
             self._apply_tooltip(btn, preset.get("tooltip_key", ""))
             btn.clicked.connect(lambda _checked=False, name=preset_name: self._apply_aim_lock_fire_gate_preset(name))
             preset_row.addWidget(btn)
@@ -3226,20 +3799,25 @@ class SentryV2TabWidget(QWidget):
         )
         center_radius_row.addWidget(self._spin_center_fire_radius)
         btn_apply_center_radius = QPushButton("Apply Radius")
+        self._set_button_role(btn_apply_center_radius, "utility")
         btn_apply_center_radius.clicked.connect(self._on_apply_center_fire_radius)
         center_radius_row.addWidget(btn_apply_center_radius)
 
         btn_sniper_small = QPushButton("Sniper Small")
+        self._set_button_role(btn_sniper_small, "utility")
         btn_sniper_small.clicked.connect(lambda _checked=False: self._apply_sniper_center_radius_profile("small"))
         center_radius_row.addWidget(btn_sniper_small)
 
         btn_sniper_medium = QPushButton("Sniper Medium")
+        self._set_button_role(btn_sniper_medium, "utility")
         btn_sniper_medium.clicked.connect(lambda _checked=False: self._apply_sniper_center_radius_profile("medium"))
         center_radius_row.addWidget(btn_sniper_medium)
 
         btn_sniper_large = QPushButton("Sniper Large")
+        self._set_button_role(btn_sniper_large, "utility")
         btn_sniper_large.clicked.connect(lambda _checked=False: self._apply_sniper_center_radius_profile("large"))
         center_radius_row.addWidget(btn_sniper_large)
+        self._style_button_row([btn_apply_center_radius, btn_sniper_small, btn_sniper_medium, btn_sniper_large], "utility")
         advanced_lay.addLayout(center_radius_row, 6, 1)
 
         self._lbl_center_fire_radius_hint = QLabel("")
@@ -3324,6 +3902,7 @@ class SentryV2TabWidget(QWidget):
         btn_summary = QPushButton("Print Summary")
         btn_summary.clicked.connect(self._on_print_precision_summary)
         export_row.addWidget(btn_summary)
+        self._style_button_row([btn_export_csv, btn_export_json, btn_summary], "utility")
         tuning_lay.addLayout(export_row)
         lay.addWidget(tuning_grp)
 
@@ -3419,10 +3998,12 @@ class SentryV2TabWidget(QWidget):
 
         btn_row = QHBoxLayout()
         btn = QPushButton("Go To Guard Position")
+        self._set_button_role(btn, "primary")
         btn.clicked.connect(self._go_to_guard)
         self._apply_tooltip(btn, "go_guard")
         btn_row.addWidget(btn)
         btn2 = QPushButton("Set Current As Guard")
+        self._set_button_role(btn2, "utility")
         self._apply_tooltip(btn2, "set_current_guard")
         btn2.clicked.connect(self._set_current_as_guard)
         btn_row.addWidget(btn2)
@@ -3495,6 +4076,8 @@ class SentryV2TabWidget(QWidget):
         btn_clr.clicked.connect(self._wp_clear)
         self._apply_tooltip(btn_clr, "waypoint_clear")
         wp_btn_row.addWidget(btn_clr)
+        self._style_button_row([btn_add, btn_rm], "utility")
+        self._style_button_row([btn_clr], "danger")
         wp_lay.addLayout(wp_btn_row)
 
         wr1 = QHBoxLayout()
@@ -3646,17 +4229,21 @@ class SentryV2TabWidget(QWidget):
 
         self._btn_mask_capture = QPushButton("Capture Vertices From Video")
         self._btn_mask_capture.setCheckable(True)
+        self._set_button_role(self._btn_mask_capture, "mode")
         self._btn_mask_capture.toggled.connect(self._on_mask_capture_toggled)
         mask_lay.addWidget(self._btn_mask_capture)
 
         draft_row = QHBoxLayout()
         self._btn_mask_finish = QPushButton("Finish Mask")
+        self._set_button_role(self._btn_mask_finish, "utility")
         self._btn_mask_finish.clicked.connect(self._finish_no_fire_mask)
         draft_row.addWidget(self._btn_mask_finish)
         self._btn_mask_undo = QPushButton("Undo Vertex")
+        self._set_button_role(self._btn_mask_undo, "utility")
         self._btn_mask_undo.clicked.connect(self._undo_no_fire_mask_vertex)
         draft_row.addWidget(self._btn_mask_undo)
         self._btn_mask_clear = QPushButton("Clear Draft")
+        self._set_button_role(self._btn_mask_clear, "danger")
         self._btn_mask_clear.clicked.connect(self._clear_no_fire_mask_draft)
         draft_row.addWidget(self._btn_mask_clear)
         mask_lay.addLayout(draft_row)
@@ -3671,9 +4258,11 @@ class SentryV2TabWidget(QWidget):
 
         manage_row = QHBoxLayout()
         self._btn_mask_toggle = QPushButton("Enable/Disable Selected")
+        self._set_button_role(self._btn_mask_toggle, "utility")
         self._btn_mask_toggle.clicked.connect(self._toggle_selected_no_fire_masks)
         manage_row.addWidget(self._btn_mask_toggle)
         self._btn_mask_remove = QPushButton("Remove Selected")
+        self._set_button_role(self._btn_mask_remove, "danger")
         self._btn_mask_remove.clicked.connect(self._remove_selected_no_fire_masks)
         manage_row.addWidget(self._btn_mask_remove)
         mask_lay.addLayout(manage_row)
@@ -3688,6 +4277,7 @@ class SentryV2TabWidget(QWidget):
         mask_lay.addWidget(self._chk_mask_trace)
 
         self._btn_mask_trace_dump = QPushButton("Dump Mask Snapshot")
+        self._set_button_role(self._btn_mask_trace_dump, "utility")
         self._btn_mask_trace_dump.clicked.connect(self._dump_mask_trace_snapshot)
         mask_lay.addWidget(self._btn_mask_trace_dump)
 
@@ -3709,11 +4299,11 @@ class SentryV2TabWidget(QWidget):
         sensors = self.config.pir_guard.sensors
         if len(sensors) < 3:
             # Ensure at least three sensors exist in config to match the UI.
-            # Default pan cues: 270° (left), 150° (center), 30° (right).
-            default_pans = [270.0, 150.0, 30.0]
+            # Equal 90° spacing: S0=45° (right), S1=135° (front), S2=225° (left).
+            default_pans = [45.0, 135.0, 225.0]
             for j in range(len(sensors), 3):
                 sensors.append(
-                    PIRSensorConfig(pin_id=j, cue_pan=default_pans[j], cue_tilt=55.0, enabled=False)
+                    PIRSensorConfig(pin_id=j, cue_pan=default_pans[j], cue_tilt=35.0, enabled=False)
                 )
 
         self._pir_spin_cues = []  # List of (pan spin, tilt spin, enabled checkbox) tuples
@@ -3839,6 +4429,11 @@ class SentryV2TabWidget(QWidget):
         self._apply_tooltip(self._chk_zone, "show_zone")
         lay.addWidget(self._chk_zone)
 
+        self._chk_guard_crosshair = QCheckBox("Show guard crosshair")
+        self._chk_guard_crosshair.setChecked(self.config.show_guard_crosshair)
+        self._chk_guard_crosshair.toggled.connect(self._on_overlay_changed)
+        lay.addWidget(self._chk_guard_crosshair)
+
         self._refresh_no_fire_mask_list()
         self._update_mask_editor_ui()
 
@@ -3875,32 +4470,40 @@ class SentryV2TabWidget(QWidget):
 
         # D-pad grid
         grid = QGridLayout()
+        grid.setHorizontalSpacing(4)
+        grid.setVerticalSpacing(4)
         btn_up = QPushButton("\u25B2")  # up arrow
-        btn_up.setFixedSize(50, 40)
+        btn_up.setFixedSize(82, 68)
+        self._set_button_role(btn_up, "dpad")
         btn_up.clicked.connect(lambda: self._manual_move(0, -1))
         self._apply_tooltip(btn_up, "manual_up")
         grid.addWidget(btn_up, 0, 1)
 
         btn_left = QPushButton("\u25C0")  # left arrow
-        btn_left.setFixedSize(50, 40)
+        btn_left.setFixedSize(82, 68)
+        self._set_button_role(btn_left, "dpad")
         btn_left.clicked.connect(lambda: self._manual_move(-1, 0))
         self._apply_tooltip(btn_left, "manual_left")
         grid.addWidget(btn_left, 1, 0)
 
-        btn_home = QPushButton("H")
-        btn_home.setFixedSize(50, 40)
+        btn_home = QPushButton("HOME")
+        btn_home.setFixedSize(92, 68)
+        self._set_button_role(btn_home, "dpad")
+        btn_home.setStyleSheet("font-size: 11px; letter-spacing: 0.5px;")
         self._apply_tooltip(btn_home, "manual_home")
         btn_home.clicked.connect(self._on_home_clicked)
         grid.addWidget(btn_home, 1, 1)
 
         btn_right = QPushButton("\u25B6")  # right arrow
-        btn_right.setFixedSize(50, 40)
+        btn_right.setFixedSize(82, 68)
+        self._set_button_role(btn_right, "dpad")
         btn_right.clicked.connect(lambda: self._manual_move(1, 0))
         self._apply_tooltip(btn_right, "manual_right")
         grid.addWidget(btn_right, 1, 2)
 
         btn_down = QPushButton("\u25BC")  # down arrow
-        btn_down.setFixedSize(50, 40)
+        btn_down.setFixedSize(82, 68)
+        self._set_button_role(btn_down, "dpad")
         btn_down.clicked.connect(lambda: self._manual_move(0, 1))
         self._apply_tooltip(btn_down, "manual_down")
         grid.addWidget(btn_down, 2, 1)
@@ -3914,22 +4517,38 @@ class SentryV2TabWidget(QWidget):
 
         self._btn_led = QPushButton("LED: OFF")
         self._btn_led.setCheckable(True)
+        self._set_button_role(self._btn_led, "mode")
         self._btn_led.toggled.connect(self._on_led_toggled)
         self._apply_tooltip(self._btn_led, "led_toggle")
         acc_lay.addWidget(self._btn_led, 0, 0)
 
         self._btn_laser = QPushButton("Laser: OFF")
         self._btn_laser.setCheckable(True)
+        self._set_button_role(self._btn_laser, "mode")
         self._btn_laser.toggled.connect(self._on_laser_toggled)
         self._apply_tooltip(self._btn_laser, "laser_toggle")
         acc_lay.addWidget(self._btn_laser, 0, 1)
 
+        self._btn_acc = QPushButton("ACC: OFF")
+        self._btn_acc.setCheckable(True)
+        self._set_button_role(self._btn_acc, "mode")
+        self._btn_acc.toggled.connect(self._on_acc_toggled)
+        self._apply_tooltip(self._btn_acc, "acc_toggle")
+        acc_lay.addWidget(self._btn_acc, 0, 2)
+
+        self._btn_spare = QPushButton("Spare: OFF")
+        self._btn_spare.setCheckable(True)
+        self._set_button_role(self._btn_spare, "mode")
+        self._btn_spare.toggled.connect(self._on_spare_toggled)
+        self._apply_tooltip(self._btn_spare, "spare_toggle")
+        acc_lay.addWidget(self._btn_spare, 1, 0)
+
         self._btn_safety = QPushButton("Safety: LOCKED")
         self._btn_safety.setCheckable(True)
-        self._btn_safety.setStyleSheet("QPushButton:checked { background: #cc3333; color: white; }")
+        self._set_button_role(self._btn_safety, "danger")
         self._btn_safety.toggled.connect(self._on_safety_toggled)
         self._apply_tooltip(self._btn_safety, "safety_toggle")
-        acc_lay.addWidget(self._btn_safety, 1, 0, 1, 2)
+        acc_lay.addWidget(self._btn_safety, 1, 1, 1, 2)
 
         lay.addWidget(acc_grp)
 
@@ -3938,10 +4557,8 @@ class SentryV2TabWidget(QWidget):
         fire_lay = QVBoxLayout(fire_grp)
 
         self._btn_fire = QPushButton("FIRE")
-        self._btn_fire.setStyleSheet(
-            "QPushButton { background: #444; color: white; font-weight: bold; font-size: 14px; padding: 8px; }"
-            "QPushButton:pressed { background: #cc2222; }"
-        )
+        self._set_button_role(self._btn_fire, "danger")
+        self._btn_fire.setMinimumHeight(44)
         self._btn_fire.pressed.connect(lambda: self._on_manual_fire(1))
         self._btn_fire.released.connect(lambda: self._on_manual_fire(0))
         self._apply_tooltip(self._btn_fire, "manual_fire")
@@ -3966,11 +4583,6 @@ class SentryV2TabWidget(QWidget):
         self._lbl_stats = QLabel("Targets: 0 | Qualified: 0 | Engaged: 0")
         lay.addWidget(self._lbl_stats)
 
-        self._lbl_detection_sizes = QLabel("Detection sizes: none")
-        self._lbl_detection_sizes.setWordWrap(True)
-        self._lbl_detection_sizes.setStyleSheet("font-family: monospace; color: #9dc7de;")
-        lay.addWidget(self._lbl_detection_sizes)
-
         self._lbl_angles = QLabel("Angles: Pan 0.0° [0..270] | Tilt 0.0° [0..110]")
         self._lbl_angles.setStyleSheet("font-weight: bold;")
         lay.addWidget(self._lbl_angles)
@@ -3992,6 +4604,7 @@ class SentryV2TabWidget(QWidget):
 
         # Save config button
         btn_save = QPushButton("Save Settings")
+        self._set_button_role(btn_save, "primary")
         btn_save.clicked.connect(self._save_config)
         self._apply_tooltip(btn_save, "save_settings")
         lay.addWidget(btn_save)
@@ -4018,11 +4631,19 @@ class SentryV2TabWidget(QWidget):
         """
         if self._closing:
             return
+        # Discard stale own-camera results that were queued before the source was
+        # closed (e.g. a webcam frame processed by the detector AFTER _close_camera
+        # was called for a new URL/test-video open).  Without this guard the old
+        # webcam frame is painted over the "Opening URL…" label, making it look as
+        # though the camera never closed.
+        if _from_own_camera and not self._local_source_kind:
+            return
         # Own camera takes priority — skip external pushes
-        if self._cap is not None and not _from_own_camera:
+        if self._has_local_source() and not _from_own_camera:
             return
         now = time.time()
         h, w_frame = frame.shape[:2]
+        self._last_raw_frame = frame.copy()
 
         raw_detections = detections or []
         if use_internal_detector and not _from_own_camera:
@@ -4035,8 +4656,11 @@ class SentryV2TabWidget(QWidget):
         self.config.guard.frame_width = w_frame
         self.config.guard.frame_height = h
 
-        # Convert raw detections to DetectedObject list
-        det_objects = self._convert_detections(raw_detections, w_frame, h, now)
+        base_objects = self._raw_detections_to_objects(raw_detections, w_frame, h)
+        prompted_objects: List[DetectedObject] = []
+        if bool(self.config.prompted_targets_enabled):
+            prompted_objects = self._prompted_matcher.detect(frame, base_objects, now)
+        det_objects = self._tracker.assign_tracks(base_objects + prompted_objects, now)
 
         # Run engine
         self.engine.update(det_objects, now)
@@ -4051,6 +4675,7 @@ class SentryV2TabWidget(QWidget):
             display = self.overlay.apply_scope_view(display, self.engine)
         self._draw_no_fire_mask_draft(display)
         self._draw_color_gate_status(display, mode, use_internal_detector)
+        self._last_display_frame = display.copy()
 
         # Update video label (only if show_video_feed is enabled)
         if self._show_video_feed:
@@ -4091,21 +4716,44 @@ class SentryV2TabWidget(QWidget):
             self._apply_all_config()
             self._detector.reset()
             self._tracker.reset()
+            self._prompted_matcher.reset()
             self.engine.start()
             self._log("Smart Sentry ENABLED")
         else:
             self._stop_fire_burst(send_release=True)
             self.engine.stop()
+            self._prompted_matcher.reset()
+            self._set_prompted_capture_active(False)
             self._log("Smart Sentry DISABLED")
         self.sentry_enabled_changed.emit(checked)
 
     def _on_show_video_toggled(self, checked: bool) -> None:
         """Toggle video display (detection continues running regardless)."""
         self._show_video_feed = checked
+        if not checked:
+            # Show black frame immediately — don't wait for the next detection cycle
+            # (with YOLO that delay can be 100–500 ms, making the toggle feel broken).
+            if self._last_display_frame is not None:
+                black = np.zeros_like(self._last_display_frame)
+                label = "Video Feed Hidden"
+                font, scale, thick = cv2.FONT_HERSHEY_SIMPLEX, 0.7, 1
+                (tw, th), _ = cv2.getTextSize(label, font, scale, thick)
+                tx = max(8, (black.shape[1] - tw) // 2)
+                ty = max(th + 8, (black.shape[0] + th) // 2)
+                cv2.putText(black, label, (tx, ty), font, scale, (108, 108, 108), thick, cv2.LINE_AA)
+                self._show_frame(black)
+            else:
+                self._video_label.clear_frame("Video Feed Hidden")
         status = "shown" if checked else "hidden"
         self._log(f"Video feed {status} (detection running)")
 
     def _on_engine_fire(self, burst_count: int) -> None:
+        active_order = getattr(self.engine, "active_order", None)
+        active_det = getattr(getattr(active_order, "target", None), "det", None)
+        if active_det is not None and str(getattr(active_det, "source", "")) == "prompted":
+            if not bool(self.config.prompted_allow_auto_fire):
+                self._log("Auto-fire suppressed for prompted target (manual-fire-only).")
+                return
         pan = self.engine.current_pan
         tilt = self.engine.current_tilt
         interval = self.config.engagement.burst_interval_ms
@@ -4140,6 +4788,19 @@ class SentryV2TabWidget(QWidget):
             self._last_scope_view_active = new_scope
             self._log("Scope view: ON (ENGAGING display mode)" if new_scope else "Scope view: OFF (normal video restored)")
 
+    def _emit_comm_pir_event(self, sensor_id: int, timestamp: float) -> None:
+        try:
+            self.pir_event_received.emit(int(sensor_id), float(timestamp))
+        except Exception:
+            pass
+
+    def _on_comm_pir_event_received(self, sensor_id: int, timestamp: float) -> None:
+        self.engine.on_pir_sensor_fired(int(sensor_id), float(timestamp))
+        if hasattr(self, "_lbl_pir_status"):
+            self._update_pir_status_display()
+        state_name = self.engine.state.name if self.engine else "?"
+        self._log(f"PIR event: sensor {int(sensor_id)} (engine={state_name})")
+
     # ------------------------------------------------------------------ #
     #  Connection handlers
     # ------------------------------------------------------------------ #
@@ -4173,12 +4834,14 @@ class SentryV2TabWidget(QWidget):
             "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO13</td><td style='padding:3px 8px; color:#1e2936;'>Trigger Servo (Projectile)</td></tr>"
             "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO32</td><td style='padding:3px 8px; color:#1e2936;'>LED Relay</td></tr>"
             "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO33</td><td style='padding:3px 8px; color:#1e2936;'>Laser Relay</td></tr>"
+            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO25</td><td style='padding:3px 8px; color:#1e2936;'>Accessory Relay (G token)</td></tr>"
+            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO26</td><td style='padding:3px 8px; color:#1e2936;'>Spare Relay (A token)</td></tr>"
             "</table>"
             "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>PIR Sensors</div>"
             "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO35</td><td style='padding:3px 8px; color:#1e2936;'>PIR Sensor 0 (left-rear cue)</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO34</td><td style='padding:3px 8px; color:#1e2936;'>PIR Sensor 1 (front-left cue)</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO39</td><td style='padding:3px 8px; color:#1e2936;'>PIR Sensor 2 (front-right cue)</td></tr>"
+            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO35</td><td style='padding:3px 8px; color:#1e2936;'>PIR Sensor 0 (right zone, cue ~45°)</td></tr>"
+            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO34</td><td style='padding:3px 8px; color:#1e2936;'>PIR Sensor 1 (front zone, cue ~135°)</td></tr>"
+            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO39</td><td style='padding:3px 8px; color:#1e2936;'>PIR Sensor 2 (left zone, cue ~225°)</td></tr>"
             "</table>"
             "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>Current Sensors</div>"
             "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
@@ -4290,6 +4953,7 @@ class SentryV2TabWidget(QWidget):
             initial_pan=float(self.engine.current_pan),
             initial_tilt=float(self.engine.current_tilt),
             initial_move_time_ms=int(self._get_manual_move_time_ms()),
+            pir_enabled=bool(self.config.pir_guard.pir_enabled),
         )
 
     def _start_connection_operation(self, operation: str, **kwargs) -> None:
@@ -4326,6 +4990,7 @@ class SentryV2TabWidget(QWidget):
                             fire=0,
                             move_time_ms=int(kwargs.get("initial_move_time_ms", 20)),
                         )
+                        self._comm.send_pir_enabled(bool(kwargs.get("pir_enabled", False)))
                     info = self._comm.connection_info()
                 else:
                     self._comm.disconnect()
@@ -4389,7 +5054,7 @@ class SentryV2TabWidget(QWidget):
     # ------------------------------------------------------------------ #
 
     def _toggle_camera(self) -> None:
-        if self._cap is not None:
+        if self._has_local_source():
             self._close_camera()
             return
         src_text = self._edit_cam_source.text().strip()
@@ -4400,9 +5065,11 @@ class SentryV2TabWidget(QWidget):
             self._lbl_cam_status.setStyleSheet("color: #888; font-size: 10px;")
             self._log("Camera source blank; defaulting to standalone camera index 0")
         # Save to config
+        selected_width, selected_height = self._selected_camera_dimensions()
+        self._remember_camera_source(src_text, selected_width, selected_height)
         self.config.connection.camera_source = src_text
-        self.config.connection.camera_width = self._spin_cam_w.value()
-        self.config.connection.camera_height = self._spin_cam_h.value()
+        self.config.connection.camera_width = selected_width
+        self.config.connection.camera_height = selected_height
         # Parse source: integer index or string path/URL
         try:
             src = int(src_text)
@@ -4411,7 +5078,7 @@ class SentryV2TabWidget(QWidget):
 
         # Conflict check: prevent opening the same camera index as the main app.
         # When the main app is on Auto, index 0 is the most common device on single-camera setups.
-        if isinstance(src, int):
+        if isinstance(src, int) and self._host_controls_hardware():
             main_win = self._get_main_window()
             if main_win is not None:
                 main_cap = getattr(main_win, "cap", None)
@@ -4433,87 +5100,771 @@ class SentryV2TabWidget(QWidget):
                     return
 
         try:
-            cap = cv2.VideoCapture(src)
-            if not cap.isOpened():
-                self._lbl_cam_status.setText(f"Failed to open: {src_text}")
-                self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
-                self._log(f"Camera open failed: {src_text}")
-                return
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.config.connection.camera_width)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.connection.camera_height)
-            self._cap = cap
-            self._grab_fail_count = 0
-            self._cam_timer.start(33)  # ~30 fps
-            self._btn_cam.setText("Close Camera")
-            actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            if actual_w > 0 and actual_h > 0:
-                self.config.connection.camera_width = actual_w
-                self.config.connection.camera_height = actual_h
-                self.config.guard.frame_width = actual_w
-                self.config.guard.frame_height = actual_h
-                self._spin_cam_w.blockSignals(True)
-                self._spin_cam_h.blockSignals(True)
-                self._spin_cam_w.setValue(actual_w)
-                self._spin_cam_h.setValue(actual_h)
-                self._spin_cam_w.blockSignals(False)
-                self._spin_cam_h.blockSignals(False)
-            self._lbl_cam_status.setText(f"Open: {src_text}  ({actual_w}x{actual_h})")
-            self._lbl_cam_status.setStyleSheet("color: #33cc33; font-size: 10px;")
-            self._log(f"Camera opened: {src_text} ({actual_w}x{actual_h})")
-            self._schedule_auto_yolo_load(300)
+            self._open_video_capture_source(src, src_text, "camera", request_frame_size=True)
         except Exception as e:
             self._lbl_cam_status.setText(f"Error: {e}")
             self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
             self._log(f"Camera error: {e}")
 
-    def _close_camera(self) -> None:
+    def _browse_test_media(self) -> None:
+        start_dir = Path.cwd()
+        current_source = str(self._local_source_label or "").strip()
+        if current_source:
+            try:
+                candidate = Path(current_source).expanduser()
+                if candidate.exists():
+                    start_dir = candidate.parent if candidate.is_file() else candidate
+            except Exception:
+                pass
+        selected_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open Test Video or Image",
+            str(start_dir),
+            "Media Files (*.mp4 *.avi *.mov *.mkv *.wmv *.webm *.jpg *.jpeg *.png *.bmp *.tif *.tiff);;Video Files (*.mp4 *.avi *.mov *.mkv *.wmv *.webm);;Image Files (*.jpg *.jpeg *.png *.bmp *.tif *.tiff);;All Files (*.*)",
+        )
+        if not selected_path:
+            return
+        self._open_test_media(selected_path)
+
+    def _open_video_url(self) -> None:
+        video_url = str(getattr(self, "_edit_video_url", None).text() if hasattr(self, "_edit_video_url") else "").strip()
+        if not video_url:
+            self._lbl_cam_status.setText("Video URL is blank")
+            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            return
+        # Close any existing source.  This also sets _url_stream_stop so any
+        # in-flight worker for a previous URL will see it and exit.
+        self._close_camera(log_close=False)
+        self._video_label.set_placeholder_enabled(False)
+        self._video_label.clear_frame("Opening URL\u2026")
+        self._lbl_cam_status.setText("Resolving URL\u2026")
+        self._lbl_cam_status.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        self._log(f"Resolving video URL: {video_url}")
+        # Bump generation so any leftover threads from a previous URL ignore their frames
+        self._url_stream_gen += 1
+        self._url_stream_stop.clear()
+        gen = self._url_stream_gen
+        threading.Thread(
+            target=self._url_stream_worker,
+            args=(video_url, gen),
+            daemon=True,
+            name="url-stream-worker",
+        ).start()
+
+    def _resolve_video_stream_source(self, video_url: str) -> tuple[str, str]:
+        lowered = video_url.strip().lower()
+        is_web_video = lowered.startswith("http://") or lowered.startswith("https://")
+        is_youtube = "youtube.com/" in lowered or "youtu.be/" in lowered
+        if not is_web_video:
+            return video_url, video_url
+        if not is_youtube:
+            return video_url, video_url
+
+        try:
+            import yt_dlp
+        except Exception as exc:
+            raise RuntimeError("yt-dlp is required for YouTube URLs") from exc
+
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "noplaylist": True,
+            "format": "best[ext=mp4]/best",
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=False)
+        if not isinstance(info, dict):
+            raise RuntimeError("Unable to resolve video URL")
+
+        if "entries" in info and info["entries"]:
+            first_entry = next((entry for entry in info["entries"] if entry), None)
+            if isinstance(first_entry, dict):
+                info = first_entry
+
+        stream_url = str(info.get("url") or "").strip()
+        if not stream_url:
+            requested_formats = info.get("requested_formats") or []
+            if requested_formats and isinstance(requested_formats, list):
+                stream_url = str(requested_formats[0].get("url") or "").strip()
+        if not stream_url:
+            raise RuntimeError("No playable stream URL found")
+
+        title = str(info.get("title") or video_url).strip()
+        return stream_url, title
+
+    def _open_test_media(self, selected_path: str) -> None:
+        media_path = Path(selected_path).expanduser()
+        if not media_path.exists():
+            self._lbl_cam_status.setText(f"Test media not found: {selected_path}")
+            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._log(f"Test media open failed: {selected_path}")
+            return
+
+        image_suffixes = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
+        try:
+            if media_path.suffix.lower() in image_suffixes:
+                self._open_image_source(media_path)
+            else:
+                self._open_video_capture_source(str(media_path), str(media_path), "test_video", request_frame_size=False)
+        except Exception as exc:
+            self._lbl_cam_status.setText(f"Test media error: {exc}")
+            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._log(f"Test media error: {exc}")
+
+    def _play_test_media(self) -> None:
+        if self._local_source_kind != "test_video":
+            return
+        if not self._test_media_paused:
+            return
+        self._test_media_paused = False
+        self._update_test_media_controls()
+        self._log("Test video resumed")
+        self._grab_frame()
+
+    def _pause_test_media(self) -> None:
+        if self._local_source_kind != "test_video":
+            return
+        if self._test_media_paused:
+            return
+        self._test_media_paused = True
+        self._update_test_media_controls()
+        self._log("Test video paused")
+
+    def _apply_camera_resolution(self) -> None:
+        width, height = self._selected_camera_dimensions()
+        source_text = self._edit_cam_source.text().strip() or "0"
+        self.config.connection.camera_source = source_text
+        self.config.connection.camera_width = int(width)
+        self.config.connection.camera_height = int(height)
+        self.config.guard.frame_width = int(width)
+        self.config.guard.frame_height = int(height)
+        self._remember_camera_source(source_text, width, height)
+        self._push_config()
+        self._save_config()
+
+        if self._local_source_kind == "camera" and self._has_local_source():
+            self._lbl_cam_status.setText(f"Reopening camera at {width} x {height}...")
+            self._lbl_cam_status.setStyleSheet("color: #d0b060; font-size: 10px;")
+            self._close_camera(log_close=False)
+            QTimer.singleShot(0, self._toggle_camera)
+            self._log(f"Applying camera resolution by reopening local source: {width} x {height}")
+            return
+
+        self._lbl_cam_status.setText(
+            f"Resolution saved: {width} x {height}. Use Restart App if the main/shared feed still shows the old size."
+        )
+        self._lbl_cam_status.setStyleSheet("color: #d0b060; font-size: 10px;")
+        self._log(f"Camera resolution saved: {width} x {height}")
+
+    def _restart_application(self) -> None:
+        self._save_config()
+        self._close_camera(log_close=False)
+        repo_root = self._repo_root_path()
+        args = list(sys.argv) if list(sys.argv) else [str((repo_root / "run.py").resolve())]
+
+        process = QProcess(self)
+        env = QProcessEnvironment.systemEnvironment()
+        env.insert("DB3000_RELAUNCH_DELAY_MS", "1200")
+        env.insert("DB3000_RELAUNCH_FROM_PID", str(os.getpid()))
+        process.setProcessEnvironment(env)
+        process.setWorkingDirectory(str(repo_root))
+        started = process.startDetached(sys.executable, args)
+        if isinstance(started, tuple):
+            started = bool(started[0])
+        if not started:
+            self._lbl_cam_status.setText("Restart failed: unable to relaunch the app")
+            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._log("Restart failed: detached relaunch did not start")
+            return
+
+        self._log("Restarting application to apply saved settings")
+        app = QApplication.instance()
+        if app is not None:
+            QTimer.singleShot(0, app.quit)
+
+    def _on_source_zoom_changed(self) -> None:
+        cc = self.config.connection
+        cc.webcam_zoom_pct = int(self._slider_webcam_zoom.value())
+        cc.test_source_zoom_pct = int(self._slider_test_zoom.value())
+        self._lbl_webcam_zoom.setText(f"{cc.webcam_zoom_pct}%")
+        self._lbl_test_zoom.setText(f"{cc.test_source_zoom_pct}%")
+
+    def _active_source_zoom_pct(self) -> int:
+        if self._local_source_kind == "camera":
+            return int(getattr(self.config.connection, "webcam_zoom_pct", 100))
+        if self._local_source_kind in {"test_video", "test_image", "url_stream"}:
+            return int(getattr(self.config.connection, "test_source_zoom_pct", 100))
+        return 100
+
+    def _apply_source_zoom(self, frame: np.ndarray) -> np.ndarray:
+        zoom_pct = self._active_source_zoom_pct()
+        return self._apply_zoom_pct_to_frame(frame, zoom_pct)
+
+    @staticmethod
+    def _apply_zoom_pct_to_frame(frame: np.ndarray, zoom_pct: int) -> np.ndarray:
+        if frame is None:
+            return frame
+        h, w = frame.shape[:2]
+        if h <= 1 or w <= 1:
+            return frame
+        zoom_scale = max(0.25, min(2.0, float(zoom_pct) / 100.0))
+        if abs(zoom_scale - 1.0) < 0.001:
+            return frame
+
+        if zoom_scale > 1.0:
+            crop_w = max(2, min(w, int(round(w / zoom_scale))))
+            crop_h = max(2, min(h, int(round(h / zoom_scale))))
+            x1 = max(0, (w - crop_w) // 2)
+            y1 = max(0, (h - crop_h) // 2)
+            cropped = frame[y1:y1 + crop_h, x1:x1 + crop_w]
+            return cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
+
+        scaled_w = max(2, int(round(w * zoom_scale)))
+        scaled_h = max(2, int(round(h * zoom_scale)))
+        shrunk = cv2.resize(frame, (scaled_w, scaled_h), interpolation=cv2.INTER_AREA)
+        pad_left = max(0, (w - scaled_w) // 2)
+        pad_right = max(0, w - scaled_w - pad_left)
+        pad_top = max(0, (h - scaled_h) // 2)
+        pad_bottom = max(0, h - scaled_h - pad_top)
+        return cv2.copyMakeBorder(
+            shrunk,
+            pad_top,
+            pad_bottom,
+            pad_left,
+            pad_right,
+            cv2.BORDER_CONSTANT,
+            value=(0, 0, 0),
+        )
+
+    def _step_test_media_frame(self) -> None:
+        if self._local_source_kind != "test_video":
+            return
+        self._test_media_paused = True
+        frame = self._read_next_test_video_frame(force_step=True)
+        if frame is None:
+            return
+        self._queue_local_frame(frame)
+        self._update_test_media_controls()
+
+    def _restart_test_media(self) -> None:
+        if self._local_source_kind == "test_image" and self._test_media_image_frame is not None:
+            self._queue_local_frame(self._test_media_image_frame.copy())
+            self._log("Test image reloaded")
+            return
+        if self._local_source_kind != "test_video" or self._cap is None:
+            return
+        self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        frame = self._read_next_test_video_frame(force_step=True)
+        if frame is not None:
+            self._queue_local_frame(frame)
+        self._log("Test video restarted")
+
+    def _return_to_camera(self) -> None:
+        """Close the current test source and reopen the last known webcam."""
+        src = getattr(self, "_last_camera_source_text", "").strip()
+        if not src:
+            self._log("Return to camera: no previous camera source saved")
+            return
+        self._close_camera(log_close=False)
+        self._log(f"Returning to camera: {src}")
+        try:
+            cam_src: int | str = int(src)
+        except ValueError:
+            cam_src = src
+        try:
+            self._open_video_capture_source(cam_src, src, "camera", request_frame_size=True)
+        except Exception as exc:
+            self._lbl_cam_status.setText(f"Return to camera failed: {exc}")
+            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._log(f"Return to camera failed: {exc}")
+
+    def _on_test_media_loop_toggled(self, checked: bool) -> None:
+        self._test_media_loop_enabled = bool(checked)
+
+    def _update_test_media_controls(self) -> None:
+        if not hasattr(self, "_btn_test_media_pause"):
+            return
+        is_test_video = self._local_source_kind == "test_video"
+        is_test_image = self._local_source_kind == "test_image"
+        self._btn_test_media_play.setEnabled(is_test_video and self._test_media_paused)
+        self._btn_test_media_pause.setEnabled(is_test_video and not self._test_media_paused)
+        self._btn_test_media_step.setEnabled(is_test_video)
+        self._btn_test_media_restart.setEnabled(is_test_video or is_test_image)
+        self._chk_test_media_loop.setEnabled(is_test_video)
+        # "Back to Camera" is only useful when a test source is active and we
+        # know which camera to return to.
+        if hasattr(self, "_btn_return_to_camera"):
+            can_return = (
+                self._local_source_kind in {"test_video", "test_image", "url_stream"}
+                and bool(getattr(self, "_last_camera_source_text", "").strip())
+            )
+            self._btn_return_to_camera.setEnabled(can_return)
+
+    def _queue_local_frame(self, frame: np.ndarray) -> None:
+        self._test_media_last_frame = frame.copy()
+        effective_frame = self._apply_source_zoom(frame)
+        if self._show_video_feed and self._detector_worker_busy:
+            if self._last_display_frame is not None and self._last_display_frame.shape[:2] == effective_frame.shape[:2]:
+                self._show_frame(self._last_display_frame)
+            else:
+                display = effective_frame.copy()
+                display = self.overlay.draw(display, self.engine)
+                if self._scope_view_active():
+                    display = self.overlay.apply_scope_view(display, self.engine)
+                self._draw_no_fire_mask_draft(display)
+                self._draw_color_gate_status(display, self.config.detection_mode.detection_mode, False)
+                self._show_frame(display)
+        with self._detector_frame_lock:
+            self._detector_pending_frame = effective_frame.copy()
+
+    def _read_next_test_video_frame(self, *, force_step: bool = False) -> Optional[np.ndarray]:
+        if self._cap is None or not self._cap.isOpened():
+            return None
+        if self._test_media_paused and not force_step and self._test_media_last_frame is not None:
+            return self._test_media_last_frame.copy()
+
+        ret, frame = self._cap.read()
+        if (not ret or frame is None) and self._test_media_loop_enabled:
+            self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = self._cap.read()
+        if not ret or frame is None:
+            self._test_media_paused = True
+            self._update_test_media_controls()
+            self._lbl_cam_status.setText("Test video paused at end of file")
+            self._lbl_cam_status.setStyleSheet("color: #d0b060; font-size: 10px;")
+            return None
+        return frame
+
+    def _open_image_source(self, media_path: Path) -> None:
+        frame = cv2.imread(str(media_path))
+        if frame is None:
+            raise RuntimeError(f"Failed to decode image: {media_path}")
+
+        self._close_camera(log_close=False)
+        self._test_media_image_frame = frame
+        self._test_media_last_frame = frame.copy()
+        self._test_media_paused = False
+        self._local_source_kind = "test_image"
+        self._local_source_label = str(media_path)
+        self._grab_fail_count = 0
+        self._sync_source_dimensions(frame.shape[1], frame.shape[0])
+        self._btn_cam.setText("Close Source")
+        self._lbl_cam_status.setText(f"Test image: {media_path.name}  ({frame.shape[1]}x{frame.shape[0]})")
+        self._lbl_cam_status.setStyleSheet("color: #33cc33; font-size: 10px;")
+        self._cam_timer.start(250)
+        self._update_test_media_controls()
+        self._log(f"Test image loaded: {media_path.name} ({frame.shape[1]}x{frame.shape[0]})")
+        self._schedule_auto_yolo_load(150)
+
+    def _open_video_capture_source(
+        self,
+        src: int | str,
+        source_text: str,
+        source_kind: str,
+        *,
+        request_frame_size: bool,
+    ) -> None:
+        self._close_camera(log_close=False)
+        self._video_label.set_placeholder_enabled(False)
+        self._video_label.clear_frame("Opening camera...")
+        requested_w = int(self.config.connection.camera_width)
+        requested_h = int(self.config.connection.camera_height)
+
+        if isinstance(src, int):
+            # Open integer-index cameras in a background thread so DSHOW/MSMF
+            # driver init doesn't freeze the Qt event loop.
+            self._lbl_cam_status.setText("Opening camera…")
+            self._lbl_cam_status.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+            self._log(f"[CAM-DEBUG] Starting background open for index {src} ({requested_w}x{requested_h})")
+
+            def _open_bg(
+                _src=src, _src_text=source_text, _sk=source_kind,
+                _rw=requested_w, _rh=requested_h, _rfs=request_frame_size,
+            ) -> None:
+                cap = None
+                backends = (
+                    (cv2.CAP_DSHOW, "DSHOW"),
+                    (cv2.CAP_MSMF, "MSMF"),
+                    (None, "DEFAULT"),
+                ) if os.name == "nt" else ((None, "DEFAULT"),)
+                for backend, bname in backends:
+                    try:
+                        c = cv2.VideoCapture(_src) if backend is None else cv2.VideoCapture(_src, backend)
+                        time.sleep(0.5)  # let driver settle
+                        if not c.isOpened():
+                            print(f"[CAM-BG] index={_src} backend={bname} not opened", flush=True)
+                            c.release()
+                            continue
+                        # Verify at least one readable frame — MSMF can report
+                        # isOpened=True but then immediately fail on grabFrame
+                        ok, _frame = c.read()
+                        print(f"[CAM-BG] index={_src} backend={bname} opened=True read_ok={ok}", flush=True)
+                        if ok:
+                            cap = c
+                            break
+                        c.release()
+                    except Exception as _e:
+                        print(f"[CAM-BG] index={_src} backend={bname} exception: {_e}", flush=True)
+                # Emit thread-safe signal back to main thread
+                if cap is not None and cap.isOpened():
+                    print(f"[CAM-BG] SUCCESS index={_src}, emitting opened signal", flush=True)
+                    self._cam_bg_opened.emit(cap, _src_text, _sk, _rw, _rh, _rfs)
+                else:
+                    if cap is not None:
+                        try:
+                            cap.release()
+                        except Exception:
+                            pass
+                    print(f"[CAM-BG] FAILED index={_src}, emitting failed signal", flush=True)
+                    self._cam_bg_failed.emit(_src_text)
+
+            threading.Thread(target=_open_bg, daemon=True, name="cam-open-bg").start()
+        else:
+            # URLs / file paths — open directly (rarely slow on startup)
+            cap = cv2.VideoCapture(src)
+            if not cap.isOpened():
+                cap.release()
+                raise RuntimeError(f"Failed to open: {source_text}")
+            self._finish_camera_open(cap, source_text, source_kind, requested_w, requested_h, request_frame_size)
+
+    def _finish_camera_open(
+        self,
+        cap: "cv2.VideoCapture",
+        source_text: str,
+        source_kind: str,
+        requested_w: int,
+        requested_h: int,
+        request_frame_size: bool,
+    ) -> None:
+        """Called on the Qt main thread after the camera has been opened."""
+        if self._closing:
+            try:
+                cap.release()
+            except Exception:
+                pass
+            return
+        if request_frame_size:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, requested_w)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, requested_h)
+
+        actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self._cap = cap
+
+        self._local_source_kind = source_kind
+        self._local_source_label = source_text
+        self._test_media_image_frame = None
+        self._test_media_last_frame = None
+        self._test_media_paused = False
+        self._grab_fail_count = 0
+        self._cam_timer.start(33)
+        self._btn_cam.setText("Close Source")
+
+        if source_kind == "camera":
+            self._remember_camera_source(source_text, self.config.connection.camera_width, self.config.connection.camera_height)
+
+        if actual_w > 0 and actual_h > 0:
+            self._sync_source_dimensions(actual_w, actual_h)
+
+        status_resolution = f"{actual_w}x{actual_h}"
+        if source_kind == "camera" and request_frame_size and (actual_w != requested_w or actual_h != requested_h):
+            status_resolution = f"requested {requested_w}x{requested_h}, got {actual_w}x{actual_h}"
+        if source_kind == "test_video":
+            status_prefix, status_name = "Test video", Path(source_text).name
+        else:
+            status_prefix, status_name = "Open", source_text
+        self._lbl_cam_status.setText(f"{status_prefix}: {status_name}  ({status_resolution})")
+        self._lbl_cam_status.setStyleSheet("color: #33cc33; font-size: 10px;")
+        if source_kind == "test_video":
+            self._log(f"Test video opened: {source_text} ({actual_w}x{actual_h})")
+        else:
+            if request_frame_size and (actual_w != requested_w or actual_h != requested_h):
+                self._log(f"Camera opened: {source_text} requested {requested_w}x{requested_h}, actual {actual_w}x{actual_h}")
+            else:
+                self._log(f"Camera opened: {source_text} ({actual_w}x{actual_h})")
+        self._update_test_media_controls()
+        self._schedule_auto_yolo_load(300)
+
+    def _url_stream_worker(self, url: str, gen: int) -> None:
+        """Single background thread that owns the ENTIRE lifecycle of a URL stream cap.
+
+        Resolve URL  →  open cap (CAP_FFMPEG, no COM/MSMF)  →  test-read  →
+        signal main thread  →  continuous read loop  →  release cap.
+
+        The cap is NEVER handed to any other thread.  This eliminates the
+        Windows DSHOW/MSMF COM single-threaded-apartment affinity problem.
+        """
+        cap = None
+        try:
+            # ── Step 1: resolve URL (yt-dlp for YouTube, passthrough otherwise) ──
+            print(f"[URL-WORKER] Step 1: resolving URL: {url[:80]}", flush=True)
+            self._cam_url_status.emit("Resolving URL (yt-dlp)\u2026")
+            try:
+                stream_source, display_label = self._resolve_video_stream_source(url)
+            except Exception as exc:
+                print(f"[URL-WORKER] Resolve failed: {exc}", flush=True)
+                self._cam_url_error.emit(str(exc))
+                return
+
+            print(f"[URL-WORKER] Resolved to: {stream_source[:80]}, label={display_label[:50]}", flush=True)
+
+            if self._url_stream_gen != gen or self._url_stream_stop.is_set():
+                print("[URL-WORKER] Superseded after resolve — exiting", flush=True)
+                return
+
+            # ── Step 2: open the cap IN THIS THREAD ──────────────────────────────
+            self._cam_url_status.emit("Opening stream\u2026")
+            print("[URL-WORKER] Step 2: opening VideoCapture(CAP_FFMPEG)...", flush=True)
+            try:
+                cap = cv2.VideoCapture(stream_source, cv2.CAP_FFMPEG)
+                if not cap.isOpened():
+                    try:
+                        cap.release()
+                    except Exception:
+                        pass
+                    # Fallback: let OpenCV pick the backend
+                    print("[URL-WORKER] CAP_FFMPEG failed, trying default backend...", flush=True)
+                    cap = cv2.VideoCapture(stream_source)
+                print(f"[URL-WORKER] cap.isOpened()={cap.isOpened()}", flush=True)
+                if not cap.isOpened():
+                    self._cam_url_error.emit(f"Failed to open stream: {display_label}")
+                    return
+            except Exception as exc:
+                print(f"[URL-WORKER] VideoCapture exception: {exc}", flush=True)
+                self._cam_url_error.emit(f"VideoCapture error: {exc}")
+                return
+
+            if self._url_stream_gen != gen or self._url_stream_stop.is_set():
+                print("[URL-WORKER] Superseded after open — exiting", flush=True)
+                return
+
+            # ── Step 3: verify the stream delivers frames (IN THIS THREAD) ───────
+            self._cam_url_status.emit("Waiting for first frame\u2026")
+            print("[URL-WORKER] Step 3: seeking first frame...", flush=True)
+            first_frame = None
+            try:
+                for _attempt in range(10):
+                    ret, fr = cap.read()
+                    print(f"[URL-WORKER] frame attempt {_attempt+1}: ret={ret}, shape={fr.shape if (fr is not None and ret) else None}", flush=True)
+                    if ret and fr is not None:
+                        first_frame = fr
+                        break
+                    time.sleep(0.4)
+            except Exception as exc:
+                print(f"[URL-WORKER] cap.read() exception: {exc}", flush=True)
+                self._cam_url_error.emit(f"Stream read error: {exc}")
+                return
+
+            if first_frame is None:
+                print("[URL-WORKER] No first frame after 10 attempts", flush=True)
+                self._cam_url_error.emit(f"Stream opened but returned no frames: {display_label}")
+                return
+
+            if self._url_stream_gen != gen or self._url_stream_stop.is_set():
+                print("[URL-WORKER] Superseded after first-frame — exiting", flush=True)
+                return
+
+            # ── Step 4: get dimensions, store first frame, signal main thread ────
+            w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or first_frame.shape[1]
+            h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or first_frame.shape[0]
+            print(f"[URL-WORKER] Step 4: stream ready {w}x{h}, emitting _cam_url_ready", flush=True)
+            with self._url_stream_frame_lock:
+                self._url_stream_frame = first_frame
+            self._cam_url_ready.emit(display_label, stream_source, w, h, gen)
+
+            # ── Step 5: continuous read loop — all in THIS thread ─────────────
+            print("[URL-WORKER] Step 5: entering continuous read loop", flush=True)
+            consecutive_fails = 0
+            frames_read = 0
+            try:
+                while (
+                    not self._url_stream_stop.is_set()
+                    and self._url_stream_gen == gen
+                ):
+                    ret, frame = cap.read()
+                    if not ret or frame is None:
+                        consecutive_fails += 1
+                        if consecutive_fails >= 60:  # ~3 s without a single frame
+                            print(f"[URL-WORKER] 60 consecutive read failures — stopping (frames_read={frames_read})", flush=True)
+                            # NOTE: self._log() is NOT safe from a background thread — use signal instead
+                            self._cam_url_error.emit("Stream ended (no more frames)")
+                            break
+                        time.sleep(0.05)
+                        continue
+                    consecutive_fails = 0
+                    frames_read += 1
+                    if frames_read == 1:
+                        print("[URL-WORKER] first loop-frame delivered to buffer", flush=True)
+                    if self._url_stream_gen == gen:
+                        with self._url_stream_frame_lock:
+                            self._url_stream_frame = frame
+            except Exception as exc:
+                print(f"[URL-WORKER] read loop exception: {exc}", flush=True)
+            print(f"[URL-WORKER] exiting read loop, frames_read={frames_read}", flush=True)
+        except Exception as exc:
+            # Catch-all so the user always gets an error message, never a silent hang
+            print(f"[URL-WORKER] UNHANDLED exception: {exc}", flush=True)
+            try:
+                self._cam_url_error.emit(f"URL stream error: {exc}")
+            except Exception:
+                pass
+        finally:
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+            if self._url_stream_gen == gen:
+                self._url_stream_active = False
+            print("[URL-WORKER] thread done", flush=True)
+
+    def _on_url_ready(self, display_label: str, source_text: str, w: int, h: int, gen: int) -> None:
+        """Called on the Qt main thread once the URL stream has delivered its first frame."""
+        print(f"[URL-MAIN] _on_url_ready: gen={gen}, active_gen={self._url_stream_gen}, closing={self._closing}", flush=True)
+        if self._closing or self._url_stream_gen != gen:
+            print("[URL-MAIN] _on_url_ready: ignoring (wrong gen or closing)", flush=True)
+            return
+        self._local_source_kind = "url_stream"
+        self._local_source_label = display_label
+        self._url_stream_active = True
+        self._test_media_image_frame = None
+        self._test_media_last_frame = None
+        self._test_media_paused = False
+        self._grab_fail_count = 0
+        self._cam_timer.start(33)
+        self._btn_cam.setText("Close Source")
+        if w > 0 and h > 0:
+            self._sync_source_dimensions(w, h)
+        self._lbl_cam_status.setText(f"URL stream: {display_label}  ({w}x{h})")
+        self._lbl_cam_status.setStyleSheet("color: #33cc33; font-size: 10px;")
+        self._log(f"URL stream opened: {display_label} ({w}x{h})")
+        self._update_test_media_controls()
+        self._schedule_auto_yolo_load(300)
+        print(f"[URL-MAIN] _on_url_ready: timer started, source_kind=url_stream", flush=True)
+
+    def _on_url_status_update(self, msg: str) -> None:
+        """Called on Qt main thread with live status text from the URL worker."""
+        if self._closing:
+            return
+        self._lbl_cam_status.setText(msg)
+        self._lbl_cam_status.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+
+    def _on_camera_open_failed(self, source_text: str) -> None:
+        """Called on Qt main thread when the background camera open failed."""
+        if self._closing:
+            return
+        retry = getattr(self, "_startup_retry_count", -1)
+        self._log(f"Camera open failed: {source_text} (attempt {retry+1})")
+        self._btn_cam.setText("Open Source")
+        if retry >= 0 and not self._has_local_source() and retry < 3:
+            # Retry with increasing back-off (1.5s, 3s, 4.5s)
+            delay = 1500 * (retry + 1)
+            self._lbl_cam_status.setText(f"Retrying camera ({retry+1}/3)…")
+            self._lbl_cam_status.setStyleSheet("color: #d0a030; font-size: 10px;")
+            QTimer.singleShot(delay, lambda r=retry+1: self._auto_open_camera_on_startup(r))
+        else:
+            self._startup_retry_count = -1
+            self._lbl_cam_status.setText(f"Failed to open: {source_text}")
+            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+
+    def _on_url_open_error(self, msg: str) -> None:
+        """Called on Qt main thread when the background URL resolve/open failed."""
+        if self._closing:
+            return
+        self._lbl_cam_status.setText(f"Video URL error: {msg}")
+        self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+        self._log(f"Video URL error: {msg}")
+        self._btn_cam.setText("Open Source")
+        # Show the error prominently on the video canvas, not just the status label
+        self._video_label.set_placeholder_enabled(False)
+        self._video_label.clear_frame(f"URL Error:\n{msg[:80]}")
+
+    def _remember_camera_source(self, source_text: str, width: int, height: int) -> None:
+        source_value = str(source_text or "").strip() or "0"
+        self._last_camera_source_text = source_value
+        self._last_camera_width = int(max(120, width))
+        self._last_camera_height = int(max(120, height))
+
+    def _sync_source_dimensions(self, width: int, height: int) -> None:
+        if width <= 0 or height <= 0:
+            return
+        self.config.guard.frame_width = int(width)
+        self.config.guard.frame_height = int(height)
+
+    def _has_local_source(self) -> bool:
+        return self._cap is not None or self._test_media_image_frame is not None or self._url_stream_active
+
+    def _close_camera(self, *, log_close: bool = True) -> None:
         self._cam_timer.stop()
         self._grab_fail_count = 0
+        self._last_display_frame = None
+        # Signal URL reader thread to stop; it will release the cap itself.
+        self._url_stream_stop.set()
+        self._url_stream_active = False
+        with self._url_stream_frame_lock:
+            self._url_stream_frame = None
         if self._cap is not None:
             try:
                 self._cap.release()
             except Exception:
                 pass
             self._cap = None
+        self._test_media_image_frame = None
+        self._test_media_last_frame = None
+        self._test_media_paused = False
+        self._local_source_kind = ""
+        self._local_source_label = ""
         try:
             self._btn_cam.setText("Open Camera")
-            self._lbl_cam_status.setText("Camera closed")
+            self._lbl_cam_status.setText("Source closed")
             self._lbl_cam_status.setStyleSheet("color: #888; font-size: 10px;")
-            self._video_label.clear_frame("Waiting for video...")
+            if log_close:
+                self._video_label.set_placeholder_enabled(True)
+                self._video_label.clear_frame("Camera Off\nOpen Camera to Start")
+            else:
+                self._video_label.set_placeholder_enabled(False)
+                self._video_label.clear_frame("Waiting for video...")
         except RuntimeError:
             pass  # widget already destroyed during shutdown
-        self._log("Camera closed")
+        self._update_test_media_controls()
+        if log_close:
+            self._log("Camera closed")
 
     def _grab_frame(self) -> None:
         """Timer-driven: grab a frame from own camera, run detection, push to engine."""
         if self._closing:
             return
-        if self._cap is None or not self._cap.isOpened():
-            return
-        ret, frame = self._cap.read()
-        if not ret or frame is None:
-            self._grab_fail_count += 1
-            if self._grab_fail_count >= self._MAX_GRAB_FAILS:
-                self._log(f"Camera: {self._grab_fail_count} consecutive grab failures — auto-closing")
-                self._close_camera()
+        frame: Optional[np.ndarray] = None
+        if self._test_media_image_frame is not None:
+            frame = self._test_media_image_frame.copy()
+        elif self._local_source_kind == "test_video":
+            frame = self._read_next_test_video_frame()
+        elif self._local_source_kind == "url_stream":
+            if not self._url_stream_active:
+                # Reader thread has exited — count as grab failure and auto-close
+                self._grab_fail_count += 1
+                if self._grab_fail_count >= self._MAX_GRAB_FAILS:
+                    self._log("URL stream ended — auto-closing source")
+                    self._close_camera()
+                return
+            with self._url_stream_frame_lock:
+                frame = self._url_stream_frame
+                self._url_stream_frame = None  # consume so we don't repeat the same frame
+        else:
+            if self._cap is None or not self._cap.isOpened():
+                return
+            ret, frame = self._cap.read()
+            if not ret or frame is None:
+                self._grab_fail_count += 1
+                if self._grab_fail_count >= self._MAX_GRAB_FAILS:
+                    self._log(f"Camera: {self._grab_fail_count} consecutive grab failures — auto-closing")
+                    self._close_camera()
+                return
+        if frame is None:
             return
         self._grab_fail_count = 0
-
-        # Keep the camera preview responsive even when YOLO is still processing
-        # the previous frame. Target boxes are omitted here because they are only
-        # trustworthy after the detector worker returns fresh results.
-        if self._show_video_feed and self._detector_worker_busy:
-            display = frame.copy()
-            display = self.overlay.draw(display, self.engine, include_target_boxes=False)
-            if self._scope_view_active():
-                display = self.overlay.apply_scope_view(display, self.engine)
-            self._draw_no_fire_mask_draft(display)
-            self._draw_color_gate_status(display, self.config.detection_mode.detection_mode, False)
-            self._show_frame(display)
-
-        with self._detector_frame_lock:
-            self._detector_pending_frame = frame.copy()
+        self._queue_local_frame(frame)
 
     def _detector_worker_loop(self) -> None:
         while not self._detector_worker_stop.is_set():
@@ -4532,10 +5883,8 @@ class SentryV2TabWidget(QWidget):
                 if not self._closing:
                     self.detection_result_ready.emit(frame, raw_boxes)
             except Exception as exc:
-                try:
-                    self._comm._last_error = f"Detector worker error: {exc}"
-                except Exception:
-                    pass
+                # Store error locally — do NOT write to self._comm from this thread.
+                self._last_detector_error = str(exc)
             finally:
                 self._detector_worker_busy = False
 
@@ -4733,16 +6082,38 @@ class SentryV2TabWidget(QWidget):
                 self._lbl_yolo_status.setStyleSheet("color: #888; font-size: 10px;")
 
     def _load_yolo_model(self) -> None:
+        """Start a background-thread YOLO model load so the event loop never freezes."""
         model_name = self._combo_yolo_model.currentText().strip()
         model_path = self._combo_yolo_model.currentData()
         if not model_name or not model_path:
             self._lbl_yolo_status.setText("No model selected")
             self._lbl_yolo_status.setStyleSheet("color: #cc3333; font-size: 10px;")
             return
-        self._lbl_yolo_status.setText(f"Loading {model_name}...")
+        if self._yolo_loading:
+            return  # already loading; ignore concurrent request
+        self._yolo_loading = True
+        self._lbl_yolo_status.setText(f"Loading {model_name}\u2026")
         self._lbl_yolo_status.setStyleSheet("color: #d0b060; font-size: 10px;")
-        self._lbl_yolo_status.repaint()
-        ok = self._detector.load_yolo(model_path)
+        self._btn_load_yolo.setEnabled(False)
+
+        def _do_load(_path: str = model_path, _name: str = model_name) -> None:
+            try:
+                ok = self._detector.load_yolo(_path)
+                err = "" if ok else (getattr(self._detector, "_last_error", "") or "unknown error")
+            except Exception as exc:
+                ok = False
+                err = str(exc)
+            self._yolo_load_result.emit(ok, _name, err)
+
+        threading.Thread(target=_do_load, daemon=True, name="yolo-loader").start()
+
+    def _on_yolo_load_result(self, ok: bool, model_name: str, err: str) -> None:
+        """Called on Qt main thread when the background YOLO load completes."""
+        self._yolo_loading = False
+        if hasattr(self, "_btn_load_yolo"):
+            self._btn_load_yolo.setEnabled(True)
+        if self._closing:
+            return
         if ok:
             self._lbl_yolo_status.setText(f"Loaded: {model_name}")
             self._lbl_yolo_status.setStyleSheet("color: #33cc33; font-size: 10px;")
@@ -4755,7 +6126,7 @@ class SentryV2TabWidget(QWidget):
         else:
             self._lbl_yolo_status.setText(f"Load FAILED: {model_name}")
             self._lbl_yolo_status.setStyleSheet("color: #cc3333; font-size: 10px;")
-            self._log(f"YOLO load failed: {model_name}")
+            self._log(f"YOLO load failed: {model_name} — {err}")
 
     def _on_yolo_model_selection_changed(self, index: int) -> None:
         if index < 0:
@@ -4775,6 +6146,8 @@ class SentryV2TabWidget(QWidget):
         dirs: list[Path] = []
         for candidate in (
             self._repo_root_path() / "YOLO_MODELS",
+            self._repo_root_path() / "app" / "YOLO_MODELS",
+            self._repo_root_path() / "app" / "models",
             Path.cwd() / "YOLO_MODELS",
         ):
             resolved = candidate.resolve()
@@ -5090,9 +6463,9 @@ class SentryV2TabWidget(QWidget):
         eg.inter_target_cooldown = self._spin_inter_cd.value()
         eg.cycle_cooldown = self._spin_cycle_cd.value()
         eg.max_queue_length = self._spin_max_queue.value()
+        eg.single_target_only = eg.max_queue_length <= 1
         eg.optimize_slew_order = self._chk_optimize.isChecked()
         if eg.single_target_only:
-            eg.max_queue_length = 1
             eg.optimize_slew_order = False
         self._sync_single_target_ui()
         eg.engagement_speed = self._slider_speed.value()
@@ -5124,20 +6497,21 @@ class SentryV2TabWidget(QWidget):
     def _sync_single_target_ui(self) -> None:
         if not hasattr(self, "_spin_max_queue") or not hasattr(self, "_chk_optimize"):
             return
-        single_target_only = bool(getattr(self.config.engagement, "single_target_only", False))
+        max_queue_length = max(1, int(getattr(self.config.engagement, "max_queue_length", 1) or 1))
+        single_target_only = max_queue_length <= 1
+        self.config.engagement.single_target_only = single_target_only
         if single_target_only:
-            self.config.engagement.max_queue_length = 1
             self.config.engagement.optimize_slew_order = False
-            self._spin_max_queue.blockSignals(True)
-            self._spin_max_queue.setValue(1)
-            self._spin_max_queue.blockSignals(False)
             self._chk_optimize.blockSignals(True)
             self._chk_optimize.setChecked(False)
             self._chk_optimize.blockSignals(False)
-        self._spin_max_queue.setEnabled(not single_target_only)
+        self._spin_max_queue.blockSignals(True)
+        self._spin_max_queue.setValue(max_queue_length)
+        self._spin_max_queue.blockSignals(False)
+        self._spin_max_queue.setEnabled(True)
         self._chk_optimize.setEnabled(not single_target_only)
         if hasattr(self, "_lbl_max_queue"):
-            self._lbl_max_queue.setEnabled(not single_target_only)
+            self._lbl_max_queue.setEnabled(True)
 
     def _update_center_fire_radius_hint(self) -> None:
         if not hasattr(self, "_lbl_center_fire_radius_hint"):
@@ -5298,8 +6672,49 @@ class SentryV2TabWidget(QWidget):
         self.config.show_overlay = self._chk_overlay.isChecked()
         self.config.show_threat_scores = self._chk_scores.isChecked()
         self.config.show_engagement_zone = self._chk_zone.isChecked()
+        self.config.show_guard_crosshair = self._chk_guard_crosshair.isChecked()
         self.config.show_no_fire_masks = self._chk_show_no_fire_masks.isChecked()
         self.overlay.update_config(self.config)
+
+    def _populate_camera_resolution_combo(self, width: int, height: int) -> None:
+        self._combo_cam_resolution.blockSignals(True)
+        self._combo_cam_resolution.clear()
+        current = (int(width), int(height))
+        resolutions = list(STANDARD_CAMERA_RESOLUTIONS)
+        if current not in resolutions:
+            resolutions.append(current)
+        for res_w, res_h in sorted(set(resolutions), key=lambda item: (item[0] * item[1], item[0], item[1])):
+            self._combo_cam_resolution.addItem(f"{res_w} x {res_h}", (int(res_w), int(res_h)))
+        index = -1
+        for item_index in range(self._combo_cam_resolution.count()):
+            data = self._combo_cam_resolution.itemData(item_index)
+            if isinstance(data, tuple) and len(data) == 2 and int(data[0]) == current[0] and int(data[1]) == current[1]:
+                index = item_index
+                break
+        if index < 0:
+            fallback = (1280, 720)
+            for item_index in range(self._combo_cam_resolution.count()):
+                data = self._combo_cam_resolution.itemData(item_index)
+                if isinstance(data, tuple) and len(data) == 2 and int(data[0]) == fallback[0] and int(data[1]) == fallback[1]:
+                    index = item_index
+                    break
+        if index >= 0:
+            self._combo_cam_resolution.setCurrentIndex(index)
+        self._combo_cam_resolution.blockSignals(False)
+
+    def _selected_camera_dimensions(self) -> Tuple[int, int]:
+        data = self._combo_cam_resolution.currentData()
+        if isinstance(data, tuple) and len(data) == 2:
+            return int(data[0]), int(data[1])
+        return int(self.config.connection.camera_width), int(self.config.connection.camera_height)
+
+    def _set_camera_dimensions(self, width: int, height: int) -> None:
+        self._populate_camera_resolution_combo(int(width), int(height))
+
+    def _on_camera_resolution_changed(self, _index: int) -> None:
+        width, height = self._selected_camera_dimensions()
+        self.config.connection.camera_width = int(width)
+        self.config.connection.camera_height = int(height)
 
     def _on_scope_view_changed(self) -> None:
         self.config.scope_view_enabled = self._chk_scope_view.isChecked()
@@ -5312,6 +6727,8 @@ class SentryV2TabWidget(QWidget):
         """Handle master PIR enable/disable."""
         self.config.pir_guard.pir_enabled = bool(checked)
         self._push_config()
+        if not self._host_controls_hardware() and self._comm.is_connected():
+            self._queue_comm_task("send_pir_enabled", bool(checked))
         self._log(f"PIR guard {'enabled' if checked else 'disabled'}")
 
     def _on_pir_sensor_changed(self, idx: int, field: str, value: float) -> None:
@@ -5345,7 +6762,11 @@ class SentryV2TabWidget(QWidget):
         if not self.engine or not hasattr(self.engine, '_pir_manager'):
             self._lbl_pir_status.setText("Status: Engine not ready")
             return
-        status_text = self.engine._pir_manager.get_status_text()
+        mgr = self.engine._pir_manager
+        status_text = mgr.get_status_text()
+        queued = mgr.peek_queue_count()
+        if queued > 0:
+            status_text += f"  [{queued} sensor(s) pending]"
         self._lbl_pir_status.setText(f"Status: {status_text}")
 
     def _scope_view_active_for_state(self, state: SentryV2State) -> bool:
@@ -5383,6 +6804,8 @@ class SentryV2TabWidget(QWidget):
         )
 
     def _on_mask_capture_toggled(self, checked: bool) -> None:
+        if checked and self._prompted_capture_active:
+            self._set_prompted_capture_active(False)
         self._mask_capture_active = bool(checked)
         self._update_mask_editor_ui()
         self._log(
@@ -5560,6 +6983,18 @@ class SentryV2TabWidget(QWidget):
         if not self._host_controls_hardware():
             self._queue_comm_task("set_laser", checked, self.engine.current_pan, self.engine.current_tilt)
 
+    def _on_acc_toggled(self, checked: bool) -> None:
+        self._acc_on = checked
+        self._btn_acc.setText(f"ACC: {'ON' if checked else 'OFF'}")
+        if not self._host_controls_hardware():
+            self._queue_comm_task("set_acc", checked, self.engine.current_pan, self.engine.current_tilt)
+
+    def _on_spare_toggled(self, checked: bool) -> None:
+        self._spare_on = checked
+        self._btn_spare.setText(f"Spare: {'ON' if checked else 'OFF'}")
+        if not self._host_controls_hardware():
+            self._queue_comm_task("set_spare", checked, self.engine.current_pan, self.engine.current_tilt)
+
     def _on_safety_toggled(self, checked: bool) -> None:
         self._safety_armed = checked
         self._btn_safety.setText(f"Safety: {'ARMED' if checked else 'LOCKED'}")
@@ -5634,13 +7069,297 @@ class SentryV2TabWidget(QWidget):
             cc.invert_pan = self._chk_invert_pan.isChecked()
             cc.invert_tilt = self._chk_invert_tilt.isChecked()
             cc.camera_source = self._edit_cam_source.text().strip()
-            cc.camera_width = self._spin_cam_w.value()
-            cc.camera_height = self._spin_cam_h.value()
+            selected_width, selected_height = self._selected_camera_dimensions()
+            cc.camera_width = selected_width
+            cc.camera_height = selected_height
+            cc.webcam_zoom_pct = int(self._slider_webcam_zoom.value())
+            cc.test_source_zoom_pct = int(self._slider_test_zoom.value())
             self.config.settings_panel_width = int(self._slider_panel_width.value())
-            self.config.save()
+            self.config.prompted_targets_enabled = bool(getattr(self, "_chk_prompted_enabled", None) and self._chk_prompted_enabled.isChecked())
+            self.config.prompted_allow_auto_fire = bool(getattr(self, "_chk_prompted_auto_fire", None) and self._chk_prompted_auto_fire.isChecked())
+            self.config.prompted_library_path = self._portable_path_string(self._resolved_prompted_library_path())
+            self.config.config_path = "app/config/sentry_v2_settings.json"
+            self.config.save(str(SENTRY_V2_SETTINGS_PATH))
+            self._save_prompted_target_library()
             self._log(f"Settings saved: {self.config.config_path}")
         except Exception as e:
             self._log(f"Save error: {e}")
+
+    def _resolved_prompted_library_path(self) -> Path:
+        configured = Path(str(self.config.prompted_library_path or "app/config/sentry_v2_prompted_targets.json"))
+        if configured.is_absolute():
+            return configured
+        return (Path(__file__).resolve().parents[2] / configured).resolve()
+
+    def _load_prompted_target_library(self) -> PromptedTargetLibrary:
+        return PromptedTargetLibrary.load(str(self._resolved_prompted_library_path()))
+
+    def _save_prompted_target_library(self) -> None:
+        try:
+            self._prompted_target_library.save(str(self._resolved_prompted_library_path()))
+        except Exception as exc:
+            self._log(f"Prompted target save failed: {exc}")
+
+    def _reset_prompted_runtime(self) -> None:
+        self._prompted_matcher.refresh_library_cache()
+
+    def _selected_prompted_target_id(self) -> Optional[str]:
+        if not hasattr(self, "_prompted_target_list"):
+            return None
+        item = self._prompted_target_list.currentItem()
+        if item is None:
+            return None
+        target_id = str(item.data(Qt.UserRole) or "")
+        return target_id or None
+
+    def _selected_prompted_target(self):
+        target_id = self._selected_prompted_target_id()
+        if not target_id:
+            return None
+        return self._prompted_target_library.get_profile(target_id)
+
+    def _rebuild_prompted_target_list(self) -> None:
+        if not hasattr(self, "_prompted_target_list"):
+            return
+        selected_id = self._selected_prompted_target_id()
+        self._prompted_list_syncing = True
+        self._prompted_target_list.blockSignals(True)
+        self._prompted_target_list.clear()
+        for profile in self._prompted_target_library.profiles:
+            item = QListWidgetItem(f"{profile.name} ({len(profile.examples)} examples)")
+            item.setData(Qt.UserRole, profile.target_id)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+            item.setCheckState(Qt.Checked if profile.enabled else Qt.Unchecked)
+            self._prompted_target_list.addItem(item)
+            if selected_id and profile.target_id == selected_id:
+                item.setSelected(True)
+        self._prompted_target_list.blockSignals(False)
+        self._prompted_list_syncing = False
+        self._on_prompted_target_selected()
+        self._update_prompted_status_label()
+
+    def _on_prompted_settings_changed(self) -> None:
+        self.config.prompted_targets_enabled = bool(self._chk_prompted_enabled.isChecked())
+        self.config.prompted_allow_auto_fire = bool(self._chk_prompted_auto_fire.isChecked())
+        if not self.config.prompted_targets_enabled:
+            self._reset_prompted_runtime()
+        self._update_prompted_status_label()
+
+    def _on_prompted_target_selected(self) -> None:
+        profile = self._selected_prompted_target()
+        self._prompted_detail_syncing = True
+        if hasattr(self, "_btn_prompted_rename"):
+            self._btn_prompted_rename.setEnabled(profile is not None)
+        if hasattr(self, "_btn_prompted_remove_last_example"):
+            self._btn_prompted_remove_last_example.setEnabled(profile is not None and bool(profile.examples if profile is not None else []))
+        if hasattr(self, "_btn_prompted_remove"):
+            self._btn_prompted_remove.setEnabled(profile is not None)
+        if profile is not None and hasattr(self, "_edit_prompted_name"):
+            self._edit_prompted_name.setText(str(profile.name))
+        if hasattr(self, "_spin_prompted_min_score"):
+            self._spin_prompted_min_score.setEnabled(profile is not None)
+            self._spin_prompted_confirm_hits.setEnabled(profile is not None)
+            self._spin_prompted_lost_timeout.setEnabled(profile is not None)
+            self._spin_prompted_search_padding.setEnabled(profile is not None)
+            self._spin_prompted_global_interval.setEnabled(profile is not None)
+            if profile is not None:
+                self._spin_prompted_min_score.setValue(float(profile.min_match_score))
+                self._spin_prompted_confirm_hits.setValue(int(profile.min_confirm_hits))
+                self._spin_prompted_lost_timeout.setValue(float(profile.lost_timeout_s))
+                self._spin_prompted_search_padding.setValue(int(profile.local_search_padding_px))
+                self._spin_prompted_global_interval.setValue(int(profile.full_frame_search_interval))
+                self._lbl_prompted_examples.setText(f"Examples: {len(profile.examples)}")
+            else:
+                self._lbl_prompted_examples.setText("Examples: 0")
+        self._prompted_detail_syncing = False
+        self._update_prompted_status_label()
+
+    def _on_prompted_target_item_changed(self, item: QListWidgetItem) -> None:
+        if self._prompted_list_syncing:
+            return
+        target_id = str(item.data(Qt.UserRole) or "")
+        profile = self._prompted_target_library.get_profile(target_id)
+        if profile is None:
+            return
+        profile.enabled = item.checkState() == Qt.Checked
+        self._save_prompted_target_library()
+        self._reset_prompted_runtime()
+        self._update_prompted_status_label()
+
+    def _on_prompted_profile_settings_changed(self) -> None:
+        if self._prompted_detail_syncing:
+            return
+        profile = self._selected_prompted_target()
+        if profile is None:
+            return
+        profile.min_match_score = float(self._spin_prompted_min_score.value())
+        profile.min_confirm_hits = int(self._spin_prompted_confirm_hits.value())
+        profile.lost_timeout_s = float(self._spin_prompted_lost_timeout.value())
+        profile.local_search_padding_px = int(self._spin_prompted_search_padding.value())
+        profile.full_frame_search_interval = int(self._spin_prompted_global_interval.value())
+        self._save_prompted_target_library()
+        self._reset_prompted_runtime()
+        self._update_prompted_status_label()
+
+    def _rename_selected_prompted_target(self) -> None:
+        profile = self._selected_prompted_target()
+        if profile is None:
+            return
+        new_name = str(self._edit_prompted_name.text().strip() or "")
+        if not new_name:
+            self._log("Enter a target name before renaming.")
+            return
+        profile.name = new_name
+        self._save_prompted_target_library()
+        self._reset_prompted_runtime()
+        self._rebuild_prompted_target_list()
+        self._log(f"Prompted target renamed: {new_name}")
+
+    def _remove_last_prompted_example(self) -> None:
+        profile = self._selected_prompted_target()
+        if profile is None:
+            return
+        updated = self._prompted_target_library.remove_last_example(profile.target_id)
+        if updated is None:
+            return
+        if not updated.examples:
+            removed_name = str(updated.name)
+            self._prompted_target_library.remove_target(updated.target_id)
+            self._log(f"Removed final example and deleted prompted target: {removed_name}")
+        else:
+            self._log(f"Removed last prompted example from {updated.name}.")
+        self._save_prompted_target_library()
+        self._reset_prompted_runtime()
+        self._rebuild_prompted_target_list()
+
+    def _remove_selected_prompted_target(self) -> None:
+        profile = self._selected_prompted_target()
+        if profile is None:
+            return
+        removed_name = str(profile.name)
+        self._prompted_target_library.remove_target(profile.target_id)
+        self._save_prompted_target_library()
+        self._reset_prompted_runtime()
+        self._rebuild_prompted_target_list()
+        self._log(f"Prompted target removed: {removed_name}")
+
+    def _set_prompted_capture_active(self, active: bool) -> None:
+        self._prompted_capture_active = bool(active)
+        if hasattr(self, "_video_label"):
+            self._video_label.set_roi_selection_enabled(bool(active))
+        if hasattr(self, "_btn_prompted_live"):
+            self._btn_prompted_live.setText("Stop Live Capture" if active else "Add From Live")
+        self._update_prompted_status_label()
+
+    def _toggle_prompted_live_capture(self) -> None:
+        if self._prompted_capture_active:
+            self._set_prompted_capture_active(False)
+            self._log("Prompted live capture stopped.")
+            return
+        if self._last_raw_frame is None:
+            self._log("Prompted live capture needs an active frame first.")
+            return
+        if self._mask_capture_active:
+            self._log("Disable no-fire mask capture before prompted live capture.")
+            return
+        self._set_prompted_capture_active(True)
+        self._log("Prompted live capture enabled: drag a box on the live video.")
+
+    def _browse_prompted_image(self) -> None:
+        path, _selected_filter = QFileDialog.getOpenFileName(
+            self,
+            "Select Target Image",
+            str(Path(__file__).resolve().parents[2]),
+            "Images (*.png *.jpg *.jpeg *.bmp *.webp);;All files (*.*)",
+        )
+        if not path:
+            return
+        image = cv2.imread(path)
+        if image is None:
+            self._log(f"Could not load image: {path}")
+            return
+        dialog = PromptedMediaSelectionDialog(title="Select Prompted Targets From Image", image=image, parent=self)
+        if dialog.exec_() != dialog.Accepted:
+            return
+        selections = dialog.selections()
+        for selection in selections:
+            selection.source_path = path
+        self._append_or_create_prompted_targets(selections, "image")
+
+    def _browse_prompted_video(self) -> None:
+        path, _selected_filter = QFileDialog.getOpenFileName(
+            self,
+            "Select Target Video",
+            str(Path(__file__).resolve().parents[2]),
+            "Videos (*.mp4 *.avi *.mov *.mkv *.wmv *.m4v);;All files (*.*)",
+        )
+        if not path:
+            return
+        dialog = PromptedMediaSelectionDialog(title="Select Prompted Targets From Video", video_path=path, parent=self)
+        if dialog.exec_() != dialog.Accepted:
+            return
+        selections = dialog.selections()
+        for selection in selections:
+            selection.source_path = path
+        self._append_or_create_prompted_targets(selections, "video")
+
+    def _append_or_create_prompted_targets(self, selections: List[PromptedSelection], source_label: str) -> None:
+        if not selections:
+            return
+        selected_profile = self._selected_prompted_target() if self._chk_prompted_append_selected.isChecked() else None
+        if selected_profile is not None:
+            self._prompted_target_library.append_examples(selected_profile.target_id, selections)
+            self._save_prompted_target_library()
+            self._reset_prompted_runtime()
+            self._rebuild_prompted_target_list()
+            self._log(f"Added {len(selections)} {source_label} example(s) to {selected_profile.name}.")
+            return
+
+        base_name = str(self._edit_prompted_name.text().strip() or "")
+        created = 0
+        if len(selections) == 1:
+            name = base_name or self._prompted_target_library.next_default_name()
+            if self._prompted_target_library.add_new_target(name, selections) is not None:
+                created += 1
+        else:
+            for index, selection in enumerate(selections, start=1):
+                name = f"{base_name} {index}".strip() if base_name else self._prompted_target_library.next_default_name()
+                if self._prompted_target_library.add_new_target(name, [selection]) is not None:
+                    created += 1
+        if created > 0:
+            self._save_prompted_target_library()
+            self._reset_prompted_runtime()
+            self._rebuild_prompted_target_list()
+            self._log(f"Created {created} prompted target(s) from {source_label}.")
+
+    def _on_video_roi_selected(self, frame_x: float, frame_y: float, width: float, height: float) -> None:
+        if not self._prompted_capture_active:
+            return
+        if self._last_raw_frame is None:
+            self._log("Prompted capture failed: no current frame available.")
+            self._set_prompted_capture_active(False)
+            return
+        selection = PromptedSelection(
+            frame=self._last_raw_frame.copy(),
+            bbox=(int(round(frame_x)), int(round(frame_y)), max(1, int(round(width))), max(1, int(round(height)))),
+            source_type="live",
+        )
+        self._append_or_create_prompted_targets([selection], "live")
+        self._set_prompted_capture_active(False)
+
+    def _update_prompted_status_label(self) -> None:
+        if not hasattr(self, "_lbl_prompted_status"):
+            return
+        enabled_count = sum(1 for profile in self._prompted_target_library.profiles if profile.enabled)
+        total_count = len(self._prompted_target_library.profiles)
+        status = "ON" if self.config.prompted_targets_enabled else "OFF"
+        live_hint = " | live capture armed" if self._prompted_capture_active else ""
+        selected = self._selected_prompted_target()
+        selected_hint = f" | Selected: {selected.name}" if selected is not None else ""
+        self._lbl_prompted_status.setText(
+            f"Runtime: {status} | Targets: {enabled_count}/{total_count} enabled | "
+            f"Auto-fire: {'ON' if self.config.prompted_allow_auto_fire else 'OFF'}{selected_hint}{live_hint}"
+        )
 
     # ------------------------------------------------------------------ #
     #  Internal helpers
@@ -5661,6 +7380,7 @@ class SentryV2TabWidget(QWidget):
         self.config.settings_panel_width = width
         self._lbl_panel_width.setText(f"{width} px")
         self._apply_panel_width(width)
+        self._reflow_all_responsive_button_grids()
 
     def _apply_saved_panel_width(self) -> None:
         self._apply_panel_width(int(self.config.settings_panel_width))
@@ -5672,6 +7392,7 @@ class SentryV2TabWidget(QWidget):
             total_width = max(self.width(), width + 720)
         left_width = max(480, total_width - width)
         self._main_splitter.setSizes([left_width, width])
+        self._reflow_all_responsive_button_grids()
 
     def _on_servo_time_changed(self, value: int) -> None:
         move_time = int(value)
@@ -5921,10 +7642,16 @@ class SentryV2TabWidget(QWidget):
     def _resolved_engagement_preset_settings(self, preset: dict) -> dict:
         settings = dict(vars(EngagementConfig()))
         settings.update(dict(preset.get("settings", {})))
-        # Only force single_target mode if explicitly requested (backward compatibility)
-        if settings.get("single_target_only", True):
+        max_queue_length = max(1, int(settings.get("max_queue_length", 1) or 1))
+        settings["max_queue_length"] = max_queue_length
+        # The visible queue control is the source of truth. Preserve explicit
+        # single-target presets only when they also request a single slot.
+        if bool(settings.get("single_target_only", False)) and max_queue_length <= 1:
             settings["max_queue_length"] = 1
             settings["optimize_slew_order"] = False
+            settings["single_target_only"] = True
+        else:
+            settings["single_target_only"] = max_queue_length <= 1
         return settings
 
     def _apply_threat_preset(self, preset_name_or_settings: str | dict) -> None:
@@ -6102,6 +7829,11 @@ class SentryV2TabWidget(QWidget):
             tf.min_confidence = float(settings["min_confidence"])
             tf.min_size_ratio = float(settings["min_size_ratio"])
             tf.max_size_ratio = float(settings["max_size_ratio"])
+            tf.shape_filter_enabled = bool(settings.get("shape_filter_enabled", False))
+            tf.shape_profile_name = str(settings.get("shape_profile_name", "") or "")
+            tf.semantic_min_confirm_frames = int(settings.get("semantic_min_confirm_frames", 1) or 1)
+            tf.semantic_min_confirm_confidence = float(settings.get("semantic_min_confirm_confidence", 0.0) or 0.0)
+            tf.semantic_confirm_ttl_s = float(settings.get("semantic_confirm_ttl_s", 0.8) or 0.8)
             self._detector.set_yolo_classes(",".join(tf.allowed_classes))
             self._push_config()
             if preset_label:
@@ -6336,6 +8068,11 @@ class SentryV2TabWidget(QWidget):
             "min_confidence": float(tf.min_confidence),
             "min_size_ratio": float(tf.min_size_ratio),
             "max_size_ratio": float(tf.max_size_ratio),
+            "shape_filter_enabled": bool(getattr(tf, "shape_filter_enabled", False)),
+            "shape_profile_name": str(getattr(tf, "shape_profile_name", "") or ""),
+            "semantic_min_confirm_frames": int(getattr(tf, "semantic_min_confirm_frames", 1) or 1),
+            "semantic_min_confirm_confidence": float(getattr(tf, "semantic_min_confirm_confidence", 0.0) or 0.0),
+            "semantic_confirm_ttl_s": float(getattr(tf, "semantic_confirm_ttl_s", 0.8) or 0.8),
         }
 
     def _capture_current_threat_settings(self) -> dict:
@@ -6768,9 +8505,21 @@ class SentryV2TabWidget(QWidget):
             ok = self._comm.set_laser(*args, **kwargs)
             self.command_result_ready.emit("set_laser", bool(ok), getattr(self._comm, "_last_error", "") or "")
             return
+        if task_name == "set_acc":
+            ok = self._comm.set_acc(*args, **kwargs)
+            self.command_result_ready.emit("set_acc", bool(ok), getattr(self._comm, "_last_error", "") or "")
+            return
+        if task_name == "set_spare":
+            ok = self._comm.set_spare(*args, **kwargs)
+            self.command_result_ready.emit("set_spare", bool(ok), getattr(self._comm, "_last_error", "") or "")
+            return
         if task_name == "set_safety":
             ok = self._comm.set_safety(*args, **kwargs)
             self.command_result_ready.emit("set_safety", bool(ok), getattr(self._comm, "_last_error", "") or "")
+            return
+        if task_name == "send_pir_enabled":
+            ok = self._comm.send_pir_enabled(*args, **kwargs)
+            self.command_result_ready.emit("send_pir_enabled", bool(ok), getattr(self._comm, "_last_error", "") or getattr(self._comm, "_last_cmd", "") or "")
             return
 
     def _on_command_result_ready(self, command_name: str, ok: bool, detail: str) -> None:
@@ -6871,12 +8620,13 @@ class SentryV2TabWidget(QWidget):
     def _suppress_motion_detection(self, seconds: Optional[float] = None) -> None:
         suppress_for = self.config.detection_mode.motion_ignore_after_move_s if seconds is None else seconds
         if suppress_for > 0:
-            print(f"DEBUG: SUPPRESSION TRIGGERED duration={suppress_for:.3f}")
             self._detector.suppress_motion(float(suppress_for))
 
     def _apply_all_config(self) -> None:
         """Read all UI controls into config before start."""
         self._on_detection_mode_changed(self._combo_detection_mode.currentIndex())
+        if hasattr(self, "_chk_prompted_enabled"):
+            self._on_prompted_settings_changed()
         self._on_detection_settings_changed()
         self._on_color_settings_changed()
         self._on_filter_changed()
@@ -6887,8 +8637,8 @@ class SentryV2TabWidget(QWidget):
         self._on_scope_view_changed()
         self._on_overlay_changed()
 
-    def _convert_detections(
-        self, raw: list, frame_w: int, frame_h: int, timestamp: Optional[float] = None
+    def _raw_detections_to_objects(
+        self, raw: list, frame_w: int, frame_h: int
     ) -> List[DetectedObject]:
         """
         Convert main-app detection format to DetectedObject list.
@@ -6918,6 +8668,12 @@ class SentryV2TabWidget(QWidget):
                 frame_width=frame_w,
                 frame_height=frame_h,
             ))
+        return result
+
+    def _convert_detections(
+        self, raw: list, frame_w: int, frame_h: int, timestamp: Optional[float] = None
+    ) -> List[DetectedObject]:
+        result = self._raw_detections_to_objects(raw, frame_w, frame_h)
         return self._tracker.assign_tracks(result, timestamp or time.time())
 
     def _resolve_class_and_source(self, class_id: int) -> Tuple[str, str]:
@@ -7030,12 +8786,10 @@ class SentryV2TabWidget(QWidget):
 
         x = 10
         y = frame.shape[0] - 12
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.50
-        thickness = 1
-        (tw, th), _ = cv2.getTextSize(text, font, font_scale, thickness)
-        cv2.rectangle(frame, (x - 6, y - th - 8), (x + tw + 6, y + 6), (20, 20, 20), -1)
-        cv2.putText(frame, text, (x, y), font, font_scale, color, thickness, cv2.LINE_AA)
+        font = cv2.FONT_HERSHEY_DUPLEX
+        font_scale = 0.38
+        cv2.putText(frame, text, (x + 1, y + 1), font, font_scale, (0, 0, 0), 2, cv2.LINE_AA)
+        cv2.putText(frame, text, (x, y),           font, font_scale, color,    1, cv2.LINE_AA)
 
     def _refresh_status(self) -> None:
         """Periodic status label update."""
@@ -7050,18 +8804,6 @@ class SentryV2TabWidget(QWidget):
             f"Move: {int(getattr(self, '_last_tracking_move_time_ms', 0))}ms | "
             f"Suppress: {float(getattr(self, '_last_tracking_suppression_s', 0.0)):.2f}s"
         )
-        if hasattr(self, "_lbl_detection_sizes"):
-            if self._last_detected_objects:
-                lines = ["Detection sizes (pixels):"]
-                for idx, det in enumerate(self._last_detected_objects, start=1):
-                    x, y, w, h = det.bbox
-                    area_px = int(max(0, w) * max(0, h))
-                    lines.append(
-                        f"#{idx} {det.class_name:<12} {w:>4}x{h:<4} area={area_px:>7}px2 @({x},{y})"
-                    )
-                self._lbl_detection_sizes.setText("\n".join(lines))
-            else:
-                self._lbl_detection_sizes.setText("Detection sizes: none")
         current_pan = float(self.engine.current_pan)
         current_tilt = float(self.engine.current_tilt)
         guard = self.config.guard
@@ -7104,6 +8846,7 @@ class SentryV2TabWidget(QWidget):
         # Update PIR status display in Guard tab
         if hasattr(self, "_lbl_pir_status"):
             self._update_pir_status_display()
+        self._update_prompted_status_label()
 
     def _dump_mask_trace_snapshot(self) -> None:
         blocked_mask = str(self.engine.get_engagement_stats().get('no_fire_mask') or '')
