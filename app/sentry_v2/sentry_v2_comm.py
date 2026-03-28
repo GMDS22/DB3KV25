@@ -859,6 +859,8 @@ class SentryV2Comm:
             "mode": 1 if self.trigger_mode_bb else 0,
             "led": 1 if self.led_on else 0,
             "laser": 1 if self.laser_on else 0,
+            "acc": 1 if self.acc_on else 0,
+            "spare": 1 if self.spare_on else 0,
         }
 
     def _send_io_serial(self, fire: int = 0) -> bool:
@@ -885,9 +887,9 @@ class SentryV2Comm:
         io = self._build_io_tokens(fire)
         ok = self._send_udp_payload(
             io,
-            label=f"UDP IO F{io['fire']}L{io['led']}R{io['laser']}S{io['safety']}M{io['mode']}",
+            label=f"UDP IO F{io['fire']}L{io['led']}R{io['laser']}S{io['safety']}M{io['mode']}A{io['acc']}P{io['spare']}",
         )
         if ok:
-            self._last_cmd += f" | UDP IO F{io['fire']}L{io['led']}R{io['laser']}"
+            self._last_cmd += f" | UDP IO F{io['fire']}L{io['led']}R{io['laser']}A{io['acc']}P{io['spare']}"
         return ok
 

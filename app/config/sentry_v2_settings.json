@@ -1,7 +1,7 @@
 {
   "connection": {
-    "connection_type": 1,
-    "esp32_port": "COM31",
+    "connection_type": 2,
+    "esp32_port": "",
     "esp32_baud": 115200,
     "debug_port": "COM31",
     "debug_baud": 115200,

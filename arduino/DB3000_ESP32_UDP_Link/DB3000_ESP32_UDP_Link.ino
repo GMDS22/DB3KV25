@@ -62,6 +62,8 @@ static const int PIN_TRIGGER_MOSFET = 27;   // Water mode
 static const int PIN_TRIGGER_SERVO  = 13;   // Projectile mode (PWM-capable)
 static const int PIN_LED_RELAY      = 32;
 static const int PIN_LASER_RELAY    = 33;
+static const int PIN_ACC_RELAY      = 25;
+static const int PIN_SPARE_RELAY    = 26;
 static const int PIN_SWEEP_BUTTON   = 0;    // DevKit BOOT button (active low)
 
 static const int PIN_CURR_PAN   = 36;       // ADC1 (input-only, VP)
@@ -175,6 +177,8 @@ static int  target_tilt = 40;
 static int  safety_state = 1;   // 1 = safe/locked, 0 = armed
 static int  led_state    = 0;
 static int  laser_state  = 0;
+static int  acc_state    = 0;
+static int  spare_state  = 0;
 static int  fire_request = 0;
 static bool fire_hold    = false;
 
@@ -800,6 +804,8 @@ static void update_motion_outputs(bool motion_blocked) {
 static void update_accessories() {
   digitalWrite(PIN_LED_RELAY,   led_state   ? HIGH : LOW);
   digitalWrite(PIN_LASER_RELAY, laser_state ? HIGH : LOW);
+  digitalWrite(PIN_ACC_RELAY,   acc_state   ? HIGH : LOW);
+  digitalWrite(PIN_SPARE_RELAY, spare_state ? HIGH : LOW);
 }
 
 static void set_mosfet(bool on) {
@@ -968,6 +974,8 @@ static void send_caps(IPAddress ip, uint16_t port) {
   pins["trigger_servo"] = PIN_TRIGGER_SERVO;
   pins["led"]           = PIN_LED_RELAY;
   pins["laser"]         = PIN_LASER_RELAY;
+  pins["acc"]           = PIN_ACC_RELAY;
+  pins["spare"]         = PIN_SPARE_RELAY;
   pins["curr_pan"]      = PIN_CURR_PAN;
   pins["curr_tilt"]     = PIN_CURR_TILT;
   pins["curr_total"]    = PIN_CURR_TOTAL;
@@ -1112,6 +1120,16 @@ static void apply_command(JsonObject payload) {
     laser_state = payload["laser"];
     if (prev != laser_state) blink_accessory = true;
   }
+  if (payload.containsKey("acc")) {
+    int prev = acc_state;
+    acc_state = payload["acc"];
+    if (prev != acc_state) blink_accessory = true;
+  }
+  if (payload.containsKey("spare")) {
+    int prev = spare_state;
+    spare_state = payload["spare"];
+    if (prev != spare_state) blink_accessory = true;
+  }
   if (payload.containsKey("mode")) {
     int prev = trigger_cfg.mode;
     trigger_cfg.mode = payload["mode"];
@@ -1183,6 +1201,9 @@ static void apply_command(JsonObject payload) {
   if (blink_accessory) status_led_enqueue_pattern(3);
   if (blink_fire)      status_led_enqueue_pattern(2);
   if (blink_motion)    status_led_enqueue_pattern(1);
+
+  // Always blink once on every command receipt (like serial firmware)
+  status_led_enqueue_pattern(1);
 }
 
 static void process_packet(char *buffer, size_t len,
@@ -1358,12 +1379,13 @@ static void validate_pins() {
 
   int all_pins[] = {
     PIN_UART_RX, PIN_UART_TX, PIN_TRIGGER_MOSFET, PIN_TRIGGER_SERVO,
-    PIN_LED_RELAY, PIN_LASER_RELAY, PIN_CURR_PAN, PIN_CURR_TILT,
-    PIN_CURR_TOTAL
+    PIN_LED_RELAY, PIN_LASER_RELAY, PIN_ACC_RELAY, PIN_SPARE_RELAY,
+    PIN_CURR_PAN, PIN_CURR_TILT, PIN_CURR_TOTAL
   };
   const char *names[] = {
     "UART_RX", "UART_TX", "MOSFET", "TRIG_SERVO",
-    "LED_RELAY", "LASER_RELAY", "CURR_PAN", "CURR_TILT", "CURR_TOTAL"
+    "LED_RELAY", "LASER_RELAY", "ACC_RELAY", "SPARE_RELAY",
+    "CURR_PAN", "CURR_TILT", "CURR_TOTAL"
   };
   int count = sizeof(all_pins) / sizeof(all_pins[0]);
 
@@ -1429,7 +1451,7 @@ static void run_self_test() {
   Serial.println("  -> OFF OK");
 
   // 3. Laser relay
-  Serial.println("[TEST] 3/7 Laser relay toggle");
+  Serial.println("[TEST] 3/9 Laser relay toggle");
   digitalWrite(PIN_LASER_RELAY, HIGH);
   delay(300);
   Serial.println("  -> ON");
@@ -1437,8 +1459,26 @@ static void run_self_test() {
   delay(200);
   Serial.println("  -> OFF OK");
 
-  // 4. MOSFET
-  Serial.println("[TEST] 4/7 MOSFET trigger toggle");
+  // 4. ACC relay
+  Serial.println("[TEST] 4/9 ACC relay toggle");
+  digitalWrite(PIN_ACC_RELAY, HIGH);
+  delay(300);
+  Serial.println("  -> ON");
+  digitalWrite(PIN_ACC_RELAY, LOW);
+  delay(200);
+  Serial.println("  -> OFF OK");
+
+  // 5. Spare relay
+  Serial.println("[TEST] 5/9 Spare relay toggle");
+  digitalWrite(PIN_SPARE_RELAY, HIGH);
+  delay(300);
+  Serial.println("  -> ON");
+  digitalWrite(PIN_SPARE_RELAY, LOW);
+  delay(200);
+  Serial.println("  -> OFF OK");
+
+  // 6. MOSFET
+  Serial.println("[TEST] 6/9 MOSFET trigger toggle");
   digitalWrite(PIN_TRIGGER_MOSFET, HIGH);
   delay(150);
   Serial.println("  -> ON");
@@ -1446,16 +1486,16 @@ static void run_self_test() {
   delay(100);
   Serial.println("  -> OFF OK");
 
-  // 5. Bus servo home
-  Serial.println("[TEST] 5/7 Bus servo home (Pan=90, Tilt=40)");
+  // 7. Bus servo home
+  Serial.println("[TEST] 7/9 Bus servo home (Pan=90, Tilt=40)");
   set_bus_servo_angle(BUS_ID_PAN,  90, 500);
   delay(100);
   set_bus_servo_angle(BUS_ID_TILT, 40, 500);
   delay(600);
   Serial.println("  -> Home sent, check physical movement");
 
-  // 6. Pan sweep
-  Serial.println("[TEST] 6/7 Pan sweep: 80 -> 100 -> 90");
+  // 8. Pan sweep
+  Serial.println("[TEST] 8/9 Pan sweep: 80 -> 100 -> 90");
   set_bus_servo_angle(BUS_ID_PAN, 80, 300);
   delay(400);
   set_bus_servo_angle(BUS_ID_PAN, 100, 300);
@@ -1464,8 +1504,8 @@ static void run_self_test() {
   delay(400);
   Serial.println("  -> Pan sweep complete");
 
-  // 7. Tilt sweep
-  Serial.println("[TEST] 7/7 Tilt sweep: 30 -> 50 -> 40");
+  // 9. Tilt sweep
+  Serial.println("[TEST] 9/9 Tilt sweep: 30 -> 50 -> 40");
   set_bus_servo_angle(BUS_ID_TILT, 30, 300);
   delay(400);
   set_bus_servo_angle(BUS_ID_TILT, 50, 300);
@@ -1544,15 +1584,20 @@ void setup() {
   pinMode(PIN_TRIGGER_MOSFET, OUTPUT);
   pinMode(PIN_LED_RELAY,      OUTPUT);
   pinMode(PIN_LASER_RELAY,    OUTPUT);
+  pinMode(PIN_ACC_RELAY,      OUTPUT);
+  pinMode(PIN_SPARE_RELAY,    OUTPUT);
   pinMode(PIN_STATUS_LED,     OUTPUT);
   pinMode(PIN_SWEEP_BUTTON,   INPUT_PULLUP);
   digitalWrite(PIN_TRIGGER_MOSFET, LOW);
   digitalWrite(PIN_LED_RELAY,      LOW);
   digitalWrite(PIN_LASER_RELAY,    LOW);
+  digitalWrite(PIN_ACC_RELAY,      LOW);
+  digitalWrite(PIN_SPARE_RELAY,    LOW);
   digitalWrite(PIN_STATUS_LED,     LOW);
   Serial.printf("  MOSFET(GPIO%d)=LOW  LED(GPIO%d)=LOW  LASER(GPIO%d)=LOW\n",
                 PIN_TRIGGER_MOSFET, PIN_LED_RELAY, PIN_LASER_RELAY);
-  Serial.printf("  STATUS_LED(GPIO%d)=LOW\n", PIN_STATUS_LED);
+  Serial.printf("  ACC(GPIO%d)=LOW  SPARE(GPIO%d)=LOW  STATUS_LED(GPIO%d)=LOW\n",
+                PIN_ACC_RELAY, PIN_SPARE_RELAY, PIN_STATUS_LED);
   Serial.printf("  SWEEP_BUTTON(GPIO%d)=INPUT_PULLUP\n", PIN_SWEEP_BUTTON);
 
   // Trigger servo PWM is armed on first runtime use so startup stays passive.

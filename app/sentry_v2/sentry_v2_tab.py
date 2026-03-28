@@ -2127,6 +2127,7 @@ class SentryV2TabWidget(QWidget):
         self._status_timer.start(500)
         self._schedule_auto_yolo_load(1200)
         QTimer.singleShot(800, self._auto_open_camera_on_startup)
+        QTimer.singleShot(1000, self._auto_connect_on_startup)
 
     def _load_settings_config(self) -> SentryV2Config:
         """Load settings from the canonical path and only fall back to legacy once if needed."""
@@ -2171,6 +2172,23 @@ class SentryV2TabWidget(QWidget):
             if not self._closing and not self._has_local_source() and _retry < 3:
                 delay = 1500 * (_retry + 1)
                 QTimer.singleShot(delay, lambda r=_retry+1: self._auto_open_camera_on_startup(r))
+
+    def _auto_connect_on_startup(self) -> None:
+        """Auto-connect on startup if in WiFi mode and not already connected."""
+        if self._host_controls_hardware():
+            return  # Host app manages connection
+        if self._comm.is_connected():
+            return  # Already connected
+        if self._connection_busy:
+            return  # Connection operation in progress
+
+        # Only auto-connect for WiFi modes (2=WiFi+Debug, 3=WiFi Full)
+        mode = self.config.connection.connection_type
+        if mode not in (2, 3):
+            return
+
+        self._log(f"Auto-connecting in mode {mode}...")
+        self._toggle_connection()
 
     def cleanup(self) -> None:
         """Stop timers and release all resources. Safe to call multiple times."""
