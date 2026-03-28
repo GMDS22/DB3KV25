@@ -141,6 +141,19 @@ The app supports three serial modes (UI: **Configuration & Connection → Serial
 
 **Arduino IDE quick link:** Use **Tools → Arduino IDE** inside the app to launch the IDE (or open the tools folder if the IDE isn’t found).
 
+## Launcher behavior
+
+- `python run.py` now launches the standalone Smart Sentry v2 window by default.
+- `python run.py --main` launches the legacy full main app in `app/MAIN_FILE_SINGLE_CAM.py`.
+- For Smart Sentry v2 Full WiFi mode, the ESP32 transport is UDP JSON + CRC32, matching the validation tools such as `esp32_udp_command_verify.py`.
+
+## ESP32 Firmware Baseline
+
+- Current active ESP32 sketches are tracked in `ESP32_CURRENT_SKETCH.md`.
+- For USB serial/dual-port IO + PIR operation, the current firmware is `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`.
+- For full WiFi runtime, the current firmware is `arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino`.
+- Any firmware update must include synchronized documentation updates in `ESP32_CURRENT_SKETCH.md`, `ESP32_UDP_FLASH.md`, and `CHANGE_IMPACT_REFERENCE.md`.
+
 ## Presets (minimal UI workflow)
 
 Factory presets (from `app/turret_presets.py`) can be applied from two places:

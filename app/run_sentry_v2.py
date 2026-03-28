@@ -10,11 +10,21 @@ from __future__ import annotations
 import os
 import sys
 
-from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow
 
-from db3k_meta import get_app_title
-from theme_manager import ThemeManager
+try:
+    from db3k_meta import get_app_title
+except Exception:
+    def get_app_title() -> str:
+        return "Smart Sentry"
+
+try:
+    from theme_manager import ThemeManager
+except Exception:
+    class ThemeManager:
+        def apply_theme(self, _theme_name: str = "dark") -> None:
+            return
+
 from sentry_v2.sentry_v2_tab import SENTRY_V2_STANDALONE_THEME, SentryV2TabWidget
 
 
@@ -27,16 +37,6 @@ class SentryV2StandaloneWindow(QMainWindow):
         self.sentry_v2_tab = SentryV2TabWidget(self)
         self.sentry_v2_tab.set_host_main_window(None)
         self.setCentralWidget(self.sentry_v2_tab)
-
-        # In standalone mode, default to the widget's own camera source.
-        QTimer.singleShot(0, self._startup_camera)
-
-    def _startup_camera(self) -> None:
-        try:
-            if getattr(self.sentry_v2_tab, "_cap", None) is None:
-                self.sentry_v2_tab._toggle_camera()
-        except Exception:
-            pass
 
     def closeEvent(self, event):
         try:

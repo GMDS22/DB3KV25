@@ -253,6 +253,10 @@ static void handleLine(String line) {
   line.trim();
   if (line.length() == 0) return;
 
+  // Echo the command for debugging
+  Serial.print("RECV: ");
+  Serial.println(line);
+
   // Uppercase for tolerant parsing
   line.toUpperCase();
 
@@ -285,9 +289,8 @@ static void handleLine(String line) {
       (prev_mode != mode_projectile);
   bool fire_changed = (prev_fire != fire_token);
 
-  if (accessory_changed || fire_changed) {
-    startStatusBlink(fire_changed ? 2 : 1);
-  }
+  // Blink LED on ANY command receipt (not just changes)
+  startStatusBlink(1);
 
   if (fire_token && safety_is_safe) {
     Serial.println("WARN FIRE_BLOCKED_SAFETY S=1 (send S0 to arm)");

@@ -1,0 +1,19 @@
+Right-side header — AFTER changes
+───────────────────────────────────────────────────────
+Pin# GPIO Assignment Notes
+───────────────────────────────────────────────────────
+1 VIN +5V power
+2 GND Ground
+3 13 PIN_TRIGGER_SERVO (PWM) Servo PWM — stays here
+4 12 [LEAVE FREE — boot pin ⚠️]
+5 14 [LEAVE FREE — JTAG pin ⚠️]
+6 27 PIN_TRIGGER_MOSFET ╗
+7 26 PIN_SPARE_RELAY ← NEW ║ 5 consecutive
+8 25 PIN_ACC_RELAY ║ relay outputs
+9 33 PIN_LASER_RELAY ║ one connector
+10 32 PIN_LED_RELAY ╝
+11 35 PIR Sensor 0 ╗
+12 34 PIR Sensor 1 ║ 3 consecutive
+13 39 PIR Sensor 2 ╝ PIR inputs
+14 36 PIN_CURR_PAN (ADC) Unchanged
+15 EN Reset

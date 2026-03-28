@@ -14,6 +14,7 @@ from pathlib import Path
 # drivers/PyTorch CUDA support may be missing (common on some AMD/Windows setups).
 YOLO = None
 _HAS_ULTRALYTICS = False
+SUPPORTED_MODEL_SUFFIXES = (".pt", ".onnx", ".engine", ".torchscript")
 
 
 def _prepare_windows_torch_runtime_env() -> None:
@@ -108,12 +109,96 @@ class YoloDetector:
         self._last_detect_sound_time = 0.0
         self._detect_sound_debounce = 0.6
 
+    def _repo_root_path(self) -> Path:
+        try:
+            return Path(__file__).resolve().parent.parent
+        except Exception:
+            return Path.cwd()
+
+    def _candidate_model_dirs(self) -> list[Path]:
+        candidates: list[Path] = []
+        raw_models_dir = str(getattr(self, "models_dir", "YOLO_MODELS") or "YOLO_MODELS").strip()
+
+        def _add(path_value: Path | str) -> None:
+            try:
+                path_obj = Path(path_value).expanduser()
+                if not path_obj.is_absolute():
+                    path_obj = (self._repo_root_path() / path_obj).resolve()
+                else:
+                    path_obj = path_obj.resolve()
+                if path_obj not in candidates:
+                    candidates.append(path_obj)
+            except Exception:
+                pass
+
+        if raw_models_dir:
+            _add(raw_models_dir)
+            try:
+                if not Path(raw_models_dir).is_absolute():
+                    _add(Path.cwd() / raw_models_dir)
+            except Exception:
+                pass
+
+        _add(self._repo_root_path() / "YOLO_MODELS")
+        _add(Path.cwd() / "YOLO_MODELS")
+        return candidates
+
+    def _discover_models(self) -> list[tuple[str, str]]:
+        discovered: dict[str, str] = {}
+        for models_dir in self._candidate_model_dirs():
+            try:
+                if not models_dir.is_dir():
+                    continue
+            except Exception:
+                continue
+
+            try:
+                entries = sorted(models_dir.iterdir(), key=lambda item: item.name.lower())
+            except Exception:
+                continue
+
+            for entry in entries:
+                try:
+                    if not entry.is_file():
+                        continue
+                    if entry.suffix.lower() not in SUPPORTED_MODEL_SUFFIXES:
+                        continue
+                    discovered.setdefault(entry.name, str(entry.resolve()))
+                except Exception:
+                    continue
+
+        return sorted(discovered.items(), key=lambda item: item[0].lower())
+
+    def resolve_model_path(self, model_name: str) -> str:
+        candidate = str(model_name or "").strip()
+        if not candidate:
+            return ""
+
+        try:
+            if os.path.isabs(candidate) or os.path.exists(candidate) or os.path.sep in candidate:
+                return os.path.abspath(candidate)
+        except Exception:
+            pass
+
+        try:
+            for name, path in self._discover_models():
+                if name == candidate or os.path.basename(candidate) == name:
+                    return path
+        except Exception:
+            pass
+
+        try:
+            configured_dir = str(getattr(self, "models_dir", "YOLO_MODELS") or "YOLO_MODELS")
+            return os.path.abspath(os.path.join(configured_dir, candidate))
+        except Exception:
+            return candidate
+
     def find_models(self):
-        """Finds all .pt files in the models directory."""
-        if not os.path.exists(self.models_dir):
-            os.makedirs(self.models_dir)
+        """Find supported YOLO model files from configured and repo-local model folders."""
+        try:
+            return [name for name, _ in self._discover_models()]
+        except Exception:
             return []
-        return [f for f in os.listdir(self.models_dir) if f.endswith(".pt")]
 
     def load_model(self, model_name):
         """
@@ -184,18 +269,7 @@ class YoloDetector:
                 return False
             # Determine candidate model path
             candidate = model_name or ""
-            # If model_name looks like a path or the file exists as given, use it
-            if (
-                os.path.isabs(candidate)
-                or os.path.exists(candidate)
-                or os.path.sep in candidate
-            ):
-                model_path = candidate
-            else:
-                model_path = os.path.join(self.models_dir, candidate)
-
-            # Normalize path for comparison
-            model_path = os.path.normpath(model_path)
+            model_path = os.path.normpath(self.resolve_model_path(candidate))
 
             # If the same model path is already loaded, nothing to do
             if (

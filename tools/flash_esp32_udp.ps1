@@ -8,6 +8,7 @@ param(
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Cli = Join-Path $RepoRoot "tools/arduino-cli/arduino-cli.exe"
 $SketchPath = Join-Path $RepoRoot $Sketch
+$LocalArduinoJson = Join-Path $RepoRoot "external/ArduinoJson"
 
 if (-not (Test-Path $Cli)) {
     Write-Error "arduino-cli.exe not found at $Cli"
@@ -38,7 +39,14 @@ if (-not $Port) {
     exit 1
 }
 
-& $Cli compile --fqbn $Fqbn $SketchPath
+$CompileArgs = @("compile", "--fqbn", $Fqbn)
+if (Test-Path $LocalArduinoJson) {
+    Write-Host "Using local ArduinoJson library at $LocalArduinoJson"
+    $CompileArgs += @("--library", $LocalArduinoJson)
+}
+$CompileArgs += $SketchPath
+
+& $Cli @CompileArgs
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Compile failed"
     exit 1

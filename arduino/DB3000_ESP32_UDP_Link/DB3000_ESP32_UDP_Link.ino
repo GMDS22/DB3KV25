@@ -2,11 +2,15 @@
 // ---------------------------------------------------------------
 // Receives JSON+CRC32 commands over UDP and drives the turret IO.
 // Default network mode is AP at 192.168.4.1 (matches app defaults).
+// Selected deployment topology:
+//   PC <-> ESP32 over WiFi/UDP only during runtime
+//   Debug Board <-> ESP32 over UART2 (GPIO16/GPIO17)
+//   ESP32 USB remains available for flashing and serial diagnostics
 //
 // Changes in v2:
 //   - Comprehensive Serial debug logging (boot, WiFi, connection,
 //     command reception, parsed values, servo execution).
-//   - Boot self-test: trigger servo sweep, relay toggle, bus-servo
+//   - Manual self-test: trigger servo sweep, relay toggle, bus-servo
 //     ping, brownout detection.
 //   - Manual test mode ("test" command from app).
 //   - Pin-conflict validation at boot.
@@ -58,6 +62,7 @@ static const int PIN_TRIGGER_MOSFET = 27;   // Water mode
 static const int PIN_TRIGGER_SERVO  = 13;   // Projectile mode (PWM-capable)
 static const int PIN_LED_RELAY      = 32;
 static const int PIN_LASER_RELAY    = 33;
+static const int PIN_SWEEP_BUTTON   = 0;    // DevKit BOOT button (active low)
 
 static const int PIN_CURR_PAN   = 36;       // ADC1 (input-only, VP)
 static const int PIN_CURR_TILT  = 39;       // ADC1 (input-only, VN)
@@ -179,6 +184,7 @@ static uint32_t last_state_ms = 0;
 static uint32_t last_fire_start_ms = 0;
 static bool fire_active       = false;
 static bool rapid_fire_active = false;
+static bool trigger_servo_pwm_ready = false;
 
 static uint32_t trip_start_ms = 0;
 static bool current_fault     = false;
@@ -203,6 +209,23 @@ static uint32_t crc_fail_count   = 0;
 static uint32_t parse_fail_count = 0;
 static uint32_t bus_send_count   = 0;
 static bool     first_client_seen = false;
+
+// =========================================================
+// Local button-triggered range sweep
+// =========================================================
+static const uint32_t SWEEP_BUTTON_DEBOUNCE_MS = 35;
+static const uint16_t SWEEP_MOVE_TIME_MS = 2500;
+static const uint32_t SWEEP_STEP_HOLD_MS = 2800;
+static const uint8_t  SWEEP_STEP_COUNT = 6;
+
+static bool     sweep_button_raw_pressed = false;
+static bool     sweep_button_stable_pressed = false;
+static uint32_t sweep_button_last_change_ms = 0;
+
+static bool     sweep_active = false;
+static uint8_t  sweep_step_index = 0;
+static bool     sweep_step_initialized = false;
+static uint32_t sweep_step_started_ms = 0;
 
 // =========================================================
 // Status LED blink engine (non-blocking)
@@ -290,6 +313,7 @@ static void status_led_tick(uint32_t now_val) {
 // Forward declarations
 // =========================================================
 static void run_self_test();
+static void update_button_sweep(uint32_t now_val);
 
 // =========================================================
 // CRC32
@@ -369,7 +393,139 @@ static uint32_t duty_us_to_ticks(uint32_t us) {
   return ticks;
 }
 
+static int clamped_home_pan() {
+  return clamp_int(home_cfg.pan, limits_cfg.pan_min, limits_cfg.pan_max);
+}
+
+static int clamped_home_tilt() {
+  return clamp_int(home_cfg.tilt, limits_cfg.tilt_min, limits_cfg.tilt_max);
+}
+
+static bool get_sweep_step_target(uint8_t stepIndex, int *panOut, int *tiltOut) {
+  if (!panOut || !tiltOut) return false;
+
+  switch (stepIndex) {
+    case 0:
+      *panOut = clamped_home_pan();
+      *tiltOut = clamped_home_tilt();
+      return true;
+    case 1:
+      *panOut = limits_cfg.pan_min;
+      *tiltOut = limits_cfg.tilt_min;
+      return true;
+    case 2:
+      *panOut = limits_cfg.pan_max;
+      *tiltOut = limits_cfg.tilt_min;
+      return true;
+    case 3:
+      *panOut = limits_cfg.pan_max;
+      *tiltOut = limits_cfg.tilt_max;
+      return true;
+    case 4:
+      *panOut = limits_cfg.pan_min;
+      *tiltOut = limits_cfg.tilt_max;
+      return true;
+    case 5:
+      *panOut = clamped_home_pan();
+      *tiltOut = clamped_home_tilt();
+      return true;
+    default:
+      return false;
+  }
+}
+
+static void start_button_sweep(uint32_t now_val) {
+  if (sweep_active) {
+    return;
+  }
+
+  sweep_active = true;
+  sweep_step_index = 0;
+  sweep_step_initialized = false;
+  sweep_step_started_ms = now_val;
+
+  Serial.printf("[SWEEP] Started from button using limits pan[%d..%d] tilt[%d..%d]\n",
+                limits_cfg.pan_min, limits_cfg.pan_max,
+                limits_cfg.tilt_min, limits_cfg.tilt_max);
+  status_led_enqueue_pattern(5);
+}
+
+static void finish_button_sweep() {
+  sweep_active = false;
+  sweep_step_index = 0;
+  sweep_step_initialized = false;
+  target_pan = clamped_home_pan();
+  target_tilt = clamped_home_tilt();
+
+  Serial.printf("[SWEEP] Complete -> home pan=%d tilt=%d\n",
+                target_pan, target_tilt);
+  status_led_enqueue_pattern(5);
+}
+
+static void update_button_sweep(uint32_t now_val) {
+  const bool raw_pressed = (digitalRead(PIN_SWEEP_BUTTON) == LOW);
+  if (raw_pressed != sweep_button_raw_pressed) {
+    sweep_button_raw_pressed = raw_pressed;
+    sweep_button_last_change_ms = now_val;
+  }
+
+  if ((now_val - sweep_button_last_change_ms) >= SWEEP_BUTTON_DEBOUNCE_MS &&
+      sweep_button_stable_pressed != sweep_button_raw_pressed) {
+    sweep_button_stable_pressed = sweep_button_raw_pressed;
+    if (sweep_button_stable_pressed) {
+      start_button_sweep(now_val);
+    }
+  }
+
+  if (!sweep_active) {
+    return;
+  }
+
+  if (!sweep_step_initialized) {
+    int sweep_pan = clamped_home_pan();
+    int sweep_tilt = clamped_home_tilt();
+    if (!get_sweep_step_target(sweep_step_index, &sweep_pan, &sweep_tilt)) {
+      finish_button_sweep();
+      return;
+    }
+
+    target_pan = sweep_pan;
+    target_tilt = sweep_tilt;
+    sweep_step_started_ms = now_val;
+    sweep_step_initialized = true;
+
+    Serial.printf("[SWEEP] Step %u/%u -> pan=%d tilt=%d time=%ums\n",
+                  (unsigned)(sweep_step_index + 1), (unsigned)SWEEP_STEP_COUNT,
+                  target_pan, target_tilt, (unsigned)SWEEP_MOVE_TIME_MS);
+  }
+
+  if ((now_val - sweep_step_started_ms) < SWEEP_STEP_HOLD_MS) {
+    return;
+  }
+
+  sweep_step_index++;
+  sweep_step_initialized = false;
+  if (sweep_step_index >= SWEEP_STEP_COUNT) {
+    finish_button_sweep();
+  }
+}
+
+static bool ensure_trigger_servo_pwm_ready() {
+  if (trigger_servo_pwm_ready) {
+    return true;
+  }
+  bool ledc_ok = ledcAttach(PIN_TRIGGER_SERVO, SERVO_HZ, SERVO_RES_BITS);
+  Serial.printf("[FIRE] LEDC attach on demand: %s\n", ledc_ok ? "OK" : "FAILED!");
+  trigger_servo_pwm_ready = ledc_ok;
+  return trigger_servo_pwm_ready;
+}
+
 static void servo_write_deg(int pin, int deg) {
+  if (pin == PIN_TRIGGER_SERVO) {
+    if (!ensure_trigger_servo_pwm_ready()) {
+      return;
+    }
+  }
   uint32_t us    = deg_to_duty_us(deg);
   uint32_t ticks = duty_us_to_ticks(us);
   ledcWrite(pin, ticks);
@@ -602,6 +758,12 @@ static void update_motion_outputs(bool motion_blocked) {
   const uint32_t now     = now_ms();
   const bool     changed = (pan != last_sent_pan) || (tilt != last_sent_tilt);
 
+  // During a local button sweep, only transmit on step changes so the long
+  // move-time command is not constantly restarted mid-motion.
+  if (!changed && sweep_active) {
+    return;
+  }
+
   // Send if changed or every 250 ms as keep-alive
   if (!changed && (now - last_bus_send_ms) < 250) {
     return;
@@ -613,7 +775,10 @@ static void update_motion_outputs(bool motion_blocked) {
   uint16_t tilt_time  = compute_move_time_ms(tilt_delta);
 
   // Apply optional diagnostic override.
-  if (move_time_override_ms > 0 && now <= move_time_override_until_ms) {
+  if (sweep_active) {
+    pan_time = SWEEP_MOVE_TIME_MS;
+    tilt_time = SWEEP_MOVE_TIME_MS;
+  } else if (move_time_override_ms > 0 && now <= move_time_override_until_ms) {
     pan_time = move_time_override_ms;
     tilt_time = move_time_override_ms;
   }
@@ -1235,7 +1400,7 @@ static void validate_pins() {
 }
 
 // =========================================================
-// Boot self-test
+// Manual self-test
 // =========================================================
 static void run_self_test() {
   Serial.println("================================================");
@@ -1380,6 +1545,7 @@ void setup() {
   pinMode(PIN_LED_RELAY,      OUTPUT);
   pinMode(PIN_LASER_RELAY,    OUTPUT);
   pinMode(PIN_STATUS_LED,     OUTPUT);
+  pinMode(PIN_SWEEP_BUTTON,   INPUT_PULLUP);
   digitalWrite(PIN_TRIGGER_MOSFET, LOW);
   digitalWrite(PIN_LED_RELAY,      LOW);
   digitalWrite(PIN_LASER_RELAY,    LOW);
@@ -1387,14 +1553,11 @@ void setup() {
   Serial.printf("  MOSFET(GPIO%d)=LOW  LED(GPIO%d)=LOW  LASER(GPIO%d)=LOW\n",
                 PIN_TRIGGER_MOSFET, PIN_LED_RELAY, PIN_LASER_RELAY);
   Serial.printf("  STATUS_LED(GPIO%d)=LOW\n", PIN_STATUS_LED);
+  Serial.printf("  SWEEP_BUTTON(GPIO%d)=INPUT_PULLUP\n", PIN_SWEEP_BUTTON);
 
-  // Trigger servo PWM (LEDC)
-  Serial.printf("[BOOT] LEDC: GPIO%d freq=%dHz res=%d-bit\n",
+  // Trigger servo PWM is armed on first runtime use so startup stays passive.
+  Serial.printf("[BOOT] Trigger servo PWM deferred: GPIO%d freq=%dHz res=%d-bit\n",
                 PIN_TRIGGER_SERVO, SERVO_HZ, SERVO_RES_BITS);
-  bool ledc_ok = ledcAttach(PIN_TRIGGER_SERVO, SERVO_HZ, SERVO_RES_BITS);
-  Serial.printf("  LEDC attach: %s\n", ledc_ok ? "OK" : "FAILED!");
-  servo_write_deg(PIN_TRIGGER_SERVO, TRIGGER_SERVO_REST_DEG);
-  Serial.printf("  Trigger servo -> %d deg (rest)\n", TRIGGER_SERVO_REST_DEG);
 
   // ADC
   Serial.println("[BOOT] ADC: 12-bit, 11dB atten");
@@ -1403,9 +1566,8 @@ void setup() {
   analogSetPinAttenuation(PIN_CURR_TILT,  ADC_11db);
   analogSetPinAttenuation(PIN_CURR_TOTAL, ADC_11db);
 
-  // Self-test BEFORE WiFi
-  Serial.println("[BOOT] Running self-test...");
-  run_self_test();
+  // Startup must stay passive: no trigger, relay, MOSFET, or bus-servo movement.
+  Serial.println("[BOOT] Startup self-test skipped to keep all outputs idle.");
 
   // WiFi AP
   Serial.printf("[BOOT] WiFi AP: SSID='%s' pass='%s'\n", WIFI_SSID, WIFI_PASS);
@@ -1505,6 +1667,7 @@ void loop() {
                         (current_fault && current_cfg.block_fire);
   bool motion_blocked = (current_fault && current_cfg.block_motion);
 
+  update_button_sweep(now);
   update_motion_outputs(motion_blocked);
   update_accessories();
   update_fire_outputs(now, fire_blocked);

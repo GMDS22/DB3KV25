@@ -109,8 +109,9 @@ A quick-reference help panel for the ESP32 wiring scheme.
 **Content**: Table in this section is loaded by `open_pin_assignment_window` at runtime so the Help menu stays in sync.
 **Firmware**:
 - UDP link mode: `arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino`
-- USB serial IO mode (Dual Port primary COM, e.g. COM10): `arduino/DB3000_ESP32_IO_Telemetry_2026/DB3000_ESP32_IO_Telemetry_2026.ino`
+- USB serial IO mode (Dual Port primary COM, e.g. COM10): `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino` (current)
 **Flash workflow**: See `ESP32_UDP_FLASH.md` and `tools/flash_esp32_udp.ps1`.
+**Single source of truth for active sketches**: `ESP32_CURRENT_SKETCH.md`.
 
 | Pin | Function | Mode |
 |---|---|---|

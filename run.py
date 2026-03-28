@@ -219,11 +219,11 @@ _configure_ml_runtime_env()
 # Preload torch runtime before app imports (import-order stability fix)
 _preload_torch_runtime()
 
-# Run main application
+# Run Smart Sentry v2
 if __name__ == "__main__":
-    
     try:
-        runpy.run_path('MAIN_FILE_SINGLE_CAM.py', run_name='__main__')
+        import run_sentry_v2
+        raise SystemExit(run_sentry_v2.main())
     except SystemExit:
         raise
     except Exception:

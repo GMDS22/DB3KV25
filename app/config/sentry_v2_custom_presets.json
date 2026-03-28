@@ -23,7 +23,12 @@
         ],
         "min_confidence": 0.32999999999999996,
         "min_size_ratio": 0.0001,
-        "max_size_ratio": 0.05
+        "max_size_ratio": 0.05,
+        "shape_filter_enabled": true,
+        "shape_profile_name": "rat",
+        "semantic_min_confirm_frames": 3,
+        "semantic_min_confirm_confidence": 0.72,
+        "semantic_confirm_ttl_s": 0.8
       },
       "threat": {
         "weights": {
@@ -87,14 +92,14 @@
       },
       "servo_move_time_ms": 110
     },
-    "yolo_rat_sniper1": {
-      "name": "Yolo Rat Sniper1",
+    "yolo_rat_sniper_v2_distance_safe": {
+      "name": "Yolo Rat Sniper V2 Distance Safe",
       "detection": {
         "detection_mode": 2,
         "min_contour_area": 468.0,
         "max_contour_area": 4680.0,
-        "yolo_min_area": 100,
-        "yolo_confidence": 0.56,
+        "yolo_min_area": 36,
+        "yolo_confidence": 0.68,
         "color_preset": "grey",
         "color_min_area": 62,
         "color_max_area": 20000,
@@ -107,9 +112,14 @@
         "allowed_classes": [
           "rat"
         ],
-        "min_confidence": 0.32999999999999996,
-        "min_size_ratio": 0.0001,
-        "max_size_ratio": 0.05
+        "min_confidence": 0.64,
+        "min_size_ratio": 0.00003,
+        "max_size_ratio": 0.035,
+        "shape_filter_enabled": true,
+        "shape_profile_name": "rat",
+        "semantic_min_confirm_frames": 4,
+        "semantic_min_confirm_confidence": 0.72,
+        "semantic_confirm_ttl_s": 0.9
       },
       "threat": {
         "weights": {
@@ -118,22 +128,22 @@
           "w_confidence": 0.91,
           "w_class_priority": 0.28,
           "w_speed": 0.02,
-          "w_persistence": 0.02,
+          "w_persistence": 0.10,
           "w_approach": 0.69
         },
         "use_ml_model": false
       },
       "engagement": {
-        "min_threat_score": 0.6200000000000001,
+        "min_threat_score": 0.58,
         "burst_count": 1,
         "burst_interval_ms": 140,
-        "inter_target_cooldown": 0.9,
-        "cycle_cooldown": 3.1,
+        "inter_target_cooldown": 0.45,
+        "cycle_cooldown": 1.8,
         "max_queue_length": 1,
         "optimize_slew_order": false,
         "single_target_only": true,
-        "return_delay": 1.5,
-        "engagement_speed": 77,
+        "return_delay": 0.8,
+        "engagement_speed": 80,
         "auto_trigger_enabled": true,
         "trigger_mode_bb": true,
         "precision_aim_enabled": true,
@@ -159,14 +169,105 @@
         "fire_trigger_exit_tilt_tolerance": 0.14,
         "fire_trigger_max_pan_rate": 2.0,
         "fire_trigger_max_tilt_rate": 1.7,
-        "fire_trigger_hold_time": 0.1,
-        "fire_trigger_refractory_time": 0.2,
-        "fire_trigger_min_confidence": 0.45,
-        "fire_trigger_min_persistence": 0.12,
+        "fire_trigger_hold_time": 0.12,
+        "fire_trigger_refractory_time": 0.12,
+        "fire_trigger_min_confidence": 0.72,
+        "fire_trigger_min_persistence": 0.4,
         "fire_requires_lock": true,
         "aim_lock_pan_tolerance": 0.18,
         "aim_lock_tilt_tolerance": 0.14,
-        "aim_lock_required_frames": 8,
+        "aim_lock_required_frames": 9,
+        "aim_lock_timeout": 3.2,
+        "target_loss_timeout": 1.0,
+        "continuous_hunt_on_loss": false
+      },
+      "servo_move_time_ms": 110
+    },
+    "yolo_rat_sniper1": {
+      "name": "Yolo Rat Sniper1",
+      "detection": {
+        "detection_mode": 2,
+        "min_contour_area": 468.0,
+        "max_contour_area": 4680.0,
+        "yolo_min_area": 100,
+        "yolo_confidence": 0.88,
+        "color_preset": "grey",
+        "color_min_area": 62,
+        "color_max_area": 496,
+        "color_fusion_strategy": "AND",
+        "color_fusion_overlap": 61,
+        "motion_ignore_after_move_s": 0.06,
+        "motion_gate_threshold": 1.0
+      },
+      "filter": {
+        "allowed_classes": [
+          "rat"
+        ],
+        "min_confidence": 0.82,
+        "min_size_ratio": 0.0001,
+        "max_size_ratio": 0.05,
+        "shape_filter_enabled": true,
+        "shape_profile_name": "rat",
+        "semantic_min_confirm_frames": 4,
+        "semantic_min_confirm_confidence": 0.9,
+        "semantic_confirm_ttl_s": 0.8
+      },
+      "threat": {
+        "weights": {
+          "w_proximity": 0.58,
+          "w_size": 0.04,
+          "w_confidence": 0.91,
+          "w_class_priority": 0.28,
+          "w_speed": 0.02,
+          "w_persistence": 0.02,
+          "w_approach": 0.69
+        },
+        "use_ml_model": false
+      },
+      "engagement": {
+        "min_threat_score": 0.72,
+        "burst_count": 1,
+        "burst_interval_ms": 140,
+        "inter_target_cooldown": 0.9,
+        "cycle_cooldown": 3.1,
+        "max_queue_length": 1,
+        "optimize_slew_order": false,
+        "single_target_only": true,
+        "return_delay": 1.5,
+        "engagement_speed": 77,
+        "auto_trigger_enabled": true,
+        "trigger_mode_bb": true,
+        "precision_aim_enabled": true,
+        "precision_settle_time": 1.1,
+        "precision_kp": 0.035,
+        "precision_ki": 0.0,
+        "precision_kd": 0.01,
+        "precision_max_step": 0.1,
+        "precision_deadzone_pan_deg": 0.07,
+        "precision_deadzone_tilt_deg": 0.06,
+        "precision_error_ema": 0.4,
+        "precision_max_pan_step": 0.9,
+        "precision_max_tilt_step": 0.75,
+        "precision_reversal_brake": 0.3,
+        "fire_micro_adjust_enabled": true,
+        "fire_micro_adjust_max_pan_step": 0.25,
+        "fire_micro_adjust_max_tilt_step": 0.2,
+        "fire_recenter_pan_tolerance": 0.18,
+        "fire_recenter_tilt_tolerance": 0.14,
+        "fire_trigger_enter_pan_tolerance": 0.12,
+        "fire_trigger_enter_tilt_tolerance": 0.09,
+        "fire_trigger_exit_pan_tolerance": 0.18,
+        "fire_trigger_exit_tilt_tolerance": 0.14,
+        "fire_trigger_max_pan_rate": 2.0,
+        "fire_trigger_max_tilt_rate": 1.7,
+        "fire_trigger_hold_time": 0.1,
+        "fire_trigger_refractory_time": 0.2,
+        "fire_trigger_min_confidence": 0.82,
+        "fire_trigger_min_persistence": 0.3,
+        "fire_requires_lock": true,
+        "aim_lock_pan_tolerance": 0.18,
+        "aim_lock_tilt_tolerance": 0.14,
+        "aim_lock_required_frames": 10,
         "aim_lock_timeout": 3.2,
         "target_loss_timeout": 1.2,
         "continuous_hunt_on_loss": false
@@ -604,6 +705,92 @@
         "continuous_hunt_on_loss": false
       },
       "servo_move_time_ms": 13
+    },
+    "mlft_v1": {
+      "name": "MLFT - V1",
+      "detection": {
+        "detection_mode": 10,
+        "min_contour_area": 100.0,
+        "max_contour_area": 2188.0,
+        "yolo_min_area": 85,
+        "yolo_confidence": 0.36,
+        "color_preset": "black",
+        "color_min_area": 44,
+        "color_max_area": 4423,
+        "color_fusion_strategy": "AND",
+        "color_fusion_overlap": 50,
+        "motion_ignore_after_move_s": 0.019999999999999997,
+        "motion_gate_threshold": 1.35
+      },
+      "filter": {
+        "allowed_classes": [
+          "rat"
+        ],
+        "min_confidence": 0.48000000000000004,
+        "min_size_ratio": 0.0,
+        "max_size_ratio": 0.135
+      },
+      "threat": {
+        "weights": {
+          "w_proximity": 0.99,
+          "w_size": 0.01,
+          "w_confidence": 0.81,
+          "w_class_priority": 0.28,
+          "w_speed": 0.02,
+          "w_persistence": 0.81,
+          "w_approach": 0.87
+        },
+        "use_ml_model": false
+      },
+      "engagement": {
+        "min_threat_score": 0.62,
+        "burst_count": 3,
+        "burst_interval_ms": 140,
+        "inter_target_cooldown": 0.9,
+        "cycle_cooldown": 3.1,
+        "max_queue_length": 1,
+        "optimize_slew_order": false,
+        "single_target_only": true,
+        "return_delay": 1.5,
+        "engagement_speed": 77,
+        "auto_trigger_enabled": true,
+        "trigger_mode_bb": true,
+        "precision_aim_enabled": true,
+        "precision_settle_time": 0.45000000000000007,
+        "precision_kp": 0.035,
+        "precision_ki": 0.0,
+        "precision_kd": 0.01,
+        "precision_max_step": 0.1,
+        "precision_deadzone_pan_deg": 0.02,
+        "precision_deadzone_tilt_deg": 0.02,
+        "precision_error_ema": 0.6300000000000001,
+        "precision_max_pan_step": 0.9,
+        "precision_max_tilt_step": 0.75,
+        "precision_reversal_brake": 0.3,
+        "fire_micro_adjust_enabled": true,
+        "fire_micro_adjust_max_pan_step": 0.25,
+        "fire_micro_adjust_max_tilt_step": 0.2,
+        "fire_recenter_pan_tolerance": 0.1,
+        "fire_recenter_tilt_tolerance": 0.1,
+        "fire_trigger_enter_pan_tolerance": 0.05,
+        "fire_trigger_enter_tilt_tolerance": 0.05,
+        "fire_trigger_exit_pan_tolerance": 0.07,
+        "fire_trigger_exit_tilt_tolerance": 0.06,
+        "fire_trigger_max_pan_rate": 2.0,
+        "fire_trigger_max_tilt_rate": 1.7,
+        "fire_trigger_hold_time": 0.1,
+        "fire_trigger_refractory_time": 0.2,
+        "fire_trigger_min_confidence": 0.45,
+        "fire_trigger_min_persistence": 0.12,
+        "fire_requires_lock": true,
+        "aim_lock_pan_tolerance": 0.1,
+        "aim_lock_tilt_tolerance": 0.1,
+        "aim_lock_required_frames": 12,
+        "aim_lock_timeout": 3.2,
+        "target_loss_timeout": 0.95,
+        "continuous_hunt_on_loss": false
+      },
+      "servo_move_time_ms": 110
     }
   }
 }

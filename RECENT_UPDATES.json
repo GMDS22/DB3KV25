@@ -3,6 +3,18 @@
   "max_items": 10,
   "items": [
     {
+      "date": "2026-03-18",
+      "title": "Smart Sentry v2 UI/preset completion: app/sentry_v2/sentry_v2_tab.py now exposes motion self-suppression tuning on the Detection panel plus advanced precision, aim-lock, fire-gate, recenter, and target-loss controls on the Engage panel; detection and engagement preset application now updates those controls directly; engagement presets were expanded so each profile carries explicit values for the newly exposed fields; and tooltips were extended in app/sentry_v2/sentry_v2_tooltips.py so the advanced behavior is understandable from the UI."
+    },
+    {
+      "date": "2026-03-18",
+      "title": "Smart Sentry v2 detection/engagement refinement: hybrid detection modes in app/sentry_v2/sentry_v2_detector.py now require corroboration from both selected methods instead of falling back to a single constituent detector, motion-locked overlap checks were tightened, engagement reacquisition in app/sentry_v2/sentry_v2_engine.py now resists cross-target swaps by enforcing source/class/size proximity, active detection-mode changes reset live Sentry runtime safely, motion-mode suppression after turret moves was shortened for faster reacquisition, and Sentry v2 threat/engagement presets plus app/config/sentry_v2_settings.json were tightened toward center-priority aiming and firing while preserving each profile’s intent."
+    },
+    {
+      "date": "2026-03-17",
+      "title": "Smart Sentry v2 update: widened preset separation across detection, target filtering, threat scoring, engagement, and servo timing; added persistent no-fire-mask config support plus angular mask helpers, planner/fire gating, overlay rendering, a new video-canvas foundation, an initial Guard-tab live-click mask editor flow with right-click polygon finish, status/log feedback when a no-fire mask is actively blocking aim or fire, Guard-tab runtime diagnostics tools including change-only mask tracing plus a manual dump button for live projection/block verification, and a new engaging-state round scope view with adjustable radius and vignette opacity. Files: app/sentry_v2/sentry_v2_tab.py, app/sentry_v2/sentry_v2_config.py, app/sentry_v2/engagement_planner.py, app/sentry_v2/sentry_v2_engine.py, app/sentry_v2/sentry_v2_overlay.py, app/sentry_v2/sentry_v2_no_fire_masks.py, app/sentry_v2/sentry_v2_video_canvas.py, app/config/sentry_v2_settings.json, SENTRY_V2_NO_FIRE_MASKS_AND_PRESETS_UPDATE.md, SENTRY_V2_SCOPE_VIEW_TROUBLESHOOTING.md."
+    },
+    {
       "date": "2026-03-10",
       "title": "Auto-fire alignment update: single-shot auto-fire in app/MAIN_FILE_SINGLE_CAM.py now fires from the active red aim-box target being centered near frame center on both axes, while preserving the existing cooldown, motion gate, stability gate, and trigger-pulse path. Deadzone still supports convergence, but it is no longer the single-shot fire command by itself."
     },

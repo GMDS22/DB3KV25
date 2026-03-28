@@ -1,6 +1,15 @@
-# ESP32 UDP Link Flash Workflow
+# ESP32 Flash Workflow
 
-This guide flashes the ESP32 UDP link firmware using the included Arduino CLI.
+This guide flashes ESP32 firmware sketches using the included Arduino CLI.
+
+Canonical sketch mapping is maintained in [ESP32_CURRENT_SKETCH.md](ESP32_CURRENT_SKETCH.md).
+
+Selected runtime topology: full WiFi.
+
+- PC to ESP32: WiFi/UDP only during normal operation
+- Debug Board to ESP32: UART2 on GPIO16 and GPIO17
+- ESP32 USB: keep available for flashing and serial diagnostics
+- Debug Board USB to PC: optional bench diagnostics only, not required for runtime
 
 ## Prereqs
 - Board: ESP32 DevKit v1 (WROOM-32)
@@ -33,16 +42,46 @@ From repo root:
 .\tools\flash_esp32_udp.ps1 -Port COM5
 ```
 
+Current bench example:
+
+```powershell
+.\tools\flash_esp32_udp.ps1 -Port COM26
+```
+
 Add -InstallCore if you want the script to attempt core install:
 
 ```powershell
 .\tools\flash_esp32_udp.ps1 -Port COM5 -InstallCore
 ```
 
-## Sketch Location
-- arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino
+## Sketch Locations
+- Full WiFi UDP runtime:
+	- arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino
+- USB Serial IO + PIR runtime (current serial/dual-port firmware):
+	- arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
+
+Upload USB Serial IO + PIR sketch:
+
+```powershell
+.\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino"
+```
+
+## Library Note
+- The flash script will use a repo-local ArduinoJson library at `external/ArduinoJson` when present.
+- This avoids dependency on the default Arduino user libraries folder during compile.
 
 ## Defaults
 - WiFi AP SSID: DB3000-ESP32
 - WiFi AP password: db3000pass
 - UDP port: 9000
+
+## Pin Assignments
+- GPIO16: UART2 RX from Debug Board TX
+- GPIO17: UART2 TX to Debug Board RX
+- GPIO27: Trigger MOSFET (Water)
+- GPIO13: Trigger Servo (Projectile)
+- GPIO32: LED Relay
+- GPIO33: Laser Relay
+- GPIO36: Pan current sensor
+- GPIO39: Tilt current sensor
+- GPIO34: Total current sensor

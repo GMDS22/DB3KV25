@@ -43,6 +43,7 @@ class SentryV2PIRManager:
         self._scan_points: List[Tuple[float, float]] = []  # (pan, tilt) scan grid
         self._scan_index: int = 0
         self._scan_point_visited: set = set()  # Track visited points during scan
+        self._scan_reference_point: Optional[Tuple[float, float]] = None
         
     def update_config(self, config: PIRGuardConfig) -> None:
         """Hot-reload configuration."""
@@ -52,6 +53,7 @@ class SentryV2PIRManager:
         self._cue_queue.clear()
         self._active_cue = None
         self._scan_active = False
+        self._scan_reference_point = None
         
     def on_pir_event(self, sensor_id: int, timestamp: float) -> None:
         """Called when a PIR sensor fires. Handles debouncing and queueing."""
@@ -103,6 +105,14 @@ class SentryV2PIRManager:
             else:
                 self._active_cue = None  # Timeout reached, clear it
         
+        # Discard stale events before popping (data_timeout_ms guard)
+        timeout_s = self.cfg.data_timeout_ms / 1000.0
+        while self._cue_queue:
+            if now - self._cue_queue[0].timestamp > timeout_s:
+                self._cue_queue.pop(0)  # too old, discard
+            else:
+                break
+
         # Try to get next from queue
         if self._cue_queue:
             cue = self._cue_queue.pop(0)
@@ -111,7 +121,7 @@ class SentryV2PIRManager:
             self._scan_active = False  # Reset scan state
             self._scan_index = 0
             return cue
-        
+
         return None
     
     def generate_scan_grid(self, center_pan: float, center_tilt: float) -> List[Tuple[float, float]]:
@@ -149,6 +159,7 @@ class SentryV2PIRManager:
         self._scan_points = self.generate_scan_grid(center_pan, center_tilt)
         self._scan_index = 0
         self._scan_point_visited.clear()
+        self._scan_reference_point = (float(center_pan), float(center_tilt))
     
     def get_next_scan_point(self) -> Optional[Tuple[float, float]]:
         """Get the next point in the scan grid. Returns None if scan complete."""
@@ -157,17 +168,44 @@ class SentryV2PIRManager:
         
         if self._scan_index >= len(self._scan_points):
             self._scan_active = False
+            self._scan_reference_point = None
             return None
         
         point = self._scan_points[self._scan_index]
         self._scan_index += 1
+        self._scan_reference_point = point
         return point
     
+    def complete_active_cue(self) -> None:
+        """Mark the active cue as resolved (target found/engaged).
+
+        Clears only the active cue and scan state — queued events from
+        other sensors are preserved so the hunt protocol can continue
+        investigating remaining zones.
+        """
+        self._active_cue = None
+        self._scan_active = False
+        self._scan_reference_point = None
+        # _cue_queue intentionally NOT cleared here
+
     def cancel_active_cue(self) -> None:
-        """Cancel the currently active cue (e.g., target was found)."""
+        """Cancel the active cue and clear the entire queue (full stop).
+
+        Use this when giving up (scan exhausted, no-scan mode, config
+        reload, or feature disabled).  Do NOT call this on target-found
+        — use complete_active_cue() instead to preserve queued events.
+        """
         self._active_cue = None
         self._scan_active = False
         self._cue_queue.clear()
+        self._scan_reference_point = None
+
+    def peek_queue_count(self) -> int:
+        """Return number of events waiting in queue (excludes active cue)."""
+        return len(self._cue_queue)
+
+    def get_scan_reference_point(self) -> Optional[Tuple[float, float]]:
+        return self._scan_reference_point
     
     def get_status_text(self) -> str:
         """Return human-readable status string for overlay/UI."""

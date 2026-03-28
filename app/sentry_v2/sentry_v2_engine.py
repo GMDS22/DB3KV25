@@ -144,9 +144,6 @@ class SentryV2Engine:
         self._pir_scan_awaiting_settle: bool = False  # Waiting for servo settle before next scan point
         self._pir_settle_start: float = 0.0
 
-        # ML training logger (optional: logs engagement decisions for model training)
-        self._ml_logger = MLTrainingLogger()
-
         # Callbacks
         self._cb_fire: Optional[Callable[[int], None]] = None
         self._cb_move: Optional[Callable[[float, float], None]] = None
@@ -193,11 +190,13 @@ class SentryV2Engine:
 
     def start(self) -> None:
         """Activate sentry — move to guard position and start watching."""
+        self._filter.reset()
         self._change_state(SentryV2State.GUARDING)
         self._move_turret(self.cfg.guard.guard_pan, self.cfg.guard.guard_tilt)
 
     def stop(self) -> None:
         self._change_state(SentryV2State.PAUSED)
+        self._filter.reset()
         if self._log_precision_tuning and self._current_precision_engagement_id:
             self._precision_logger.end_engagement()
             self._current_precision_engagement_id = None
@@ -241,7 +240,7 @@ class SentryV2Engine:
         self._last_no_fire_mask_name = ""
 
         # 1. Filter
-        qualified = self._filter.filter(detections)
+        qualified = self._filter.filter(detections, now)
         self.last_qualified = qualified
 
         # 2. Score
@@ -290,8 +289,9 @@ class SentryV2Engine:
                     self.active_order = first
                     self._remember_active_target(first.target.det)
                     self._start_order_engagement(first, now)
-                    # If PIR cue was active, cancel it (real target found)
-                    self._pir_manager.cancel_active_cue()
+                    # Target found — complete active cue but preserve queued
+                    # events so other sensor zones are hunted after this engage.
+                    self._pir_manager.complete_active_cue()
                     self._pir_cue_mode = False
                     return
 
@@ -332,9 +332,9 @@ class SentryV2Engine:
         
         # Check if we found targets above threshold
         if targets:
-            # Found a target! Cancel PIR mode and let normal engagement take over
+            # Found a target — complete cue (preserve queue) and engage.
             self._pir_cue_mode = False
-            self._pir_manager.cancel_active_cue()
+            self._pir_manager.complete_active_cue()
             # Trigger engagement
             if now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown:
                 queue = self._planner.plan(targets, self.current_pan, self.current_tilt)
@@ -370,7 +370,7 @@ class SentryV2Engine:
         if targets:
             self._pir_cue_mode = False
             self._pir_scan_mode = False
-            self._pir_manager.cancel_active_cue()
+            self._pir_manager.complete_active_cue()
             if now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown:
                 queue = self._planner.plan(targets, self.current_pan, self.current_tilt)
                 if queue:
@@ -388,7 +388,7 @@ class SentryV2Engine:
         
         # Wait for servo settle before moving to next scan point
         if self._pir_scan_awaiting_settle:
-            settle_time = 0.25
+            settle_time = self._pir_scan_settle_time()
             if now - self._pir_settle_start < settle_time:
                 return  # Still settling
             self._pir_scan_awaiting_settle = False
@@ -405,6 +405,15 @@ class SentryV2Engine:
             self._pir_scan_mode = False
             self._pir_manager.cancel_active_cue()
             self._patrol_initialized = False
+
+    def _pir_scan_settle_time(self) -> float:
+        reference = self._pir_manager.get_scan_reference_point()
+        if reference is None:
+            reference = (float(self.current_pan), float(self.current_tilt))
+        distance = float(max(abs(float(self.current_pan) - float(reference[0])), abs(float(self.current_tilt) - float(reference[1]))))
+        speed = float(max(1.0, self.cfg.pir_guard.scan_speed))
+        travel_time = distance / speed
+        return float(min(1.20, max(0.12, travel_time + 0.08)))
 
     # ------------------------------------------------------------------ #
     # ENGAGING state
@@ -514,6 +523,9 @@ class SentryV2Engine:
                 self.cfg.engagement.auto_trigger_enabled
                 and elapsed >= float(self.cfg.engagement.aim_lock_timeout)
                 and target is not None
+                and self._ready_to_fire()
+                and self._target_meets_fire_requirements(target)
+                and self._has_aim_lock(lock_pan, lock_tilt)
                 and self._current_no_fire_mask() is None
             ):
                 self._begin_fire(order, now)
@@ -718,6 +730,13 @@ class SentryV2Engine:
         if not self.cfg.engagement.fire_requires_lock:
             return True
         return self._aim_lock_frames >= max(1, self.cfg.engagement.aim_lock_required_frames)
+
+    def _target_meets_fire_requirements(self, target: TrackedTarget) -> bool:
+        eng = self.cfg.engagement
+        return (
+            float(target.det.confidence) >= float(eng.fire_trigger_min_confidence)
+            and float(target.persistence) >= float(eng.fire_trigger_min_persistence)
+        )
 
     def _safe_log_precision_frame(self, **kwargs: object) -> None:
         if not self._log_precision_tuning or self._precision_logging_faulted:

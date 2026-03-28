@@ -1,0 +1,14 @@
+# Smart Sentry v2 portable runtime dependencies
+# This file is intentionally self-contained for standalone packaging.
+
+numpy>=1.21.6
+opencv-python>=4.5.5.64
+pyserial>=3.5
+PyQt5>=5.15.9
+ultralytics>=8.0.0
+torch>=1.12.0
+scikit-learn>=1.0.0
+yt-dlp>=2025.1.0
+
+# Optional build helper (if using cx_Freeze for portable executable builds)
+cx-Freeze>=6.10

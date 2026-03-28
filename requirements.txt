@@ -6,6 +6,8 @@ opencv-python>=4.5.5.64
 pyserial>=3.5
 PyQt5>=5.15.9
 ultralytics>=8.0.0
+scikit-learn>=1.0.0
+yt-dlp>=2025.1.0
 
 # Packaging (optional - comment out if not needed for building executables)
 cx-Freeze>=6.10

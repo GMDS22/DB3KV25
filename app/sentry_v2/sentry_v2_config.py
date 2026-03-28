@@ -59,7 +59,7 @@ class DetectionModeConfig:
     min_contour_area: float = 250.0
     max_contour_area: float = 250000.0
     # --- YOLO-specific (modes 2,4,5,9,10) ---
-    yolo_model_name: str = "ratdogcat.pt"
+    yolo_model_name: str = "ratdogcat_last.pt"
     yolo_min_area: int = 0
     yolo_confidence: float = 0.45
     # --- Color detection (modes 6,7,8,9) ---
@@ -101,6 +101,15 @@ class TargetFilterConfig:
     min_size_ratio: float = 0.0025
     # Maximum bounding-box area (fraction of frame area, 0-1, 0=no limit)
     max_size_ratio: float = 0.18
+    # Optional bbox aspect-ratio safety gate for class-specific targets.
+    shape_filter_enabled: bool = False
+    shape_profile_name: str = ""
+    # Minimum consecutive tracked frames required before a semantic class is accepted.
+    semantic_min_confirm_frames: int = 1
+    # Minimum confidence required for a frame to count toward semantic confirmation.
+    semantic_min_confirm_confidence: float = 0.0
+    # Reset semantic confirmation if a track disappears longer than this.
+    semantic_confirm_ttl_s: float = 0.8
     # Engagement zone: normalised rectangle [x1, y1, x2, y2]
     # (0,0)=top-left  (1,1)=bottom-right — only targets inside are engaged
     engagement_zone: Tuple[float, float, float, float] = (0.0, 0.0, 1.0, 1.0)
@@ -284,21 +293,26 @@ class PIRGuardConfig:
     # Number of PIR sensors (typically 3)
     pir_count: int = 3
     # Individual sensor configs
+    # Equal 90° spacing across the full 0–270° pan arc:
+    #   S0 (GPIO35) covers right zone  0°– 90°  → cue_pan= 45°
+    #   S1 (GPIO34) covers front zone  90°–180° → cue_pan=135°
+    #   S2 (GPIO39) covers left zone  180°–270° → cue_pan=225°
     sensors: List[PIRSensorConfig] = field(default_factory=lambda: [
-        PIRSensorConfig(pin_id=0, cue_pan=270.0, cue_tilt=55.0, enabled=False),
-        PIRSensorConfig(pin_id=1, cue_pan=150.0, cue_tilt=55.0, enabled=False),
-        PIRSensorConfig(pin_id=2, cue_pan=30.0, cue_tilt=55.0, enabled=False),
+        PIRSensorConfig(pin_id=0, cue_pan=45.0,  cue_tilt=35.0, enabled=False),
+        PIRSensorConfig(pin_id=1, cue_pan=135.0, cue_tilt=35.0, enabled=False),
+        PIRSensorConfig(pin_id=2, cue_pan=225.0, cue_tilt=35.0, enabled=False),
     ])
     # Enable adaptive scan when PIR fires but camera doesn't detect
     scan_on_no_detect: bool = True
     # Pan sweep range (degrees left/right from cue point)
-    scan_pan_range: float = 25.0
+    # 45° covers the full 90° zone for each sensor (±45° from center)
+    scan_pan_range: float = 45.0
     # Tilt sweep range (degrees up/down from cue point)
     scan_tilt_range: float = 15.0
     # Scan movement speed (degrees per second)
     scan_speed: float = 12.0
     # Time to wait for camera detection after initial slew (seconds)
-    confirmation_timeout: float = 1.0
+    confirmation_timeout: float = 1.2
     # Number of points in scan grid per axis (3x3 = 9 points)
     scan_grid_resolution: int = 3
     # Data timeout: discard PIR data older than this (milliseconds)
@@ -336,6 +350,8 @@ class ConnectionConfig:
     camera_source: str = "0"       # Standalone default camera index; may also be a URL or file path
     camera_width: int = 1280
     camera_height: int = 720
+    webcam_zoom_pct: int = 100
+    test_source_zoom_pct: int = 100
 
 
 @dataclass
@@ -360,6 +376,9 @@ class SentryV2Config:
     scope_radius_pct: int = 35
     scope_vignette_opacity: int = 60
     settings_panel_width: int = 420
+    prompted_targets_enabled: bool = False
+    prompted_allow_auto_fire: bool = False
+    prompted_library_path: str = "app/config/sentry_v2_prompted_targets.json"
 
     # --- Persistence ---
     config_path: str = "app/config/sentry_v2_settings.json"
@@ -465,6 +484,9 @@ class SentryV2Config:
             scope_radius_pct=d.get("scope_radius_pct", 35),
             scope_vignette_opacity=d.get("scope_vignette_opacity", 60),
             settings_panel_width=d.get("settings_panel_width", 420),
+            prompted_targets_enabled=d.get("prompted_targets_enabled", False),
+            prompted_allow_auto_fire=d.get("prompted_allow_auto_fire", False),
+            prompted_library_path=d.get("prompted_library_path", "app/config/sentry_v2_prompted_targets.json"),
             config_path=d.get("config_path", "app/config/sentry_v2_settings.json"),
         )
 

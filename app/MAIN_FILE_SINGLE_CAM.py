@@ -188,15 +188,6 @@ except Exception as e:
     SentryTabWidget = None
     SENTRY_MODE_AVAILABLE = False
 
-# Smart Sentry v2 (AI-powered stationary guard with multi-target engagement)
-try:
-    from sentry_v2.sentry_v2_tab import SentryV2TabWidget
-    SENTRY_V2_AVAILABLE = True
-except Exception as e:
-    print(f"[SENTRY_V2] Import failed: {e}")
-    SentryV2TabWidget = None
-    SENTRY_V2_AVAILABLE = False
-
 # Try to register QTextCursor as a Qt metatype to avoid queued-argument warnings
 # Use a single guarded attempt to avoid duplicate registrations.
 try:
@@ -816,67 +807,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 traceback.print_exc()
                 self.sentry_tab = None
         # ========== END AGENT-MANAGED BLOCK: SENTRY MODE TAB ==========
-
-        # ========== AGENT-MANAGED BLOCK: SMART SENTRY V2 TAB ==========
-        # AI-powered stationary guard with multi-target engagement
-        # Added: Mar 2026 | See: app/sentry_v2/
-        self.sentry_v2_tab = None
-        self.sentry_v2_active = False
-        self._sentry_v2_window = None
-        self._sentry_v2_window_action = None
-        if SENTRY_V2_AVAILABLE and SentryV2TabWidget is not None:
-            try:
-                self.sentry_v2_tab = SentryV2TabWidget()
-                if hasattr(self.sentry_v2_tab, "set_host_main_window"):
-                    self.sentry_v2_tab.set_host_main_window(self)
-
-                self._sentry_v2_window = QMainWindow()
-                self._sentry_v2_window.setWindowTitle("Smart Sentry v2")
-                self._sentry_v2_window.setObjectName("smart_sentry_v2_window")
-                self._sentry_v2_window.setCentralWidget(self.sentry_v2_tab)
-                self._sentry_v2_window.resize(1280, 860)
-
-                def _handle_sentry_v2_window_close(event):
-                    try:
-                        if getattr(self, "sentry_v2_tab", None) is not None and self.sentry_v2_tab.is_enabled():
-                            self.sentry_v2_tab.set_enabled(False)
-                    except Exception:
-                        pass
-                    try:
-                        self.sentry_v2_active = False
-                    except Exception:
-                        pass
-                    try:
-                        if getattr(self, "_sentry_v2_window_action", None) is not None:
-                            self._sentry_v2_window_action.setChecked(False)
-                    except Exception:
-                        pass
-                    try:
-                        if event is not None and hasattr(event, "accept"):
-                            event.accept()
-                    except Exception:
-                        pass
-                    return None
-
-                self._sentry_v2_window.closeEvent = _handle_sentry_v2_window_close
-
-                # Only signals that the main app still needs
-                self.sentry_v2_tab.sentry_enabled_changed.connect(self._on_sentry_v2_enabled_changed)
-                self.sentry_v2_tab.detection_mode_changed.connect(self._on_sentry_v2_detection_mode_changed)
-                self.sentry_v2_tab.color_preset_changed.connect(
-                    lambda preset: setattr(self, "color_preset", preset) if hasattr(self, "color_preset") else None
-                )
-
-                self._sentry_v2_saved_dock_visibility = {}
-
-                print("[SENTRY_V2] Smart Sentry v2 window initialized successfully")
-            except Exception as e:
-                print(f"[SENTRY_V2] Failed to create tab: {e}")
-                import traceback
-                traceback.print_exc()
-                self.sentry_v2_tab = None
-                self._sentry_v2_window = None
-        # ========== END AGENT-MANAGED BLOCK: SMART SENTRY V2 TAB ==========
 
         # === IDLE ZONES TAB ===
         self.idle_zones_tab = None
@@ -2616,6 +2546,10 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self._refresh_connect_button_state()
             except Exception:
                 pass
+            try:
+                QTimer.singleShot(1200, self._auto_load_selected_yolo_model)
+            except Exception:
+                pass
             
             # ===== SET BACKGROUND SUBTRACTION AS DEFAULT ON FIRST RUN =====
             # If detection mode is still at 0 (Frame Difference), user hasn't customized it yet.
@@ -3384,19 +3318,18 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             try:
                 self.serial_device_type_combo.addItems(
                     [
-                        "ESP32 (DB3000 ASCII/IO)",
-                        "Debug Board (Bus Servo Direct)",
-                        "Dual Port (ESP32 IO + Debug Board Pan/Tilt)",
+                        "ESP32 USB (DB3000 ASCII/IO)",
+                        "Debug Board USB (Bus Servo, optional ESP32 WiFi IO)",
+                        "Dual USB (ESP32 USB + Debug Board USB)",
+                        "Full WiFi (ESP32 WiFi + Debug Board on ESP32 UART)",
                     ]
                 )
                 self.serial_device_type_combo.setToolTip(
-                    "Select how the app talks to the selected COM port.\n"
-                    "- ESP32: sends text commands like P90T40F0... for IO/control.\n"
-                    "- Debug Board: sends binary bus-servo packets for PAN/TILT on Debug Board COM.\n"
-                    "  If ESP32 Host/Port is filled, Connect also opens ESP32 Wi-Fi link for IO/fire/relays (no ESP32 USB needed).\n"
-                    "- Dual Port: uses TWO independent USB serial ports (ESP32 + Debug Board).\n"
-                    "  ESP32 handles IO/telemetry (fire/relays/safety), Debug Board COM handles PAN/TILT.\n"
-                    "  Note: Dual Port does NOT require the Debug Board to be chained to the ESP32."
+                    "Select how the app reaches the turret hardware.\n"
+                    "- ESP32 USB: one USB cable, ASCII commands for motion and IO.\n"
+                    "- Debug Board USB: bus-servo PAN/TILT on Debug Board COM; optional ESP32 WiFi handles fire/relays/safety.\n"
+                    "- Dual USB: two USB cables, ESP32 handles IO and Debug Board handles PAN/TILT.\n"
+                    "- Full WiFi: PC talks to ESP32 by WiFi/UDP only; Debug Board stays wired to ESP32 UART2 (GPIO16/17)."
                 )
             except Exception:
                 pass
@@ -7509,15 +7442,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     code_fixer_action.triggered.connect(open_code_fixer)
                 except Exception:
                     pass
-
-                if getattr(self, "_sentry_v2_window", None) is not None:
-                    self._sentry_v2_window_action = cast(Any, tools_menu.addAction("Smart Sentry v2"))
-                    try:
-                        self._sentry_v2_window_action.setCheckable(True)
-                        self._sentry_v2_window_action.setChecked(False)
-                        self._sentry_v2_window_action.triggered.connect(self._toggle_sentry_v2_window)
-                    except Exception:
-                        pass
                 
                 # Floating Panel
                 panel_action = tools_menu.addAction("Floating Panel")
@@ -8123,36 +8047,119 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 pass
 
     def open_pin_assignment_window(self):
-        """Open a simple dialog showing ESP32 pin assignments."""
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHeaderView
+        """Open a dialog showing ESP32 pin assignments with colour-coded groups."""
+        from PyQt5.QtWidgets import (
+            QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem,
+            QHeaderView, QLabel, QTabWidget, QWidget, QVBoxLayout as VBox,
+        )
+        from PyQt5.QtGui import QColor, QFont
+        from PyQt5.QtCore import Qt
         try:
             dlg = QDialog(self)
-            dlg.setWindowTitle("ESP32 DevKit v1 Pin Assignments (UDP Link Mode)")
-            dlg.resize(520, 340)
-            layout = QVBoxLayout(dlg)
-            
-            data = [
-                ("GPIO16", "UART2 RX (debug board TX)", "Serial In"),
-                ("GPIO17", "UART2 TX (debug board RX)", "Serial Out"),
-                ("GPIO27", "Trigger MOSFET (Water)", "Digital Out"),
-                ("GPIO13", "Trigger Servo (Projectile)", "PWM"),
-                ("GPIO32", "LED Relay", "Digital Out"),
-                ("GPIO33", "Laser Relay", "Digital Out"),
-                ("GPIO36", "Pan Current Sensor", "ADC1 Input"),
-                ("GPIO39", "Tilt Current Sensor", "ADC1 Input"),
-                ("GPIO34", "Total Current Sensor", "ADC1 Input"),
-            ]
+            dlg.setWindowTitle("ESP32 Pin Assignments — DB3000")
+            dlg.resize(780, 560)
+            root = QVBoxLayout(dlg)
+            root.setContentsMargins(8, 8, 8, 8)
 
-            table = QTableWidget(len(data), 3)
-            table.setHorizontalHeaderLabels(["Pin", "Function", "Mode"])
-            table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-            
-            for r, (pin, func, mode) in enumerate(data):
-                table.setItem(r, 0, QTableWidgetItem(pin))
-                table.setItem(r, 1, QTableWidgetItem(func))
-                table.setItem(r, 2, QTableWidgetItem(mode))
-                
-            layout.addWidget(table)
+            tabs = QTabWidget()
+
+            # ── helpers ────────────────────────────────────────────────────────
+            CAT_COLORS = {
+                "UART":    QColor("#cce5ff"),   # blue
+                "Output":  QColor("#ffd6c0"),   # orange
+                "PIR":     QColor("#c8f0c8"),   # green
+                "Current": QColor("#fff0b0"),   # yellow
+            }
+
+            def _make_table(rows):
+                """Build a styled 4-column table from (pin, category, function, mode) rows."""
+                t = QTableWidget(len(rows), 4)
+                t.setHorizontalHeaderLabels(["Pin", "Category", "Function", "Mode"])
+                t.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+                t.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+                t.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+                t.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+                t.setEditTriggers(QTableWidget.NoEditTriggers)
+                t.setSelectionBehavior(QTableWidget.SelectRows)
+                t.verticalHeader().setVisible(False)
+                t.setAlternatingRowColors(False)
+                t.setShowGrid(True)
+                bold = QFont()
+                bold.setBold(True)
+                for r, (pin, cat, func, mode) in enumerate(rows):
+                    bg = CAT_COLORS.get(cat, QColor("#f5f5f5"))
+                    for c, text in enumerate([pin, cat, func, mode]):
+                        item = QTableWidgetItem(text)
+                        item.setBackground(bg)
+                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                        if c == 0:
+                            item.setFont(bold)
+                            item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
+                        t.setItem(r, c, item)
+                t.resizeRowsToContents()
+                return t
+
+            # ── Tab 1: PIR Firmware (active) ───────────────────────────────────
+            pir_tab = QWidget()
+            pir_lay = VBox(pir_tab)
+            pir_note = QLabel(
+                "<b>Firmware:</b> DB3000_ESP32_IO_Telemetry_2026_w_PIR &nbsp;(currently active)<br>"
+                "<b>Runtime path:</b> PC → ESP32 via WiFi/UDP &bull; Debug Board → ESP32 via UART2<br>"
+                "<span style='color:#555;'>"
+                "GPIO 34, 35, 39 are <i>input-only</i> ADC1 pins — cannot be driven as outputs."
+                "</span>"
+            )
+            pir_note.setWordWrap(True)
+            pir_note.setContentsMargins(4, 4, 4, 8)
+            pir_lay.addWidget(pir_note)
+
+            pir_rows = [
+                # pin        category   function                                   mode
+                ("GPIO 16", "UART",    "UART2 RX  ←  Debug Board TX",            "Serial In"),
+                ("GPIO 17", "UART",    "UART2 TX  →  Debug Board RX",            "Serial Out"),
+                ("GPIO 27", "Output",  "Trigger MOSFET  (water solenoid)",        "Digital Out"),
+                ("GPIO 13", "Output",  "Trigger Servo  (projectile launcher)",    "PWM Out"),
+                ("GPIO 32", "Output",  "LED Relay",                               "Digital Out"),
+                ("GPIO 33", "Output",  "Laser Relay",                             "Digital Out"),
+                ("GPIO 25", "Output",  "Accessory Relay",                         "Digital Out"),
+                ("GPIO 35", "PIR",     "PIR Sensor 0  —  Left / Rear  (~270°)",   "ADC1 In"),
+                ("GPIO 34", "PIR",     "PIR Sensor 1  —  Front / Left  (~150°)",  "ADC1 In"),
+                ("GPIO 39", "PIR",     "PIR Sensor 2  —  Front / Right  (~30°)",  "ADC1 In"),
+            ]
+            pir_lay.addWidget(_make_table(pir_rows))
+            tabs.addTab(pir_tab, "PIR Firmware  (active)")
+
+            # ── Tab 2: UDP Link Firmware (legacy) ──────────────────────────────
+            udp_tab = QWidget()
+            udp_lay = VBox(udp_tab)
+            udp_note = QLabel(
+                "<b>Firmware:</b> DB3000_ESP32_UDP_Link &nbsp;(legacy / no PIR support)<br>"
+                "<b>Runtime path:</b> PC → ESP32 via WiFi/UDP &bull; Debug Board → ESP32 via UART2<br>"
+                "<span style='color:#a00;'>"
+                "⚠  GPIO 34, 39 are repurposed as current-sensor ADC inputs in this firmware.<br>"
+                "   They <u>cannot</u> simultaneously function as PIR sensor inputs."
+                "</span>"
+            )
+            udp_note.setWordWrap(True)
+            udp_note.setContentsMargins(4, 4, 4, 8)
+            udp_lay.addWidget(udp_note)
+
+            udp_rows = [
+                ("GPIO 16", "UART",    "UART2 RX  ←  Debug Board TX",            "Serial In"),
+                ("GPIO 17", "UART",    "UART2 TX  →  Debug Board RX",            "Serial Out"),
+                ("GPIO 27", "Output",  "Trigger MOSFET  (water solenoid)",        "Digital Out"),
+                ("GPIO 13", "Output",  "Trigger Servo  (projectile launcher)",    "PWM Out"),
+                ("GPIO 32", "Output",  "LED Relay",                               "Digital Out"),
+                ("GPIO 33", "Output",  "Laser Relay",                             "Digital Out"),
+                ("GPIO 25", "Output",  "Accessory Relay",                         "Digital Out"),
+                ("GPIO 36", "Current", "Pan Motor Current Sensor",                "ADC1 In"),
+                ("GPIO 39", "Current", "Tilt Motor Current Sensor",               "ADC1 In"),
+                ("GPIO 34", "Current", "Total Current Sensor",                    "ADC1 In"),
+            ]
+            udp_lay.addWidget(_make_table(udp_rows))
+            tabs.addTab(udp_tab, "UDP Firmware  (legacy)")
+
+            root.addWidget(tabs)
             dlg.exec_()
         except Exception as e:
             print(f"Error opening pin window: {e}")
@@ -10304,7 +10311,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         return None
 
     def _serial_device_type_index(self) -> int:
-        """0 = ESP32 ASCII/IO, 1 = Debug Board bus-servo, 2 = Dual Port."""
+        """0 = ESP32 USB, 1 = Debug Board USB, 2 = Dual USB, 3 = Full WiFi."""
         try:
             idx = self._safe_widget_method_return(
                 "serial_device_type_combo", "currentIndex", None
@@ -10327,6 +10334,12 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
     def _serial_is_dual_port(self) -> bool:
         try:
             return int(self._serial_device_type_index()) == 2
+        except Exception:
+            return False
+
+    def _serial_is_wifi_full(self) -> bool:
+        try:
+            return int(self._serial_device_type_index()) == 3
         except Exception:
             return False
 
@@ -10419,7 +10432,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         return swapped_primary, primary_baud, swapped_debug, debug_baud, True
 
     def _serial_is_nano_ascii(self) -> bool:
-        # Backward-compatible helper name: index 0 is now ESP32 ASCII/IO mode.
+        # Backward-compatible helper name: index 0 is now ESP32 USB ASCII/IO mode.
         try:
             return int(self._serial_device_type_index()) == 0
         except Exception:
@@ -10452,7 +10465,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         show_primary = bool(mode_idx in (0, 2))
         show_debug = bool(mode_idx in (1, 2))
-        show_wifi = bool(mode_idx == 1)
+        show_wifi = bool(mode_idx in (1, 2, 3))
 
         try:
             self._set_visible(getattr(self, "primary_com_label", None), show_primary)
@@ -11777,6 +11790,40 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         except Exception:
             return False
 
+    def _auto_load_selected_yolo_model(self) -> bool:
+        """Load the currently selected YOLO model after startup settles."""
+        try:
+            combo = getattr(self, "yolo_model_combo", None)
+            detector = getattr(self, "yolo_detector", None)
+            if combo is None or detector is None:
+                return False
+
+            model_name = str(combo.currentText() or "").strip()
+            if not model_name:
+                return False
+
+            resolved_model = self._resolve_valid_yolo_model_name(model_name)
+            if not resolved_model:
+                return False
+
+            try:
+                model_loaded = bool(getattr(detector, "model_loaded", False))
+            except Exception:
+                model_loaded = False
+            try:
+                loaded_name = str(getattr(detector, "model_name", "") or "")
+            except Exception:
+                loaded_name = ""
+
+            if model_loaded and loaded_name and (
+                loaded_name == resolved_model or loaded_name == os.path.basename(resolved_model)
+            ):
+                return True
+
+            return bool(self._request_yolo_model_load_async(resolved_model))
+        except Exception:
+            return False
+
     def _refresh_yolo_model_combo(self, selected_model: str = "") -> str:
         """Refresh the YOLO model combo from the currently configured models directory."""
         try:
@@ -11982,7 +12029,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 self,
                 "Select YOLO model",
                 start_dir,
-                "YOLO Model Files (*.pt);;All Files (*)",
+                "YOLO Model Files (*.pt *.onnx *.engine *.torchscript);;All Files (*)",
             )
             if not path:
                 return
@@ -12042,7 +12089,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         )
                     else:
                         self.enhancer.log_serial_output(
-                            f"YOLO models folder set to: {path} (no .pt files found)",
+                            f"YOLO models folder set to: {path} (no model files found)",
                             fire=False,
                         )
             except Exception:
@@ -17767,6 +17814,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
         dual_mode = bool(self._serial_is_dual_port())
         debug_board_mode = bool(self._serial_is_debug_board_bus())
+        full_wifi_mode = bool(self._serial_is_wifi_full())
 
         primary_open = bool(self.ser is not None and getattr(self.ser, "is_open", False))
         bus_open = bool(
@@ -17838,7 +17886,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
             # ESP32 UDP-only mode (no COM ports selected): auto-connect ESP32 link.
             wifi_only_requested = (not str(port).strip()) and (not str(dbg_port).strip())
-            if wifi_only_requested:
+            if full_wifi_mode or wifi_only_requested:
                 return self._connect_esp32_link_from_panel()
 
             # If switching into serial-only mode, close UDP link first.
@@ -17880,7 +17928,7 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                     except Exception:
                         pass
                     return False
-            else:
+            elif not full_wifi_mode:
                 if not selected_port or selected_port.strip() == "":
                     self._safe_enhancer_log(
                         "COM port not specified. Please select a valid port."
@@ -17911,7 +17959,11 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
 
             try:
                 if hasattr(self, "connection_status_label"):
-                    if dual_mode:
+                    if full_wifi_mode:
+                        self.connection_status_label.setText(
+                            "Connecting: ESP32 Wi-Fi..."
+                        )
+                    elif dual_mode:
                         if hybrid_wifi_requested and (not str(port).strip()):
                             self.connection_status_label.setText(
                                 f"Connecting: DebugBoard={dbg_port} + ESP32 Wi-Fi..."
@@ -17967,13 +18019,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                         self._refresh_connect_button_state()
                     except Exception:
                         pass
-            else:
+            elif not full_wifi_mode:
                 self._connect_serial_async(selected_port, selected_baud)
                 if debug_wifi_requested and (not link_open):
                     try:
                         self._connect_esp32_link_from_panel()
                     except Exception:
                         pass
+            else:
+                return self._connect_esp32_link_from_panel()
             return
 
         return self._disconnect_main_app_transports(
@@ -26095,25 +26149,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             print(f"[SENTRY] update error: {e}")
         # ========== END SENTRY MODE FRAME UPDATE ==========
 
-        # ========== SMART SENTRY V2 FRAME UPDATE ==========
-        try:
-            _v2_tab = getattr(self, "sentry_v2_tab", None)
-            _v2_window = getattr(self, "_sentry_v2_window", None)
-            _v2_visible = (
-                _v2_tab is not None
-                and _v2_window is not None
-                and _v2_window.isVisible()
-            )
-            _v2_feed_active = _v2_tab is not None and _v2_tab.is_enabled()
-
-            if _v2_feed_active and frame1 is not None:
-                self.sentry_v2_tab.process_frame(frame1, None, use_internal_detector=True)
-        except Exception as e:
-            import traceback
-            print(f"[SENTRY_V2] update error: {e}")
-            traceback.print_exc()
-        # ========== END SMART SENTRY V2 FRAME UPDATE ==========
-
         # Output cadence:
         # Prefer the dedicated serial timer (higher Hz, decoupled from camera FPS).
         # Fall back to per-frame sending only if the timer is unavailable/inactive.
@@ -26448,16 +26483,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             except Exception as log_err:
                 print(f"[SENTRY] send_serial_command guard error: {e} (log error: {log_err})")
         # ========== END SENTRY MODE BLOCK ==========
-        # ========== SMART SENTRY V2 BLOCK ==========
-        try:
-            if getattr(self, "sentry_v2_active", False) and getattr(self, "sentry_v2_tab", None) is not None:
-                if self.sentry_v2_tab.is_enabled():
-                    # Sentry v2 has its own serial connection — block main app commands
-                    return
-        except Exception as e:
-            print(f"[SENTRY_V2] send_serial_command guard error: {e}")
-        # ========== END SMART SENTRY V2 BLOCK ==========
-
         # Drain ESP32 UDP events every cycle so current telemetry remains live
         # even when serial writes are skipped by redundant-command filtering.
         try:
@@ -29364,44 +29389,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         # A mismatch here can make autotracking appear "ON" while servos never move.
         # See CHANGE_IMPACT_REFERENCE.md → Sections 10 and 12.
         try:
-            # --- Smart Sentry v2 tab detection ---
-            if getattr(self, "sentry_v2_tab", None) is not None:
-                v2_index = self.main_tab_widget.indexOf(self.sentry_v2_tab)
-                if v2_index >= 0 and index == v2_index:
-                    self.sentry_v2_active = True
-                    # Pause main tracking
-                    if getattr(self, "tracking_active", False):
-                        self._sentry_v2_previous_tracking_state = True
-                        try:
-                            if getattr(self, "state_manager", None) is not None:
-                                self.state_manager.ensure_tracking_disabled(reason="Smart Sentry v2 tab activated")
-                            else:
-                                self.tracking_active = False
-                                self.aiming_active = False
-                        except Exception:
-                            self.tracking_active = False
-                            self.aiming_active = False
-                    else:
-                        self._sentry_v2_previous_tracking_state = False
-                    # Hide irrelevant dock panels
-                    self._sentry_v2_hide_docks()
-                elif v2_index >= 0 and getattr(self, "sentry_v2_active", False):
-                    self.sentry_v2_active = False
-                    if self.sentry_v2_tab.is_enabled():
-                        self.sentry_v2_tab.set_enabled(False)
-                    if getattr(self, "_sentry_v2_previous_tracking_state", False):
-                        try:
-                            if getattr(self, "state_manager", None) is not None:
-                                self.state_manager.ensure_tracking_active(reason="Smart Sentry v2 tab deactivated")
-                            else:
-                                self.tracking_active = True
-                                self.aiming_active = True
-                        except Exception:
-                            self.tracking_active = True
-                            self.aiming_active = True
-                    # Restore hidden dock panels
-                    self._sentry_v2_restore_docks()
-
             if self.sentry_tab is None:
                 return
             
@@ -29585,8 +29572,32 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                 except Exception:
                     pass
                 return
+
+            # Primary path: delegate burst fire to Sentry v2 comm backend so
+            # connection modes using UDP IO (e.g. Mode 2) work correctly.
+            try:
+                sentry_tab = getattr(self, "sentry_tab", None)
+                if sentry_tab is not None:
+                    pan = float(getattr(getattr(sentry_tab, "engine", None), "current_pan", getattr(self, "target_pan", 90)))
+                    tilt = float(getattr(getattr(sentry_tab, "engine", None), "current_tilt", getattr(self, "target_tilt", 40)))
+                    interval = int(getattr(getattr(sentry_tab, "config", None).engagement, "burst_interval_ms", 50)) if getattr(sentry_tab, "config", None) is not None else 50
+
+                    start_burst = getattr(sentry_tab, "_start_fire_burst", None)
+                    if callable(start_burst):
+                        start_burst(pan, tilt, int(max(1, int(burst_count))), int(max(10, interval)))
+                        try:
+                            if hasattr(self, "enhancer"):
+                                self.enhancer.log_serial_output(
+                                    f"[SENTRY] FIRE delegated to Sentry comm backend (burst={int(burst_count)})",
+                                    fire=True,
+                                )
+                        except Exception:
+                            pass
+                        return
+            except Exception as e:
+                print(f"[SENTRY] Delegated fire fallback to legacy path: {e}")
             
-            # Fire burst
+            # Legacy fallback: direct serial burst (ESP32 USB ASCII mode)
             try:
                 if (
                     hasattr(self, "ser")
@@ -29676,6 +29687,15 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
         """
         try:
             if self.sentry_tab is not None and self.sentry_mode_active:
+                # For color-aware/filtered sentry modes, force sentry_v2 internal detection
+                # so color preset and class criteria are applied from sentry settings.
+                use_internal_detector = False
+                try:
+                    mode_idx = int(getattr(getattr(self.sentry_tab, "config", None), "detection_mode", None).detection_mode)
+                    use_internal_detector = mode_idx in {6, 7, 8, 9, 10}
+                except Exception:
+                    use_internal_detector = False
+
                 # Convert detections to format expected by sentry
                 # Main app uses (x, y, w, h, score, class_name) format
                 # Sentry expects (x, y, w, h, score)
@@ -29688,140 +29708,16 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
                             sentry_detections.append((x, y, w, h, score))
                 
                 # Process frame through sentry
-                self.sentry_tab.process_frame(frame, sentry_detections)
+                self.sentry_tab.process_frame(
+                    frame,
+                    sentry_detections,
+                    use_internal_detector=use_internal_detector,
+                )
         except Exception as e:
             print(f"[SENTRY] Frame update error: {e}")
     
     # =========================================================================
     # END AGENT-MANAGED BLOCK: SENTRY MODE INTEGRATION
-    # =========================================================================
-
-    # =========================================================================
-    # AGENT-MANAGED BLOCK: SMART SENTRY V2 INTEGRATION (Mar 2026)
-    # =========================================================================
-
-    def _show_sentry_v2_window(self):
-        """Show the standalone Smart Sentry v2 window."""
-        try:
-            window = getattr(self, "_sentry_v2_window", None)
-            if window is None:
-                return
-            window.show()
-            try:
-                window.raise_()
-                window.activateWindow()
-            except Exception:
-                pass
-            if getattr(self, "_sentry_v2_window_action", None) is not None:
-                self._sentry_v2_window_action.setChecked(True)
-        except Exception as e:
-            print(f"[SENTRY_V2] show window error: {e}")
-
-    def _toggle_sentry_v2_window(self, checked: bool):
-        """Toggle the standalone Smart Sentry v2 window."""
-        try:
-            window = getattr(self, "_sentry_v2_window", None)
-            if window is None:
-                return
-            if checked:
-                self._show_sentry_v2_window()
-            else:
-                window.close()
-        except Exception as e:
-            print(f"[SENTRY_V2] toggle window error: {e}")
-
-    def _on_sentry_v2_enabled_changed(self, enabled: bool):
-        """Handle Smart Sentry v2 enable/disable toggle."""
-        try:
-            self.sentry_v2_active = bool(enabled)
-            if enabled:
-                self._show_sentry_v2_window()
-                if getattr(self, "tracking_active", False):
-                    self._sentry_v2_previous_tracking_state = True
-                    try:
-                        if getattr(self, "state_manager", None) is not None:
-                            self.state_manager.ensure_tracking_disabled(reason="Smart Sentry v2 enabled")
-                        else:
-                            self.tracking_active = False
-                            self.aiming_active = False
-                    except Exception:
-                        self.tracking_active = False
-                        self.aiming_active = False
-                print("[SENTRY_V2] Smart Sentry ENABLED")
-            else:
-                if getattr(self, "_sentry_v2_previous_tracking_state", False):
-                    try:
-                        if getattr(self, "state_manager", None) is not None:
-                            self.state_manager.ensure_tracking_active(reason="Smart Sentry v2 disabled")
-                        else:
-                            self.tracking_active = True
-                            self.aiming_active = True
-                    except Exception:
-                        self.tracking_active = True
-                        self.aiming_active = True
-                if getattr(self, "_sentry_v2_window_action", None) is not None:
-                    self._sentry_v2_window_action.setChecked(
-                        getattr(self, "_sentry_v2_window", None) is not None
-                        and self._sentry_v2_window.isVisible()
-                    )
-                print("[SENTRY_V2] Smart Sentry DISABLED")
-        except Exception as e:
-            print(f"[SENTRY_V2] enabled_changed error: {e}")
-
-    def _on_sentry_v2_detection_mode_changed(self, mode: int):
-        """Sync detection mode from Smart Sentry v2 to main app combo box."""
-        try:
-            if hasattr(self, "detection_mode_combo"):
-                self.detection_mode_combo.setCurrentIndex(mode)
-        except Exception as e:
-            print(f"[SENTRY_V2] Detection mode sync error: {e}")
-
-    # --- Dock panel management for Smart Sentry v2 ---
-
-    _SENTRY_V2_HIDE_DOCKS = {
-        "Configuration & Connection",
-        "Home Position",
-        "Servo Limits",
-        "Accessories",
-        "Target Detection",
-        "Tracking Behavior",
-        "Manual Movement & Firing",
-        "System",
-        "System Health Monitor",
-        "Behavior Presets",
-    }
-
-    def _sentry_v2_hide_docks(self) -> None:
-        """Hide dock panels not applicable in Smart Sentry mode."""
-        try:
-            from PyQt5.QtWidgets import QDockWidget
-            saved = {}
-            for dock in self.findChildren(QDockWidget):
-                title = dock.windowTitle()
-                if title in self._SENTRY_V2_HIDE_DOCKS:
-                    saved[title] = dock.isVisible()
-                    dock.setVisible(False)
-            self._sentry_v2_saved_dock_visibility = saved
-        except Exception as e:
-            print(f"[SENTRY_V2] Dock hide error: {e}")
-
-    def _sentry_v2_restore_docks(self) -> None:
-        """Restore dock panels hidden by Smart Sentry mode."""
-        try:
-            from PyQt5.QtWidgets import QDockWidget
-            saved = getattr(self, "_sentry_v2_saved_dock_visibility", {})
-            if not saved:
-                return
-            for dock in self.findChildren(QDockWidget):
-                title = dock.windowTitle()
-                if title in saved:
-                    dock.setVisible(saved[title])
-            self._sentry_v2_saved_dock_visibility = {}
-        except Exception as e:
-            print(f"[SENTRY_V2] Dock restore error: {e}")
-
-    # =========================================================================
-    # END AGENT-MANAGED BLOCK: SMART SENTRY V2 INTEGRATION
     # =========================================================================
 
     def closeEvent(self, a0):
@@ -29837,14 +29733,6 @@ class TrackingApp(QMainWindow, LayoutManagerMixin):
             pass
         try:
             self.running = False
-        except Exception:
-            pass
-
-        # Stop sentry v2 timers immediately (prevents grab-frame during teardown)
-        try:
-            _v2 = getattr(self, "sentry_v2_tab", None)
-            if _v2 is not None:
-                _v2.cleanup()
         except Exception:
             pass
 

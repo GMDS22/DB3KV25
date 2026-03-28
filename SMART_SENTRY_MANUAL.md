@@ -3,7 +3,7 @@
 > **Version:** 2.1.0  
 > **Module Path:** `app/sentry_v2/`  
 > **Last Updated:** 2026-03-16  
-> **Status:** Verified against current implementation; shared-feed detector independence, host-window integration, nonblocking burst fire, and adjustable settings panel are now active
+> **Status:** Verified against current implementation; Smart Sentry v2 now runs as a standalone app, keeps its own settings file, defaults blank camera source to camera `0`, and retains the protected aiming/firing baseline
 
 ---
 
@@ -31,23 +31,24 @@
 
 ## 1. ARCHITECTURE OVERVIEW
 
-Smart Sentry v2 is an embedded turret control module within the DADBOT v4 desktop application. Its **detection logic**, **serial/UDP communication**, and **state machine** are self-contained, but its video source can run in one of two ways:
+Smart Sentry v2 is a standalone turret control application launched from the DB3000 launcher. Its **detection logic**, **serial/UDP communication**, **camera ownership**, and **state machine** are self-contained inside `app/sentry_v2/`.
 
-- **Main app feed mode:** the main app pushes its live BGR frame into sentry v2
-- **Secondary camera mode:** sentry v2 opens and owns a separate camera or stream source
+- **Standalone camera ownership:** Smart Sentry opens and owns its own camera or stream source
+- **Separate runtime settings:** Smart Sentry persists to `app/config/sentry_v2_settings.json`
+- **One-app-at-a-time workflow:** Smart Sentry and the main app may use the same COM values, but never at the same time
 
-On single-camera systems, sentry v2 should normally use the main app feed and should not open camera index `0` again.
+On single-camera systems, Smart Sentry should normally use camera index `0` unless the operator explicitly selects another camera or stream source.
 
 ### Verified Current Integration Notes
 
-- **Current shared-feed implementation:** the main app pushes the live BGR frame into Smart Sentry v2, and Smart Sentry now runs `SentryV2Detector` on that frame itself.
-- **Current own-camera implementation:** when Smart Sentry opens its own camera, it runs its full internal detector pipeline and ignores external frame pushes.
-- **Current host integration:** the host app now passes an explicit main-window reference into Smart Sentry, so camera conflict checks no longer depend only on parent-chain discovery.
+- **Current standalone implementation:** Smart Sentry v2 is no longer hosted inside the main app and no longer depends on pushed main-app frames.
+- **Current own-camera implementation:** Smart Sentry opens its configured camera source itself and runs its full internal detector pipeline on that feed.
+- **Current protected baseline:** the live visual-servo controller, precision refinement, motion suppression, and fire-gating behavior are the preserved baseline and should only change for measured improvement.
 
 ### Module Philosophy
 
 - **Independent sentry logic:** No reliance on main app detection or serial ports
-- **Dual video-source support:** Main app feed by default, optional separate camera when needed
+- **Single owned video source:** Smart Sentry owns one configured camera/stream source at a time
 - **Self-contained pipeline:** Camera → Detection → Filter → Score → Plan → Engage → Fire
 - **Pluggable connection modes:** 4 hardware topologies supported
 - **11 detection modes:** From simple motion to YOLO + color hybrids
@@ -178,11 +179,11 @@ Standalone multi-mode detector. No dependency on main app detection code.
 | 3 | Hybrid: Diff + BackSub | Union of modes 0 and 1 |
 | 4 | Hybrid: Diff + YOLO | Frame diff motion gate → YOLO on motion frames only |
 | 5 | Hybrid: BackSub + YOLO | BackSub motion gate → YOLO on motion frames only |
-| 6 | Color Detection | HSV `inRange` → morphology → contours |
-| 7 | Hybrid: Color + Diff | Union of modes 6 and 0 |
-| 8 | Hybrid: Color + BackSub | Union of modes 6 and 1 |
-| 9 | Hybrid: Color + YOLO | Color mask → YOLO (union merge) |
-| 10 | Filtered Target Mode | Same as YOLO (mode 2) — extra class filtering in engine |
+| 6 | Color Detection | HSV `inRange` → morphology → contours. Named presets retry with a small saturation/value tolerance so moderate shading still reads as the selected color. |
+| 7 | Hybrid: Color + Diff | Color mask + frame diff. With a specific color preset, the motion box must overlap the selected color. |
+| 8 | Hybrid: Color + BackSub | Color mask + foreground motion. With a specific color preset, the foreground box must overlap the selected color. |
+| 9 | Hybrid: Color + YOLO | Color mask + YOLO. With a specific color preset, the YOLO box must overlap the selected color; `OR` fallback only applies when the preset is `any`. |
+| 10 | Filtered Target Mode | Motion-locked filtered mode: merges frame diff + backsub motion, optionally gates on color, prefers overlapping YOLO boxes for aim stability, and falls back to `moving_object` when no class box is present. |
 
 **Color Presets (HSV ranges):**
 
@@ -302,7 +303,8 @@ Converts scored targets to an optimized engagement queue.
 **Key Methods:**
 - `plan(targets, current_pan, current_tilt)` → `List[EngagementOrder]`
   - Filters by `min_threat_score`
-  - Truncates to `max_queue_length`
+   - Truncates to `max_queue_length`
+   - When `single_target_only` is enabled, queue length is forced to `1` and slew-order optimisation is disabled
   - Converts pixel position → pan/tilt degrees via `_pixel_to_pantilt()`
   - Optionally optimizes order via nearest-neighbor TSP heuristic
 
@@ -347,7 +349,8 @@ tilt = current_tilt + offset_y
 
 **Mode 3 — Full WiFi:**
 - Everything over UDP to ESP32
-- Full ASCII command string sent via UDP
+- Motion and IO are sent as JSON payloads with CRC32 integrity check
+- Typical payload fields are `pan_cmd`, `tilt_cmd`, `fire`, `safety`, `mode`, `led`, `laser`, and optional `move_time_ms`
 - ESP32 relays bus servo commands to debug board via UART2
 
 ### Per-Link Connection Status
@@ -370,20 +373,31 @@ Checksum: (subtraction mode) ~sum(payload) & 0xFF
 - Time: Movement duration in milliseconds
 - Default servo IDs: Pan=1, Tilt=2
 
-### UDP IO Protocol (Modes 2, 3)
+### UDP Protocol (Modes 2, 3)
 
 JSON payload sent via UDP datagram:
 ```json
 {
-  "led": 1,
-  "laser": 0,
-  "fire": 0,
-  "safety": 1,
-  "mode": 0,
+   "v": 1,
+   "t": "cmd",
   "seq": 42,
-  "crc": 2847593812
+   "ts": 1700000000000,
+   "p": {
+      "pan_cmd": 135,
+      "tilt_cmd": 55,
+      "fire": 0,
+      "safety": 1,
+      "mode": 0,
+      "led": 1,
+      "laser": 0,
+      "move_time_ms": 1200
+   },
+   "crc": "a1b2c3d4"
 }
 ```
+
+- Mode 2 typically sends IO-only payloads over UDP while pan/tilt still go to the Debug Board USB link.
+- Mode 3 sends full motion plus IO over UDP; it does not send raw ASCII over UDP anymore.
 
 ---
 
@@ -437,8 +451,11 @@ _DISPATCH = {
 **Color Detection (Mode 6):**
 1. Convert to HSV
 2. Build combined mask from preset ranges (or custom HSV)
-3. Gaussian blur + morphological close
-4. `findContours()` → filter by min/max area → bounding boxes
+3. If a named preset finds nothing, retry once with a small saturation/value tolerance while preserving the same hue family
+4. Gaussian blur + morphological close
+5. `findContours()` → filter by min/max area → bounding boxes
+
+Named presets are hue-anchored but shade-tolerant. Moderate darkening or desaturation of the selected target color is still treated as that selected color, while nearby families such as cyan versus blue remain separated.
 
 **Hybrid Modes (3–5, 7–9):**
 - **Union hybrids** (3, 7, 8): Run both algorithms, merge results via `_merge_boxes()`
@@ -652,8 +669,8 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 | `burst_interval_ms` | `int` | 50 | Milliseconds between shots |
 | `inter_target_cooldown` | `float` | 0.8 | Seconds between targets |
 | `cycle_cooldown` | `float` | 2.0 | Seconds between full cycles |
-| `max_queue_length` | `int` | 5 | Max simultaneous targets |
-| `optimize_slew_order` | `bool` | True | TSP nearest-neighbor ordering |
+| `max_queue_length` | `int` | 1 | Max simultaneous targets; forced to `1` when `single_target_only` is enabled |
+| `optimize_slew_order` | `bool` | False | TSP nearest-neighbor ordering; disabled in single-target mode |
 | `return_delay` | `float` | 1.5 | Seconds before returning to guard |
 | `engagement_speed` | `int` | 80 | Servo speed multiplier |
 | `auto_trigger_enabled` | `bool` | False | Enable automatic firing |
@@ -706,7 +723,7 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 | `bus_servo_time_ms` | `int` | 20 | Servo movement time (ms) |
 | `invert_pan` | `bool` | False | Invert pan direction |
 | `invert_tilt` | `bool` | False | Invert tilt direction |
-| `camera_source` | `str` | "" | Blank = shared main-app feed; otherwise camera index, URL, or file path |
+| `camera_source` | `str` | "0" | Camera index, URL, or file path. Blank input is normalized to camera `0`. |
 | `camera_width` | `int` | 1280 | Requested camera width |
 | `camera_height` | `int` | 720 | Requested camera height |
 | `settings_panel_width` | `int` | 420 | Preferred width of the right-side settings panel |
@@ -1145,7 +1162,7 @@ These are current implementation risks verified during documentation review and 
 
 When code changes are made later, update this manual in the same pass for:
 
-- shared-feed data flow
+- standalone camera/data flow
 - camera ownership behavior
 - current UI layout and navigation model
 - persisted settings surface
