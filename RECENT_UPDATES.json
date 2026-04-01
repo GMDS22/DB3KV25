@@ -3,6 +3,10 @@
   "max_items": 10,
   "items": [
     {
+      "date": "2026-04-01",
+      "title": "Smart Sentry v2 layout accessibility update: converted settings tabs in app/sentry_v2/sentry_v2_tab.py to a left-side vertical tab rail so all tabs remain reachable in narrow panel widths, and moved runtime/serial log output into a dedicated always-visible bottom pane using a vertical splitter (with clear-log action) so logs remain visible while editing settings."
+    },
+    {
       "date": "2026-03-18",
       "title": "Smart Sentry v2 UI/preset completion: app/sentry_v2/sentry_v2_tab.py now exposes motion self-suppression tuning on the Detection panel plus advanced precision, aim-lock, fire-gate, recenter, and target-loss controls on the Engage panel; detection and engagement preset application now updates those controls directly; engagement presets were expanded so each profile carries explicit values for the newly exposed fields; and tooltips were extended in app/sentry_v2/sentry_v2_tooltips.py so the advanced behavior is understandable from the UI."
     },

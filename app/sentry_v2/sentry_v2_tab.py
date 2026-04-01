@@ -38,7 +38,7 @@ from PyQt5.QtWidgets import (
     QFileDialog,
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject, QProcess, QProcessEnvironment
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtGui import QImage, QPixmap, QColor
 
 from .sentry_v2_config import (
     SentryV2Config,
@@ -1685,7 +1685,7 @@ AIM_LOCK_FIRE_GATE_PRESETS = {
 
 SENTRY_V2_THEME = """
 QWidget#sentryV2Root {
-    background-color: #0f141a;
+    background-color: #101720;
     color: #e6edf3;
     font-family: "Segoe UI";
     font-size: 10pt;
@@ -1699,9 +1699,9 @@ QWidget#sentryV2Root QScrollArea > QWidget > QWidget {
     border: none;
 }
 QWidget#sentryV2Root QGroupBox {
-    background-color: #18212b;
-    border: 1px solid #2a3745;
-    border-radius: 10px;
+    background-color: #16212c;
+    border: 1px solid #304255;
+    border-radius: 12px;
     margin-top: 12px;
     padding: 12px 10px 10px 10px;
     font-weight: 600;
@@ -1710,56 +1710,64 @@ QWidget#sentryV2Root QGroupBox::title {
     subcontrol-origin: margin;
     left: 10px;
     padding: 0 6px;
-    color: #8fe3c4;
+    color: #86d7ff;
 }
 QWidget#sentryV2Root QTabWidget::pane {
-    background-color: #141b23;
-    border: 1px solid #2a3745;
+    background-color: #131d28;
+    border: 1px solid #304255;
     border-radius: 10px;
     top: -1px;
 }
 QWidget#sentryV2Root QTabBar::tab {
-    background-color: #1b2430;
+    background-color: #1a2531;
     color: #9eabb8;
-    border: 1px solid #2a3745;
+    border: 1px solid #304255;
+    border-radius: 8px;
+    padding: 8px 14px;
+    min-height: 30px;
+}
+QWidget#sentryV2Root QTabBar::tab:left {
+    min-width: 110px;
+}
+QWidget#sentryV2Root QTabBar::tab:top {
     border-bottom: none;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    padding: 8px 12px;
-    margin-right: 4px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    margin-right: 6px;
 }
 QWidget#sentryV2Root QTabBar::tab:selected {
-    background-color: #243140;
+    background-color: #23374a;
+    border-color: #4ea8de;
     color: #f4fbff;
 }
 QWidget#sentryV2Root QTabBar::tab:hover:!selected {
-    background-color: #202b38;
+    background-color: #213140;
     color: #dce7f2;
 }
 QWidget#sentryV2Root QPushButton {
-    background-color: #223243;
+    background-color: #22364a;
     color: #edf5fb;
-    border: 1px solid #35516a;
+    border: 1px solid #3d5e7a;
     border-radius: 8px;
     padding: 7px 12px;
     min-height: 34px;
 }
 QWidget#sentryV2Root QPushButton:hover {
-    background-color: #294159;
-    border-color: #4a708f;
+    background-color: #2c4862;
+    border-color: #66a3cf;
 }
 QWidget#sentryV2Root QPushButton:pressed {
-    background-color: #1b2b38;
+    background-color: #1c3042;
 }
 QWidget#sentryV2Root QPushButton:checked {
-    background-color: #1f6f57;
-    border-color: #2aa87d;
+    background-color: #1f6c72;
+    border-color: #39b0ba;
     color: #f6fffb;
 }
 QWidget#sentryV2Root QPushButton:disabled {
-    background-color: #19232d;
+    background-color: #1a2430;
     color: #6f7d8a;
-    border-color: #2a3745;
+    border-color: #2f3f50;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="primary"] {
     background-color: #1c4f78;
@@ -1879,8 +1887,8 @@ QWidget#sentryV2Root QCheckBox::indicator {
     background-color: #0c1117;
 }
 QWidget#sentryV2Root QCheckBox::indicator:checked {
-    background-color: #2aa87d;
-    border-color: #2aa87d;
+    background-color: #35b8c3;
+    border-color: #35b8c3;
 }
 QWidget#sentryV2Root QSlider::groove:horizontal {
     height: 6px;
@@ -1900,7 +1908,7 @@ QWidget#sentryV2Root QScrollBar:vertical {
     margin: 2px;
 }
 QWidget#sentryV2Root QScrollBar::handle:vertical {
-    background-color: #324251;
+    background-color: #395169;
     border-radius: 6px;
     min-height: 24px;
 }
@@ -1910,7 +1918,7 @@ QWidget#sentryV2Root QScrollBar:horizontal {
     margin: 2px;
 }
 QWidget#sentryV2Root QScrollBar::handle:horizontal {
-    background-color: #324251;
+    background-color: #395169;
     border-radius: 6px;
     min-width: 24px;
 }
@@ -1928,8 +1936,8 @@ QLabel#sentryV2Video {
     border-radius: 12px;
 }
 QTextEdit#sentryV2Log {
-    background-color: #0a0f14;
-    border: 1px solid #2a3745;
+    background-color: #0f1721;
+    border: 1px solid #33485f;
 }
 """
 
@@ -2236,6 +2244,10 @@ class SentryV2TabWidget(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(4, 4, 4, 4)
 
+        self._layout_splitter = QSplitter(Qt.Vertical)
+        self._layout_splitter.setChildrenCollapsible(False)
+        self._layout_splitter.setHandleWidth(8)
+
         self._main_splitter = QSplitter(Qt.Horizontal)
         self._main_splitter.setChildrenCollapsible(False)
         self._main_splitter.setHandleWidth(8)
@@ -2283,22 +2295,26 @@ class SentryV2TabWidget(QWidget):
         panel_layout.addWidget(self._chk_show_video)
 
         # Sub-tabs for settings categories
-        settings_tabs = QTabWidget()
-        settings_tabs.setTabPosition(QTabWidget.North)
+        self._settings_tabs = QTabWidget()
+        self._settings_tabs.setTabPosition(QTabWidget.North)
+        self._settings_tabs.setUsesScrollButtons(True)
+        self._settings_tabs.tabBar().setExpanding(False)
+        self._settings_tabs.tabBar().setElideMode(Qt.ElideNone)
 
-        settings_tabs.addTab(self._build_connection_tab(), "Connection")
-        settings_tabs.addTab(self._build_master_profiles_tab(), "Master Profiles")
-        settings_tabs.addTab(self._build_detection_tab(), "Detection")
-        settings_tabs.addTab(self._build_prompted_targets_tab(), "Prompted Targets")
-        settings_tabs.addTab(self._build_filter_tab(), "Target Filter")
-        settings_tabs.addTab(self._build_scoring_tab(), "Threat AI")
-        settings_tabs.addTab(self._build_engagement_tab(), "Engage")
-        settings_tabs.addTab(self._build_guard_tab(), "Guard")
-        settings_tabs.addTab(self._build_controls_tab(), "Controls")
+        self._settings_tabs.addTab(self._build_connection_tab(), "Connection")
+        self._settings_tabs.addTab(self._build_master_profiles_tab(), "Master Profiles")
+        self._settings_tabs.addTab(self._build_detection_tab(), "Detection")
+        self._settings_tabs.addTab(self._build_prompted_targets_tab(), "Prompted Targets")
+        self._settings_tabs.addTab(self._build_filter_tab(), "Target Filter")
+        self._settings_tabs.addTab(self._build_scoring_tab(), "Threat AI")
+        self._settings_tabs.addTab(self._build_engagement_tab(), "Engage")
+        self._settings_tabs.addTab(self._build_guard_tab(), "Guard")
+        self._settings_tabs.addTab(self._build_controls_tab(), "Controls")
+        self._apply_settings_tab_colors()
 
-        panel_layout.addWidget(settings_tabs, stretch=1)
+        panel_layout.addWidget(self._settings_tabs, stretch=1)
 
-        # Status / log
+        # Status + panel controls
         panel_layout.addWidget(self._build_status_group())
         panel_layout.addWidget(self._build_panel_width_group())
 
@@ -2306,9 +2322,15 @@ class SentryV2TabWidget(QWidget):
         self._main_splitter.addWidget(self._settings_scroll)
         self._main_splitter.setStretchFactor(0, 3)
         self._main_splitter.setStretchFactor(1, 0)
-        root.addWidget(self._main_splitter)
+
+        self._layout_splitter.addWidget(self._main_splitter)
+        self._layout_splitter.addWidget(self._build_log_group())
+        self._layout_splitter.setStretchFactor(0, 5)
+        self._layout_splitter.setStretchFactor(1, 1)
+        root.addWidget(self._layout_splitter)
 
         QTimer.singleShot(0, self._apply_saved_panel_width)
+        QTimer.singleShot(0, self._apply_saved_log_panel_height)
         QTimer.singleShot(0, self._reflow_all_responsive_button_grids)
 
         self._apply_all_tooltips()
@@ -2317,6 +2339,25 @@ class SentryV2TabWidget(QWidget):
 
     def _apply_theme(self) -> None:
         self.setStyleSheet(SENTRY_V2_THEME)
+
+    def _apply_settings_tab_colors(self) -> None:
+        if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
+            return
+        tab_bar = self._settings_tabs.tabBar()
+        tab_colors = [
+            "#8cc4ff",  # Connection
+            "#a9f1c0",  # Master Profiles
+            "#f5d27a",  # Detection
+            "#f7b48a",  # Prompted Targets
+            "#d7b3ff",  # Target Filter
+            "#9fd8ff",  # Threat AI
+            "#ffb7cf",  # Engage
+            "#9fe3d3",  # Guard
+            "#c6d2e3",  # Controls
+        ]
+        for idx, color in enumerate(tab_colors):
+            if idx < tab_bar.count():
+                tab_bar.setTabTextColor(idx, QColor(color))
 
     def _disable_wheel_scroll(self, widget: QWidget) -> None:
         """Disable mouse wheel scrolling on spinboxes, sliders, and comboboxes."""
@@ -4606,7 +4647,7 @@ class SentryV2TabWidget(QWidget):
         return w
 
     # ------------------------------------------------------------------ #
-    #  Status Group
+    #  Status + Log Groups
     # ------------------------------------------------------------------ #
 
     def _build_status_group(self) -> QGroupBox:
@@ -4631,13 +4672,6 @@ class SentryV2TabWidget(QWidget):
         self._lbl_no_fire_status.setStyleSheet("font-weight: bold; color: #8fe3c4;")
         lay.addWidget(self._lbl_no_fire_status)
 
-        self._log_text = QTextEdit()
-        self._log_text.setObjectName("sentryV2Log")
-        self._log_text.setReadOnly(True)
-        self._log_text.setMaximumHeight(120)
-        self._log_text.setStyleSheet("font-size: 11px; font-family: monospace;")
-        lay.addWidget(self._log_text)
-
         # Save config button
         btn_save = QPushButton("Save Settings")
         self._set_button_role(btn_save, "primary")
@@ -4646,6 +4680,37 @@ class SentryV2TabWidget(QWidget):
         lay.addWidget(btn_save)
 
         return grp
+
+    def _build_log_group(self) -> QGroupBox:
+        grp = QGroupBox("Serial Output")
+        grp.setMinimumHeight(150)
+
+        lay = QVBoxLayout(grp)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(6)
+
+        self._log_text = QTextEdit()
+        self._log_text.setObjectName("sentryV2Log")
+        self._log_text.setReadOnly(True)
+        self._log_text.setStyleSheet("font-size: 11px; font-family: Consolas, 'Courier New', monospace;")
+        lay.addWidget(self._log_text, stretch=1)
+
+        controls = QHBoxLayout()
+        controls.addStretch(1)
+        btn_clear = QPushButton("Clear Log")
+        self._set_button_role(btn_clear, "utility")
+        btn_clear.clicked.connect(self._log_text.clear)
+        controls.addWidget(btn_clear)
+        lay.addLayout(controls)
+
+        return grp
+
+    def _apply_saved_log_panel_height(self) -> None:
+        if not hasattr(self, "_layout_splitter"):
+            return
+        total_height = max(1, self._layout_splitter.size().height())
+        log_height = max(160, int(total_height * 0.24))
+        self._layout_splitter.setSizes([max(1, total_height - log_height), log_height])
 
     # ================================================================== #
     #  Public API (called by main app)

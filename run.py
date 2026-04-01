@@ -4,7 +4,8 @@ DADBOT v4 Portable - Application Entry Point
 Launches the main turret control application with YOLO detection
 """
 
-import sy
+import os
+import sys
 import runpy
 import warnings
 import io
