@@ -2911,6 +2911,24 @@ class SentryV2TabWidget(QWidget):
 
         lay.addWidget(self._grp_udp)
 
+        # --- Secondary ESP32 WiFi settings (mode 4) ---
+        self._grp_servo_udp = QGroupBox("Secondary ESP32 WiFi")
+        servo_udp_lay = QGridLayout(self._grp_servo_udp)
+
+        servo_udp_lay.addWidget(QLabel("Host:"), 0, 0)
+        self._edit_servo_udp_host = QLineEdit(self.config.connection.servo_udp_host)
+        self._apply_tooltip(self._edit_servo_udp_host, "servo_udp_host")
+        servo_udp_lay.addWidget(self._edit_servo_udp_host, 0, 1)
+
+        servo_udp_lay.addWidget(QLabel("Port:"), 1, 0)
+        self._spin_servo_udp_port = QSpinBox()
+        self._spin_servo_udp_port.setRange(1, 65535)
+        self._spin_servo_udp_port.setValue(self.config.connection.servo_udp_port)
+        self._apply_tooltip(self._spin_servo_udp_port, "servo_udp_port")
+        servo_udp_lay.addWidget(self._spin_servo_udp_port, 1, 1)
+
+        lay.addWidget(self._grp_servo_udp)
+
         # Direction inversion
         inv_grp = QGroupBox("Direction")
         inv_lay = QVBoxLayout(inv_grp)
@@ -4832,6 +4850,7 @@ class SentryV2TabWidget(QWidget):
         "Two USB cables — bus servo to Debug Board + IO to ESP32.",
         "One USB cable — Debug Board stays on USB, ESP32 IO goes over WiFi.",
         "No runtime USB — PC talks to ESP32 over WiFi, Debug Board stays on ESP32 UART2 (GPIO16/17).",
+        "No USB cables — Primary ESP32 handles IO, Secondary ESP32 (Yahboom board) handles servos.",
     ]
 
     def _show_full_wifi_pinout(self) -> None:
@@ -4897,6 +4916,8 @@ class SentryV2TabWidget(QWidget):
         self._grp_servo.setVisible(m in (1, 2))
         # UDP panel: modes 2, 3
         self._grp_udp.setVisible(m in (2, 3))
+        # Secondary ESP32 UDP panel: mode 4
+        self._grp_servo_udp.setVisible(m == 4)
 
     def _scan_ports(self, target: str = "esp32") -> None:
         combo = self._combo_esp32_ports if target == "esp32" else self._combo_debug_ports
@@ -4904,8 +4925,13 @@ class SentryV2TabWidget(QWidget):
         ports = SentryV2Comm.list_serial_ports()
         for dev, desc in ports:
             combo.addItem(f"{dev}  —  {desc}", dev)
-        if not ports:
+
+        if ports:
+            combo.setCurrentIndex(0)
+            self._on_port_selected(target)
+        else:
             combo.addItem("(no ports found)")
+
         self._log(f"Scan ({target}): {len(ports)} port(s) found")
 
     def _on_port_selected(self, target: str = "esp32") -> None:
@@ -4914,11 +4940,16 @@ class SentryV2TabWidget(QWidget):
             dev = self._combo_esp32_ports.itemData(idx)
             if dev:
                 self._edit_esp32_port.setText(dev)
+            else:
+                # Fallback: show text if there is no data payload
+                self._edit_esp32_port.setText(self._combo_esp32_ports.currentText())
         else:
             idx = self._combo_debug_ports.currentIndex()
             dev = self._combo_debug_ports.itemData(idx)
             if dev:
                 self._edit_debug_port.setText(dev)
+            else:
+                self._edit_debug_port.setText(self._combo_debug_ports.currentText())
 
     def _on_invert_changed(self) -> None:
         self.config.connection.invert_pan = self._chk_invert_pan.isChecked()
@@ -4943,12 +4974,27 @@ class SentryV2TabWidget(QWidget):
         m = self._combo_conn_type.currentIndex()
         cc = self.config.connection
         cc.connection_type = m
-        cc.esp32_port = self._edit_esp32_port.text().strip()
+
+        # Prefer explicit dropdown selection (data payload) over the typed text.
+        esp32_data = self._combo_esp32_ports.itemData(self._combo_esp32_ports.currentIndex())
+        if esp32_data:
+            cc.esp32_port = str(esp32_data).strip()
+        else:
+            cc.esp32_port = self._edit_esp32_port.text().strip()
+
         cc.esp32_baud = self._spin_esp32_baud.value()
-        cc.debug_port = self._edit_debug_port.text().strip()
+
+        debug_data = self._combo_debug_ports.itemData(self._combo_debug_ports.currentIndex())
+        if debug_data:
+            cc.debug_port = str(debug_data).strip()
+        else:
+            cc.debug_port = self._edit_debug_port.text().strip()
+
         cc.debug_baud = self._spin_debug_baud.value()
         cc.udp_host = self._edit_udp_host.text().strip()
         cc.udp_port = self._spin_udp_port.value()
+        cc.servo_udp_host = self._edit_servo_udp_host.text().strip()
+        cc.servo_udp_port = self._spin_servo_udp_port.value()
         cc.pan_servo_id = self._spin_pan_id.value()
         cc.tilt_servo_id = self._spin_tilt_id.value()
         cc.bus_servo_time_ms = self._spin_servo_time.value()
@@ -7081,6 +7127,8 @@ class SentryV2TabWidget(QWidget):
             cc.debug_baud = self._spin_debug_baud.value()
             cc.udp_host = self._edit_udp_host.text().strip()
             cc.udp_port = self._spin_udp_port.value()
+            cc.servo_udp_host = self._edit_servo_udp_host.text().strip()
+            cc.servo_udp_port = self._spin_servo_udp_port.value()
             cc.pan_servo_id = self._spin_pan_id.value()
             cc.tilt_servo_id = self._spin_tilt_id.value()
             cc.bus_servo_time_ms = self._spin_servo_time.value()

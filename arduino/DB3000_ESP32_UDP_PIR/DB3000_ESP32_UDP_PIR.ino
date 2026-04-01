@@ -62,6 +62,8 @@ static const int PIN_UART_RX        = 16;   // UART2 RX — debug board TX
 static const int PIN_UART_TX        = 17;   // UART2 TX — debug board RX
 static const int PIN_TRIGGER_MOSFET = 27;   // Water-mode trigger relay
 static const int PIN_TRIGGER_SERVO  = 13;   // Projectile trigger servo (PWM)
+static const int PIN_PAN_SERVO      = 12;   // Pan servo (PWM) - Waveshare servo header
+static const int PIN_TILT_SERVO     = 14;   // Tilt servo (PWM) - Waveshare servo header
 static const int PIN_LED_RELAY      = 32;   // LED relay
 static const int PIN_LASER_RELAY    = 33;   // Laser relay
 static const int PIN_ACC_RELAY      = 25;   // Accessory relay
@@ -464,7 +466,23 @@ static bool ensure_trigger_servo_pwm_ready() {
   return ok;
 }
 static void servo_write_deg(int pin, int deg) {
-  if (pin == PIN_TRIGGER_SERVO && !ensure_trigger_servo_pwm_ready()) return;
+  // Initialize PWM for servo pins as needed
+  static bool pan_servo_ready = false;
+  static bool tilt_servo_ready = false;
+
+  if (pin == PIN_TRIGGER_SERVO && !trigger_servo_pwm_ready) {
+    trigger_servo_pwm_ready = ledcAttach(PIN_TRIGGER_SERVO, SERVO_HZ, SERVO_RES_BITS);
+    Serial.printf("[SERVO] Trigger PWM init: %s\n", trigger_servo_pwm_ready ? "OK" : "FAILED!");
+  }
+  if (pin == PIN_PAN_SERVO && !pan_servo_ready) {
+    pan_servo_ready = ledcAttach(PIN_PAN_SERVO, SERVO_HZ, SERVO_RES_BITS);
+    Serial.printf("[SERVO] Pan PWM init: %s\n", pan_servo_ready ? "OK" : "FAILED!");
+  }
+  if (pin == PIN_TILT_SERVO && !tilt_servo_ready) {
+    tilt_servo_ready = ledcAttach(PIN_TILT_SERVO, SERVO_HZ, SERVO_RES_BITS);
+    Serial.printf("[SERVO] Tilt PWM init: %s\n", tilt_servo_ready ? "OK" : "FAILED!");
+  }
+
   ledcWrite(pin, duty_us_to_ticks(deg_to_duty_us(deg)));
 }
 
@@ -596,8 +614,9 @@ static void update_motion_outputs(bool blocked) {
   if (changed)
     Serial.printf("[MOTION] Pan %d->%d (%ums)  Tilt %d->%d (%ums)\n",
                   last_sent_pan, pan, pan_time, last_sent_tilt, tilt, tilt_time);
-  set_bus_servo_angle(BUS_ID_PAN,  pan,  pan_time);
-  set_bus_servo_angle(BUS_ID_TILT, tilt, tilt_time);
+  // Use PWM servos instead of serial bus
+  servo_write_deg(PIN_PAN_SERVO,  pan);
+  servo_write_deg(PIN_TILT_SERVO, tilt);
   last_sent_pan    = pan;
   last_sent_tilt   = tilt;
   last_bus_send_ms = now;
@@ -755,6 +774,7 @@ static void send_caps(IPAddress ip, uint16_t port) {
   JsonObject pins = caps["pins"].to<JsonObject>();
   pins["uart_rx"] = PIN_UART_RX; pins["uart_tx"] = PIN_UART_TX;
   pins["mosfet"]  = PIN_TRIGGER_MOSFET; pins["trigger_servo"] = PIN_TRIGGER_SERVO;
+  pins["pan_servo"] = PIN_PAN_SERVO; pins["tilt_servo"] = PIN_TILT_SERVO;
   pins["led"]     = PIN_LED_RELAY;      pins["laser"] = PIN_LASER_RELAY;
   pins["acc"]     = PIN_ACC_RELAY;      pins["spare"] = PIN_SPARE_RELAY;
   encode_and_send(doc, ip, port);
@@ -1035,6 +1055,15 @@ static void process_packet(char *buffer, size_t len, IPAddress ip, uint16_t port
         bool bridge_rx_ok = (rx_pan > 0 && rx_tilt > 0);
         send_ack_busdiag(seq, (pan_ok || tilt_ok || bridge_rx_ok), ip, port,
                          pan_ok, tilt_ok, rx_pan, rx_tilt, mode_str, bridge_rx_ok);
+      } else if (strcmp(action, "test_id") == 0) {
+        // Test arbitrary servo ID: {"t":"cmd","action":"test_id","id":3,"deg":90,"time":1000}
+        uint8_t test_id = payload.get("id") | 1;  // Default to 1 if not specified
+        int test_deg = payload.get("deg") | 90;  // Default to 90° if not specified
+        uint16_t test_time = payload.get("time") | 1000; // Default to 1000ms if not specified
+        Serial.printf("[TEST_ID] Testing servo ID %d to %d° in %ums\n", test_id, test_deg, test_time);
+        // Send to both pan and tilt IDs for testing
+        set_bus_servo_angle(test_id, test_deg, test_time);
+        send_ack(seq, true, ip, port);
       } else if (strcmp(action, "test") == 0) {
         run_self_test(); send_ack(seq, true, ip, port);
       } else {
@@ -1056,6 +1085,8 @@ static void process_packet(char *buffer, size_t len, IPAddress ip, uint16_t port
 static void validate_pins() {
   Serial.println("[BOOT] Pin validation:");
   Serial.printf("  TRIG_SERVO  GPIO%d  PWM=%s\n",  PIN_TRIGGER_SERVO, (PIN_TRIGGER_SERVO < 34) ? "YES" : "NO");
+  Serial.printf("  PAN_SERVO   GPIO%d  PWM=%s\n",  PIN_PAN_SERVO,     (PIN_PAN_SERVO < 34) ? "YES" : "NO");
+  Serial.printf("  TILT_SERVO  GPIO%d  PWM=%s\n",  PIN_TILT_SERVO,    (PIN_TILT_SERVO < 34) ? "YES" : "NO");
   Serial.printf("  STATUS_LED  GPIO%d\n",           PIN_STATUS_LED);
   Serial.printf("  UART2_RX    GPIO%d  %s\n",       PIN_UART_RX,  (PIN_UART_RX  == 16) ? "DEFAULT" : "NON-DEFAULT");
   Serial.printf("  UART2_TX    GPIO%d  %s\n",       PIN_UART_TX,  (PIN_UART_TX  == 17) ? "DEFAULT" : "NON-DEFAULT");
@@ -1089,11 +1120,9 @@ static void run_self_test() {
   digitalWrite(PIN_LASER_RELAY, HIGH); delay(300); digitalWrite(PIN_LASER_RELAY, LOW); delay(200);
   Serial.println("[TEST] 4/5 MOSFET pulse");
   digitalWrite(PIN_TRIGGER_MOSFET, HIGH); delay(150); digitalWrite(PIN_TRIGGER_MOSFET, LOW);
-  Serial.println("[TEST] 5/5 Bus servo home (Pan=90 Tilt=40)");
-  set_bus_servo_angle(BUS_ID_PAN,  90, 500); delay(100);
-  set_bus_servo_angle(BUS_ID_TILT, 40, 500); delay(600);
-  int pan_mA = read_current_mA(PIN_CURR_PAN, PAN_MA_PER_ADC);
-  Serial.printf("[TEST] Pan current: %dmA\n", pan_mA);
+  Serial.println("[TEST] 5/5 PWM servo home (Pan=90 Tilt=40)");
+  servo_write_deg(PIN_PAN_SERVO,  90); delay(100);
+  servo_write_deg(PIN_TILT_SERVO, 40); delay(600);
   Serial.println("[TEST] ==== Self-Test Complete ====");
 }
 

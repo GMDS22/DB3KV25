@@ -1,12 +1,14 @@
 {
   "connection": {
-    "connection_type": 2,
+    "connection_type": 4,
     "esp32_port": "",
     "esp32_baud": 115200,
-    "debug_port": "COM31",
+    "debug_port": "COM28",
     "debug_baud": 115200,
     "udp_host": "192.168.4.1",
     "udp_port": 9000,
+    "servo_udp_host": "192.168.4.2",
+    "servo_udp_port": 9001,
     "pan_servo_id": 1,
     "tilt_servo_id": 2,
     "bus_servo_time_ms": 60,

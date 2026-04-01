@@ -13,18 +13,26 @@ If firmware is changed, this file MUST be updated in the same change.
 
 2. Full WiFi UDP Runtime (ESP32 receives motion + IO over UDP JSON)
 - Current sketch: [arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino](arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino)
-- Used with: Smart Sentry v2 Full WiFi mode.
+- Used with: Smart Sentry v2 Full WiFi mode and Dual ESP32 WiFi mode (primary ESP32).
+
+3. Yahboom Servo Driver UDP Runtime (ESP32 with integrated serial bus servo driver)
+- Current sketch: [arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino](arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino)
+- Why: Accepts JSON servo commands over UDP, controls Yahboom YB-SD35M servos via integrated driver.
+- Used with: Smart Sentry v2 Dual ESP32 WiFi mode (secondary ESP32 for servos).
 
 ## Upload Commands
 
 From repository root:
 
 ```powershell
-# Full WiFi UDP sketch
+# Full WiFi UDP sketch (primary ESP32)
 .\tools\flash_esp32_udp.ps1 -Port COM5
 
 # USB Serial IO + PIR sketch
 .\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino"
+
+# Yahboom Servo Driver UDP sketch (secondary ESP32)
+.\tools\flash_esp32_udp.ps1 -Port COM6 -Sketch "arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino"
 ```
 
 ## Mandatory Firmware-Doc Update Policy

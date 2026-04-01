@@ -328,6 +328,7 @@ tilt = current_tilt + offset_y
 | Dual USB | 1 | Bus servo to Debug Board + IO to ESP32 | ESP32 + Debug Board (separate USB) |
 | WiFi + Debug USB | 2 | Bus servo to Debug Board, IO over WiFi | Debug Board USB + ESP32 WiFi |
 | Full WiFi | 3 | Everything wireless | ESP32 WiFi (debug board wired to ESP32) |
+| Dual ESP32 WiFi | 4 | Separate ESP32 boards for servos and IO | Primary ESP32 WiFi + Secondary ESP32 WiFi |
 
 ### Mode Details
 
@@ -352,6 +353,13 @@ tilt = current_tilt + offset_y
 - Motion and IO are sent as JSON payloads with CRC32 integrity check
 - Typical payload fields are `pan_cmd`, `tilt_cmd`, `fire`, `safety`, `mode`, `led`, `laser`, and optional `move_time_ms`
 - ESP32 relays bus servo commands to debug board via UART2
+
+**Mode 4 — Dual ESP32 WiFi:**
+- Primary ESP32 handles IO (fire, safety, laser, LED, PIR)
+- Secondary ESP32 (Yahboom board) handles pan/tilt servo control
+- Both communicate over WiFi/UDP only
+- No USB cables required at runtime
+- Simplifies wiring by separating servo control from accessory control
 
 ### Per-Link Connection Status
 
@@ -718,6 +726,8 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 | `debug_baud` | `int` | 115200 | Debug board baud rate |
 | `udp_host` | `str` | "192.168.4.1" | ESP32 WiFi IP address |
 | `udp_port` | `int` | 9000 | UDP port |
+| `servo_udp_host` | `str` | "192.168.4.2" | Secondary ESP32 (Yahboom board) WiFi IP address |
+| `servo_udp_port` | `int` | 9001 | Secondary ESP32 UDP port |
 | `pan_servo_id` | `int` | 1 | Bus servo ID for pan |
 | `tilt_servo_id` | `int` | 2 | Bus servo ID for tilt |
 | `bus_servo_time_ms` | `int` | 20 | Servo movement time (ms) |
@@ -750,9 +760,11 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 │ [✓] Invert Pan  [✓] Invert Tilt                        │
 ├─ WiFi / UDP ───────────────────────────────────────────┤
 │ Host: [192.168.4.1]  Port: [9000]                      │
+├─ Secondary ESP32 WiFi ────────────────────────────────┤
+│ Host: [192.168.4.2]  Port: [9001]                      │
 ├─ Connection ───────────────────────────────────────────┤
 │ [Connect]                                               │
-│ ESP32 Serial: ✅  Debug Board: ✅  UDP: —               │
+│ ESP32 Serial: ✅  Debug Board: ✅  UDP: —  Servo UDP: —  │
 ├─ Camera ───────────────────────────────────────────────┤
 │ Source: [blank = shared feed]   Width: [1280] Height: [720] │
 │ [Open Camera]   Status: Shared main-app feed or owned camera │

@@ -4,12 +4,12 @@ This guide flashes ESP32 firmware sketches using the included Arduino CLI.
 
 Canonical sketch mapping is maintained in [ESP32_CURRENT_SKETCH.md](ESP32_CURRENT_SKETCH.md).
 
-Selected runtime topology: full WiFi.
+Selected runtime topology: dual ESP32 WiFi.
 
-- PC to ESP32: WiFi/UDP only during normal operation
-- Debug Board to ESP32: UART2 on GPIO16 and GPIO17
-- ESP32 USB: keep available for flashing and serial diagnostics
-- Debug Board USB to PC: optional bench diagnostics only, not required for runtime
+- Primary ESP32 (IO/accessories): WiFi/UDP only during normal operation
+- Secondary ESP32 (servos): WiFi/UDP servo control with integrated Yahboom driver
+- No runtime USB dependency for either board
+- No ESP32 USB serial required at runtime
 
 ## Prereqs
 - Board: ESP32 DevKit v1 (WROOM-32)
@@ -35,18 +35,44 @@ Option B (Arduino CLI):
 From repo root:
 
 ```powershell
-# list ports
-.\tools\arduino-cli\arduino-cli.exe board list
-
-# upload
+# Primary ESP32 (IO/accessories) - Full WiFi UDP sketch
 .\tools\flash_esp32_udp.ps1 -Port COM5
+
+# Secondary ESP32 (servos) - Yahboom Servo Driver UDP sketch
+.\tools\flash_esp32_udp.ps1 -Port COM6 -Sketch "arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino"
 ```
 
-Current bench example:
+## Dual ESP32 WiFi Setup
+
+For fully wireless operation with separate boards for IO and servos:
 
 ```powershell
-.\tools\flash_esp32_udp.ps1 -Port COM26
+# Primary ESP32 (IO/accessories/fire/safety/LED/laser/PIR)
+.\tools\flash_esp32_udp.ps1 -Port COM5
+
+# Secondary ESP32 (Yahboom servo driver board)
+.\tools\flash_esp32_udp.ps1 -Port COM6 -Sketch "arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino"
 ```
+
+### Dual Board Testing
+
+After flashing both boards, test connectivity:
+
+```powershell
+python esp32_dual_board_test.py
+```
+
+This validates:
+- Primary ESP32 (192.168.4.1:9000) responds to IO commands
+- Secondary ESP32 (192.168.4.2:9001) responds to servo commands
+- Both boards maintain simultaneous UDP connectivity
+
+## Yahboom Board Specific Notes
+- The Yahboom ESP32 servo driver board has integrated serial bus servo control
+- Supports up to 253 ST/RSBL series servos
+- Accepts JSON commands over UDP: `{"pan_cmd": angle, "tilt_cmd": angle, "move_time_ms": time}`
+- Default servo IDs: Pan=1, Tilt=2 (configurable in app settings)
+- Power: 9-25V input, matches servo voltage requirements
 
 Add -InstallCore if you want the script to attempt core install:
 

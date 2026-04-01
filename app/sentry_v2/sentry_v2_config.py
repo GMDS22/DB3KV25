@@ -328,6 +328,7 @@ class ConnectionConfig:
         1  ESP32 USB + Debug Board USB  (2 COM ports)
         2  ESP32 WiFi + Debug Board USB (1 COM + UDP)
         3  ESP32 WiFi (fully wireless)  (UDP only)
+        4  Dual ESP32 WiFi              (2 UDP endpoints)
     """
     connection_type: int = 3
     # ESP32 serial (modes 0, 1)
@@ -336,9 +337,12 @@ class ConnectionConfig:
     # Debug board serial (modes 1, 2)
     debug_port: str = ""
     debug_baud: int = 115200
-    # WiFi UDP (modes 2, 3)
+    # Primary ESP32 WiFi (modes 2, 3, 4) - handles IO/accessories
     udp_host: str = "192.168.4.1"
     udp_port: int = 9000
+    # Secondary ESP32 WiFi (mode 4) - handles servos
+    servo_udp_host: str = "192.168.4.2"
+    servo_udp_port: int = 9001
     # Servo config
     pan_servo_id: int = 1
     tilt_servo_id: int = 2

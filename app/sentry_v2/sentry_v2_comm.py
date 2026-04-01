@@ -52,22 +52,50 @@ class SentryV2Comm:
     MODE_DUAL_USB = 1            # Debug Board USB (pan/tilt) + ESP32 USB (IO)
     MODE_WIFI_DEBUG_USB = 2      # Debug Board USB (pan/tilt) + ESP32 WiFi (IO)
     MODE_WIFI_FULL = 3           # Everything over WiFi (debug board on ESP32)
+    MODE_DUAL_ESP32_WIFI = 4     # Dual ESP32 WiFi (servos + IO separate)
 
     MODE_LABELS = [
         "ESP32 USB",
         "ESP32 USB + Debug Board USB",
         "ESP32 WiFi + Debug Board USB",
         "ESP32 WiFi + Debug Board on ESP32 UART",
+        "Dual ESP32 WiFi",
     ]
+
+    @staticmethod
+    def _normalize_serial_port_name(raw_port: str) -> str:
+        try:
+            port_text = str(raw_port or "").strip()
+        except Exception:
+            return ""
+        if not port_text:
+            return ""
+
+        port_upper = port_text.upper()
+        if port_upper.startswith("\\\\.\\COM"):
+            return "\\\\.\\COM" + port_text[8:].strip()
+
+        token = port_text.split()[0].strip().rstrip(":")
+        token_upper = token.upper()
+        if token_upper.startswith("COM") and len(token) > 3:
+            suffix = token[3:].strip()
+            if suffix.isdigit():
+                return f"COM{int(suffix)}"
+        if token.isdigit():
+            return f"COM{int(token)}"
+        return port_text
 
     def __init__(self) -> None:
         # Primary ESP32 serial (modes 0, 1)
         self._ser: Optional[_serial.Serial] = None
         # Debug board serial (modes 1, 2)
         self._bus_ser: Optional[_serial.Serial] = None
-        # UDP socket (modes 2, 3)
+        # Primary UDP socket (modes 2, 3, 4) - IO/accessories
         self._sock: Optional[socket.socket] = None
         self._udp_target: Optional[tuple] = None
+        # Secondary UDP socket (mode 4) - servos
+        self._servo_sock: Optional[socket.socket] = None
+        self._servo_udp_target: Optional[tuple] = None
 
         self._mode: int = self.MODE_ESP32_USB
         self._lock = threading.Lock()
@@ -125,6 +153,8 @@ class SentryV2Comm:
         debug_baud: int = 115200,
         udp_host: str = "192.168.4.1",
         udp_port: int = 9000,
+        servo_udp_host: str = "192.168.4.2",
+        servo_udp_port: int = 9001,
     ) -> bool:
         """Open connections for the specified mode. Returns True on success.
 
@@ -154,19 +184,32 @@ class SentryV2Comm:
                 else:
                     self._connect_details["Debug Board"] = (False, bus_err)
 
-                ok_esp = self._open_serial(esp32_port, esp32_baud, primary=True)
-                esp_err = self._last_error
-                self._connect_details["ESP32 USB"] = (ok_esp, esp32_port if ok_esp else esp_err)
+                norm_debug_port = self._normalize_serial_port_name(debug_port)
+                norm_esp_port = self._normalize_serial_port_name(esp32_port)
+                esp_disabled = (not norm_esp_port) or (
+                    norm_debug_port
+                    and norm_esp_port
+                    and norm_debug_port.upper() == norm_esp_port.upper()
+                )
 
-                if not ok_bus and not ok_esp:
+                if esp_disabled:
+                    ok_esp = False
+                    esp_err = "ESP32 link skipped (blank or same as Debug Board COM port)"
+                    self._connect_details["ESP32 USB"] = (False, esp_err)
+                else:
+                    ok_esp = self._open_serial(esp32_port, esp32_baud, primary=True)
+                    esp_err = self._last_error
+                    self._connect_details["ESP32 USB"] = (ok_esp, esp32_port if ok_esp else esp_err)
+
+                if not ok_bus and not ok_esp and not esp_disabled:
                     self._last_error = f"Both failed — Debug: {bus_err} | ESP32: {esp_err}"
                 elif not ok_bus:
                     self._last_error = f"Debug board failed: {bus_err}"
-                elif not ok_esp:
+                elif not ok_esp and not esp_disabled:
                     self._last_error = f"ESP32 failed: {esp_err}"
                 if ok_esp:
                     self._start_receiver()
-                return ok_bus and ok_esp
+                return ok_bus and (ok_esp or esp_disabled)
 
             elif self._mode == self.MODE_WIFI_DEBUG_USB:
                 ok_bus = self._open_serial(debug_port, debug_baud, primary=False)
@@ -201,6 +244,27 @@ class SentryV2Comm:
                     self._start_receiver()
                 return ok
 
+            elif self._mode == self.MODE_DUAL_ESP32_WIFI:
+                # Primary ESP32 (IO/accessories)
+                ok_primary = self._open_udp(udp_host, udp_port)
+                primary_err = self._last_error
+                self._connect_details["Primary ESP32 WiFi"] = (ok_primary, f"{udp_host}:{udp_port}" if ok_primary else primary_err)
+
+                # Secondary ESP32 (servos)
+                ok_servo = self._open_udp_secondary(servo_udp_host, servo_udp_port)
+                servo_err = self._last_error
+                self._connect_details["Servo ESP32 WiFi"] = (ok_servo, f"{servo_udp_host}:{servo_udp_port}" if ok_servo else servo_err)
+
+                if not ok_primary and not ok_servo:
+                    self._last_error = f"Both failed — Primary: {primary_err} | Servo: {servo_err}"
+                elif not ok_primary:
+                    self._last_error = f"Primary ESP32 failed: {primary_err}"
+                elif not ok_servo:
+                    self._last_error = f"Servo ESP32 failed: {servo_err}"
+                if ok_primary:
+                    self._start_receiver()
+                return ok_primary and ok_servo
+
             else:
                 self._last_error = f"Unknown mode: {self._mode}"
                 return False
@@ -209,30 +273,8 @@ class SentryV2Comm:
             return False
 
     def _open_serial(self, port: str, baud: int, *, primary: bool) -> bool:
-        def _normalize_serial_port_name(raw_port: str) -> str:
-            try:
-                port_text = str(raw_port or "").strip()
-            except Exception:
-                return ""
-            if not port_text:
-                return ""
-
-            port_upper = port_text.upper()
-            if port_upper.startswith("\\\\.\\COM"):
-                return "\\\\.\\COM" + port_text[8:].strip()
-
-            token = port_text.split()[0].strip().rstrip(":")
-            token_upper = token.upper()
-            if token_upper.startswith("COM") and len(token) > 3:
-                suffix = token[3:].strip()
-                if suffix.isdigit():
-                    return f"COM{int(suffix)}"
-            if token.isdigit():
-                return f"COM{int(token)}"
-            return port_text
-
         try:
-            normalized_port = _normalize_serial_port_name(port)
+            normalized_port = self._normalize_serial_port_name(port)
             if not normalized_port:
                 self._last_error = "No COM port specified"
                 return False
@@ -283,6 +325,17 @@ class SentryV2Comm:
             self._last_error = str(e)
             return False
 
+    def _open_udp_secondary(self, host: str, port: int) -> bool:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setblocking(False)
+            self._servo_sock = sock
+            self._servo_udp_target = (host, int(port))
+            return True
+        except Exception as e:
+            self._last_error = str(e)
+            return False
+
     @staticmethod
     def _compact_json(obj: Dict[str, Any]) -> bytes:
         return json.dumps(obj, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
@@ -308,6 +361,21 @@ class SentryV2Comm:
         with self._lock:
             sock = self._sock
             udp_target = self._udp_target
+        try:
+            if sock is None or udp_target is None:
+                return False
+            data = self._build_udp_packet(payload)
+            sock.sendto(data, udp_target)
+            self._last_cmd = label
+            return True
+        except Exception as e:
+            self._last_error = str(e)
+            return False
+
+    def _send_udp_payload_secondary(self, payload: Dict[str, Any], *, label: str) -> bool:
+        with self._lock:
+            sock = self._servo_sock
+            udp_target = self._servo_udp_target
         try:
             if sock is None or udp_target is None:
                 return False
@@ -346,16 +414,24 @@ class SentryV2Comm:
             ser = self._ser
             bus_ser = self._bus_ser
             sock = self._sock
+            servo_sock = self._servo_sock
             self._ser = None
             self._bus_ser = None
             self._sock = None
+            self._servo_sock = None
             self._udp_target = None
+            self._servo_udp_target = None
 
         self._safe_close_serial(ser)
         self._safe_close_serial(bus_ser)
         if sock is not None:
             try:
                 sock.close()
+            except Exception:
+                pass
+        if servo_sock is not None:
+            try:
+                servo_sock.close()
             except Exception:
                 pass
 
@@ -375,6 +451,11 @@ class SentryV2Comm:
             )
         elif m == self.MODE_WIFI_FULL:
             return self._sock is not None and self._udp_target is not None
+        elif m == self.MODE_DUAL_ESP32_WIFI:
+            return (
+                self._sock is not None and self._udp_target is not None
+                and self._servo_sock is not None and self._servo_udp_target is not None
+            )
         return False
 
     def connection_info(self) -> str:
@@ -389,6 +470,8 @@ class SentryV2Comm:
             return f"WiFi: {self._udp_target[0]}:{self._udp_target[1]} | Debug: {self._bus_ser.port}"
         elif m == self.MODE_WIFI_FULL:
             return f"WiFi: {self._udp_target[0]}:{self._udp_target[1]} (full)"
+        elif m == self.MODE_DUAL_ESP32_WIFI:
+            return f"Primary: {self._udp_target[0]}:{self._udp_target[1]} | Servo: {self._servo_udp_target[0]}:{self._servo_udp_target[1]}"
         return "Unknown"
 
     # ------------------------------------------------------------------ #
@@ -443,7 +526,7 @@ class SentryV2Comm:
             except Exception as e:
                 self._last_error = str(e)
                 return False
-        if m in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL):
+        if m in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI):
             return self._send_udp_payload({"pir_enabled": value}, label=f"UDP PIR P{value}")
         return False
 
@@ -469,6 +552,12 @@ class SentryV2Comm:
             return ok_bus and ok_io
         elif m == self.MODE_WIFI_FULL:
             return self._send_wifi_full(pan_out, tilt_out, fire, move_time_ms=move_time_ms)
+        elif m == self.MODE_DUAL_ESP32_WIFI:
+            # Send servo commands to secondary ESP32
+            ok_servo = self._send_servo_udp(pan_out, tilt_out, move_time_ms=move_time_ms)
+            # Send IO commands to primary ESP32
+            ok_io = self._send_io_udp(fire)
+            return ok_servo and ok_io
         return False
 
     def _start_receiver(self) -> None:
@@ -705,6 +794,16 @@ class SentryV2Comm:
         )
         return self._send_udp_payload(payload, label=label)
 
+    def _send_servo_udp(self, pan: float, tilt: float, move_time_ms: Optional[int] = None) -> bool:
+        """Send servo position command to secondary ESP32 over UDP."""
+        payload = {
+            "pan_cmd": round(pan, 2),
+            "tilt_cmd": round(tilt, 2),
+        }
+        if move_time_ms is not None:
+            payload["move_time_ms"] = int(move_time_ms)
+        return self._send_udp_payload_secondary(payload, label=f"UDP Servo P{pan:.1f} T{tilt:.1f}")
+
     # ------------------------------------------------------------------ #
     #  Bus servo protocol  (modes 1, 2)
     # ------------------------------------------------------------------ #
@@ -760,7 +859,13 @@ class SentryV2Comm:
                         break
                 else:
                     time.sleep(0.01)
-            return bytes(buf)
+            
+            # Validate response: must start with 0xFF 0xFF (servo response header)
+            if len(buf) >= 4 and buf[0] == 0xFF and buf[1] == 0xFF:
+                return bytes(buf)
+            else:
+                # Not a valid servo response - return empty to indicate no servo detected
+                return b""
         except Exception:
             return b""
 
