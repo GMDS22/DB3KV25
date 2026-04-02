@@ -80,6 +80,8 @@ class SentryV2Detector:
         self._back_sub: Optional[cv2.BackgroundSubtractorMOG2] = None
         self._backsub_warmup: int = 0
         self._BACKSUB_WARMUP_FRAMES: int = 30
+        self._BACKSUB_HISTORY: int = 120
+        self._BACKSUB_VAR_THRESHOLD: float = 36.0
 
         # YOLO (lazy init)
         self._yolo_model = None
@@ -226,7 +228,12 @@ class SentryV2Detector:
         dilated = cv2.dilate(opened, kernel, iterations=self.dilate_iters)
 
         contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        return self._contours_to_boxes(contours, score=0.62, class_id=CLASS_ID_MOTION)
+        return self._contours_to_boxes(
+            contours,
+            score=0.62,
+            class_id=CLASS_ID_MOTION,
+            frame_shape=frame.shape,
+        )
 
     # ------------------------------------------------------------------ #
     #  Background Subtraction  (mode 1)
@@ -234,10 +241,15 @@ class SentryV2Detector:
 
     def _detect_backsub(self, frame: np.ndarray) -> list:
         if self._back_sub is None:
-            self._back_sub = cv2.createBackgroundSubtractorMOG2()
+            self._back_sub = cv2.createBackgroundSubtractorMOG2(
+                history=self._BACKSUB_HISTORY,
+                varThreshold=self._BACKSUB_VAR_THRESHOLD,
+                detectShadows=False,
+            )
             self._backsub_warmup = 0
 
-        mask = self._back_sub.apply(frame)
+        filtered = cv2.GaussianBlur(frame, (5, 5), 0)
+        mask = self._back_sub.apply(filtered)
         if self._motion_detection_suppressed():
             return []
         self._backsub_warmup += 1
@@ -246,8 +258,14 @@ class SentryV2Detector:
 
         kernel = np.ones((3, 3), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=max(1, self.dilate_iters))
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        return self._contours_to_boxes(contours, score=0.7, class_id=CLASS_ID_FOREGROUND)
+        return self._contours_to_boxes(
+            contours,
+            score=0.7,
+            class_id=CLASS_ID_FOREGROUND,
+            frame_shape=frame.shape,
+        )
 
     # ------------------------------------------------------------------ #
     #  YOLO  (modes 2, 10)
@@ -644,14 +662,35 @@ class SentryV2Detector:
     def _contours_to_boxes(
         self, contours, *, min_area: float = -1, max_area: float = -1,
         score: float = 1.0, class_id: int = 0,
+        frame_shape: Optional[Tuple[int, int, int]] = None,
     ) -> list:
         mn = min_area if min_area >= 0 else self.min_contour
         mx = max_area if max_area >= 0 else self.max_contour
         boxes = []
+        frame_h = int(frame_shape[0]) if frame_shape is not None else 0
+        frame_w = int(frame_shape[1]) if frame_shape is not None else 0
+        frame_area = float(max(1, frame_h * frame_w)) if frame_h and frame_w else 0.0
         for c in contours:
-            a = cv2.contourArea(c)
+            a = float(cv2.contourArea(c))
             if mn < a < mx:
                 x, y, w, h = cv2.boundingRect(c)
+                if w <= 2 or h <= 2:
+                    continue
+                bbox_area = float(max(1, w * h))
+                fill_ratio = a / bbox_area
+                if fill_ratio < 0.12:
+                    continue
+                if frame_area > 0.0:
+                    touches = sum(
+                        (
+                            x <= 1,
+                            y <= 1,
+                            (x + w) >= (frame_w - 1),
+                            (y + h) >= (frame_h - 1),
+                        )
+                    )
+                    if touches >= 2 and bbox_area >= (frame_area * 0.12):
+                        continue
                 boxes.append((x, y, w, h, score, class_id))
         return boxes
 

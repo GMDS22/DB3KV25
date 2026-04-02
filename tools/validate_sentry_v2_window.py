@@ -92,12 +92,7 @@ def main() -> int:
         sentry = getattr(window, "sentry_v2_tab", None)
         if sentry is None:
             return
-        panel_width = getattr(sentry, "_slider_panel_width", None)
         splitter = getattr(sentry, "_main_splitter", None)
-        if panel_width is not None:
-            panel_width.setValue(510)
-            app.processEvents()
-            log(f"panel_width_value={panel_width.value()}")
         if splitter is not None:
             log(f"splitter_sizes={splitter.sizes()}")
         log(f"final_window_visible={window.isVisible()}")

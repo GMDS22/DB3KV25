@@ -227,6 +227,12 @@ This document serves as the **single authoritative reference** for understanding
 - If you modify hardcoded constants, **multiple subsystems WILL be affected**
 - Test across ALL detection modes, not just the one you're debugging
 
+### Smart Sentry v2 Startup Coupling
+
+- Smart Sentry v2 startup behavior is coupled across `app/sentry_v2/sentry_v2_tab.py`, `app/sentry_v2/sentry_v2_config.py`, and `app/config/sentry_v2_settings.json`.
+- Launch-time auto camera open, auto-connect, and YOLO auto-load should be treated as a single startup policy, because enabling them together materially changes perceived startup latency and device side effects.
+- If you change Sentry startup defaults, update both the persisted config keys and `RECENT_UPDATES.json`, and verify that manual camera open, manual connect, and manual YOLO load still work from a cold launch.
+
 ---
 
 ## 2. Camera & Video Capture Pipeline
@@ -1353,6 +1359,29 @@ Sentry Mode is an intelligent guard turret system that learns target movement pa
 | [app/sentry_mode/sentry_controller.py](app/sentry_mode/sentry_controller.py) | Main orchestrator and state machine |
 | [app/sentry_mode/sentry_config.py](app/sentry_mode/sentry_config.py) | Configuration dataclass |
 | [app/sentry_mode/track_recorder.py](app/sentry_mode/track_recorder.py) | Records target trajectories |
+
+## 12A. Smart Sentry v2 Tracking Couplings
+
+### Predictive aiming and target retention
+
+- `app/sentry_v2/sentry_v2_engine.py` now combines recent target velocity with current center error to produce predictive lead during precision aiming and fire micro-adjustment.
+- `app/sentry_v2/threat_scorer.py` remains the single source of truth for per-track velocity (`heading_x`, `heading_y`) and persistence used by Smart Sentry v2 prediction.
+- `app/sentry_v2/simple_tracker.py` track continuity directly affects prediction quality and loss recovery quality. Overly strict class matching can reset velocity history and make predictive aim or reacquire look unstable.
+- `app/sentry_v2/sentry_v2_config.py` engagement settings now include prediction and loss-recovery knobs. If these defaults or saved keys change, preserve both load and save compatibility.
+- Loss recovery in `app/sentry_v2/sentry_v2_engine.py` is a finite staged flow: forward pursuit, bounded local scan, expanding scan rings, then normal queue advance or return when `target_loss_timeout` expires. Do not re-gate that recovery path behind `continuous_hunt_on_loss`; that flag is only for intentionally extending post-timeout hunt behavior.
+- `app/sentry_v2/sentry_v2_tab.py` engagement presets and custom master preset capture use `vars(EngagementConfig())` / `vars(self.config.engagement)`, so newly added engagement fields automatically propagate into preset snapshots even if there is no dedicated UI control yet.
+- Manual guard or Home actions in `app/sentry_v2/sentry_v2_tab.py` must clear active Smart Sentry v2 engagement, return, and PIR-cue state through `app/sentry_v2/sentry_v2_engine.py`. Sending only a move command without resetting engine state can make the turret snap back to stale queue or return targets on the next frame.
+
+### If You Change Any of These
+
+- Re-verify `app/sentry_v2/sentry_v2_engine.py` precision phase, fire micro-adjust phase, and target-loss behavior together. Changing only one usually shifts prediction timing or reacquire behavior in surprising ways.
+- Re-check `app/sentry_v2/simple_tracker.py` before tuning prediction constants. Track churn can look like a bad lead calculation even when the prediction math is correct.
+- Keep loss-recovery movement bounded by guard pan/tilt limits and do not let search logic fight guard-return logic once `target_loss_timeout` expires.
+- Treat `target_loss_timeout` as the total recovery budget. Pursuit, local scan, and expanding scan stages must all remain finite so non-hunt presets still fall back to queue advance or return deterministically.
+- In Smart Sentry v2 connection mode 2, pan/tilt movement and trigger/PIR IO do not share the same transport. Debug Board USB can be healthy while ESP32 WiFi IO is down, which means movement may still work while GPIO13 trigger-servo and PIR enable commands fail.
+- In mode 2, connect-time home/initial movement must use the movement-only path rather than the combined `send_command(...)` path, otherwise a missing ESP32 WiFi link can make startup look like pan/tilt motion is broken even when the Debug Board movement link is fine.
+- Re-test manual Home / Move to Guard behavior after changing queueing, return timing, or PIR cue flow. Those controls are only stable if the engine-side queue and active cue state are canceled before GUARDING resumes.
+- Home / Move to Guard must also reset remembered target aim anchors, loss-recovery anchors, return timers, and patrol anchors. Canceling only the visible queue is not enough; otherwise the next engine tick can still drift back toward stale pre-Home engagement memory after the turret already reached guard.
 | [app/sentry_mode/path_analyzer.py](app/sentry_mode/path_analyzer.py) | Identifies repeated patterns (Fréchet distance) |
 | [app/sentry_mode/trajectory_predictor.py](app/sentry_mode/trajectory_predictor.py) | Kalman filter predictions |
 | [app/sentry_mode/peripheral_sensor.py](app/sentry_mode/peripheral_sensor.py) | Kill zone detection |

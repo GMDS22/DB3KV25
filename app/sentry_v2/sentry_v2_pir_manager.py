@@ -33,6 +33,8 @@ class SentryV2PIRManager:
         
         # Queue of pending cue events
         self._cue_queue: List[PIRSensorEvent] = []
+        self._last_accepted_event_time: float = 0.0
+        self._last_accepted_sensor_id: Optional[int] = None
         
         # Current active cue (being pursued by turret)
         self._active_cue: Optional[PIRSensorEvent] = None
@@ -54,6 +56,8 @@ class SentryV2PIRManager:
         self._active_cue = None
         self._scan_active = False
         self._scan_reference_point = None
+        self._last_accepted_event_time = 0.0
+        self._last_accepted_sensor_id = None
         
     def on_pir_event(self, sensor_id: int, timestamp: float) -> None:
         """Called when a PIR sensor fires. Handles debouncing and queueing."""
@@ -74,8 +78,19 @@ class SentryV2PIRManager:
         
         if now - last_fire < debounce_s:
             return  # Still in debounce period
+
+        cross_lockout_s = max(0.0, float(getattr(self.cfg, "cross_sensor_lockout_ms", 0) or 0) / 1000.0)
+        if (
+            cross_lockout_s > 0.0
+            and self._last_accepted_sensor_id is not None
+            and int(self._last_accepted_sensor_id) != int(sensor_id)
+            and (now - self._last_accepted_event_time) < cross_lockout_s
+        ):
+            return
         
         self._last_fire_time[sensor_id] = now
+        self._last_accepted_event_time = now
+        self._last_accepted_sensor_id = int(sensor_id)
         
         # Create cue event and queue it
         event = PIRSensorEvent(
@@ -129,7 +144,7 @@ class SentryV2PIRManager:
         Generate a scan grid centered at the cue point.
         Returns list of (pan, tilt) points to visit.
         """
-        pan_range = self.cfg.scan_pan_range
+        pan_range = self._effective_scan_pan_range()
         tilt_range = self.cfg.scan_tilt_range
         resolution = self.cfg.scan_grid_resolution
         
@@ -152,6 +167,30 @@ class SentryV2PIRManager:
                 grid.append((p, t))
         
         return grid
+
+    def _effective_scan_pan_range(self) -> float:
+        configured = float(max(5.0, self.cfg.scan_pan_range))
+        enabled_cues = [
+            float(sensor.cue_pan)
+            for sensor in self.cfg.sensors
+            if bool(getattr(sensor, "enabled", False))
+        ]
+        if len(enabled_cues) < 2:
+            return configured
+
+        normalized = sorted((cue % 360.0) for cue in enabled_cues)
+        separations: List[float] = []
+        for idx, cue in enumerate(normalized):
+            nxt = normalized[(idx + 1) % len(normalized)]
+            delta = (nxt - cue) % 360.0
+            if delta > 0.0:
+                separations.append(delta)
+        if not separations:
+            return configured
+
+        min_separation = min(separations)
+        non_overlap_limit = max(5.0, min_separation * 0.45)
+        return float(min(configured, non_overlap_limit))
     
     def start_scan(self, center_pan: float, center_tilt: float) -> None:
         """Start an adaptive scan at the cue location."""

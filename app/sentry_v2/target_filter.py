@@ -100,11 +100,12 @@ class TargetFilter:
         return self._passes_semantic_confirmation(det, now)
 
     def _passes_base(self, det: DetectedObject) -> bool:
-        is_non_semantic = det.class_name in NON_SEMANTIC_CLASSES or str(getattr(det, "source", "")) == "prompted"
+        is_prompted = str(getattr(det, "source", "")) == "prompted"
+        is_non_semantic = det.class_name in NON_SEMANTIC_CLASSES
 
         # 1. Class whitelist
         if (
-            not is_non_semantic
+            not is_prompted
             and self.cfg.allowed_classes
             and det.class_name not in self.cfg.allowed_classes
         ):
@@ -115,13 +116,13 @@ class TargetFilter:
             return False
 
         # 3. Size
-        if not is_non_semantic:
+        if not is_prompted:
             area = det.area_ratio
             if area < self.cfg.min_size_ratio:
                 return False
             if self.cfg.max_size_ratio > 0 and area > self.cfg.max_size_ratio:
                 return False
-            if not self._passes_shape_profile(det):
+            if not is_non_semantic and not self._passes_shape_profile(det):
                 return False
 
         # 4. Engagement zone

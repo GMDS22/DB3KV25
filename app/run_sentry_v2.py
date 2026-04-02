@@ -10,6 +10,31 @@ from __future__ import annotations
 import os
 import sys
 
+
+def _configure_ml_runtime_env() -> None:
+    """Stabilize torch/ultralytics startup on Windows before Qt imports."""
+    try:
+        os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
+        os.environ.setdefault("MKL_NUM_THREADS", "1")
+        os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+        os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+    except Exception:
+        pass
+
+
+def _preload_torch_runtime() -> None:
+    """Preload torch before importing the Qt-heavy Sentry stack."""
+    try:
+        import torch  # noqa: F401
+    except Exception:
+        # Lazy-loading paths inside the Sentry stack handle optional ML runtime failures.
+        return
+
+
+_configure_ml_runtime_env()
+_preload_torch_runtime()
+
 from PyQt5.QtWidgets import QApplication, QMainWindow
 
 try:
@@ -25,18 +50,24 @@ except Exception:
         def apply_theme(self, _theme_name: str = "dark") -> None:
             return
 
-from sentry_v2.sentry_v2_tab import SENTRY_V2_STANDALONE_THEME, SentryV2TabWidget
+from sentry_v2.sentry_v2_tab import (
+    SENTRY_V2_PANEL_DEFAULT_WIDTH,
+    SENTRY_V2_STANDALONE_THEME,
+    SENTRY_V2_WIDGET_MIN_WIDTH,
+    SentryV2TabWidget,
+)
 
 
 class SentryV2StandaloneWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(f"{get_app_title()} - Smart Sentry v2")
-        self.resize(1460, 940)
 
         self.sentry_v2_tab = SentryV2TabWidget(self)
         self.sentry_v2_tab.set_host_main_window(None)
         self.setCentralWidget(self.sentry_v2_tab)
+        self.setMinimumWidth(max(SENTRY_V2_WIDGET_MIN_WIDTH, self.minimumSizeHint().width()))
+        self.resize(max(1460, SENTRY_V2_PANEL_DEFAULT_WIDTH + 840), 940)
 
     def closeEvent(self, event):
         try:

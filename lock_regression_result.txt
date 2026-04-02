@@ -1,5 +1,0 @@
-baseline_lock_send 123 77 lock=True
-after_move_manual_lock False
-after_send_manual 95 85 lock=False
-after_go_home_lock False
-after_send_home 90 90 lock=False

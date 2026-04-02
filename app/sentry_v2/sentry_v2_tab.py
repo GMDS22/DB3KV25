@@ -38,7 +38,7 @@ from PyQt5.QtWidgets import (
     QFileDialog,
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject, QProcess, QProcessEnvironment
-from PyQt5.QtGui import QImage, QPixmap, QColor
+from PyQt5.QtGui import QImage, QPixmap, QColor, QIcon
 
 from .sentry_v2_config import (
     SentryV2Config,
@@ -118,6 +118,10 @@ COLOR_PRESETS: List[str] = [
 CUSTOM_MASTER_PRESET_PATH = Path(__file__).resolve().parents[1] / "config" / "sentry_v2_custom_presets.json"
 SENTRY_V2_SETTINGS_PATH = Path(__file__).resolve().parents[1] / "config" / "sentry_v2_settings.json"
 LEGACY_SENTRY_V2_SETTINGS_PATH = Path(__file__).resolve().parents[1] / "app" / "config" / "sentry_v2_settings.json"
+SENTRY_V2_PANEL_MIN_WIDTH = 560
+SENTRY_V2_PANEL_DEFAULT_WIDTH = 620
+SENTRY_V2_VIDEO_MIN_WIDTH = 120
+SENTRY_V2_WIDGET_MIN_WIDTH = SENTRY_V2_PANEL_MIN_WIDTH + SENTRY_V2_VIDEO_MIN_WIDTH + 28
 
 DETECTION_PRESETS = {
     "frame_diff": {
@@ -126,36 +130,36 @@ DETECTION_PRESETS = {
         "tooltip_key": "preset_detection_frame_diff",
         "settings": {
             "detection_mode": 0,
-            "min_contour_area": 780.0,
-            "max_contour_area": 7800.0,
+            "min_contour_area": 920.0,
+            "max_contour_area": 6800.0,
             "yolo_min_area": 180,
-            "yolo_confidence": 0.55,
+            "yolo_confidence": 0.60,
             "color_preset": "any",
             "color_min_area": 160,
             "color_max_area": 18000,
             "color_fusion_strategy": "AND",
             "color_fusion_overlap": 20,
-            "motion_ignore_after_move_s": 0.18,
-            "motion_gate_threshold": 1.9,
+            "motion_ignore_after_move_s": 0.24,
+            "motion_gate_threshold": 2.2,
         },
     },
     "backsub": {
         "label": "Background Subtraction",
-        "description": "Foreground extraction that keeps broad motion blobs and scene cut-outs.",
+        "description": "Foreground extraction tuned to reject shadow noise and broad scene shimmer.",
         "tooltip_key": "preset_detection_backsub",
         "settings": {
             "detection_mode": 1,
-            "min_contour_area": 420.0,
-            "max_contour_area": 4200.0,
+            "min_contour_area": 720.0,
+            "max_contour_area": 5400.0,
             "yolo_min_area": 180,
-            "yolo_confidence": 0.50,
+            "yolo_confidence": 0.56,
             "color_preset": "any",
             "color_min_area": 160,
             "color_max_area": 18000,
             "color_fusion_strategy": "AND",
             "color_fusion_overlap": 20,
-            "motion_ignore_after_move_s": 0.14,
-            "motion_gate_threshold": 0.7,
+            "motion_ignore_after_move_s": 0.24,
+            "motion_gate_threshold": 1.15,
         },
     },
     "yolo": {
@@ -183,17 +187,17 @@ DETECTION_PRESETS = {
         "tooltip_key": "preset_detection_dual_motion",
         "settings": {
             "detection_mode": 3,
-            "min_contour_area": 936.0,
-            "max_contour_area": 9360.0,
+            "min_contour_area": 1180.0,
+            "max_contour_area": 8200.0,
             "yolo_min_area": 180,
-            "yolo_confidence": 0.50,
+            "yolo_confidence": 0.58,
             "color_preset": "any",
             "color_min_area": 160,
             "color_max_area": 24000,
             "color_fusion_strategy": "AND",
             "color_fusion_overlap": 20,
-            "motion_ignore_after_move_s": 0.14,
-            "motion_gate_threshold": 1.5,
+            "motion_ignore_after_move_s": 0.22,
+            "motion_gate_threshold": 1.9,
         },
     },
     "motion_yolo": {
@@ -316,17 +320,17 @@ DETECTION_PRESETS = {
         "tooltip_key": "preset_detection_motion_locked",
         "settings": {
             "detection_mode": 10,
-            "min_contour_area": 468.0,
-            "max_contour_area": 4680.0,
-            "yolo_min_area": 100,
-            "yolo_confidence": 0.34,
+            "min_contour_area": 820.0,
+            "max_contour_area": 6200.0,
+            "yolo_min_area": 180,
+            "yolo_confidence": 0.48,
             "color_preset": "any",
             "color_min_area": 110,
             "color_max_area": 20000,
             "color_fusion_strategy": "AND",
             "color_fusion_overlap": 12,
-            "motion_ignore_after_move_s": 0.04,
-            "motion_gate_threshold": 1.35,
+            "motion_ignore_after_move_s": 0.12,
+            "motion_gate_threshold": 1.85,
         },
     },
     "observer_motion_watch": {
@@ -772,7 +776,7 @@ MASTER_PROFILE_PRESETS = {
         "description": "Middle-ground profile between conservative tracking and active engagement.",
         "tooltip_key": "preset_master_balanced_sentry",
         "detection": "motion_locked",
-        "filter": "wide_net",
+        "filter": "sniper_medium_motion",
         "threat": "balanced_guard",
         "engagement": "balanced_response",
         "servo": "balanced",
@@ -1695,7 +1699,7 @@ QWidget#sentryV2Root QLabel {
 }
 QWidget#sentryV2Root QScrollArea,
 QWidget#sentryV2Root QScrollArea > QWidget > QWidget {
-    background: transparent;
+    background-color: #101821;
     border: none;
 }
 QWidget#sentryV2Root QGroupBox {
@@ -1712,6 +1716,25 @@ QWidget#sentryV2Root QGroupBox::title {
     padding: 0 6px;
     color: #86d7ff;
 }
+QWidget#sentryV2Root QWidget#sentryV2PinnedBottom {
+    background-color: #101821;
+    border-top: 1px solid #2f4459;
+    border-radius: 10px 10px 0 0;
+    padding-top: 4px;
+}
+QWidget#sentryV2Root QWidget#sentryV2PinnedTop {
+    background-color: #101821;
+    border-bottom: 1px solid #2f4459;
+    border-radius: 0 0 10px 10px;
+    padding: 4px 0 2px 0;
+}
+QWidget#sentryV2Root QWidget#sentryV2PinnedBottom QGroupBox {
+    margin-top: 8px;
+    padding: 10px 8px 8px 8px;
+}
+QWidget#sentryV2Root QWidget#sentryV2PinnedBottom QLabel {
+    color: #d2dde7;
+}
 QWidget#sentryV2Root QTabWidget::pane {
     background-color: #131d28;
     border: 1px solid #304255;
@@ -1720,14 +1743,15 @@ QWidget#sentryV2Root QTabWidget::pane {
 }
 QWidget#sentryV2Root QTabBar::tab {
     background-color: #1a2531;
-    color: #9eabb8;
     border: 1px solid #304255;
     border-radius: 8px;
-    padding: 8px 14px;
+    padding: 4px 2px;
     min-height: 30px;
 }
 QWidget#sentryV2Root QTabBar::tab:left {
-    min-width: 110px;
+    min-width: 40px;
+    max-width: 48px;
+    margin-bottom: 3px;
 }
 QWidget#sentryV2Root QTabBar::tab:top {
     border-bottom: none;
@@ -1737,20 +1761,23 @@ QWidget#sentryV2Root QTabBar::tab:top {
 }
 QWidget#sentryV2Root QTabBar::tab:selected {
     background-color: #23374a;
-    border-color: #4ea8de;
+    border-color: #6ec4ff;
     color: #f4fbff;
+}
+QWidget#sentryV2Root QTabBar::tab:selected:left {
+    border-left: 3px solid #6ec4ff;
 }
 QWidget#sentryV2Root QTabBar::tab:hover:!selected {
     background-color: #213140;
-    color: #dce7f2;
+    color: #eef6ff;
 }
 QWidget#sentryV2Root QPushButton {
     background-color: #22364a;
     color: #edf5fb;
     border: 1px solid #3d5e7a;
     border-radius: 8px;
-    padding: 7px 12px;
-    min-height: 34px;
+    padding: 4px 8px;
+    min-height: 26px;
 }
 QWidget#sentryV2Root QPushButton:hover {
     background-color: #2c4862;
@@ -1787,8 +1814,8 @@ QWidget#sentryV2Root QPushButton[buttonRole="preset"] {
     border-color: #41627f;
     color: #f0f7fc;
     font-weight: 600;
-    padding: 8px 12px;
-    min-height: 38px;
+    padding: 5px 8px;
+    min-height: 30px;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="preset"]:hover {
     background-color: #2b4259;
@@ -1809,9 +1836,9 @@ QWidget#sentryV2Root QPushButton[buttonRole="dpad"] {
     border-radius: 12px;
     color: #f4fbff;
     font-weight: 700;
-    font-size: 18px;
-    min-height: 56px;
-    padding: 10px 14px;
+    font-size: 15px;
+    min-height: 40px;
+    padding: 6px 8px;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="dpad"]:hover {
     background-color: #334b64;
@@ -1998,6 +2025,7 @@ class SentryV2TabWidget(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setObjectName("sentryV2Root")
+        self.setMinimumWidth(SENTRY_V2_WIDGET_MIN_WIDTH)
 
         # Config (try loading saved, else defaults)
         self.config = self._load_settings_config()
@@ -2018,6 +2046,8 @@ class SentryV2TabWidget(QWidget):
         self.engine.on_fire(self._on_engine_fire)
         self.engine.on_move(self._on_engine_move)
         self.engine.on_state_change(self._on_engine_state_change)
+        self._pan_tilt_motion_enabled: bool = True
+        self.engine.set_motion_enabled(self._pan_tilt_motion_enabled)
 
         # Overlay
         self.overlay = SentryV2Overlay(self.config)
@@ -2042,7 +2072,10 @@ class SentryV2TabWidget(QWidget):
         self._test_media_paused: bool = False
         self._test_media_loop_enabled: bool = True
         self._grab_fail_count: int = 0
-        self._MAX_GRAB_FAILS: int = 30  # auto-close after ~1s of failures
+        self._MAX_GRAB_FAILS: int = 90  # tolerate brief camera stalls before recovery/close
+        self._camera_recovery_attempts: int = 0
+        self._MAX_CAMERA_RECOVERY_ATTEMPTS: int = 2
+        self._camera_recovery_in_progress: bool = False
         self._startup_retry_count: int = -1  # tracks auto-open retries
         # Wire thread-safe camera open result signals
         self._cam_bg_opened.connect(self._finish_camera_open)
@@ -2101,6 +2134,8 @@ class SentryV2TabWidget(QWidget):
         self._detector_pending_frame: Optional[np.ndarray] = None
         self._detector_worker_stop = threading.Event()
         self._detector_worker_busy: bool = False
+        self._last_detector_error: str = ""
+        self._last_detector_error_seen: str = ""
         # URL stream reader thread state (background thread owns the cap for HTTP streams)
         self._url_stream_active: bool = False
         self._url_stream_stop: threading.Event = threading.Event()
@@ -2124,6 +2159,8 @@ class SentryV2TabWidget(QWidget):
         self.pir_event_received.connect(self._on_comm_pir_event_received)
         self._yolo_load_result.connect(self._on_yolo_load_result)
         self._yolo_loading: bool = False
+        self._startup_autoconnect_active: bool = False
+        self._startup_autoconnect_retry: int = 0
 
         # Build UI
         self._build_ui()
@@ -2133,9 +2170,7 @@ class SentryV2TabWidget(QWidget):
         self._status_timer = QTimer(self)
         self._status_timer.timeout.connect(self._refresh_status)
         self._status_timer.start(500)
-        self._schedule_auto_yolo_load(1200)
-        QTimer.singleShot(800, self._auto_open_camera_on_startup)
-        QTimer.singleShot(1000, self._auto_connect_on_startup)
+        self._schedule_startup_tasks()
 
     def _load_settings_config(self) -> SentryV2Config:
         """Load settings from the canonical path and only fall back to legacy once if needed."""
@@ -2153,8 +2188,8 @@ class SentryV2TabWidget(QWidget):
         if selected == legacy and legacy.exists():
             try:
                 cfg.save(str(canonical))
-            except Exception:
-                pass
+            except Exception as exc:
+                print(f"[SENTRY_V2_TAB] Failed to migrate legacy settings to canonical path: {exc}", flush=True)
 
         return cfg
 
@@ -2165,6 +2200,15 @@ class SentryV2TabWidget(QWidget):
             return path_obj.resolve().relative_to(repo_root).as_posix()
         except Exception:
             return str(path_obj)
+
+    def _schedule_startup_tasks(self) -> None:
+        """CHANGE WARNING: Startup work here couples camera bring-up, transport auto-connect, and YOLO warmup; keep expensive work deferred when quick startup is enabled."""
+        if bool(getattr(self.config, "quick_startup_enabled", True)):
+            self._log("Quick startup enabled: deferring auto camera open, auto-connect, and YOLO model load until requested.")
+            return
+        self._schedule_auto_yolo_load(1200)
+        QTimer.singleShot(800, self._auto_open_camera_on_startup)
+        QTimer.singleShot(1000, lambda: self._auto_connect_on_startup(0))
 
     def _auto_open_camera_on_startup(self, _retry: int = 0) -> None:
         self._log(f"[CAM-DEBUG] _auto_open_camera_on_startup called: retry={_retry}, closing={self._closing}, has_source={self._has_local_source()}")
@@ -2181,7 +2225,7 @@ class SentryV2TabWidget(QWidget):
                 delay = 1500 * (_retry + 1)
                 QTimer.singleShot(delay, lambda r=_retry+1: self._auto_open_camera_on_startup(r))
 
-    def _auto_connect_on_startup(self) -> None:
+    def _auto_connect_on_startup(self, _retry: int = 0) -> None:
         """Auto-connect on startup if in WiFi mode and not already connected."""
         if self._host_controls_hardware():
             return  # Host app manages connection
@@ -2195,7 +2239,28 @@ class SentryV2TabWidget(QWidget):
         if mode not in (2, 3):
             return
 
-        self._log(f"Auto-connecting in mode {mode}...")
+        # In mode 2, resolve the live Debug Board COM port at startup.
+        # Windows can reassign COM numbers across reconnects or between PCs.
+        if mode == 2:
+            configured_port = str(self._edit_debug_port.text() or self.config.connection.debug_port or "").strip()
+            resolved_debug = self._resolve_serial_port("debug", configured_port)
+            if resolved_debug:
+                if resolved_debug != configured_port:
+                    self._log(f"Auto-connect resolved Debug Board COM port: {resolved_debug}")
+                self._edit_debug_port.setText(resolved_debug)
+                self.config.connection.debug_port = resolved_debug
+            elif _retry < 4:
+                delay_ms = 1000 * (_retry + 1)
+                self._log(
+                    f"Auto-connect wait: Debug Board COM port not resolved yet (retry {_retry + 1}/4 in {delay_ms}ms)"
+                )
+                QTimer.singleShot(delay_ms, lambda r=_retry + 1: self._auto_connect_on_startup(r))
+                return
+
+        self._startup_autoconnect_active = True
+        self._startup_autoconnect_retry = _retry
+
+        self._log(f"Auto-connecting in mode {mode} (attempt {_retry + 1})...")
         self._toggle_connection()
 
     def cleanup(self) -> None:
@@ -2243,20 +2308,22 @@ class SentryV2TabWidget(QWidget):
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(4, 4, 4, 4)
+        # CHANGE WARNING: Keep settings tab pages horizontally ignorable so hidden page size hints do not force the right pane wider than the visible viewport.
+
+        self._main_splitter = QSplitter(Qt.Horizontal)
+        self._main_splitter.setChildrenCollapsible(False)
+        self._main_splitter.setHandleWidth(8)
+        self._main_splitter.splitterMoved.connect(self._on_main_splitter_moved)
 
         self._layout_splitter = QSplitter(Qt.Vertical)
         self._layout_splitter.setChildrenCollapsible(False)
         self._layout_splitter.setHandleWidth(8)
 
-        self._main_splitter = QSplitter(Qt.Horizontal)
-        self._main_splitter.setChildrenCollapsible(False)
-        self._main_splitter.setHandleWidth(8)
-
         # --- Left: video feed ---
         self._video_label = SentryV2VideoCanvas("Waiting for video...")
         self._video_label.setObjectName("sentryV2Video")
         self._video_label.setAlignment(Qt.AlignCenter)
-        self._video_label.setMinimumSize(480, 360)
+        self._video_label.setMinimumSize(SENTRY_V2_VIDEO_MIN_WIDTH, 180)
         self._video_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._video_label.setStyleSheet("background-color: #0b1016; color: #6f7d8a;")
         logo_path = Path(__file__).resolve().parents[1] / "LOGO.png"
@@ -2267,69 +2334,92 @@ class SentryV2TabWidget(QWidget):
         self._video_label.frameClicked.connect(self._on_video_frame_clicked)
         self._video_label.frameRightClicked.connect(self._on_video_frame_right_clicked)
         self._video_label.roiSelected.connect(self._on_video_roi_selected)
-        self._main_splitter.addWidget(self._video_label)
 
-        # --- Right: controls in scrollable panel ---
-        self._settings_scroll = QScrollArea()
-        self._settings_scroll.setFrameShape(QFrame.NoFrame)
-        self._settings_scroll.setWidgetResizable(True)
-        self._settings_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._settings_scroll.setMinimumWidth(300)
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
+        self._layout_splitter.addWidget(self._video_label)
+        self._layout_splitter.addWidget(self._build_log_group())
+        self._layout_splitter.setStretchFactor(0, 6)
+        self._layout_splitter.setStretchFactor(1, 1)
+        left_layout.addWidget(self._layout_splitter)
+        self._main_splitter.addWidget(left_panel)
 
-        panel = QWidget()
-        panel_layout = QVBoxLayout(panel)
-        panel_layout.setContentsMargins(4, 4, 4, 4)
+        # --- Right: full-height controls with fixed tabs and per-page scrolling ---
+        panel_layout = QVBoxLayout()
+        panel_layout.setContentsMargins(0, 0, 0, 0)
         panel_layout.setSpacing(6)
+
+        pinned_top = QWidget()
+        pinned_top.setObjectName("sentryV2PinnedTop")
+        pinned_top_layout = QVBoxLayout(pinned_top)
+        pinned_top_layout.setContentsMargins(8, 4, 8, 4)
+        pinned_top_layout.setSpacing(4)
 
         # Enable toggle
         self._chk_enable = QCheckBox("Enable Smart Sentry")
         self._chk_enable.setStyleSheet("font-weight: bold; font-size: 13px;")
         self._chk_enable.toggled.connect(self._on_enable_toggled)
-        panel_layout.addWidget(self._chk_enable)
+        pinned_top_layout.addWidget(self._chk_enable)
 
         # Show video feed toggle
         self._chk_show_video = QCheckBox("Show Video Feed")
         self._chk_show_video.setChecked(True)
         self._chk_show_video.toggled.connect(self._on_show_video_toggled)
         self._chk_show_video.setToolTip("Toggle video display on/off (detection continues running)")
-        panel_layout.addWidget(self._chk_show_video)
+        pinned_top_layout.addWidget(self._chk_show_video)
+
+        panel_layout.addWidget(pinned_top)
 
         # Sub-tabs for settings categories
         self._settings_tabs = QTabWidget()
-        self._settings_tabs.setTabPosition(QTabWidget.North)
-        self._settings_tabs.setUsesScrollButtons(True)
+        self._settings_tabs.setTabPosition(QTabWidget.West)
+        self._settings_tabs.setUsesScrollButtons(False)
         self._settings_tabs.tabBar().setExpanding(False)
         self._settings_tabs.tabBar().setElideMode(Qt.ElideNone)
+        self._settings_tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
 
-        self._settings_tabs.addTab(self._build_connection_tab(), "Connection")
-        self._settings_tabs.addTab(self._build_master_profiles_tab(), "Master Profiles")
-        self._settings_tabs.addTab(self._build_detection_tab(), "Detection")
-        self._settings_tabs.addTab(self._build_prompted_targets_tab(), "Prompted Targets")
-        self._settings_tabs.addTab(self._build_filter_tab(), "Target Filter")
-        self._settings_tabs.addTab(self._build_scoring_tab(), "Threat AI")
-        self._settings_tabs.addTab(self._build_engagement_tab(), "Engage")
-        self._settings_tabs.addTab(self._build_guard_tab(), "Guard")
-        self._settings_tabs.addTab(self._build_controls_tab(), "Controls")
+        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_connection_tab()), "Connection")
+        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_master_profiles_tab()), "Master Profiles")
+        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_detection_tab()), "Detection")
+        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_prompted_targets_tab()), "Prompted Targets")
+        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_filter_tab()), "Target Filter")
+        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_scoring_tab()), "Threat AI")
+        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_engagement_tab()), "Engage")
+        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_guard_tab()), "Guard")
+        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_controls_tab()), "Controls")
+        for index in range(self._settings_tabs.count()):
+            page = self._settings_tabs.widget(index)
+            if page is not None:
+                page.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self._apply_settings_tab_colors()
 
         panel_layout.addWidget(self._settings_tabs, stretch=1)
 
-        # Status + panel controls
-        panel_layout.addWidget(self._build_status_group())
-        panel_layout.addWidget(self._build_panel_width_group())
+        right_panel = QWidget()
+        right_panel.setMinimumWidth(SENTRY_V2_PANEL_MIN_WIDTH)
+        right_panel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(6)
+        right_layout.addLayout(panel_layout, stretch=1)
 
-        self._settings_scroll.setWidget(panel)
-        self._main_splitter.addWidget(self._settings_scroll)
+        pinned_bottom = QWidget()
+        pinned_bottom.setObjectName("sentryV2PinnedBottom")
+        pinned_bottom_layout = QVBoxLayout(pinned_bottom)
+        pinned_bottom_layout.setContentsMargins(0, 0, 0, 0)
+        pinned_bottom_layout.setSpacing(4)
+        pinned_bottom_layout.addWidget(self._build_status_group())
+        right_layout.addWidget(pinned_bottom)
+
+        self._main_splitter.addWidget(right_panel)
         self._main_splitter.setStretchFactor(0, 3)
         self._main_splitter.setStretchFactor(1, 0)
 
-        self._layout_splitter.addWidget(self._main_splitter)
-        self._layout_splitter.addWidget(self._build_log_group())
-        self._layout_splitter.setStretchFactor(0, 5)
-        self._layout_splitter.setStretchFactor(1, 1)
-        root.addWidget(self._layout_splitter)
+        root.addWidget(self._main_splitter)
 
-        QTimer.singleShot(0, self._apply_saved_panel_width)
+        QTimer.singleShot(0, self._apply_default_panel_width)
         QTimer.singleShot(0, self._apply_saved_log_panel_height)
         QTimer.singleShot(0, self._reflow_all_responsive_button_grids)
 
@@ -2344,6 +2434,7 @@ class SentryV2TabWidget(QWidget):
         if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
             return
         tab_bar = self._settings_tabs.tabBar()
+        tab_bar.setIconSize(QPixmap(10, 10).size())
         tab_colors = [
             "#8cc4ff",  # Connection
             "#a9f1c0",  # Master Profiles
@@ -2358,6 +2449,18 @@ class SentryV2TabWidget(QWidget):
         for idx, color in enumerate(tab_colors):
             if idx < tab_bar.count():
                 tab_bar.setTabTextColor(idx, QColor(color))
+                marker = QPixmap(10, 10)
+                marker.fill(QColor(color))
+                tab_bar.setTabIcon(idx, QIcon(marker))
+
+    def _wrap_settings_tab(self, content: QWidget) -> QScrollArea:
+        content.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        scroll = QScrollArea()
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setWidget(content)
+        return scroll
 
     def _disable_wheel_scroll(self, widget: QWidget) -> None:
         """Disable mouse wheel scrolling on spinboxes, sliders, and comboboxes."""
@@ -2382,6 +2485,12 @@ class SentryV2TabWidget(QWidget):
         super().resizeEvent(event)
         self._reflow_all_responsive_button_grids()
 
+    def _on_main_splitter_moved(self, _pos: int, _index: int) -> None:
+        self._reflow_all_responsive_button_grids()
+
+    def _sync_settings_panel_width(self) -> None:
+        return
+
     def _set_button_role(self, button: Optional[QPushButton], role: str) -> None:
         if button is None:
             return
@@ -2395,14 +2504,21 @@ class SentryV2TabWidget(QWidget):
             self._set_button_role(button, role)
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
+    def _compact_combo_box(self, combo: Optional[QComboBox], minimum_chars: int = 14) -> None:
+        if combo is None:
+            return
+        combo.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        combo.setMinimumContentsLength(max(6, minimum_chars))
+        combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
     def _responsive_button_grid_columns(self, grid: QGridLayout, button_count: int) -> int:
         parent = grid.parentWidget()
-        available_width = parent.width() if parent is not None else int(self.config.settings_panel_width)
+        available_width = parent.width() if parent is not None else SENTRY_V2_PANEL_MIN_WIDTH
         if available_width <= 0:
-            available_width = int(self.config.settings_panel_width)
+            available_width = SENTRY_V2_PANEL_MIN_WIDTH
         if button_count <= 1:
             return 1
-        return 1 if available_width < 520 else 2
+        return 1 if available_width < 430 else 2
 
     def _register_responsive_button_grid(self, grid: QGridLayout) -> None:
         if grid not in self._responsive_button_grids:
@@ -2436,29 +2552,10 @@ class SentryV2TabWidget(QWidget):
             widget = item.widget() if item is not None else None
             if isinstance(widget, QPushButton):
                 self._set_button_role(widget, "preset")
-                widget.setMinimumHeight(38)
+                widget.setMinimumHeight(30)
                 widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self._register_responsive_button_grid(grid)
         self._reflow_responsive_button_grid(grid)
-
-    def _build_panel_width_group(self) -> QGroupBox:
-        grp = QGroupBox("Panel Layout")
-        lay = QHBoxLayout(grp)
-        lay.addWidget(QLabel("Panel Width:"))
-
-        self._slider_panel_width = QSlider(Qt.Horizontal)
-        self._slider_panel_width.setRange(320, 820)
-        self._slider_panel_width.setValue(int(self.config.settings_panel_width))
-        self._slider_panel_width.valueChanged.connect(self._on_panel_width_changed)
-        self._slider_panel_width.setToolTip(
-            "Adjust the Smart Sentry settings panel width. Drag right for easier access to dense controls."
-        )
-        lay.addWidget(self._slider_panel_width)
-
-        self._lbl_panel_width = QLabel(f"{int(self.config.settings_panel_width)} px")
-        self._lbl_panel_width.setMinimumWidth(56)
-        lay.addWidget(self._lbl_panel_width)
-        return grp
 
     def _apply_tooltip(self, widget: QWidget | None, key: str) -> None:
         """Apply a predefined tooltip to a widget if both exist."""
@@ -2696,6 +2793,7 @@ class SentryV2TabWidget(QWidget):
 
         cam_lay.addWidget(QLabel("Resolution:"), 1, 0)
         self._combo_cam_resolution = QComboBox()
+        self._compact_combo_box(self._combo_cam_resolution, minimum_chars=12)
         self._populate_camera_resolution_combo(self.config.connection.camera_width, self.config.connection.camera_height)
         self._apply_tooltip(self._combo_cam_resolution, "camera_width")
         self._combo_cam_resolution.currentIndexChanged.connect(self._on_camera_resolution_changed)
@@ -2711,7 +2809,7 @@ class SentryV2TabWidget(QWidget):
         self._slider_webcam_zoom.valueChanged.connect(self._on_source_zoom_changed)
         webcam_zoom_row.addWidget(self._slider_webcam_zoom, 1)
         self._lbl_webcam_zoom = QLabel("")
-        self._lbl_webcam_zoom.setMinimumWidth(70)
+        self._lbl_webcam_zoom.setMinimumWidth(56)
         webcam_zoom_row.addWidget(self._lbl_webcam_zoom)
         cam_lay.addLayout(webcam_zoom_row, 2, 1)
 
@@ -2725,87 +2823,127 @@ class SentryV2TabWidget(QWidget):
         self._slider_test_zoom.valueChanged.connect(self._on_source_zoom_changed)
         test_zoom_row.addWidget(self._slider_test_zoom, 1)
         self._lbl_test_zoom = QLabel("")
-        self._lbl_test_zoom.setMinimumWidth(70)
+        self._lbl_test_zoom.setMinimumWidth(56)
         test_zoom_row.addWidget(self._lbl_test_zoom)
         cam_lay.addLayout(test_zoom_row, 3, 1)
+
+        lbl_live_section = QLabel("Live Camera")
+        lbl_live_section.setStyleSheet("font-weight: bold; color: #cfe8ff; padding-top: 4px;")
+        cam_lay.addWidget(lbl_live_section, 4, 0, 1, 2)
 
         self._btn_cam = QPushButton("Open Camera")
         self._set_button_role(self._btn_cam, "primary")
         self._btn_cam.clicked.connect(self._toggle_camera)
         self._apply_tooltip(self._btn_cam, "camera_toggle")
-        cam_lay.addWidget(self._btn_cam, 4, 0, 1, 2)
-
-        self._btn_test_media = QPushButton("Open Test Media...")
-        self._set_button_role(self._btn_test_media, "utility")
-        self._btn_test_media.clicked.connect(self._browse_test_media)
-        cam_lay.addWidget(self._btn_test_media, 5, 0, 1, 2)
-
-        cam_lay.addWidget(QLabel("Video URL:"), 6, 0)
-        self._edit_video_url = QLineEdit()
-        self._edit_video_url.setPlaceholderText("Paste a YouTube or direct video URL")
-        cam_lay.addWidget(self._edit_video_url, 6, 1)
-
-        self._btn_open_video_url = QPushButton("Open URL")
-        self._set_button_role(self._btn_open_video_url, "utility")
-        self._btn_open_video_url.clicked.connect(self._open_video_url)
-        cam_lay.addWidget(self._btn_open_video_url, 7, 0, 1, 2)
-
-        resolution_action_row = QHBoxLayout()
-        self._btn_apply_camera_resolution = QPushButton("Apply Resolution")
-        self._set_button_role(self._btn_apply_camera_resolution, "utility")
-        self._btn_apply_camera_resolution.clicked.connect(self._apply_camera_resolution)
-        resolution_action_row.addWidget(self._btn_apply_camera_resolution)
-
-        self._btn_restart_app = QPushButton("Restart App")
-        self._set_button_role(self._btn_restart_app, "utility")
-        self._btn_restart_app.clicked.connect(self._restart_application)
-        resolution_action_row.addWidget(self._btn_restart_app)
-        cam_lay.addLayout(resolution_action_row, 8, 0, 1, 2)
-
-        media_ctrl_row = QHBoxLayout()
-        self._btn_test_media_play = QPushButton("Play")
-        self._set_button_role(self._btn_test_media_play, "utility")
-        self._btn_test_media_play.clicked.connect(self._play_test_media)
-        media_ctrl_row.addWidget(self._btn_test_media_play)
-
-        self._btn_test_media_pause = QPushButton("Pause")
-        self._set_button_role(self._btn_test_media_pause, "utility")
-        self._btn_test_media_pause.clicked.connect(self._pause_test_media)
-        media_ctrl_row.addWidget(self._btn_test_media_pause)
-
-        self._btn_test_media_step = QPushButton("Next Frame")
-        self._set_button_role(self._btn_test_media_step, "utility")
-        self._btn_test_media_step.clicked.connect(self._step_test_media_frame)
-        media_ctrl_row.addWidget(self._btn_test_media_step)
-
-        self._btn_test_media_restart = QPushButton("Restart")
-        self._set_button_role(self._btn_test_media_restart, "utility")
-        self._btn_test_media_restart.clicked.connect(self._restart_test_media)
-        media_ctrl_row.addWidget(self._btn_test_media_restart)
-
-        self._chk_test_media_loop = QCheckBox("Loop")
-        self._chk_test_media_loop.setChecked(True)
-        self._chk_test_media_loop.toggled.connect(self._on_test_media_loop_toggled)
-        media_ctrl_row.addWidget(self._chk_test_media_loop)
-        self._style_button_row(
-            [self._btn_test_media_play, self._btn_test_media_pause, self._btn_test_media_step, self._btn_test_media_restart],
-            "utility",
-        )
-        cam_lay.addLayout(media_ctrl_row, 9, 0, 1, 2)
+        live_action_row = QHBoxLayout()
+        live_action_row.addWidget(self._btn_cam)
 
         # One-click return to webcam after a test video/image session ends
-        self._btn_return_to_camera = QPushButton("\u21a9 Back to Camera")
+        self._btn_return_to_camera = QPushButton("\u21a9 Back")
         self._set_button_role(self._btn_return_to_camera, "primary")
         self._btn_return_to_camera.clicked.connect(self._return_to_camera)
         self._btn_return_to_camera.setEnabled(False)
         self._btn_return_to_camera.setToolTip(
             "Close the current test source and reopen the last webcam"
         )
-        cam_lay.addWidget(self._btn_return_to_camera, 10, 0, 1, 2)
+        live_action_row.addWidget(self._btn_return_to_camera)
+        cam_lay.addLayout(live_action_row, 5, 0, 1, 2)
+
+        lbl_media_section = QLabel("Media Inputs")
+        lbl_media_section.setStyleSheet("font-weight: bold; color: #cfe8ff; padding-top: 4px;")
+        cam_lay.addWidget(lbl_media_section, 6, 0, 1, 2)
+
+        self._btn_test_media = QPushButton("Open Media...")
+        self._set_button_role(self._btn_test_media, "utility")
+        self._btn_test_media.clicked.connect(self._browse_test_media)
+        cam_lay.addWidget(self._btn_test_media, 7, 0, 1, 2)
+
+        cam_lay.addWidget(QLabel("Video URL:"), 8, 0)
+        self._edit_video_url = QLineEdit()
+        self._edit_video_url.setPlaceholderText("Paste a YouTube or direct video URL")
+        url_col = QVBoxLayout()
+        url_col.setSpacing(4)
+        url_col.addWidget(self._edit_video_url)
+
+        self._btn_open_video_url = QPushButton("Open URL")
+        self._set_button_role(self._btn_open_video_url, "utility")
+        self._btn_open_video_url.clicked.connect(self._open_video_url)
+        url_button_row = QHBoxLayout()
+        url_button_row.addStretch(1)
+        url_button_row.addWidget(self._btn_open_video_url)
+        url_col.addLayout(url_button_row)
+        cam_lay.addLayout(url_col, 8, 1)
+
+        lbl_playback_section = QLabel("Playback")
+        lbl_playback_section.setStyleSheet("font-weight: bold; color: #cfe8ff; padding-top: 4px;")
+        cam_lay.addWidget(lbl_playback_section, 9, 0, 1, 2)
+
+        resolution_action_grid = QGridLayout()
+        resolution_action_grid.setHorizontalSpacing(6)
+        resolution_action_grid.setVerticalSpacing(4)
+        self._btn_apply_camera_resolution = QPushButton("Apply Res")
+        self._set_button_role(self._btn_apply_camera_resolution, "utility")
+        self._btn_apply_camera_resolution.clicked.connect(self._apply_camera_resolution)
+        resolution_action_grid.addWidget(self._btn_apply_camera_resolution, 0, 0)
+
+        self._btn_restart_app = QPushButton("Restart")
+        self._set_button_role(self._btn_restart_app, "utility")
+        self._btn_restart_app.clicked.connect(self._restart_application)
+        resolution_action_grid.addWidget(self._btn_restart_app, 0, 1)
+        self._style_button_row([self._btn_apply_camera_resolution, self._btn_restart_app], "utility")
+        self._register_responsive_button_grid(resolution_action_grid)
+        self._reflow_responsive_button_grid(resolution_action_grid)
+
+        media_ctrl_grid = QGridLayout()
+        media_ctrl_grid.setHorizontalSpacing(6)
+        media_ctrl_grid.setVerticalSpacing(4)
+        self._btn_test_media_play = QPushButton("Play")
+        self._set_button_role(self._btn_test_media_play, "utility")
+        self._btn_test_media_play.clicked.connect(self._play_test_media)
+        media_ctrl_grid.addWidget(self._btn_test_media_play, 0, 0)
+
+        self._btn_test_media_pause = QPushButton("Pause")
+        self._set_button_role(self._btn_test_media_pause, "utility")
+        self._btn_test_media_pause.clicked.connect(self._pause_test_media)
+        media_ctrl_grid.addWidget(self._btn_test_media_pause, 0, 1)
+
+        self._btn_test_media_step = QPushButton("Step")
+        self._set_button_role(self._btn_test_media_step, "utility")
+        self._btn_test_media_step.clicked.connect(self._step_test_media_frame)
+        media_ctrl_grid.addWidget(self._btn_test_media_step, 1, 0)
+
+        self._btn_test_media_restart = QPushButton("Restart")
+        self._set_button_role(self._btn_test_media_restart, "utility")
+        self._btn_test_media_restart.clicked.connect(self._restart_test_media)
+        media_ctrl_grid.addWidget(self._btn_test_media_restart, 1, 1)
+
+        self._chk_test_media_loop = QCheckBox("Loop")
+        self._chk_test_media_loop.setChecked(True)
+        self._chk_test_media_loop.toggled.connect(self._on_test_media_loop_toggled)
+        self._style_button_row(
+            [self._btn_test_media_play, self._btn_test_media_pause, self._btn_test_media_step, self._btn_test_media_restart],
+            "utility",
+        )
+        self._register_responsive_button_grid(media_ctrl_grid)
+        self._reflow_responsive_button_grid(media_ctrl_grid)
+        playback_col = QVBoxLayout()
+        playback_col.setSpacing(4)
+        playback_col.addLayout(media_ctrl_grid)
+        loop_row = QHBoxLayout()
+        loop_row.addStretch(1)
+        loop_row.addWidget(self._chk_test_media_loop)
+        playback_col.addLayout(loop_row)
+        cam_lay.addLayout(playback_col, 10, 0, 1, 2)
+
+        lbl_maintenance_section = QLabel("Maintenance")
+        lbl_maintenance_section.setStyleSheet("font-weight: bold; color: #cfe8ff; padding-top: 4px;")
+        cam_lay.addWidget(lbl_maintenance_section, 11, 0, 1, 2)
+
+        cam_lay.addLayout(resolution_action_grid, 12, 0, 1, 2)
 
         self._lbl_cam_status = QLabel("Camera closed")
         self._lbl_cam_status.setStyleSheet("color: #888; font-size: 10px;")
-        cam_lay.addWidget(self._lbl_cam_status, 11, 0, 1, 2)
+        cam_lay.addWidget(self._lbl_cam_status, 13, 0, 1, 2)
         self._on_source_zoom_changed()
         self._update_test_media_controls()
 
@@ -2815,6 +2953,7 @@ class SentryV2TabWidget(QWidget):
         type_grp = QGroupBox("Connection Mode")
         type_lay = QVBoxLayout(type_grp)
         self._combo_conn_type = QComboBox()
+        self._compact_combo_box(self._combo_conn_type, minimum_chars=18)
         self._combo_conn_type.addItems(SentryV2Comm.MODE_LABELS)
         self._combo_conn_type.setCurrentIndex(self.config.connection.connection_type)
         self._combo_conn_type.currentIndexChanged.connect(self._on_conn_type_changed)
@@ -2824,7 +2963,7 @@ class SentryV2TabWidget(QWidget):
         self._lbl_mode_hint.setWordWrap(True)
         self._lbl_mode_hint.setStyleSheet("color: #aaa; font-size: 10px;")
         type_lay.addWidget(self._lbl_mode_hint)
-        self._btn_wifi_pinout = QPushButton("Show Full WiFi Pinout")
+        self._btn_wifi_pinout = QPushButton("WiFi Pinout")
         self._set_button_role(self._btn_wifi_pinout, "utility")
         self._btn_wifi_pinout.clicked.connect(self._show_full_wifi_pinout)
         self._apply_tooltip(self._btn_wifi_pinout, "wifi_pinout")
@@ -2846,6 +2985,7 @@ class SentryV2TabWidget(QWidget):
         esp_lay.addWidget(btn_scan_esp, 0, 2)
 
         self._combo_esp32_ports = QComboBox()
+        self._compact_combo_box(self._combo_esp32_ports, minimum_chars=14)
         self._combo_esp32_ports.setPlaceholderText("Available ports...")
         self._combo_esp32_ports.currentTextChanged.connect(
             lambda _: self._on_port_selected("esp32"))
@@ -2877,6 +3017,7 @@ class SentryV2TabWidget(QWidget):
         dbg_lay.addWidget(btn_scan_dbg, 0, 2)
 
         self._combo_debug_ports = QComboBox()
+        self._compact_combo_box(self._combo_debug_ports, minimum_chars=14)
         self._combo_debug_ports.setPlaceholderText("Available ports...")
         self._combo_debug_ports.currentTextChanged.connect(
             lambda _: self._on_port_selected("debug"))
@@ -2922,6 +3063,7 @@ class SentryV2TabWidget(QWidget):
 
         srv_lay.addWidget(QLabel("Move Time Presets:"), 3, 0)
         self._combo_servo_time_preset = QComboBox()
+        self._compact_combo_box(self._combo_servo_time_preset, minimum_chars=12)
         self._combo_servo_time_preset.currentIndexChanged.connect(self._on_servo_time_preset_selected)
         srv_lay.addWidget(self._combo_servo_time_preset, 3, 1)
         self._rebuild_servo_time_preset_combo()
@@ -3142,6 +3284,7 @@ class SentryV2TabWidget(QWidget):
         self._lbl_yolo_status = QLabel("No model loaded")
         self._lbl_yolo_status.setStyleSheet("color: #888; font-size: 10px;")
         yolo_lay.addWidget(self._lbl_yolo_status, 4, 0, 1, 3)
+        self._set_yolo_status("info", "Model not loaded yet")
 
         lay.addWidget(self._grp_yolo)
 
@@ -3342,7 +3485,7 @@ class SentryV2TabWidget(QWidget):
         self._set_button_role(self._btn_prompted_rename, "utility")
         self._btn_prompted_rename.clicked.connect(self._rename_selected_prompted_target)
         button_row.addWidget(self._btn_prompted_rename)
-        self._btn_prompted_remove_last_example = QPushButton("Remove Last Example")
+        self._btn_prompted_remove_last_example = QPushButton("Remove Last")
         self._set_button_role(self._btn_prompted_remove_last_example, "utility")
         self._btn_prompted_remove_last_example.clicked.connect(self._remove_last_prompted_example)
         button_row.addWidget(self._btn_prompted_remove_last_example)
@@ -3560,12 +3703,12 @@ class SentryV2TabWidget(QWidget):
         # ML training buttons
         ml_btn_lay = QHBoxLayout()
         
-        btn_train = QPushButton("Train ML Model")
+        btn_train = QPushButton("Train ML")
         btn_train.clicked.connect(self._train_ml_model)
         btn_train.setToolTip("Train a new ML model from logged engagement decisions")
         ml_btn_lay.addWidget(btn_train)
         
-        btn_save = QPushButton("Save ML Model")
+        btn_save = QPushButton("Save ML")
         btn_save.clicked.connect(self._save_ml_model)
         btn_save.setToolTip("Save the trained ML model to disk")
         ml_btn_lay.addWidget(btn_save)
@@ -3628,7 +3771,7 @@ class SentryV2TabWidget(QWidget):
         lay.addWidget(preset_grp)
 
         # Auto-Trigger toggle (prominent)
-        self._chk_auto_trigger = QCheckBox("Auto-Trigger (fire automatically)")
+        self._chk_auto_trigger = QCheckBox("Auto-Trigger")
         self._chk_auto_trigger.setStyleSheet(
             "font-weight: bold; color: #ff4d4d;"
             if self.config.engagement.auto_trigger_enabled
@@ -3643,7 +3786,8 @@ class SentryV2TabWidget(QWidget):
         trig_row = QHBoxLayout()
         trig_row.addWidget(QLabel("Trigger Mode:"))
         self._combo_trigger_mode = QComboBox()
-        self._combo_trigger_mode.addItems(["Water (MOSFET)", "Projectile (BB Servo)"])
+        self._compact_combo_box(self._combo_trigger_mode, minimum_chars=16)
+        self._combo_trigger_mode.addItems(["Water (MOSFET)", "Projectile (GPIO13 Servo)"])
         self._combo_trigger_mode.setCurrentIndex(1 if self.config.engagement.trigger_mode_bb else 0)
         self._combo_trigger_mode.currentIndexChanged.connect(self._on_trigger_mode_changed)
         self._apply_tooltip(self._combo_trigger_mode, "trigger_mode")
@@ -3687,7 +3831,7 @@ class SentryV2TabWidget(QWidget):
 
         # Inter-target cooldown
         row4 = QHBoxLayout()
-        row4.addWidget(QLabel("Inter-target cooldown (s):"))
+        row4.addWidget(QLabel("Target cooldown (s):"))
         self._spin_inter_cd = QDoubleSpinBox()
         self._spin_inter_cd.setRange(0.1, 5.0)
         self._spin_inter_cd.setSingleStep(0.1)
@@ -3711,7 +3855,7 @@ class SentryV2TabWidget(QWidget):
 
         # Max queue
         row6 = QHBoxLayout()
-        self._lbl_max_queue = QLabel("Max targets per cycle:")
+        self._lbl_max_queue = QLabel("Max targets/cycle:")
         row6.addWidget(self._lbl_max_queue)
         self._spin_max_queue = QSpinBox()
         self._spin_max_queue.setRange(1, 10)
@@ -3722,7 +3866,7 @@ class SentryV2TabWidget(QWidget):
         lay.addLayout(row6)
 
         # Optimize slew
-        self._chk_optimize = QCheckBox("Optimise servo travel order")
+        self._chk_optimize = QCheckBox("Optimise travel order")
         self._chk_optimize.setChecked(self.config.engagement.optimize_slew_order)
         self._chk_optimize.toggled.connect(self._on_engagement_changed)
         self._apply_tooltip(self._chk_optimize, "optimize_travel")
@@ -3747,7 +3891,7 @@ class SentryV2TabWidget(QWidget):
         prec_grp = QGroupBox("Precision Aiming (small/distant targets)")
         prec_lay = QGridLayout(prec_grp)
 
-        self._chk_precision = QCheckBox("Enable precision refinement")
+        self._chk_precision = QCheckBox("Precision refinement")
         self._chk_precision.setChecked(self.config.engagement.precision_aim_enabled)
         self._chk_precision.toggled.connect(self._on_engagement_changed)
         self._apply_tooltip(self._chk_precision, "precision_enable")
@@ -3899,6 +4043,7 @@ class SentryV2TabWidget(QWidget):
 
         self._lbl_center_fire_radius_hint = QLabel("")
         self._lbl_center_fire_radius_hint.setStyleSheet("color: #999; font-size: 10px;")
+        self._lbl_center_fire_radius_hint.setWordWrap(True)
         advanced_lay.addWidget(self._lbl_center_fire_radius_hint, 7, 0, 1, 2)
 
         advanced_lay.addWidget(QLabel("Fire exit Pan / Tilt (deg):"), 8, 0)
@@ -3952,7 +4097,7 @@ class SentryV2TabWidget(QWidget):
         advanced_lay.addWidget(self._spin_target_loss_timeout, 10, 1)
 
         advanced_lay.addWidget(QLabel("Continuous hunt on loss:"), 11, 0)
-        self._chk_continuous_hunt_loss = QCheckBox("Stay hunting instead of returning to guard")
+        self._chk_continuous_hunt_loss = QCheckBox("Keep hunting on loss")
         self._chk_continuous_hunt_loss.setChecked(bool(getattr(self.config.engagement, "continuous_hunt_on_loss", False)))
         self._chk_continuous_hunt_loss.toggled.connect(self._on_engagement_changed)
         self._apply_tooltip(self._chk_continuous_hunt_loss, "continuous_hunt_on_loss")
@@ -3965,7 +4110,7 @@ class SentryV2TabWidget(QWidget):
         self._set_engagement_preset_label(self._match_engagement_preset_name())
         tuning_grp = QGroupBox("Precision Tuning Data Logger")
         tuning_lay = QVBoxLayout(tuning_grp)
-        self._chk_precision_logging = QCheckBox("Enable Precision Tuning Logger")
+        self._chk_precision_logging = QCheckBox("Precision tuning logger")
         self._chk_precision_logging.setChecked(False)
         self._chk_precision_logging.toggled.connect(self._on_precision_logging_toggled)
         tuning_lay.addWidget(self._chk_precision_logging)
@@ -4074,12 +4219,12 @@ class SentryV2TabWidget(QWidget):
         static_lay.addLayout(limit_row_2)
 
         btn_row = QHBoxLayout()
-        btn = QPushButton("Go To Guard Position")
+        btn = QPushButton("Go To Guard")
         self._set_button_role(btn, "primary")
         btn.clicked.connect(self._go_to_guard)
         self._apply_tooltip(btn, "go_guard")
         btn_row.addWidget(btn)
-        btn2 = QPushButton("Set Current As Guard")
+        btn2 = QPushButton("Set As Guard")
         self._set_button_role(btn2, "utility")
         self._apply_tooltip(btn2, "set_current_guard")
         btn2.clicked.connect(self._set_current_as_guard)
@@ -4304,7 +4449,7 @@ class SentryV2TabWidget(QWidget):
         name_row.addWidget(self._edit_mask_name)
         mask_lay.addLayout(name_row)
 
-        self._btn_mask_capture = QPushButton("Capture Vertices From Video")
+        self._btn_mask_capture = QPushButton("Capture From Video")
         self._btn_mask_capture.setCheckable(True)
         self._set_button_role(self._btn_mask_capture, "mode")
         self._btn_mask_capture.toggled.connect(self._on_mask_capture_toggled)
@@ -4334,7 +4479,7 @@ class SentryV2TabWidget(QWidget):
         mask_lay.addWidget(self._mask_list)
 
         manage_row = QHBoxLayout()
-        self._btn_mask_toggle = QPushButton("Enable/Disable Selected")
+        self._btn_mask_toggle = QPushButton("Toggle Selected")
         self._set_button_role(self._btn_mask_toggle, "utility")
         self._btn_mask_toggle.clicked.connect(self._toggle_selected_no_fire_masks)
         manage_row.addWidget(self._btn_mask_toggle)
@@ -4353,7 +4498,7 @@ class SentryV2TabWidget(QWidget):
         self._chk_mask_trace.setChecked(False)
         mask_lay.addWidget(self._chk_mask_trace)
 
-        self._btn_mask_trace_dump = QPushButton("Dump Mask Snapshot")
+        self._btn_mask_trace_dump = QPushButton("Dump Snapshot")
         self._set_button_role(self._btn_mask_trace_dump, "utility")
         self._btn_mask_trace_dump.clicked.connect(self._dump_mask_trace_snapshot)
         mask_lay.addWidget(self._btn_mask_trace_dump)
@@ -4371,6 +4516,14 @@ class SentryV2TabWidget(QWidget):
         self._chk_pir_enabled.toggled.connect(self._on_pir_enabled_changed)
         self._apply_tooltip(self._chk_pir_enabled, "pir_enabled")
         pir_lay.addWidget(self._chk_pir_enabled)
+
+        pir_hint = QLabel(
+            "For roughly 120° physical spacing, keep one sensor as the active owner of a target crossing adjacent PIR cones. "
+            "The lockout below suppresses near-simultaneous cross-sensor overlap in software."
+        )
+        pir_hint.setWordWrap(True)
+        pir_hint.setStyleSheet("color: #97a8b8; font-size: 10px;")
+        pir_lay.addWidget(pir_hint)
 
         # PIR sensors table (3 rows: pan cue angle, tilt cue angle, enabled)
         sensors = self.config.pir_guard.sensors
@@ -4481,6 +4634,23 @@ class SentryV2TabWidget(QWidget):
         scan_row3.addStretch()
         pir_lay.addLayout(scan_row3)
 
+        scan_row4 = QHBoxLayout()
+        scan_row4.addWidget(QLabel("Cross-Sensor Lockout (ms):"))
+        self._spin_pir_cross_lockout_ms = QSpinBox()
+        self._spin_pir_cross_lockout_ms.setRange(0, 3000)
+        self._spin_pir_cross_lockout_ms.setSingleStep(50)
+        self._spin_pir_cross_lockout_ms.setValue(int(getattr(self.config.pir_guard, "cross_sensor_lockout_ms", 800)))
+        self._spin_pir_cross_lockout_ms.valueChanged.connect(self._on_pir_settings_changed)
+        scan_row4.addWidget(self._spin_pir_cross_lockout_ms)
+
+        self._btn_pir_layout_120 = QPushButton("Use 120° PIR")
+        self._set_button_role(self._btn_pir_layout_120, "utility")
+        self._btn_pir_layout_120.clicked.connect(self._apply_pir_120_layout)
+        self._btn_pir_layout_120.setToolTip("Apply a non-overlapping three-sector PIR layout for sensors spaced roughly 120° apart")
+        scan_row4.addWidget(self._btn_pir_layout_120)
+        scan_row4.addStretch()
+        pir_lay.addLayout(scan_row4)
+
         # Status display
         self._lbl_pir_status = QLabel("Status: Idle")
         pir_lay.addWidget(self._lbl_pir_status)
@@ -4545,26 +4715,41 @@ class SentryV2TabWidget(QWidget):
         spd_row.addWidget(self._spin_step)
         dpad_lay.addLayout(spd_row)
 
+        motion_row = QHBoxLayout()
+        self._btn_motion_enable = QPushButton("Auto Motion: ON")
+        self._btn_motion_enable.setCheckable(True)
+        self._btn_motion_enable.setChecked(True)
+        self._set_button_role(self._btn_motion_enable, "mode")
+        self._btn_motion_enable.toggled.connect(self._on_pan_tilt_motion_toggled)
+        self._btn_motion_enable.setToolTip("Disable automatic pan/tilt tracking and guard slews while keeping the Debug Board, PIR sensors, serial logging, and manual recovery controls active")
+        motion_row.addWidget(self._btn_motion_enable)
+        dpad_lay.addLayout(motion_row)
+
+        motion_note = QLabel("When disabled, Smart Sentry tracking and PIR-driven slews stop sending pan/tilt moves, but manual arrows, Home, and Move to Guard still work.")
+        motion_note.setWordWrap(True)
+        motion_note.setStyleSheet("color: #97a8b8; font-size: 10px;")
+        dpad_lay.addWidget(motion_note)
+
         # D-pad grid
         grid = QGridLayout()
         grid.setHorizontalSpacing(4)
         grid.setVerticalSpacing(4)
         btn_up = QPushButton("\u25B2")  # up arrow
-        btn_up.setFixedSize(82, 68)
+        btn_up.setFixedSize(66, 54)
         self._set_button_role(btn_up, "dpad")
-        btn_up.clicked.connect(lambda: self._manual_move(0, -1))
+        btn_up.clicked.connect(lambda: self._manual_move(0, 1))
         self._apply_tooltip(btn_up, "manual_up")
         grid.addWidget(btn_up, 0, 1)
 
         btn_left = QPushButton("\u25C0")  # left arrow
-        btn_left.setFixedSize(82, 68)
+        btn_left.setFixedSize(66, 54)
         self._set_button_role(btn_left, "dpad")
         btn_left.clicked.connect(lambda: self._manual_move(-1, 0))
         self._apply_tooltip(btn_left, "manual_left")
         grid.addWidget(btn_left, 1, 0)
 
         btn_home = QPushButton("HOME")
-        btn_home.setFixedSize(92, 68)
+        btn_home.setFixedSize(84, 62)
         self._set_button_role(btn_home, "dpad")
         btn_home.setStyleSheet("font-size: 11px; letter-spacing: 0.5px;")
         self._apply_tooltip(btn_home, "manual_home")
@@ -4572,16 +4757,16 @@ class SentryV2TabWidget(QWidget):
         grid.addWidget(btn_home, 1, 1)
 
         btn_right = QPushButton("\u25B6")  # right arrow
-        btn_right.setFixedSize(82, 68)
+        btn_right.setFixedSize(66, 54)
         self._set_button_role(btn_right, "dpad")
         btn_right.clicked.connect(lambda: self._manual_move(1, 0))
         self._apply_tooltip(btn_right, "manual_right")
         grid.addWidget(btn_right, 1, 2)
 
         btn_down = QPushButton("\u25BC")  # down arrow
-        btn_down.setFixedSize(82, 68)
+        btn_down.setFixedSize(66, 54)
         self._set_button_role(btn_down, "dpad")
-        btn_down.clicked.connect(lambda: self._manual_move(0, 1))
+        btn_down.clicked.connect(lambda: self._manual_move(0, -1))
         self._apply_tooltip(btn_down, "manual_down")
         grid.addWidget(btn_down, 2, 1)
 
@@ -4620,22 +4805,32 @@ class SentryV2TabWidget(QWidget):
         self._apply_tooltip(self._btn_spare, "spare_toggle")
         acc_lay.addWidget(self._btn_spare, 1, 0)
 
+        acc_note = QLabel("Accessories stay separate from arming and fire controls.")
+        acc_note.setWordWrap(True)
+        acc_note.setStyleSheet("color: #97a8b8; font-size: 10px;")
+        acc_lay.addWidget(acc_note, 1, 1, 1, 2)
+
+        lay.addWidget(acc_grp)
+
+        # --- Safety and Manual Fire ---
+        fire_grp = QGroupBox("Safety & Fire")
+        fire_lay = QVBoxLayout(fire_grp)
+
+        fire_note = QLabel("Arm Safety before using manual fire. Safety is isolated here so it is not visually mixed with ordinary accessory toggles.")
+        fire_note.setWordWrap(True)
+        fire_note.setStyleSheet("color: #c9d7e3; font-size: 10px;")
+        fire_lay.addWidget(fire_note)
+
         self._btn_safety = QPushButton("Safety: LOCKED")
         self._btn_safety.setCheckable(True)
         self._set_button_role(self._btn_safety, "danger")
         self._btn_safety.toggled.connect(self._on_safety_toggled)
         self._apply_tooltip(self._btn_safety, "safety_toggle")
-        acc_lay.addWidget(self._btn_safety, 1, 1, 1, 2)
-
-        lay.addWidget(acc_grp)
-
-        # --- Manual Fire ---
-        fire_grp = QGroupBox("Fire Control")
-        fire_lay = QVBoxLayout(fire_grp)
+        fire_lay.addWidget(self._btn_safety)
 
         self._btn_fire = QPushButton("FIRE")
         self._set_button_role(self._btn_fire, "danger")
-        self._btn_fire.setMinimumHeight(44)
+        self._btn_fire.setMinimumHeight(36)
         self._btn_fire.pressed.connect(lambda: self._on_manual_fire(1))
         self._btn_fire.released.connect(lambda: self._on_manual_fire(0))
         self._apply_tooltip(self._btn_fire, "manual_fire")
@@ -4655,25 +4850,35 @@ class SentryV2TabWidget(QWidget):
         lay = QVBoxLayout(grp)
         self._lbl_state = QLabel("State: PAUSED")
         self._lbl_state.setStyleSheet("font-weight: bold;")
+        self._lbl_state.setWordWrap(True)
         lay.addWidget(self._lbl_state)
 
         self._lbl_stats = QLabel("Targets: 0 | Qualified: 0 | Engaged: 0")
+        self._lbl_stats.setWordWrap(True)
         lay.addWidget(self._lbl_stats)
 
         self._lbl_angles = QLabel("Angles: Pan 0.0° [0..270] | Tilt 0.0° [0..110]")
         self._lbl_angles.setStyleSheet("font-weight: bold;")
+        self._lbl_angles.setWordWrap(True)
         lay.addWidget(self._lbl_angles)
 
         self._lbl_angles_controls = QLabel("Current Commanded: Pan 0.0° | Tilt 0.0°")
         self._lbl_angles_controls.setStyleSheet("font-weight: bold;")
+        self._lbl_angles_controls.setWordWrap(True)
         lay.addWidget(self._lbl_angles_controls)
 
         self._lbl_no_fire_status = QLabel("No-fire mask: clear")
         self._lbl_no_fire_status.setStyleSheet("font-weight: bold; color: #8fe3c4;")
+        self._lbl_no_fire_status.setWordWrap(True)
         lay.addWidget(self._lbl_no_fire_status)
 
+        self._lbl_recovery_status = QLabel("Recovery: idle")
+        self._lbl_recovery_status.setStyleSheet("font-weight: bold; color: #97a8b8;")
+        self._lbl_recovery_status.setWordWrap(True)
+        lay.addWidget(self._lbl_recovery_status)
+
         # Save config button
-        btn_save = QPushButton("Save Settings")
+        btn_save = QPushButton("Save")
         self._set_button_role(btn_save, "primary")
         btn_save.clicked.connect(self._save_config)
         self._apply_tooltip(btn_save, "save_settings")
@@ -4683,7 +4888,8 @@ class SentryV2TabWidget(QWidget):
 
     def _build_log_group(self) -> QGroupBox:
         grp = QGroupBox("Serial Output")
-        grp.setMinimumHeight(150)
+        grp.setMinimumHeight(110)
+        grp.setMaximumHeight(220)
 
         lay = QVBoxLayout(grp)
         lay.setContentsMargins(8, 8, 8, 8)
@@ -4697,7 +4903,7 @@ class SentryV2TabWidget(QWidget):
 
         controls = QHBoxLayout()
         controls.addStretch(1)
-        btn_clear = QPushButton("Clear Log")
+        btn_clear = QPushButton("Clear")
         self._set_button_role(btn_clear, "utility")
         btn_clear.clicked.connect(self._log_text.clear)
         controls.addWidget(btn_clear)
@@ -4709,7 +4915,7 @@ class SentryV2TabWidget(QWidget):
         if not hasattr(self, "_layout_splitter"):
             return
         total_height = max(1, self._layout_splitter.size().height())
-        log_height = max(160, int(total_height * 0.24))
+        log_height = max(110, min(190, int(total_height * 0.18)))
         self._layout_splitter.setSizes([max(1, total_height - log_height), log_height])
 
     # ================================================================== #
@@ -4892,8 +5098,9 @@ class SentryV2TabWidget(QWidget):
     def _emit_comm_pir_event(self, sensor_id: int, timestamp: float) -> None:
         try:
             self.pir_event_received.emit(int(sensor_id), float(timestamp))
-        except Exception:
-            pass
+        except Exception as exc:
+            if not self._closing:
+                self._report_runtime_warning("PIR signal emit failed", exc)
 
     def _on_comm_pir_event_received(self, sensor_id: int, timestamp: float) -> None:
         self.engine.on_pir_sensor_fired(int(sensor_id), float(timestamp))
@@ -4999,6 +5206,70 @@ class SentryV2TabWidget(QWidget):
 
         self._log(f"Scan ({target}): {len(ports)} port(s) found")
 
+    def _list_serial_ports_normalized(self) -> list[tuple[str, str]]:
+        ports: list[tuple[str, str]] = []
+        try:
+            for dev, desc in SentryV2Comm.list_serial_ports():
+                normalized = SentryV2Comm._normalize_serial_port_name(str(dev or "").strip())
+                if normalized:
+                    ports.append((normalized, str(desc or "").strip()))
+        except Exception:
+            return []
+        return ports
+
+    def _resolve_serial_port(self, target: str, preferred_port: str = "") -> str:
+        ports = self._list_serial_ports_normalized()
+        if not ports:
+            return SentryV2Comm._normalize_serial_port_name(preferred_port)
+
+        available = {port.upper(): port for port, _desc in ports}
+        preferred = SentryV2Comm._normalize_serial_port_name(preferred_port)
+        if preferred and preferred.upper() in available:
+            return available[preferred.upper()]
+
+        non_system_ports = [
+            (port, desc)
+            for port, desc in ports
+            if "communications port" not in str(desc or "").strip().lower()
+        ]
+        if len(non_system_ports) == 1:
+            return non_system_ports[0][0]
+
+        keyword_scores = {
+            "debug": {
+                "usb-serial": 6,
+                "ch340": 6,
+                "wch": 5,
+                "usb serial": 5,
+                "cp210": 3,
+                "uart": 2,
+            },
+            "esp32": {
+                "esp32": 8,
+                "cp210": 6,
+                "silicon labs": 5,
+                "usb-serial": 3,
+                "ch340": 3,
+                "uart": 2,
+            },
+        }
+        scored: list[tuple[int, str]] = []
+        for port, desc in non_system_ports:
+            text = str(desc or "").lower()
+            score = 0
+            for token, weight in keyword_scores.get(target, {}).items():
+                if token in text:
+                    score += int(weight)
+            scored.append((score, port))
+
+        if scored:
+            scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+            best_score, best_port = scored[0]
+            if best_score > 0:
+                return best_port
+
+        return non_system_ports[0][0] if len(non_system_ports) == 1 else ""
+
     def _on_port_selected(self, target: str = "esp32") -> None:
         if target == "esp32":
             idx = self._combo_esp32_ports.currentIndex()
@@ -5040,20 +5311,43 @@ class SentryV2TabWidget(QWidget):
         cc = self.config.connection
         cc.connection_type = m
 
-        # Prefer explicit dropdown selection (data payload) over the typed text.
+        # Prefer the user's typed value. Dropdown values are only a convenience
+        # after a scan and must not silently override a manually entered COM port.
+        typed_esp32 = self._edit_esp32_port.text().strip()
         esp32_data = self._combo_esp32_ports.itemData(self._combo_esp32_ports.currentIndex())
-        if esp32_data:
+        if typed_esp32:
+            cc.esp32_port = typed_esp32
+        elif esp32_data:
             cc.esp32_port = str(esp32_data).strip()
         else:
-            cc.esp32_port = self._edit_esp32_port.text().strip()
+            cc.esp32_port = ""
 
         cc.esp32_baud = self._spin_esp32_baud.value()
 
+        typed_debug = self._edit_debug_port.text().strip()
         debug_data = self._combo_debug_ports.itemData(self._combo_debug_ports.currentIndex())
-        if debug_data:
+        if typed_debug:
+            cc.debug_port = typed_debug
+        elif debug_data:
             cc.debug_port = str(debug_data).strip()
         else:
-            cc.debug_port = self._edit_debug_port.text().strip()
+            cc.debug_port = ""
+
+        if m in (0, 1):
+            resolved_esp32 = self._resolve_serial_port("esp32", cc.esp32_port)
+            if resolved_esp32 and resolved_esp32 != cc.esp32_port:
+                self._log(f"Auto-selected ESP32 COM port: {resolved_esp32}")
+                self._edit_esp32_port.setText(resolved_esp32)
+            if resolved_esp32:
+                cc.esp32_port = resolved_esp32
+
+        if m in (1, 2):
+            resolved_debug = self._resolve_serial_port("debug", cc.debug_port)
+            if resolved_debug and resolved_debug != cc.debug_port:
+                self._log(f"Auto-selected Debug Board COM port: {resolved_debug}")
+                self._edit_debug_port.setText(resolved_debug)
+            if resolved_debug:
+                cc.debug_port = resolved_debug
 
         cc.debug_baud = self._spin_debug_baud.value()
         cc.udp_host = self._edit_udp_host.text().strip()
@@ -5083,6 +5377,7 @@ class SentryV2TabWidget(QWidget):
             initial_tilt=float(self.engine.current_tilt),
             initial_move_time_ms=int(self._get_manual_move_time_ms()),
             pir_enabled=bool(self.config.pir_guard.pir_enabled),
+            motion_enabled=bool(self._pan_tilt_motion_enabled),
         )
 
     def _start_connection_operation(self, operation: str, **kwargs) -> None:
@@ -5113,13 +5408,20 @@ class SentryV2TabWidget(QWidget):
                         udp_port=int(kwargs.get("udp_port", 9000)),
                     )
                     if ok:
-                        self._comm.send_command(
-                            float(kwargs.get("initial_pan", 90.0)),
-                            float(kwargs.get("initial_tilt", 50.0)),
-                            fire=0,
-                            move_time_ms=int(kwargs.get("initial_move_time_ms", 20)),
-                        )
-                        self._comm.send_pir_enabled(bool(kwargs.get("pir_enabled", False)))
+                        if bool(kwargs.get("motion_enabled", True)):
+                            self._comm.send_movement(
+                                float(kwargs.get("initial_pan", 90.0)),
+                                float(kwargs.get("initial_tilt", 50.0)),
+                                move_time_ms=int(kwargs.get("initial_move_time_ms", 20)),
+                            )
+                        pir_enabled = bool(kwargs.get("pir_enabled", False))
+                        pir_ok = self._comm.send_pir_enabled(pir_enabled)
+                        if pir_enabled and not pir_ok:
+                            self.command_result_ready.emit(
+                                "send_pir_enabled",
+                                False,
+                                getattr(self._comm, "_last_error", "") or "PIR enable command failed",
+                            )
                     info = self._comm.connection_info()
                 else:
                     self._comm.disconnect()
@@ -5163,13 +5465,34 @@ class SentryV2TabWidget(QWidget):
             self._lbl_conn_status.setText("Disconnected")
             self._lbl_conn_status.setStyleSheet("color: #cc3333; font-weight: bold;")
             self._log("Disconnected")
+            self._startup_autoconnect_active = False
+            self._startup_autoconnect_retry = 0
             return
 
         if ok:
             self._btn_connect.setText("Disconnect")
             self._lbl_conn_status.setText(self._format_connection_details(details, info))
-            self._lbl_conn_status.setStyleSheet("color: #33cc33; font-weight: bold;")
+            mode2_degraded_io = (
+                int(self.config.connection.connection_type) == 2
+                and (
+                    getattr(self._comm, "_sock", None) is None
+                    or getattr(self._comm, "_udp_target", None) is None
+                )
+            )
+            self._lbl_conn_status.setStyleSheet(
+                "color: #ffae42; font-weight: bold;" if mode2_degraded_io else "color: #33cc33; font-weight: bold;"
+            )
             self._log(f"Connected: {info}")
+            fire_mode = "Projectile (ESP32 GPIO13 Servo)" if self._comm.trigger_mode_bb else "Water (MOSFET)"
+            safety_state = "ARMED" if self._safety_armed else "LOCKED"
+            auto_trigger_state = "ON" if bool(self.config.engagement.auto_trigger_enabled) else "OFF"
+            self._log(f"Fire config: mode={fire_mode} | safety={safety_state} | auto-trigger={auto_trigger_state}")
+            if mode2_degraded_io:
+                self._log(
+                    "Connection warning: Debug Board pan/tilt movement is available, but ESP32 WiFi IO is unavailable. GPIO13 trigger-servo and PIR enable commands will not work until the WiFi link reconnects"
+                )
+            self._startup_autoconnect_active = False
+            self._startup_autoconnect_retry = 0
             self._schedule_auto_yolo_load(300)
         else:
             self._btn_connect.setText("Connect")
@@ -5177,6 +5500,28 @@ class SentryV2TabWidget(QWidget):
             self._lbl_conn_status.setText(failure_text)
             self._lbl_conn_status.setStyleSheet("color: #cc3333; font-weight: bold;")
             self._log(f"Connection failed: {err or 'unknown error'}")
+
+            # Startup-only retry for transient Windows COM enumeration race.
+            # Applies only to mode 2 and only when the error indicates COM port
+            # file not found (e.g. \\.\COM28 not ready yet).
+            err_text = str(err or "")
+            mode = int(self.config.connection.connection_type)
+            if (
+                self._startup_autoconnect_active
+                and mode == 2
+                and self._startup_autoconnect_retry < 4
+                and ("could not open port" in err_text.lower())
+                and ("filenotfounderror" in err_text.lower() or "cannot find the file" in err_text.lower())
+            ):
+                next_retry = self._startup_autoconnect_retry + 1
+                delay_ms = 1200 * next_retry
+                self._startup_autoconnect_retry = next_retry
+                self._log(
+                    f"Auto-connect retry scheduled ({next_retry}/4) after transient COM open failure"
+                )
+                QTimer.singleShot(delay_ms, lambda r=next_retry: self._auto_connect_on_startup(r))
+            else:
+                self._startup_autoconnect_active = False
 
     # ------------------------------------------------------------------ #
     #  Camera management
@@ -5680,13 +6025,14 @@ class SentryV2TabWidget(QWidget):
         actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self._cap = cap
-
         self._local_source_kind = source_kind
         self._local_source_label = source_text
         self._test_media_image_frame = None
         self._test_media_last_frame = None
         self._test_media_paused = False
         self._grab_fail_count = 0
+        self._camera_recovery_attempts = 0
+        self._camera_recovery_in_progress = False
         self._cam_timer.start(33)
         self._btn_cam.setText("Close Source")
 
@@ -5915,6 +6261,50 @@ class SentryV2TabWidget(QWidget):
         self._last_camera_width = int(max(120, width))
         self._last_camera_height = int(max(120, height))
 
+    def _attempt_camera_recovery(self, reason: str) -> bool:
+        if self._closing or self._local_source_kind != "camera":
+            return False
+        if self._camera_recovery_in_progress:
+            return True
+        if self._camera_recovery_attempts >= self._MAX_CAMERA_RECOVERY_ATTEMPTS:
+            return False
+
+        src = str(getattr(self, "_last_camera_source_text", "") or "").strip()
+        if not src:
+            return False
+
+        self._camera_recovery_attempts += 1
+        attempt = self._camera_recovery_attempts
+        self._camera_recovery_in_progress = True
+        self._log(
+            f"{reason} Attempting camera recovery ({attempt}/{self._MAX_CAMERA_RECOVERY_ATTEMPTS})"
+        )
+        self._lbl_cam_status.setText(
+            f"Camera stalled. Reopening source ({attempt}/{self._MAX_CAMERA_RECOVERY_ATTEMPTS})..."
+        )
+        self._lbl_cam_status.setStyleSheet("color: #d0b060; font-size: 10px;")
+        self._close_camera(log_close=False)
+
+        def _reopen() -> None:
+            if self._closing:
+                self._camera_recovery_in_progress = False
+                return
+            try:
+                cam_src: int | str
+                try:
+                    cam_src = int(src)
+                except ValueError:
+                    cam_src = src
+                self._open_video_capture_source(cam_src, src, "camera", request_frame_size=True)
+            except Exception as exc:
+                self._camera_recovery_in_progress = False
+                self._lbl_cam_status.setText(f"Camera recovery failed: {exc}")
+                self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+                self._log(f"Camera recovery failed ({attempt}/{self._MAX_CAMERA_RECOVERY_ATTEMPTS}): {exc}")
+
+        QTimer.singleShot(250, _reopen)
+        return True
+
     def _sync_source_dimensions(self, width: int, height: int) -> None:
         if width <= 0 or height <= 0:
             return
@@ -5944,6 +6334,9 @@ class SentryV2TabWidget(QWidget):
         self._test_media_paused = False
         self._local_source_kind = ""
         self._local_source_label = ""
+        if log_close:
+            self._camera_recovery_attempts = 0
+            self._camera_recovery_in_progress = False
         try:
             self._btn_cam.setText("Open Camera")
             self._lbl_cam_status.setText("Source closed")
@@ -5954,8 +6347,9 @@ class SentryV2TabWidget(QWidget):
             else:
                 self._video_label.set_placeholder_enabled(False)
                 self._video_label.clear_frame("Waiting for video...")
-        except RuntimeError:
-            pass  # widget already destroyed during shutdown
+        except RuntimeError as exc:
+            if not self._closing:
+                self._report_runtime_warning("Camera close UI update skipped", exc)
         self._update_test_media_controls()
         if log_close:
             self._log("Camera closed")
@@ -5983,10 +6377,25 @@ class SentryV2TabWidget(QWidget):
         else:
             if self._cap is None or not self._cap.isOpened():
                 return
-            ret, frame = self._cap.read()
+            try:
+                ret, frame = self._cap.read()
+            except cv2.error as exc:
+                self._grab_fail_count += 1
+                if self._grab_fail_count == 1 or self._grab_fail_count % 5 == 0:
+                    self._log(f"Camera read error: {exc}")
+                if self._grab_fail_count >= self._MAX_GRAB_FAILS:
+                    if self._attempt_camera_recovery("Camera read errors persisted."):
+                        return
+                    self._log("Camera read errors persisted — auto-closing")
+                    self._close_camera()
+                return
             if not ret or frame is None:
                 self._grab_fail_count += 1
                 if self._grab_fail_count >= self._MAX_GRAB_FAILS:
+                    if self._attempt_camera_recovery(
+                        f"Camera had {self._grab_fail_count} consecutive grab failures."
+                    ):
+                        return
                     self._log(f"Camera: {self._grab_fail_count} consecutive grab failures — auto-closing")
                     self._close_camera()
                 return
@@ -6035,6 +6444,8 @@ class SentryV2TabWidget(QWidget):
         self.config.detection_mode.detection_mode = index
         self._update_mode_description()
         self._update_detection_panel_visibility()
+        if index in {2, 4, 5, 9, 10} and "Runtime ready:" not in self._lbl_yolo_status.text():
+            self._set_yolo_status("pending", "YOLO mode selected. Load a model to activate inference")
         self._sync_target_size_preset_combo()
         self._detector.reset()
         self._tracker.reset()
@@ -6195,9 +6606,7 @@ class SentryV2TabWidget(QWidget):
             self._combo_yolo_model.addItem(label, path)
 
         if not self._yolo_model_entries:
-            if hasattr(self, "_lbl_yolo_status"):
-                self._lbl_yolo_status.setText("No YOLO models found")
-                self._lbl_yolo_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._set_yolo_status("error", "No YOLO models found")
             return
 
         selected_index = self._preferred_yolo_model_index()
@@ -6206,23 +6615,19 @@ class SentryV2TabWidget(QWidget):
         current_label = self._combo_yolo_model.currentText()
         if current_label:
             self.config.detection_mode.yolo_model_name = current_label
-            if hasattr(self, "_lbl_yolo_status"):
-                self._lbl_yolo_status.setText(f"Ready: {current_label}")
-                self._lbl_yolo_status.setStyleSheet("color: #888; font-size: 10px;")
+            self._set_yolo_status("info", f"Model selected: {current_label}")
 
     def _load_yolo_model(self) -> None:
         """Start a background-thread YOLO model load so the event loop never freezes."""
         model_name = self._combo_yolo_model.currentText().strip()
         model_path = self._combo_yolo_model.currentData()
         if not model_name or not model_path:
-            self._lbl_yolo_status.setText("No model selected")
-            self._lbl_yolo_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._set_yolo_status("error", "No model selected")
             return
         if self._yolo_loading:
             return  # already loading; ignore concurrent request
         self._yolo_loading = True
-        self._lbl_yolo_status.setText(f"Loading {model_name}\u2026")
-        self._lbl_yolo_status.setStyleSheet("color: #d0b060; font-size: 10px;")
+        self._set_yolo_status("pending", f"Loading model: {model_name}")
         self._btn_load_yolo.setEnabled(False)
 
         def _do_load(_path: str = model_path, _name: str = model_name) -> None:
@@ -6244,8 +6649,7 @@ class SentryV2TabWidget(QWidget):
         if self._closing:
             return
         if ok:
-            self._lbl_yolo_status.setText(f"Loaded: {model_name}")
-            self._lbl_yolo_status.setStyleSheet("color: #33cc33; font-size: 10px;")
+            self._set_yolo_status("ok", f"Runtime ready: {model_name}")
             self.config.detection_mode.yolo_model_name = model_name
             try:
                 self.config.save()
@@ -6253,8 +6657,10 @@ class SentryV2TabWidget(QWidget):
                 self._log(f"YOLO selection save failed: {exc}")
             self._log(f"YOLO model loaded: {model_name}")
         else:
-            self._lbl_yolo_status.setText(f"Load FAILED: {model_name}")
-            self._lbl_yolo_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            reason = (err or "unknown error").strip()
+            if len(reason) > 80:
+                reason = reason[:77] + "..."
+            self._set_yolo_status("error", f"Runtime unavailable: {model_name} ({reason})")
             self._log(f"YOLO load failed: {model_name} — {err}")
 
     def _on_yolo_model_selection_changed(self, index: int) -> None:
@@ -6264,9 +6670,23 @@ class SentryV2TabWidget(QWidget):
         if not model_name:
             return
         self.config.detection_mode.yolo_model_name = model_name
-        if not self._lbl_yolo_status.text().startswith("Loaded:"):
-            self._lbl_yolo_status.setText(f"Ready: {model_name}")
-            self._lbl_yolo_status.setStyleSheet("color: #888; font-size: 10px;")
+        if "Runtime ready:" not in self._lbl_yolo_status.text():
+            self._set_yolo_status("info", f"Model selected: {model_name}")
+
+    def _set_yolo_status(self, level: str, message: str) -> None:
+        if not hasattr(self, "_lbl_yolo_status"):
+            return
+        level_key = (level or "info").lower().strip()
+        style_map = {
+            "ok": ("#33cc33", "OK"),
+            "pending": ("#d0b060", "WAIT"),
+            "error": ("#cc3333", "ERR"),
+            "info": ("#8ea4b8", "INFO"),
+        }
+        color, badge = style_map.get(level_key, style_map["info"])
+        self._lbl_yolo_status.setText(f"[{badge}] {message}")
+        self._lbl_yolo_status.setStyleSheet(f"color: {color}; font-size: 10px; font-weight: 600;")
+        self._lbl_yolo_status.setToolTip(message)
 
     def _repo_root_path(self) -> Path:
         return Path(__file__).resolve().parents[2]
@@ -6653,7 +7073,7 @@ class SentryV2TabWidget(QWidget):
             self._spin_center_fire_radius.setValue(max(0.02, min(1.0, radius)))
             self._spin_center_fire_radius.blockSignals(False)
         self._lbl_center_fire_radius_hint.setText(
-            f"Current trigger center radius: {radius:.3f} deg (Pan {enter_pan:.3f}, Tilt {enter_tilt:.3f})"
+            f"Center radius: {radius:.3f} deg (Pan {enter_pan:.3f}, Tilt {enter_tilt:.3f})"
         )
 
     def _on_apply_center_fire_radius(self) -> None:
@@ -6884,7 +7304,62 @@ class SentryV2TabWidget(QWidget):
         pg.scan_speed = self._spin_pir_scan_speed.value()
         pg.confirmation_timeout = self._spin_pir_confirm_timeout.value()
         pg.scan_on_no_detect = self._chk_pir_scan_enabled.isChecked()
+        pg.cross_sensor_lockout_ms = int(self._spin_pir_cross_lockout_ms.value())
         self._push_config()
+
+    def _apply_pir_120_layout(self) -> None:
+        recommended_pans = [270.0, 150.0, 30.0]
+        recommended_tilt = 55.0
+        while len(self.config.pir_guard.sensors) < 3:
+            idx = len(self.config.pir_guard.sensors)
+            self.config.pir_guard.sensors.append(PIRSensorConfig(pin_id=idx, cue_pan=recommended_pans[idx], cue_tilt=recommended_tilt, enabled=True))
+        for idx, pan in enumerate(recommended_pans[:3]):
+            sensor = self.config.pir_guard.sensors[idx]
+            sensor.cue_pan = float(pan)
+            sensor.cue_tilt = float(recommended_tilt)
+            sensor.enabled = True
+            if idx < len(self._pir_spin_cues):
+                pan_spin, tilt_spin, chk_enabled = self._pir_spin_cues[idx]
+                pan_spin.blockSignals(True)
+                pan_spin.setValue(float(pan))
+                pan_spin.blockSignals(False)
+                tilt_spin.blockSignals(True)
+                tilt_spin.setValue(float(recommended_tilt))
+                tilt_spin.blockSignals(False)
+                chk_enabled.blockSignals(True)
+                chk_enabled.setChecked(True)
+                chk_enabled.blockSignals(False)
+        self._spin_pir_scan_pan_range.blockSignals(True)
+        self._spin_pir_scan_pan_range.setValue(20.0)
+        self._spin_pir_scan_pan_range.blockSignals(False)
+        self._spin_pir_scan_tilt_range.blockSignals(True)
+        self._spin_pir_scan_tilt_range.setValue(12.0)
+        self._spin_pir_scan_tilt_range.blockSignals(False)
+        self._spin_pir_cross_lockout_ms.blockSignals(True)
+        self._spin_pir_cross_lockout_ms.setValue(800)
+        self._spin_pir_cross_lockout_ms.blockSignals(False)
+        self._on_pir_settings_changed()
+        self._log("Applied PIR 120° layout: cues=270/150/30, scan pan=20°, tilt=12°, cross-sensor lockout=800ms")
+
+    def _on_pan_tilt_motion_toggled(self, checked: bool) -> None:
+        self._pan_tilt_motion_enabled = bool(checked)
+        self.engine.set_motion_enabled(self._pan_tilt_motion_enabled)
+        self._btn_motion_enable.setText(
+            "Auto Motion: ON" if self._pan_tilt_motion_enabled else "Auto Motion: OFF"
+        )
+        self._btn_motion_enable.setStyleSheet(
+            "font-weight: bold; color: #66dd88;" if self._pan_tilt_motion_enabled else "font-weight: bold; color: #ffae42;"
+        )
+        self._log(
+            "Automatic pan/tilt movement enabled" if self._pan_tilt_motion_enabled else "Automatic pan/tilt movement disabled; manual arrows/Home/Move to Guard still remain active"
+        )
+
+    def _pan_tilt_motion_blocked(self, reason: str) -> bool:
+        if self._pan_tilt_motion_enabled:
+            return False
+        self._log(reason)
+        self._refresh_status()
+        return True
 
     def _update_pir_status_display(self) -> None:
         """Update PIR status label in Guard tab."""
@@ -6929,7 +7404,7 @@ class SentryV2TabWidget(QWidget):
         self._btn_mask_undo.setEnabled(draft_count > 0)
         self._btn_mask_clear.setEnabled(draft_count > 0)
         self._btn_mask_capture.setText(
-            "Stop Vertex Capture" if self._mask_capture_active else "Capture Vertices From Video"
+            "Stop Capture" if self._mask_capture_active else "Capture From Video"
         )
 
     def _on_mask_capture_toggled(self, checked: bool) -> None:
@@ -7044,6 +7519,7 @@ class SentryV2TabWidget(QWidget):
             self._set_master_profile_label(self._match_master_profile_name())
             self._update_master_stack_summary()
         self._push_config()
+        self._save_config_quietly()
         self._log(f"Auto-trigger: {'ON' if checked else 'OFF'}")
 
     def _on_trigger_mode_changed(self, index: int) -> None:
@@ -7063,7 +7539,8 @@ class SentryV2TabWidget(QWidget):
             self._set_master_profile_label(self._match_master_profile_name())
             self._update_master_stack_summary()
         self._push_config()
-        mode_name = "Projectile (BB)" if is_bb else "Water (MOSFET)"
+        self._save_config_quietly()
+        mode_name = "Projectile (ESP32 GPIO13 Servo)" if is_bb else "Water (MOSFET)"
         self._log(f"Trigger mode: {mode_name}")
 
     # ------------------------------------------------------------------ #
@@ -7080,7 +7557,7 @@ class SentryV2TabWidget(QWidget):
         if self._host_controls_hardware():
             self.manual_move_requested.emit(int(pan_dir * step), int(tilt_dir * step))
         else:
-            self._queue_move_command(new_pan, new_tilt, move_time_ms=self._get_manual_move_time_ms())
+            self._queue_move_command(new_pan, new_tilt, move_time_ms=self._get_manual_move_time_ms(), manual_override=True)
         self._remember_commanded_position(new_pan, new_tilt)
         self._suppress_motion_detection()
         self._refresh_status()
@@ -7089,12 +7566,11 @@ class SentryV2TabWidget(QWidget):
         pan = self._spin_guard_pan.value()
         tilt = self._spin_guard_tilt.value()
         pan, tilt = self._clamp_manual_angles(pan, tilt)
-        self.engine.current_pan = pan
-        self.engine.current_tilt = tilt
+        self.engine.hold_current_guard_position(pan, tilt)
         if self._host_controls_hardware():
             self.turret_move_requested.emit(float(pan), float(tilt))
         else:
-            self._queue_move_command(pan, tilt, move_time_ms=self._get_manual_move_time_ms())
+            self._queue_move_command(pan, tilt, move_time_ms=self._get_manual_move_time_ms(), manual_override=True)
         self._remember_commanded_position(pan, tilt)
         self._suppress_motion_detection()
         self._refresh_status()
@@ -7143,6 +7619,17 @@ class SentryV2TabWidget(QWidget):
             return
         pan = self.engine.current_pan
         tilt = self.engine.current_tilt
+        if state and not self._host_controls_hardware():
+            if not self._comm.trigger_mode_bb:
+                self._log("Manual fire note: trigger mode is Water (MOSFET), not Projectile (ESP32 GPIO13 Servo)")
+            if (
+                getattr(self._comm, "_mode", None) == self._comm.MODE_WIFI_DEBUG_USB
+                and (
+                    getattr(self._comm, "_sock", None) is None
+                    or getattr(self._comm, "_udp_target", None) is None
+                )
+            ):
+                self._log("Manual fire unavailable: mode 2 routes trigger IO to ESP32 WiFi/GPIO13, and the WiFi link is not connected")
         if self._host_controls_hardware():
             self.manual_fire_requested.emit(int(state))
         else:
@@ -7156,12 +7643,11 @@ class SentryV2TabWidget(QWidget):
         pan = self._spin_guard_pan.value()
         tilt = self._spin_guard_tilt.value()
         pan, tilt = self._clamp_manual_angles(pan, tilt)
-        self.engine.current_pan = pan
-        self.engine.current_tilt = tilt
+        self.engine.hold_current_guard_position(pan, tilt)
         if self._host_controls_hardware():
             self.turret_move_requested.emit(float(pan), float(tilt))
         else:
-            self._queue_move_command(pan, tilt, move_time_ms=self._get_manual_move_time_ms())
+            self._queue_move_command(pan, tilt, move_time_ms=self._get_manual_move_time_ms(), manual_override=True)
         self._remember_commanded_position(pan, tilt)
         self._suppress_motion_detection()
         self._refresh_status()
@@ -7205,7 +7691,6 @@ class SentryV2TabWidget(QWidget):
             cc.camera_height = selected_height
             cc.webcam_zoom_pct = int(self._slider_webcam_zoom.value())
             cc.test_source_zoom_pct = int(self._slider_test_zoom.value())
-            self.config.settings_panel_width = int(self._slider_panel_width.value())
             self.config.prompted_targets_enabled = bool(getattr(self, "_chk_prompted_enabled", None) and self._chk_prompted_enabled.isChecked())
             self.config.prompted_allow_auto_fire = bool(getattr(self, "_chk_prompted_auto_fire", None) and self._chk_prompted_auto_fire.isChecked())
             self.config.prompted_library_path = self._portable_path_string(self._resolved_prompted_library_path())
@@ -7215,6 +7700,13 @@ class SentryV2TabWidget(QWidget):
             self._log(f"Settings saved: {self.config.config_path}")
         except Exception as e:
             self._log(f"Save error: {e}")
+
+    def _save_config_quietly(self) -> None:
+        try:
+            self.config.config_path = "app/config/sentry_v2_settings.json"
+            self.config.save(str(SENTRY_V2_SETTINGS_PATH))
+        except Exception as exc:
+            self._log(f"Save error: {exc}")
 
     def _resolved_prompted_library_path(self) -> Path:
         configured = Path(str(self.config.prompted_library_path or "app/config/sentry_v2_prompted_targets.json"))
@@ -7506,22 +7998,15 @@ class SentryV2TabWidget(QWidget):
     def _get_main_window(self):
         return self._main_window_ref
 
-    def _on_panel_width_changed(self, value: int) -> None:
-        width = int(value)
-        self.config.settings_panel_width = width
-        self._lbl_panel_width.setText(f"{width} px")
-        self._apply_panel_width(width)
-        self._reflow_all_responsive_button_grids()
-
-    def _apply_saved_panel_width(self) -> None:
-        self._apply_panel_width(int(self.config.settings_panel_width))
+    def _apply_default_panel_width(self) -> None:
+        self._apply_panel_width(SENTRY_V2_PANEL_DEFAULT_WIDTH)
 
     def _apply_panel_width(self, width: int) -> None:
-        width = max(320, min(820, int(width)))
+        width = max(SENTRY_V2_PANEL_MIN_WIDTH, int(width))
         total_width = self._main_splitter.size().width()
         if total_width <= 0:
-            total_width = max(self.width(), width + 720)
-        left_width = max(480, total_width - width)
+            total_width = max(self.width(), width + SENTRY_V2_VIDEO_MIN_WIDTH)
+        left_width = max(SENTRY_V2_VIDEO_MIN_WIDTH, total_width - width)
         self._main_splitter.setSizes([left_width, width])
         self._reflow_all_responsive_button_grids()
 
@@ -8564,8 +9049,12 @@ class SentryV2TabWidget(QWidget):
         *,
         fire: int = 0,
         move_time_ms: Optional[int] = None,
+        manual_override: bool = False,
     ) -> None:
         if self._closing:
+            return
+        # CHANGE WARNING: automatic motion-disable must not strand manual recovery controls.
+        if not self._pan_tilt_motion_enabled and not manual_override:
             return
         move_time = int(self._get_manual_move_time_ms() if move_time_ms is None else move_time_ms)
         with self._pending_move_lock:
@@ -8576,8 +9065,8 @@ class SentryV2TabWidget(QWidget):
             return
         try:
             self._comm_task_queue.put_nowait((task_name, args, kwargs))
-        except Exception:
-            pass
+        except Exception as exc:
+            self._report_runtime_warning(f"Comm task enqueue failed ({task_name})", exc)
 
     def _comm_worker_loop(self) -> None:
         while not self._comm_worker_stop.is_set():
@@ -8925,6 +9414,22 @@ class SentryV2TabWidget(QWidget):
     def _refresh_status(self) -> None:
         """Periodic status label update."""
         stats = self.engine.get_engagement_stats()
+
+        detector_error = str(getattr(self, "_last_detector_error", "") or "").strip()
+        if detector_error and detector_error != getattr(self, "_last_detector_error_seen", ""):
+            self._last_detector_error_seen = detector_error
+            self._log(f"[WARN] Detector worker error: {detector_error}")
+
+        # YOLO-mode-active-but-not-loaded warning — emit once per 10s to log so it's visible
+        _yolo_modes = {2, 4, 5, 9, 10}
+        cur_det_mode = self.config.detection_mode.detection_mode
+        if cur_det_mode in _yolo_modes and not getattr(self._detector, "_yolo_loaded", False):
+            now = __import__("time").monotonic()
+            if now - getattr(self, "_last_yolo_warn_t", 0.0) > 10.0:
+                self._last_yolo_warn_t = now
+                self._log("[WARN] YOLO detection active but no model loaded — load a model in the Detection tab")
+                self._set_yolo_status("error", "YOLO mode active but no model loaded — click Load in Detection tab")
+
         self._lbl_state.setText(f"State: {stats['state']}")
         self._lbl_stats.setText(
             f"Targets: {stats['targets_visible']} | "
@@ -8933,7 +9438,8 @@ class SentryV2TabWidget(QWidget):
             f"Err P/T: {stats['last_err_pan_deg']:+.2f}/{stats['last_err_tilt_deg']:+.2f} | "
             f"Lock: {stats['aim_lock_frames']} | "
             f"Move: {int(getattr(self, '_last_tracking_move_time_ms', 0))}ms | "
-            f"Suppress: {float(getattr(self, '_last_tracking_suppression_s', 0.0)):.2f}s"
+            f"Suppress: {float(getattr(self, '_last_tracking_suppression_s', 0.0)):.2f}s | "
+            f"Pan/Tilt: {'ON' if stats.get('motion_enabled', True) else 'OFF'}"
         )
         current_pan = float(self.engine.current_pan)
         current_tilt = float(self.engine.current_tilt)
@@ -8954,6 +9460,19 @@ class SentryV2TabWidget(QWidget):
             else:
                 self._lbl_no_fire_status.setText("No-fire mask: clear")
                 self._lbl_no_fire_status.setStyleSheet("font-weight: bold; color: #8fe3c4;")
+        if hasattr(self, "_lbl_recovery_status"):
+            loss_phase = str(stats.get('loss_recovery_phase') or '').strip()
+            if loss_phase:
+                phase_text = loss_phase.replace('_', ' ').title()
+                reacquire_note = str(stats.get('reacquire_note') or '').strip()
+                if reacquire_note:
+                    self._lbl_recovery_status.setText(f"Recovery: {phase_text} | Note: {reacquire_note}")
+                else:
+                    self._lbl_recovery_status.setText(f"Recovery: {phase_text}")
+                self._lbl_recovery_status.setStyleSheet("font-weight: bold; color: #ffd27a;")
+            else:
+                self._lbl_recovery_status.setText("Recovery: idle")
+                self._lbl_recovery_status.setStyleSheet("font-weight: bold; color: #97a8b8;")
         if blocked_mask != self._last_blocked_mask_seen:
             if blocked_mask:
                 self._log(f"No-fire mask active: {blocked_mask}")
@@ -9015,3 +9534,13 @@ class SentryV2TabWidget(QWidget):
         # Auto-scroll
         sb = self._log_text.verticalScrollBar()
         sb.setValue(sb.maximum())
+
+    def _report_runtime_warning(self, context: str, exc: Exception) -> None:
+        message = f"{context}: {exc}"
+        try:
+            if hasattr(self, "_log_text") and self._log_text is not None and not self._closing:
+                self._log(f"[WARN] {message}")
+                return
+        except Exception:
+            pass
+        print(f"[SENTRY_V2_TAB] {message}", flush=True)

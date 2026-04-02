@@ -7,6 +7,9 @@ from typing import Dict, List, Optional, Tuple
 from .target_filter import DetectedObject
 
 
+NON_SEMANTIC_TRACK_CLASSES = {"motion", "foreground", "color", "moving_object", "unknown", ""}
+
+
 @dataclass
 class _TrackState:
     track_id: int
@@ -51,17 +54,22 @@ class SimpleBBoxTracker:
                 track = self._tracks[track_id]
                 for det_idx in unmatched_det_indices:
                     det = detections[det_idx]
-                    if det.class_name != track.class_name:
-                        continue
                     dist = math.hypot(det.center_x - track.center_x, det.center_y - track.center_y)
-                    if dist > self._match_distance_limit(track, det):
+                    match_limit = self._match_distance_limit(track, det)
+                    if dist > match_limit:
                         continue
                     iou = self._bbox_iou(det.bbox, track.bbox)
                     area_cost = abs(self._bbox_area(det.bbox) - self._bbox_area(track.bbox)) / max(
                         1.0,
                         float(max(self._bbox_area(det.bbox), self._bbox_area(track.bbox))),
                     )
+                    class_penalty = 0.0
+                    if det.class_name != track.class_name:
+                        if not self._allow_class_transition(track, det, dist, iou, match_limit, area_cost):
+                            continue
+                        class_penalty = 28.0
                     cost = dist - (iou * 35.0) + (area_cost * 25.0)
+                    cost += class_penalty
                     if cost < best_cost:
                         best_cost = cost
                         best_pair = (track_id, det_idx)
@@ -138,6 +146,25 @@ class SimpleBBoxTracker:
         det_diag = math.hypot(float(det.bbox[2]), float(det.bbox[3]))
         dynamic_limit = 0.60 * max(track_diag, det_diag)
         return max(float(self.max_match_distance_px), dynamic_limit)
+
+    def _allow_class_transition(
+        self,
+        track: _TrackState,
+        det: DetectedObject,
+        dist: float,
+        iou: float,
+        match_limit: float,
+        area_cost: float,
+    ) -> bool:
+        track_class = str(track.class_name or "").strip().lower()
+        det_class = str(det.class_name or "").strip().lower()
+        if track_class in NON_SEMANTIC_TRACK_CLASSES or det_class in NON_SEMANTIC_TRACK_CLASSES:
+            return True
+        if iou >= 0.55 and dist <= (match_limit * 0.45):
+            return True
+        if iou >= 0.35 and area_cost <= 0.35 and dist <= (match_limit * 0.28):
+            return True
+        return False
 
     @staticmethod
     def _bbox_area(bbox: Tuple[int, int, int, int]) -> float:

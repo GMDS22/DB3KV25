@@ -116,7 +116,7 @@ class SentryV2Comm:
         self.pan_servo_id: int = 1
         self.tilt_servo_id: int = 2
         self.bus_servo_time_ms: int = 20
-        self._bus_checksum_mode: str = "auto"  # "auto", "sub", or "xor"
+        self._bus_checksum_mode: str = "sub"  # "auto", "sub", or "xor"
         self._bus_servo_ping_ok: bool = False
 
         # Diagnostics
@@ -129,6 +129,10 @@ class SentryV2Comm:
         
         # PIR event callback (called when sensor data is received)
         self._on_pir_event: Optional[Callable[[int, float], None]] = None
+
+    def _report_runtime_warning(self, context: str, exc: Exception) -> None:
+        self._last_error = f"{context}: {exc}"
+        print(f"[SENTRY_V2_COMM] {self._last_error}", flush=True)
 
     # ------------------------------------------------------------------ #
     #  Port scanning
@@ -180,7 +184,11 @@ class SentryV2Comm:
                     if checksum_mode is not None:
                         self._connect_details["Debug Board"] = (True, f"{debug_port} ({checksum_mode} checksum)")
                     else:
-                        self._connect_details["Debug Board"] = (True, f"{debug_port} (auto checksum fallback)")
+                        # USB port opened and the board is connected, but the quick
+                        # servo ping probe is not authoritative for all board/servo
+                        # combinations.  Keep the connection green and mark the probe
+                        # as inconclusive rather than implying the servos are broken.
+                        self._connect_details["Debug Board"] = (True, f"{debug_port} (servo probe inconclusive)")
                 else:
                     self._connect_details["Debug Board"] = (False, bus_err)
 
@@ -219,7 +227,11 @@ class SentryV2Comm:
                     if checksum_mode is not None:
                         self._connect_details["Debug Board"] = (True, f"{debug_port} ({checksum_mode} checksum)")
                     else:
-                        self._connect_details["Debug Board"] = (True, f"{debug_port} (auto checksum fallback)")
+                        # USB port opened and the board is connected, but the quick
+                        # servo ping probe is not authoritative for all board/servo
+                        # combinations.  Keep the connection green and mark the probe
+                        # as inconclusive rather than implying the servos are broken.
+                        self._connect_details["Debug Board"] = (True, f"{debug_port} (servo probe inconclusive)")
                 else:
                     self._connect_details["Debug Board"] = (False, bus_err)
 
@@ -232,10 +244,13 @@ class SentryV2Comm:
                 elif not ok_bus:
                     self._last_error = f"Debug board failed: {bus_err}"
                 elif not ok_udp:
-                    self._last_error = f"WiFi failed: {udp_err}"
+                    self._last_error = f"WiFi failed (Debug Board still connected): {udp_err}"
                 if ok_udp:
                     self._start_receiver()
-                return ok_bus and ok_udp
+                # In WiFi+Debug mode, Debug Board is the critical movement link.
+                # Allow degraded operation when WiFi is down so manual movement
+                # and tracking-to-servo can still run.
+                return ok_bus
 
             elif self._mode == self.MODE_WIFI_FULL:
                 ok = self._open_udp(udp_host, udp_port)
@@ -299,6 +314,9 @@ class SentryV2Comm:
                     break
                 except Exception as e:
                     last_error = str(e)
+                    err_text = str(e).lower()
+                    if "access is denied" in err_text or "permissionerror" in err_text:
+                        last_error = f"{normalized_port} is already in use by another process ({e})"
                     ser = None
 
             if ser is None:
@@ -318,6 +336,21 @@ class SentryV2Comm:
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.setblocking(False)
+            # Reachability probe: on a non-blocking UDP socket, sendto raises
+            # OSError (WSAENETUNREACH/ENETUNREACH) immediately if there is no
+            # route to the host's network — e.g. the ESP32 WiFi AP is off and
+            # the PC has no 192.168.4.x interface.  If a route exists (even if
+            # the ESP32 is busy/not yet listening) the send succeeds silently,
+            # which is the expected UDP fire-and-forget behaviour.
+            try:
+                sock.sendto(b"ping", (host, int(port)))
+            except OSError as _probe_err:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+                self._last_error = f"WiFi host unreachable ({host}:{port}): {_probe_err}"
+                return False
             self._sock = sock
             self._udp_target = (host, int(port))
             return True
@@ -445,10 +478,7 @@ class SentryV2Comm:
                 and self._bus_ser is not None and self._bus_ser.is_open
             )
         elif m == self.MODE_WIFI_DEBUG_USB:
-            return (
-                self._bus_ser is not None and self._bus_ser.is_open
-                and self._sock is not None and self._udp_target is not None
-            )
+            return self._bus_ser is not None and self._bus_ser.is_open
         elif m == self.MODE_WIFI_FULL:
             return self._sock is not None and self._udp_target is not None
         elif m == self.MODE_DUAL_ESP32_WIFI:
@@ -467,7 +497,9 @@ class SentryV2Comm:
         elif m == self.MODE_DUAL_USB:
             return f"ESP32: {self._ser.port} | Debug: {self._bus_ser.port}"
         elif m == self.MODE_WIFI_DEBUG_USB:
-            return f"WiFi: {self._udp_target[0]}:{self._udp_target[1]} | Debug: {self._bus_ser.port}"
+            if self._udp_target is not None:
+                return f"WiFi: {self._udp_target[0]}:{self._udp_target[1]} | Debug: {self._bus_ser.port}"
+            return f"Debug: {self._bus_ser.port} | WiFi: unavailable"
         elif m == self.MODE_WIFI_FULL:
             return f"WiFi: {self._udp_target[0]}:{self._udp_target[1]} (full)"
         elif m == self.MODE_DUAL_ESP32_WIFI:
@@ -665,8 +697,8 @@ class SentryV2Comm:
             return
         try:
             callback(int(sensor_id), float(timestamp))
-        except Exception:
-            pass
+        except Exception as exc:
+            self._report_runtime_warning("PIR event callback failed", exc)
 
     def send_movement(
         self,
@@ -684,11 +716,22 @@ class SentryV2Comm:
         if m == self.MODE_ESP32_USB:
             return self._send_ascii(pan_out, tilt_out, fire=0, via_serial=True)
         if m == self.MODE_DUAL_USB:
-            return self._send_bus_servo(pan_out, tilt_out, move_time_ms=move_time_ms)
+            ok_bus = self._send_bus_servo(pan_out, tilt_out, move_time_ms=move_time_ms)
+            if ok_bus:
+                self._send_io_serial(0)
+            return ok_bus
         if m == self.MODE_WIFI_DEBUG_USB:
-            return self._send_bus_servo(pan_out, tilt_out, move_time_ms=move_time_ms)
+            ok_bus = self._send_bus_servo(pan_out, tilt_out, move_time_ms=move_time_ms)
+            if ok_bus:
+                # Keep mode-2 movement aligned with the earlier working path by
+                # refreshing the IO-side safety/mode state when WiFi is present,
+                # while still allowing pan/tilt movement to succeed if WiFi drops.
+                self._send_io_udp(0)
+            return ok_bus
         if m == self.MODE_WIFI_FULL:
             return self._send_wifi_full(pan_out, tilt_out, fire=0, move_time_ms=move_time_ms)
+        if m == self.MODE_DUAL_ESP32_WIFI:
+            return self._send_servo_udp(pan_out, tilt_out, move_time_ms=move_time_ms)
         return False
 
     def send_fire_burst(
@@ -872,7 +915,7 @@ class SentryV2Comm:
     def _probe_bus_servo_checksum(self, active_ser: Optional[_serial.Serial]) -> Optional[str]:
         if active_ser is None or not active_ser.is_open:
             self._bus_servo_ping_ok = False
-            self._bus_checksum_mode = "auto"
+            self._bus_checksum_mode = "sub"
             return None
 
         original_mode = str(self._bus_checksum_mode or "auto")
@@ -885,11 +928,11 @@ class SentryV2Comm:
                         self._bus_servo_ping_ok = True
                         return mode
             self._bus_servo_ping_ok = False
-            self._bus_checksum_mode = "auto"
+            self._bus_checksum_mode = original_mode if original_mode in ("sub", "xor") else "sub"
             return None
         finally:
             if self._bus_checksum_mode not in ("sub", "xor"):
-                self._bus_checksum_mode = original_mode if original_mode in ("auto", "sub", "xor") else "auto"
+                self._bus_checksum_mode = original_mode if original_mode in ("sub", "xor") else "sub"
 
     def _build_servo_packet(self, servo_id: int, pos_ticks: int, time_ms: int) -> bytes:
         """Build a write-position packet (register 0x2A)."""

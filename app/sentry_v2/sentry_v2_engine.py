@@ -32,6 +32,7 @@ from .precision_tuning_logger import PrecisionTuningLogger
 
 
 NON_SEMANTIC_REACQUIRE_CLASSES = {"moving_object", "motion", "foreground", "color", "unknown"}
+NON_SEMANTIC_PREDICTION_CLASSES = NON_SEMANTIC_REACQUIRE_CLASSES | {""}
 
 
 class SentryV2State(Enum):
@@ -90,6 +91,12 @@ class SentryV2Engine:
         self._target_lost_since: float = 0.0
         self._active_target_last_center: Optional[Tuple[float, float]] = None
         self._active_target_last_bbox: Optional[Tuple[int, int, int, int]] = None
+        self._active_target_last_heading_norm: Tuple[float, float] = (0.0, 0.0)
+        self._active_target_last_seen_time: float = 0.0
+        self._active_target_last_aim_pan: float = self.current_pan
+        self._active_target_last_aim_tilt: float = self.current_tilt
+        self._active_target_last_class: str = ""
+        self._active_target_last_source: str = ""
         self._last_err_pan_deg: float = 0.0
         self._last_err_tilt_deg: float = 0.0
         self._err_pan_rate_deg_s: float = 0.0
@@ -101,6 +108,11 @@ class SentryV2Engine:
         self._last_reacquire_note: str = ""
         self._last_reacquire_time: float = 0.0
         self._last_no_fire_mask_name: str = ""
+        self._loss_recovery_phase: str = ""
+        self._loss_recovery_anchor_pan: float = self.current_pan
+        self._loss_recovery_anchor_tilt: float = self.current_tilt
+        self._loss_recovery_last_move_time: float = 0.0
+        self._loss_recovery_search_index: int = 0
 
         # Precision logging session tracking
         self._current_precision_engagement_id: Optional[str] = None
@@ -148,6 +160,7 @@ class SentryV2Engine:
         self._cb_fire: Optional[Callable[[int], None]] = None
         self._cb_move: Optional[Callable[[float, float], None]] = None
         self._cb_state: Optional[Callable[[SentryV2State, SentryV2State], None]] = None
+        self._motion_enabled: bool = True
 
     # ------------------------------------------------------------------ #
     # Callback registration
@@ -162,11 +175,20 @@ class SentryV2Engine:
     def on_state_change(self, cb: Callable[[SentryV2State, SentryV2State], None]) -> None:
         self._cb_state = cb
 
+    def _report_runtime_warning(self, context: str, exc: Exception) -> None:
+        print(f"[SENTRY_V2_ENGINE] {context}: {exc}", flush=True)
+
     def set_precision_logging_enabled(self, enabled: bool) -> None:
         """Enable or disable precision aiming tuning logger."""
         self._log_precision_tuning = bool(enabled)
         if enabled:
             self._precision_logging_faulted = False
+
+    def set_motion_enabled(self, enabled: bool) -> None:
+        self._motion_enabled = bool(enabled)
+
+    def is_motion_enabled(self) -> bool:
+        return bool(self._motion_enabled)
 
     def is_precision_logging_enabled(self) -> bool:
         """Check if precision logging is currently enabled."""
@@ -194,22 +216,60 @@ class SentryV2Engine:
         self._change_state(SentryV2State.GUARDING)
         self._move_turret(self.cfg.guard.guard_pan, self.cfg.guard.guard_tilt)
 
-    def stop(self) -> None:
-        self._change_state(SentryV2State.PAUSED)
+    def _reset_runtime_state(self) -> None:
         self._filter.reset()
-        if self._log_precision_tuning and self._current_precision_engagement_id:
-            self._precision_logger.end_engagement()
-            self._current_precision_engagement_id = None
         self._queue.clear()
+        self.last_queue = []
+        self.last_targets = []
+        self.last_qualified = []
         self._queue_index = 0
         self.active_order = None
         self._reset_precision_state()
         self._active_target_last_center = None
         self._active_target_last_bbox = None
+        self._active_target_last_heading_norm = (0.0, 0.0)
+        self._active_target_last_seen_time = 0.0
+        self._active_target_last_aim_pan = self.current_pan
+        self._active_target_last_aim_tilt = self.current_tilt
+        self._active_target_last_class = ""
+        self._active_target_last_source = ""
         self._last_err_pan_deg = 0.0
         self._last_err_tilt_deg = 0.0
         self._last_reacquire_note = ""
         self._last_reacquire_time = 0.0
+        self._return_start = 0.0
+        self._reset_loss_recovery_state()
+        self._pir_cue_mode = False
+        self._pir_scan_mode = False
+        self._pir_scan_awaiting_settle = False
+        self._pir_settle_start = 0.0
+        self._pir_manager.cancel_active_cue()
+        self._patrol_target_pan = self.current_pan
+        self._patrol_target_tilt = self.current_tilt
+        self._patrol_sweep_dir = 1
+        self._patrol_wp_index = 0
+        self._patrol_dwell_start = 0.0
+        self._patrol_dwelling = False
+        self._patrol_last_update = 0.0
+        self._patrol_initialized = False
+        if self._log_precision_tuning and self._current_precision_engagement_id:
+            self._precision_logger.end_engagement()
+            self._current_precision_engagement_id = None
+
+    def hold_current_guard_position(self, pan: Optional[float] = None, tilt: Optional[float] = None) -> None:
+        if pan is not None or tilt is not None:
+            target_pan = self.current_pan if pan is None else float(pan)
+            target_tilt = self.current_tilt if tilt is None else float(tilt)
+            self.current_pan, self.current_tilt = self._clamp_angles(target_pan, target_tilt)
+        self.cfg.guard.guard_pan = self.current_pan
+        self.cfg.guard.guard_tilt = self.current_tilt
+        self._reset_runtime_state()
+        self._last_engage_time = time.time()
+        self._change_state(SentryV2State.GUARDING)
+
+    def stop(self) -> None:
+        self._change_state(SentryV2State.PAUSED)
+        self._reset_runtime_state()
 
     # ------------------------------------------------------------------ #
     # Config hot-reload
@@ -263,6 +323,38 @@ class SentryV2Engine:
         """Called when a PIR sensor event is received from ESP32."""
         now = timestamp or time.time()
         self._pir_manager.on_pir_event(sensor_id, now)
+
+        # PIR is a blind-spot cueing input, not a higher-priority override than a
+        # camera-confirmed active engagement. Queue the PIR event immediately, but
+        # only convert it into motion outside live ENGAGING tracking.
+        if self.state == SentryV2State.PAUSED or not self.cfg.pir_guard.pir_enabled:
+            return
+
+        if self.state == SentryV2State.ENGAGING:
+            return
+
+        cue = self._pir_manager.get_next_cue(now)
+        if cue is None:
+            return
+
+        if self.state == SentryV2State.RETURNING:
+            self._queue.clear()
+            self._queue_index = 0
+            self.active_order = None
+            self._reset_precision_state()
+            if self._log_precision_tuning and self._current_precision_engagement_id:
+                self._precision_logger.end_engagement()
+                self._current_precision_engagement_id = None
+            self._change_state(SentryV2State.GUARDING)
+
+        self._pir_cue_mode = True
+        self._pir_cue_pan = cue.cue_pan
+        self._pir_cue_tilt = cue.cue_tilt
+        self._pir_cue_slew_start = now
+        self._pir_scan_mode = False
+        self._pir_scan_awaiting_settle = False
+        self._pir_settle_start = 0.0
+        self._move_turret(self._pir_cue_pan, self._pir_cue_tilt)
 
     # ------------------------------------------------------------------ #
     # GUARDING state
@@ -455,6 +547,10 @@ class SentryV2Engine:
             if target_det is None:
                 if self._target_lost_since <= 0.0:
                     self._target_lost_since = now
+                    if self._loss_recovery_enabled():
+                        self._start_loss_recovery(now)
+                if self._loss_recovery_enabled():
+                    self._update_loss_recovery(now)
                 if (now - self._target_lost_since) >= self.cfg.engagement.target_loss_timeout:
                     if bool(getattr(self.cfg.engagement, "continuous_hunt_on_loss", False)):
                         # Stay in precision/hunt mode and keep trying to reacquire
@@ -466,21 +562,23 @@ class SentryV2Engine:
                     self._advance_queue(now)
                 return
             self._target_lost_since = 0.0
+            self._reset_loss_recovery_state()
 
-            raw_err_pan, raw_err_tilt = self._compute_target_angle_error(target_det)
+            aim_err_pan, aim_err_tilt = self._compute_tracking_angle_error(target, now, for_fire=False)
             corr_pan, corr_tilt, lock_pan, lock_tilt = self._compute_visual_servo_correction(
-                raw_err_pan,
-                raw_err_tilt,
+                aim_err_pan,
+                aim_err_tilt,
                 use_fire_limits=False,
             )
-            self._update_error_rates(raw_err_pan, raw_err_tilt, now)
-            self._last_err_pan_deg = float(raw_err_pan)
-            self._last_err_tilt_deg = float(raw_err_tilt)
+            self._update_error_rates(aim_err_pan, aim_err_tilt, now)
+            self._last_err_pan_deg = float(aim_err_pan)
+            self._last_err_tilt_deg = float(aim_err_tilt)
+            self._record_active_target_solution(target, now, aim_err_pan, aim_err_tilt)
 
             if self._log_precision_tuning:
                 eng = self.cfg.engagement
-                target_pan = self.current_pan + raw_err_pan
-                target_tilt = self.current_tilt + raw_err_tilt
+                target_pan = self.current_pan + aim_err_pan
+                target_tilt = self.current_tilt + aim_err_tilt
                 deadzone_pan = float(eng.precision_deadzone_pan_deg)
                 deadzone_tilt = float(eng.precision_deadzone_tilt_deg)
                 within_deadzone = abs(lock_pan) <= deadzone_pan and abs(lock_tilt) <= deadzone_tilt
@@ -538,7 +636,17 @@ class SentryV2Engine:
             tracked_target = self._find_active_target(order)
             tracked_det = tracked_target.det if tracked_target is not None else None
             if tracked_det is not None:
-                self._last_err_pan_deg, self._last_err_tilt_deg = self._compute_target_angle_error(tracked_det)
+                self._last_err_pan_deg, self._last_err_tilt_deg = self._compute_tracking_angle_error(
+                    tracked_target,
+                    now,
+                    for_fire=True,
+                )
+                self._record_active_target_solution(
+                    tracked_target,
+                    now,
+                    self._last_err_pan_deg,
+                    self._last_err_tilt_deg,
+                )
                 if self.cfg.engagement.fire_micro_adjust_enabled:
                     if self._should_return_to_precision(self._last_err_pan_deg, self._last_err_tilt_deg):
                         self._engage_phase = "precision"
@@ -622,13 +730,13 @@ class SentryV2Engine:
     def _find_active_target(self, order: EngagementOrder) -> Optional[TrackedTarget]:
         for target in self.last_targets:
             if target.det.track_id == order.target.det.track_id:
-                self._remember_active_target(target.det)
+                self._remember_active_target(target.det, target=target)
                 return target
         reacquired = self._find_reacquire_target(order)
         if reacquired is not None:
             old_track_id = int(order.target.det.track_id)
             order.target = reacquired
-            self._remember_active_target(reacquired.det)
+            self._remember_active_target(reacquired.det, target=reacquired)
             new_track_id = int(reacquired.det.track_id)
             if new_track_id != old_track_id:
                 self._last_reacquire_note = f"reacquire {old_track_id}->{new_track_id}"
@@ -649,9 +757,17 @@ class SentryV2Engine:
         anchor_source = str(order.target.det.source or "").strip().lower()
         frame_w = float(max(1, self.cfg.guard.frame_width))
         frame_h = float(max(1, self.cfg.guard.frame_height))
+        loss_age = max(0.0, time.time() - float(self._active_target_last_seen_time or 0.0))
+        heading_x, heading_y = self._active_target_heading_norm(loss_age)
+        if loss_age > 0.0:
+            anchor_center = (
+                max(0.0, min(frame_w, anchor_center[0] + (heading_x * frame_w * loss_age))),
+                max(0.0, min(frame_h, anchor_center[1] + (heading_y * frame_h * loss_age))),
+            )
         anchor_diag = ((float(anchor_bbox[2]) ** 2) + (float(anchor_bbox[3]) ** 2)) ** 0.5
         anchor_area = self._bbox_area(anchor_bbox)
         reacquire_radius_px = max(72.0, min(frame_w, frame_h) * 0.16, anchor_diag * 0.60)
+        reacquire_radius_px *= min(1.9, 1.0 + (loss_age * 1.35))
 
         best_target: Optional[TrackedTarget] = None
         best_cost = float("inf")
@@ -690,9 +806,23 @@ class SentryV2Engine:
             return None
         return best_target
 
-    def _remember_active_target(self, det: DetectedObject) -> None:
+    def _remember_active_target(
+        self,
+        det: DetectedObject,
+        *,
+        target: Optional[TrackedTarget] = None,
+        timestamp: Optional[float] = None,
+    ) -> None:
         self._active_target_last_center = (float(det.center_x), float(det.center_y))
         self._active_target_last_bbox = tuple(int(v) for v in det.bbox)
+        if target is not None:
+            self._active_target_last_heading_norm = (float(target.heading_x), float(target.heading_y))
+            self._active_target_last_class = str(target.det.class_name or "").strip().lower()
+            self._active_target_last_source = str(target.det.source or "").strip().lower()
+        else:
+            self._active_target_last_class = str(det.class_name or "").strip().lower()
+            self._active_target_last_source = str(det.source or "").strip().lower()
+        self._active_target_last_seen_time = float(timestamp or time.time())
 
     @staticmethod
     def _bbox_iou(a: Tuple[int, int, int, int], b: Tuple[int, int, int, int]) -> float:
@@ -743,9 +873,10 @@ class SentryV2Engine:
             return
         try:
             self._precision_logger.log_frame(**kwargs)
-        except Exception:
+        except Exception as exc:
             self._precision_logging_faulted = True
             self._log_precision_tuning = False
+            self._report_runtime_warning("Precision frame logging disabled after logger failure", exc)
 
     def _current_no_fire_mask(self) -> Optional[object]:
         mask = find_blocking_mask(self.cfg.no_fire_masks, self.current_pan, self.current_tilt)
@@ -758,7 +889,7 @@ class SentryV2Engine:
         if self._queue_index < len(self._queue):
             nxt = self._queue[self._queue_index]
             self.active_order = nxt
-            self._remember_active_target(nxt.target.det)
+            self._remember_active_target(nxt.target.det, target=nxt.target, timestamp=now)
             self._start_order_engagement(nxt, now)
         else:
             self._last_engage_time = now
@@ -766,11 +897,16 @@ class SentryV2Engine:
             self.active_order = None
             self._active_target_last_center = None
             self._active_target_last_bbox = None
+            self._active_target_last_heading_norm = (0.0, 0.0)
+            self._active_target_last_seen_time = 0.0
+            self._active_target_last_class = ""
+            self._active_target_last_source = ""
             self._change_state(SentryV2State.RETURNING)
 
     def _start_order_engagement(self, order: EngagementOrder, now: float) -> None:
         """Start engagement for a queued order with a stable first step."""
         self._reset_precision_state()
+        self._remember_active_target(order.target.det, target=order.target, timestamp=now)
         if self.cfg.engagement.precision_aim_enabled:
             # Avoid a blind first snap that can jump in the wrong direction.
             self._enter_precision_phase(now, order)
@@ -806,10 +942,11 @@ class SentryV2Engine:
         try:
             self._precision_logger.start_engagement(target_id, detection_mode, config_snapshot)
             self._current_precision_engagement_id = target_id
-        except Exception:
+        except Exception as exc:
             self._precision_logging_faulted = True
             self._log_precision_tuning = False
             self._current_precision_engagement_id = None
+            self._report_runtime_warning("Precision session start failed; precision logging disabled", exc)
 
     def _begin_fire(self, order: EngagementOrder, now: float) -> None:
         """Transition to fire phase — respects auto_trigger_enabled gate."""
@@ -867,6 +1004,7 @@ class SentryV2Engine:
         self._target_lost_since = 0.0
         self._trigger_hold_start = 0.0
         self._trigger_gate_active = False
+        self._reset_loss_recovery_state()
 
     def _compute_target_angle_error(self, det: DetectedObject) -> Tuple[float, float]:
         fw = float(max(1, det.frame_width or self.cfg.guard.frame_width or 640))
@@ -874,6 +1012,257 @@ class SentryV2Engine:
         norm_cx = float(det.center_x) / fw
         norm_cy = float(det.center_y) / fh
         return self._planner.pixel_error_to_angle_error(norm_cx, norm_cy)
+
+    def _compute_tracking_angle_error(
+        self,
+        target: TrackedTarget,
+        now: float,
+        *,
+        for_fire: bool,
+    ) -> Tuple[float, float]:
+        raw_err_pan, raw_err_tilt = self._compute_target_angle_error(target.det)
+        eng = self.cfg.engagement
+        if not self._prediction_enabled_for_target(target):
+            return raw_err_pan, raw_err_tilt
+
+        lead_time = max(0.0, float(getattr(eng, "predictive_lead_time_s", 0.0) or 0.0))
+        if for_fire:
+            lead_time += max(0.0, float(getattr(eng, "predictive_fire_extra_lead_s", 0.0) or 0.0))
+        min_persistence = max(0.05, float(getattr(eng, "predictive_min_persistence_s", 0.18) or 0.18))
+        lead_scale = min(1.0, max(0.0, float(target.persistence) / min_persistence))
+        lead_time *= lead_scale
+        if lead_time <= 0.0:
+            return raw_err_pan, raw_err_tilt
+
+        heading_x, heading_y = self._clamp_prediction_heading_norm(
+            float(target.heading_x),
+            float(target.heading_y),
+            lead_time,
+        )
+        predicted_norm_cx = max(0.0, min(1.0, float(target.det.norm_cx) + (heading_x * lead_time)))
+        predicted_norm_cy = max(0.0, min(1.0, float(target.det.norm_cy) + (heading_y * lead_time)))
+        pred_err_pan, pred_err_tilt = self._planner.pixel_error_to_angle_error(predicted_norm_cx, predicted_norm_cy)
+        max_lead_pan = max(0.0, float(getattr(eng, "predictive_max_lead_pan_deg", 0.0) or 0.0))
+        max_lead_tilt = max(0.0, float(getattr(eng, "predictive_max_lead_tilt_deg", 0.0) or 0.0))
+        lead_pan = max(-max_lead_pan, min(max_lead_pan, pred_err_pan - raw_err_pan))
+        lead_tilt = max(-max_lead_tilt, min(max_lead_tilt, pred_err_tilt - raw_err_tilt))
+        return raw_err_pan + lead_pan, raw_err_tilt + lead_tilt
+
+    def _record_active_target_solution(
+        self,
+        target: TrackedTarget,
+        now: float,
+        aim_err_pan: float,
+        aim_err_tilt: float,
+    ) -> None:
+        self._remember_active_target(target.det, target=target, timestamp=now)
+        self._active_target_last_aim_pan = self._clamp_pan(self.current_pan + float(aim_err_pan))
+        self._active_target_last_aim_tilt = self._clamp_tilt(self.current_tilt + float(aim_err_tilt))
+
+    def _active_target_heading_norm(self, reference_window_s: float) -> Tuple[float, float]:
+        if not self._stored_target_is_prediction_eligible():
+            return 0.0, 0.0
+        return self._clamp_prediction_heading_norm(
+            float(self._active_target_last_heading_norm[0]),
+            float(self._active_target_last_heading_norm[1]),
+            max(0.08, float(reference_window_s)),
+        )
+
+    def _active_target_heading_deg_s(self, reference_window_s: float) -> Tuple[float, float]:
+        heading_x, heading_y = self._active_target_heading_norm(reference_window_s)
+        return (
+            float(heading_x) * float(self.cfg.guard.camera_hfov),
+            -(float(heading_y) * float(self.cfg.guard.camera_vfov)),
+        )
+
+    def _prediction_enabled_for_target(self, target: TrackedTarget) -> bool:
+        eng = self.cfg.engagement
+        if not bool(getattr(eng, "predictive_aim_enabled", True)):
+            return False
+        class_name = str(target.det.class_name or "").strip().lower()
+        source_name = str(target.det.source or "").strip().lower()
+        if class_name in NON_SEMANTIC_PREDICTION_CLASSES:
+            return False
+        if source_name in {"frame_diff", "backsub", "color"}:
+            return False
+        min_persistence = max(0.05, float(getattr(eng, "predictive_min_persistence_s", 0.18) or 0.18))
+        if float(target.persistence) < min_persistence:
+            return False
+        return True
+
+    def _stored_target_is_prediction_eligible(self) -> bool:
+        if self._active_target_last_class in NON_SEMANTIC_PREDICTION_CLASSES:
+            return False
+        if self._active_target_last_source in {"frame_diff", "backsub", "color"}:
+            return False
+        return True
+
+    def _clamp_prediction_heading_norm(
+        self,
+        heading_x: float,
+        heading_y: float,
+        lead_time_s: float,
+    ) -> Tuple[float, float]:
+        eng = self.cfg.engagement
+        lead_time = max(0.08, float(lead_time_s))
+        max_lead_pan = max(0.1, float(getattr(eng, "predictive_max_lead_pan_deg", 0.0) or 0.0))
+        max_lead_tilt = max(0.1, float(getattr(eng, "predictive_max_lead_tilt_deg", 0.0) or 0.0))
+        max_norm_x = max_lead_pan / max(1.0, float(self.cfg.guard.camera_hfov))
+        max_norm_y = max_lead_tilt / max(1.0, float(self.cfg.guard.camera_vfov))
+        max_heading_x = max_norm_x / lead_time
+        max_heading_y = max_norm_y / lead_time
+        return (
+            max(-max_heading_x, min(max_heading_x, float(heading_x))),
+            max(-max_heading_y, min(max_heading_y, float(heading_y))),
+        )
+
+    def _loss_recovery_enabled(self) -> bool:
+        eng = self.cfg.engagement
+        if not bool(getattr(eng, "loss_recovery_enabled", True)):
+            return False
+        if self._pir_cue_mode or self._pir_scan_mode:
+            return False
+        return bool(
+            getattr(eng, "loss_direction_pursuit_enabled", True)
+            or getattr(eng, "loss_local_search_enabled", True)
+            or getattr(eng, "loss_expanding_search_enabled", True)
+        )
+
+    def _start_loss_recovery(self, now: float) -> None:
+        if not self._loss_recovery_enabled():
+            self._reset_loss_recovery_state()
+            return
+        self._loss_recovery_anchor_pan = float(self._active_target_last_aim_pan)
+        self._loss_recovery_anchor_tilt = float(self._active_target_last_aim_tilt)
+        self._loss_recovery_last_move_time = 0.0
+        self._loss_recovery_search_index = 0
+        self._loss_recovery_phase = "pursuit"
+        self._last_reacquire_note = "loss pursuit"
+        self._last_reacquire_time = now
+
+    def _reset_loss_recovery_state(self) -> None:
+        self._loss_recovery_phase = ""
+        self._loss_recovery_anchor_pan = float(self.current_pan)
+        self._loss_recovery_anchor_tilt = float(self.current_tilt)
+        self._loss_recovery_last_move_time = 0.0
+        self._loss_recovery_search_index = 0
+
+    def _update_loss_recovery(self, now: float) -> None:
+        if self._target_lost_since <= 0.0 or not self._loss_recovery_enabled():
+            return
+
+        eng = self.cfg.engagement
+        loss_elapsed = max(0.0, now - self._target_lost_since)
+        timeout = max(0.1, float(eng.target_loss_timeout))
+        if loss_elapsed >= timeout:
+            return
+        pursuit_window = min(
+            max(0.0, float(getattr(eng, "loss_direction_pursuit_s", 0.0) or 0.0)),
+            timeout * 0.55,
+        )
+
+        if (
+            bool(getattr(eng, "loss_direction_pursuit_enabled", True))
+            and pursuit_window > 0.0
+            and loss_elapsed <= pursuit_window
+        ):
+            if self._loss_recovery_phase != "pursuit":
+                self._loss_recovery_phase = "pursuit"
+                self._last_reacquire_note = "loss pursuit"
+                self._last_reacquire_time = now
+            if (now - self._loss_recovery_last_move_time) >= 0.08:
+                heading_pan_deg_s, heading_tilt_deg_s = self._active_target_heading_deg_s(loss_elapsed + 0.08)
+                lookahead = min(pursuit_window, loss_elapsed + float(getattr(eng, "predictive_lead_time_s", 0.0) or 0.0))
+                pursuit_pan = self._loss_recovery_anchor_pan + (heading_pan_deg_s * lookahead)
+                pursuit_tilt = self._loss_recovery_anchor_tilt + (heading_tilt_deg_s * lookahead)
+                self._move_loss_recovery_target(pursuit_pan, pursuit_tilt, now)
+            return
+
+        step_interval = max(0.08, float(getattr(eng, "loss_search_step_interval_s", 0.18) or 0.18))
+        if (now - self._loss_recovery_last_move_time) < step_interval:
+            return
+
+        local_points = self._loss_recovery_local_search_points(pursuit_window)
+        expanding_points = self._loss_recovery_expanding_search_points(pursuit_window)
+        search_points: List[Tuple[float, float]] = []
+        search_points.extend(local_points)
+        search_points.extend(expanding_points)
+        if not search_points:
+            return
+        local_count = len(local_points)
+        point_index = min(self._loss_recovery_search_index, len(search_points) - 1)
+        next_phase = "local_search" if point_index < local_count else "expanding_search"
+        if self._loss_recovery_phase != next_phase:
+            self._loss_recovery_phase = next_phase
+            self._last_reacquire_note = "loss local scan" if next_phase == "local_search" else "loss expanding scan"
+            self._last_reacquire_time = now
+        point = search_points[min(self._loss_recovery_search_index, len(search_points) - 1)]
+        if self._loss_recovery_search_index < (len(search_points) - 1):
+            self._loss_recovery_search_index += 1
+        self._move_loss_recovery_target(point[0], point[1], now)
+
+    def _loss_recovery_search_origin(self, pursuit_window: float) -> Tuple[float, float]:
+        heading_pan_deg_s, heading_tilt_deg_s = self._active_target_heading_deg_s(max(0.08, pursuit_window))
+        center_pan = self._loss_recovery_anchor_pan + (heading_pan_deg_s * max(0.0, pursuit_window))
+        center_tilt = self._loss_recovery_anchor_tilt + (heading_tilt_deg_s * max(0.0, pursuit_window))
+        return center_pan, center_tilt
+
+    def _loss_recovery_local_search_points(self, pursuit_window: float) -> List[Tuple[float, float]]:
+        if not bool(getattr(self.cfg.engagement, "loss_local_search_enabled", True)):
+            return []
+        center_pan, center_tilt = self._loss_recovery_search_origin(pursuit_window)
+        pan_span = max(0.6, float(getattr(self.cfg.engagement, "loss_local_search_pan_deg", 3.5) or 3.5))
+        tilt_span = max(0.4, float(getattr(self.cfg.engagement, "loss_local_search_tilt_deg", 2.0) or 2.0))
+        return [
+            (center_pan, center_tilt),
+            (center_pan + pan_span, center_tilt),
+            (center_pan - pan_span, center_tilt),
+            (center_pan, center_tilt + tilt_span),
+            (center_pan, center_tilt - tilt_span),
+            (center_pan + (pan_span * 0.65), center_tilt + (tilt_span * 0.65)),
+            (center_pan - (pan_span * 0.65), center_tilt + (tilt_span * 0.65)),
+            (center_pan + (pan_span * 0.65), center_tilt - (tilt_span * 0.65)),
+            (center_pan - (pan_span * 0.65), center_tilt - (tilt_span * 0.65)),
+        ]
+
+    def _loss_recovery_expanding_search_points(self, pursuit_window: float) -> List[Tuple[float, float]]:
+        if not bool(getattr(self.cfg.engagement, "loss_expanding_search_enabled", True)):
+            return []
+        center_pan, center_tilt = self._loss_recovery_search_origin(pursuit_window)
+        base_pan = max(0.6, float(getattr(self.cfg.engagement, "loss_local_search_pan_deg", 3.5) or 3.5))
+        base_tilt = max(0.4, float(getattr(self.cfg.engagement, "loss_local_search_tilt_deg", 2.0) or 2.0))
+        pan_step = max(0.5, float(getattr(self.cfg.engagement, "loss_expanding_search_pan_step_deg", 3.0) or 3.0))
+        tilt_step = max(0.3, float(getattr(self.cfg.engagement, "loss_expanding_search_tilt_step_deg", 1.5) or 1.5))
+        ring_count = max(0, int(getattr(self.cfg.engagement, "loss_expanding_search_rings", 2) or 0))
+        points: List[Tuple[float, float]] = []
+        for ring_idx in range(1, ring_count + 1):
+            pan_span = base_pan + (pan_step * ring_idx)
+            tilt_span = base_tilt + (tilt_step * ring_idx)
+            points.extend([
+                (center_pan + pan_span, center_tilt),
+                (center_pan - pan_span, center_tilt),
+                (center_pan, center_tilt + tilt_span),
+                (center_pan, center_tilt - tilt_span),
+                (center_pan + pan_span, center_tilt + tilt_span),
+                (center_pan - pan_span, center_tilt + tilt_span),
+                (center_pan + pan_span, center_tilt - tilt_span),
+                (center_pan - pan_span, center_tilt - tilt_span),
+            ])
+        return points
+
+    def _move_loss_recovery_target(self, pan: float, tilt: float, now: float) -> None:
+        target_pan = self._clamp_pan(pan)
+        target_tilt = self._clamp_tilt(tilt)
+        if abs(target_pan - self.current_pan) < 0.05 and abs(target_tilt - self.current_tilt) < 0.05:
+            return
+        self._loss_recovery_last_move_time = now
+        self._move_turret(target_pan, target_tilt)
+
+    def _clamp_pan(self, pan: float) -> float:
+        return float(max(self.cfg.guard.pan_min, min(self.cfg.guard.pan_max, pan)))
+
+    def _clamp_tilt(self, tilt: float) -> float:
+        return float(max(self.cfg.guard.tilt_min, min(self.cfg.guard.tilt_max, tilt)))
 
     def _update_error_rates(self, err_pan: float, err_tilt: float, now: float) -> None:
         if self._last_error_sample_time > 0.0:
@@ -1168,8 +1557,9 @@ class SentryV2Engine:
     # ------------------------------------------------------------------ #
 
     def _move_turret(self, pan: float, tilt: float) -> None:
-        print(f"DEBUG: PID MOVE (engine): pan={pan:.3f}, tilt={tilt:.3f}")
         pan, tilt = self._clamp_angles(pan, tilt)
+        if not self._motion_enabled:
+            return
         self.current_pan = pan
         self.current_tilt = tilt
         if self._cb_move:
@@ -1217,7 +1607,9 @@ class SentryV2Engine:
             "last_err_tilt_deg": round(self._last_err_tilt_deg, 3),
             "reacquire_note": self._last_reacquire_note,
             "reacquire_recent": bool(self._last_reacquire_time and (time.time() - self._last_reacquire_time) <= 2.0),
+            "loss_recovery_phase": self._loss_recovery_phase,
             "no_fire_mask": self._last_no_fire_mask_name,
+            "motion_enabled": bool(self._motion_enabled),
         }
 
     # ------------------------------------------------------------------ #

@@ -21,7 +21,7 @@ import math
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from .sentry_v2_config import ThreatScoringConfig, TargetFilterConfig
 from .target_filter import DetectedObject
@@ -82,13 +82,27 @@ class ThreatScorer:
         self._first_seen: Dict[int, float] = {}
         # Last-seen (for pruning)
         self._last_seen: Dict[int, float] = {}
+        self._warning_keys: Set[str] = set()
 
         # Optional ML model
         self._ml_model: object = None
         if scoring_cfg.use_ml_model and _HAS_SKLEARN:
             self._load_ml_model(scoring_cfg.ml_model_path)
+        elif scoring_cfg.use_ml_model and not _HAS_SKLEARN:
+            self._log_ml_warning(
+                "ML scoring requested but scikit-learn is not installed; using weighted scoring only",
+                once_key="missing_sklearn",
+            )
 
         self._MAX_HISTORY = 30  # frames kept per track
+
+    def _log_ml_warning(self, message: str, exc: Optional[Exception] = None, *, once_key: str = "") -> None:
+        if once_key:
+            if once_key in self._warning_keys:
+                return
+            self._warning_keys.add(once_key)
+        suffix = f": {exc}" if exc is not None else ""
+        print(f"[SENTRY_V2_THREAT] {message}{suffix}", flush=True)
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -116,6 +130,11 @@ class ThreatScorer:
         # Hot-reload ML model if enabled and path changed or toggled on
         if scoring_cfg.use_ml_model and _HAS_SKLEARN:
             self._load_ml_model(scoring_cfg.ml_model_path)
+        elif scoring_cfg.use_ml_model and not _HAS_SKLEARN:
+            self._log_ml_warning(
+                "ML scoring requested but scikit-learn is not installed; using weighted scoring only",
+                once_key="missing_sklearn",
+            )
         else:
             self._ml_model = None
 
@@ -191,8 +210,12 @@ class ThreatScorer:
             try:
                 ml_score = float(self._ml_model.predict([features])[0])  # type: ignore[union-attr]
                 threat = 0.6 * threat + 0.4 * max(0.0, min(1.0, ml_score))
-            except Exception:
-                pass  # fallback to weighted score
+            except Exception as exc:
+                self._log_ml_warning(
+                    "ML threat refinement failed; using weighted scoring fallback",
+                    exc,
+                    once_key="predict_failed",
+                )
 
         threat = max(0.0, min(1.0, threat))
 
@@ -241,8 +264,9 @@ class ThreatScorer:
             if p.exists():
                 with open(p, "rb") as f:
                     self._ml_model = pickle.load(f)  # noqa: S301
-        except Exception:
+        except Exception as exc:
             self._ml_model = None
+            self._log_ml_warning(f"Failed to load ML model from {path}", exc, once_key=f"load:{path}")
 
     def save_ml_model(self, path: str) -> None:
         if self._ml_model is None or not _HAS_SKLEARN:
@@ -274,5 +298,6 @@ class ThreatScorer:
             model.fit(features_list, labels)
             self._ml_model = model
             return True
-        except Exception:
+        except Exception as exc:
+            self._log_ml_warning("ML model training failed", exc)
             return False

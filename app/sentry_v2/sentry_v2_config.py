@@ -206,6 +206,27 @@ class EngagementConfig:
     # Keep engaging/holding last known target area when target is temporarily lost
     # instead of advancing queue and returning to guard.
     continuous_hunt_on_loss: bool = False
+    # Finite multi-stage loss recovery that runs before queue advance / return.
+    loss_recovery_enabled: bool = True
+    # Predict motion from recent track history to lead fast targets.
+    predictive_aim_enabled: bool = True
+    predictive_lead_time_s: float = 0.16
+    predictive_fire_extra_lead_s: float = 0.05
+    predictive_max_lead_pan_deg: float = 3.5
+    predictive_max_lead_tilt_deg: float = 2.2
+    predictive_min_persistence_s: float = 0.18
+    # If a target drops out, first continue into its last direction, then
+    # search locally around the loss point before giving up.
+    loss_direction_pursuit_enabled: bool = True
+    loss_direction_pursuit_s: float = 0.28
+    loss_local_search_enabled: bool = True
+    loss_local_search_pan_deg: float = 3.5
+    loss_local_search_tilt_deg: float = 2.0
+    loss_expanding_search_enabled: bool = True
+    loss_expanding_search_rings: int = 2
+    loss_expanding_search_pan_step_deg: float = 3.0
+    loss_expanding_search_tilt_step_deg: float = 1.5
+    loss_search_step_interval_s: float = 0.18
 
 
 @dataclass
@@ -317,6 +338,9 @@ class PIRGuardConfig:
     scan_grid_resolution: int = 3
     # Data timeout: discard PIR data older than this (milliseconds)
     data_timeout_ms: int = 5000
+    # Ignore near-simultaneous events from different PIR sensors so one target
+    # crossing overlapping sensor cones is treated as a single zone hit.
+    cross_sensor_lockout_ms: int = 800
 
 
 @dataclass
@@ -383,6 +407,7 @@ class SentryV2Config:
     prompted_targets_enabled: bool = False
     prompted_allow_auto_fire: bool = False
     prompted_library_path: str = "app/config/sentry_v2_prompted_targets.json"
+    quick_startup_enabled: bool = True
 
     # --- Persistence ---
     config_path: str = "app/config/sentry_v2_settings.json"
@@ -491,6 +516,7 @@ class SentryV2Config:
             prompted_targets_enabled=d.get("prompted_targets_enabled", False),
             prompted_allow_auto_fire=d.get("prompted_allow_auto_fire", False),
             prompted_library_path=d.get("prompted_library_path", "app/config/sentry_v2_prompted_targets.json"),
+            quick_startup_enabled=d.get("quick_startup_enabled", True),
             config_path=d.get("config_path", "app/config/sentry_v2_settings.json"),
         )
 

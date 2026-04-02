@@ -1,1 +1,0 @@
-jscpd unavailable in this environment: no pip distribution and no node/npm on PATH.
