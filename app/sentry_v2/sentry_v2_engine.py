@@ -17,18 +17,33 @@ on every camera frame and the engine emits callbacks for turret/fire actions.
 from __future__ import annotations
 
 import random
+import sys
 import time
 from enum import Enum, auto
+from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-from .sentry_v2_config import SentryV2Config
-from .sentry_v2_no_fire_masks import find_blocking_mask
-from .target_filter import DetectedObject, TargetFilter
-from .threat_scorer import ThreatScorer, TrackedTarget
-from .engagement_planner import EngagementPlanner, EngagementOrder
-from .ml_training_logger import MLTrainingLogger
-from .sentry_v2_pir_manager import SentryV2PIRManager
-from .precision_tuning_logger import PrecisionTuningLogger
+if __package__ in (None, ""):
+    app_dir = Path(__file__).resolve().parents[1]
+    if str(app_dir) not in sys.path:
+        sys.path.insert(0, str(app_dir))
+    from sentry_v2.sentry_v2_config import SentryV2Config
+    from sentry_v2.sentry_v2_no_fire_masks import find_blocking_mask
+    from sentry_v2.target_filter import DetectedObject, TargetFilter
+    from sentry_v2.threat_scorer import ThreatScorer, TrackedTarget
+    from sentry_v2.engagement_planner import EngagementPlanner, EngagementOrder
+    from sentry_v2.ml_training_logger import MLTrainingLogger
+    from sentry_v2.sentry_v2_pir_manager import SentryV2PIRManager
+    from sentry_v2.precision_tuning_logger import PrecisionTuningLogger
+else:
+    from .sentry_v2_config import SentryV2Config
+    from .sentry_v2_no_fire_masks import find_blocking_mask
+    from .target_filter import DetectedObject, TargetFilter
+    from .threat_scorer import ThreatScorer, TrackedTarget
+    from .engagement_planner import EngagementPlanner, EngagementOrder
+    from .ml_training_logger import MLTrainingLogger
+    from .sentry_v2_pir_manager import SentryV2PIRManager
+    from .precision_tuning_logger import PrecisionTuningLogger
 
 
 NON_SEMANTIC_REACQUIRE_CLASSES = {"moving_object", "motion", "foreground", "color", "unknown"}
@@ -868,6 +883,14 @@ class SentryV2Engine:
             and float(target.persistence) >= float(eng.fire_trigger_min_persistence)
         )
 
+    def _engagement_response_scale(self, *, use_fire_limits: bool) -> float:
+        speed_value = int(max(10, min(100, int(getattr(self.cfg.engagement, "engagement_speed", 80) or 80))))
+        ratio = float(speed_value - 10) / 90.0
+        scale = 0.72 + (ratio * 0.68)
+        if use_fire_limits:
+            scale = min(scale, 1.08)
+        return scale
+
     def _safe_log_precision_frame(self, **kwargs: object) -> None:
         if not self._log_precision_tuning or self._precision_logging_faulted:
             return
@@ -1365,6 +1388,10 @@ class SentryV2Engine:
 
         corr_pan = eng.precision_kp * ctrl_pan + eng.precision_ki * self._pid_integral_pan + eng.precision_kd * d_pan
         corr_tilt = eng.precision_kp * ctrl_tilt + eng.precision_ki * self._pid_integral_tilt + eng.precision_kd * d_tilt
+
+        response_scale = self._engagement_response_scale(use_fire_limits=use_fire_limits)
+        corr_pan *= response_scale
+        corr_tilt *= response_scale
 
         # Cache PID components for logging
         self._last_pid_p_pan = float(eng.precision_kp) * ctrl_pan

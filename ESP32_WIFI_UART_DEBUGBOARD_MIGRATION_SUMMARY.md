@@ -7,6 +7,8 @@ Related planning documents:
 
 ## Goal
 
+Resolved baseline update (2026-04-03): Smart Sentry v2 now treats `arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino` as the canonical single-board WiFi baseline instead of `DB3000_ESP32_UDP_Link.ino`. Older references to `DB3000_ESP32_UDP_Link` or `DB3000_ESP32_UDP_PIR` in this document should be read as historical context only.
+
 Retarget the app from a topology that depends on the Debug Board being visible to the PC over USB to a topology where:
 
 - the PC talks to the ESP32 only, over either USB serial or WiFi/UDP
@@ -58,6 +60,7 @@ This means tracking code is already decoupled from the physical board topology. 
 There are already multiple firmware sketches in the repo:
 
 - [DB3000V4.1-main/arduino/DB3000_ESP32_IO_Telemetry_2026/DB3000_ESP32_IO_Telemetry_2026.ino](DB3000V4.1-main/arduino/DB3000_ESP32_IO_Telemetry_2026/DB3000_ESP32_IO_Telemetry_2026.ino): USB serial IO-only firmware for Dual Port. No pan/tilt forwarding.
+- `arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino`: current Smart Sentry WiFi baseline with UART2 forwarding, PIR support, GPIO2 status blink output, runtime trigger-servo tuning, and state-packet current telemetry.
 - [DB3000V4.1-main/arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino](DB3000V4.1-main/arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino): WiFi/UDP firmware for ESP32 DevKit v1 with Debug Board on UART2.
 - [DB3000V4.1-main/arduino/DB3000_ESP32_DIRECT_DEBUGBOARD/DB3000_ESP32_DIRECT_DEBUGBOARD.ino](DB3000V4.1-main/arduino/DB3000_ESP32_DIRECT_DEBUGBOARD/DB3000_ESP32_DIRECT_DEBUGBOARD.ino): WiFi/UDP direct-to-Debug-Board topology for ESP32 DevKit v1.
 - [DB3000V4.1-main/arduino/DB3000_ESP32CAM_SerialBus/DB3000_ESP32CAM_SerialBus.ino](DB3000V4.1-main/arduino/DB3000_ESP32CAM_SerialBus/DB3000_ESP32CAM_SerialBus.ino): host USB serial plus UART2 Debug Board forwarding, but targeted at ESP32-CAM pin mapping rather than the current ESP32 DevKit v1 wiring.
@@ -105,6 +108,7 @@ For the selected full-WiFi topology, this command should not be the primary oper
 
 These are already accepted by the UDP firmware in:
 
+- `arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino`
 - [DB3000V4.1-main/arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino](DB3000V4.1-main/arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino#L1023)
 - [DB3000V4.1-main/arduino/DB3000_ESP32_DIRECT_DEBUGBOARD/DB3000_ESP32_DIRECT_DEBUGBOARD.ino](DB3000V4.1-main/arduino/DB3000_ESP32_DIRECT_DEBUGBOARD/DB3000_ESP32_DIRECT_DEBUGBOARD.ino#L461)
 
@@ -141,7 +145,7 @@ For full WiFi, the preferred firmware candidates are:
 
 Recommended choice:
 
-- standardize on [DB3000V4.1-main/arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino](DB3000V4.1-main/arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino) as the primary full-WiFi firmware because it is the more complete diagnostic build and already accepts the active app payloads
+- standardize on `arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino` as the primary Smart Sentry full-WiFi baseline because it is the newer production sketch currently flashed on the board and already includes the added GPIO2 status blink output, runtime projectile trigger-servo tuning, PIR-event blink control, and periodic current telemetry that newer Smart Sentry UI/runtime work expects
 
 Required firmware behavior:
 
@@ -152,10 +156,10 @@ Required firmware behavior:
 - drive local trigger and relay pins on the ESP32
 - emit `ack`, `state`, and `cap` replies used by the app and diagnostics
 
-Firmware decision still required:
+Firmware decision now resolved for Smart Sentry v2 baseline work:
 
-- either make `DB3000_ESP32_UDP_Link` the only supported full-WiFi firmware
-- or merge any missing compatibility behavior from `DB3000_ESP32_DIRECT_DEBUGBOARD` into it and retire the duplicate sketch
+- use `SMART_SENTRY_V2_0_ESP32_UDP_PIR` as the single-board WiFi baseline
+- treat `DB3000_ESP32_UDP_Link` and `DB3000_ESP32_UDP_PIR` as older predecessors unless a specific recovery or historical comparison requires them
 
 ### 3. Main app connection UX must be made explicit for full WiFi
 
@@ -246,7 +250,7 @@ Also update [DB3000V4.1-main/RECENT_UPDATES.json](DB3000V4.1-main/RECENT_UPDATES
 
 ### Phase 1: Firmware standardization
 
-- standardize `DB3000_ESP32_UDP_Link` as the chosen runtime firmware, or merge and retire the duplicate direct-debugboard sketch
+- standardize `SMART_SENTRY_V2_0_ESP32_UDP_PIR` as the chosen Smart Sentry runtime firmware and update every flashing/runtime doc to point to that sketch first
 - confirm UART2 pin mapping and Debug Board wiring on the actual ESP32 board you will deploy
 - validate trigger, relays, safety, and pan/tilt outside the main app first
 
@@ -294,7 +298,7 @@ That keeps tracking untouched, removes the current dependency on Debug Board USB
 
 ### First priority
 
-- [DB3000V4.1-main/arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino](DB3000V4.1-main/arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino)
+- `arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino`
 - [DB3000V4.1-main/app/MAIN_FILE_SINGLE_CAM.py](DB3000V4.1-main/app/MAIN_FILE_SINGLE_CAM.py)
 
 ### Second priority

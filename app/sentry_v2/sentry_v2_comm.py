@@ -99,6 +99,7 @@ class SentryV2Comm:
 
         self._mode: int = self.MODE_ESP32_USB
         self._lock = threading.Lock()
+        self._bus_io_lock = threading.Lock()
 
         # Accessory state (tracked locally)
         self.led_on: bool = False
@@ -107,6 +108,10 @@ class SentryV2Comm:
         self.spare_on: bool = False        # GPIO 26 spare relay
         self.safety_armed: bool = False   # False=LOCKED (S1), True=ARMED (S0)
         self.trigger_mode_bb: bool = False  # False=Water M0, True=BB M1
+        self.trigger_servo_rest_deg: int = 0
+        self.trigger_servo_fire_deg: int = 45
+        self.trigger_servo_speed_dps: int = 360
+        self.pir_event_blink_enabled: bool = False
 
         # Direction inversion
         self.invert_pan: bool = False
@@ -130,9 +135,162 @@ class SentryV2Comm:
         # PIR event callback (called when sensor data is received)
         self._on_pir_event: Optional[Callable[[int, float], None]] = None
 
+        # Bus-servo feedback telemetry (modes 1, 2)
+        self._servo_feedback: Dict[str, Any] = {
+            "active": False,
+            "source": "inactive",
+            "pan_deg": None,
+            "tilt_deg": None,
+            "pan_ticks": None,
+            "tilt_ticks": None,
+            "pan_load_raw": None,
+            "tilt_load_raw": None,
+            "pan_voltage_raw": None,
+            "tilt_voltage_raw": None,
+            "pan_voltage_v": None,
+            "tilt_voltage_v": None,
+            "last_update": 0.0,
+            "diag_last_update": 0.0,
+            "last_error": "",
+        }
+        self._feedback_poll_interval_s: float = 0.75
+        self._feedback_waiting_poll_interval_s: float = 1.1
+        self._feedback_post_move_delay_s: float = 0.35
+        self._feedback_diag_poll_interval_s: float = 2.5
+        self._feedback_next_poll_time: float = 0.0
+        self._feedback_diag_next_poll_time: float = 0.0
+        self._feedback_last_motion_time: float = 0.0
+        self._feedback_waiting_miss_count: int = 0
+        self._feedback_pause_until_s: float = 0.0
+        self._last_bus_pan_ticks: Optional[int] = None
+        self._last_bus_tilt_ticks: Optional[int] = None
+
+        self._io_runtime: Dict[str, Any] = {
+            "active": False,
+            "source": "inactive",
+            "safety": None,
+            "mode": None,
+            "current_fault": None,
+            "pir_enabled": None,
+            "pan_mA": None,
+            "tilt_mA": None,
+            "total_mA": None,
+            "last_update": 0.0,
+            "last_error": "",
+        }
+
     def _report_runtime_warning(self, context: str, exc: Exception) -> None:
         self._last_error = f"{context}: {exc}"
         print(f"[SENTRY_V2_COMM] {self._last_error}", flush=True)
+
+    def _reset_servo_feedback_state(self, *, active: bool, source: str, last_error: str = "") -> None:
+        with self._lock:
+            self._servo_feedback = {
+                "active": bool(active),
+                "source": str(source or "inactive"),
+                "pan_deg": None,
+                "tilt_deg": None,
+                "pan_ticks": None,
+                "tilt_ticks": None,
+                "pan_load_raw": None,
+                "tilt_load_raw": None,
+                "pan_voltage_raw": None,
+                "tilt_voltage_raw": None,
+                "pan_voltage_v": None,
+                "tilt_voltage_v": None,
+                "last_update": 0.0,
+                "diag_last_update": 0.0,
+                "last_error": str(last_error or ""),
+            }
+            self._feedback_next_poll_time = 0.0
+            self._feedback_diag_next_poll_time = 0.0
+            self._feedback_last_motion_time = 0.0
+            self._feedback_waiting_miss_count = 0
+            self._feedback_pause_until_s = 0.0
+
+    def _reset_bus_motion_cache(self) -> None:
+        with self._lock:
+            self._last_bus_pan_ticks = None
+            self._last_bus_tilt_ticks = None
+
+    def get_servo_feedback_snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            snapshot = dict(self._servo_feedback)
+        last_update = float(snapshot.get("last_update") or 0.0)
+        snapshot["age_s"] = max(0.0, time.time() - last_update) if last_update > 0.0 else None
+        diag_last_update = float(snapshot.get("diag_last_update") or 0.0)
+        snapshot["diag_age_s"] = max(0.0, time.time() - diag_last_update) if diag_last_update > 0.0 else None
+        return snapshot
+
+    def _reset_io_runtime_state(self, *, active: bool, source: str, last_error: str = "") -> None:
+        with self._lock:
+            self._io_runtime = {
+                "active": bool(active),
+                "source": str(source or "inactive"),
+                "safety": None,
+                "mode": None,
+                "current_fault": None,
+                "pir_enabled": None,
+                "pan_mA": None,
+                "tilt_mA": None,
+                "total_mA": None,
+                "last_update": 0.0,
+                "last_error": str(last_error or ""),
+            }
+
+    def get_io_runtime_snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            snapshot = dict(self._io_runtime)
+        last_update = float(snapshot.get("last_update") or 0.0)
+        snapshot["age_s"] = max(0.0, time.time() - last_update) if last_update > 0.0 else None
+        return snapshot
+
+    def _apply_io_runtime_state(self, payload: Dict[str, Any], *, source: str, timestamp_ms: Any = None) -> None:
+        if not isinstance(payload, dict):
+            return
+        try:
+            update_time = float(timestamp_ms) / 1000.0 if timestamp_ms is not None else time.time()
+        except Exception:
+            update_time = time.time()
+
+        def _maybe_int(value: Any) -> Optional[int]:
+            try:
+                return int(value)
+            except Exception:
+                return None
+
+        with self._lock:
+            runtime = self._io_runtime
+            runtime["active"] = True
+            runtime["source"] = str(source or "esp32")
+            safety = _maybe_int(payload.get("safety"))
+            if safety is not None:
+                runtime["safety"] = safety
+            mode = _maybe_int(payload.get("mode"))
+            if mode is not None:
+                runtime["mode"] = mode
+            current_fault = payload.get("current_fault")
+            if current_fault is not None:
+                runtime["current_fault"] = bool(current_fault)
+            pir_enabled = _maybe_int(payload.get("pir_enabled"))
+            if pir_enabled is not None:
+                runtime["pir_enabled"] = pir_enabled
+            for key in ("pan_mA", "tilt_mA", "total_mA"):
+                parsed = _maybe_int(payload.get(key))
+                if parsed is not None:
+                    runtime[key] = parsed
+            runtime["last_update"] = update_time
+            runtime["last_error"] = ""
+
+    def _has_fresh_servo_feedback_locked(self, now: Optional[float] = None, *, max_age_s: float = 1.5) -> bool:
+        feedback = self._servo_feedback
+        if str(feedback.get("source") or "") != "debug-board":
+            return False
+        last_update = float(feedback.get("last_update") or 0.0)
+        if last_update <= 0.0:
+            return False
+        current_time = time.time() if now is None else float(now)
+        return (current_time - last_update) <= float(max_age_s)
 
     # ------------------------------------------------------------------ #
     #  Port scanning
@@ -168,6 +326,14 @@ class SentryV2Comm:
         self._mode = int(mode)
         self._connect_details = {}          # per-link status dict
         self._last_error = ""
+        self._reset_servo_feedback_state(
+            active=self._mode in (self.MODE_DUAL_USB, self.MODE_WIFI_DEBUG_USB),
+            source="waiting" if self._mode in (self.MODE_DUAL_USB, self.MODE_WIFI_DEBUG_USB) else "inactive",
+        )
+        self._reset_io_runtime_state(
+            active=self._mode in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI),
+            source="waiting" if self._mode in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI) else "inactive",
+        )
         try:
             if self._mode == self.MODE_ESP32_USB:
                 ok = self._open_serial(esp32_port, esp32_baud, primary=True)
@@ -369,6 +535,23 @@ class SentryV2Comm:
             self._last_error = str(e)
             return False
 
+    def refresh_primary_udp_link(self, host: str, port: int) -> bool:
+        """Reopen the primary UDP transport without disturbing serial links."""
+        with self._lock:
+            old_sock = self._sock
+            self._sock = None
+            self._udp_target = None
+        if old_sock is not None:
+            try:
+                old_sock.close()
+            except Exception:
+                pass
+        self._reset_io_runtime_state(active=True, source="waiting")
+        ok = self._open_udp(host, port)
+        if ok:
+            self._start_receiver()
+        return ok
+
     @staticmethod
     def _compact_json(obj: Dict[str, Any]) -> bytes:
         return json.dumps(obj, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
@@ -403,6 +586,7 @@ class SentryV2Comm:
             return True
         except Exception as e:
             self._last_error = str(e)
+            self._reset_io_runtime_state(active=True, source="waiting", last_error=self._last_error)
             return False
 
     def _send_udp_payload_secondary(self, payload: Dict[str, Any], *, label: str) -> bool:
@@ -467,6 +651,9 @@ class SentryV2Comm:
                 servo_sock.close()
             except Exception:
                 pass
+        self._reset_bus_motion_cache()
+        self._reset_servo_feedback_state(active=False, source="disconnected")
+        self._reset_io_runtime_state(active=False, source="disconnected")
 
     def is_connected(self) -> bool:
         m = self._mode
@@ -487,6 +674,69 @@ class SentryV2Comm:
                 and self._servo_sock is not None and self._servo_udp_target is not None
             )
         return False
+
+    def can_send_sound(self) -> bool:
+        m = self._mode
+        if m in (self.MODE_ESP32_USB, self.MODE_DUAL_USB):
+            return self._ser is not None and self._ser.is_open
+        if m in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI):
+            with self._lock:
+                return self._sock is not None and self._udp_target is not None
+        return False
+
+    def is_sound_link_verified(self, max_age_s: float = 3.0) -> bool:
+        m = self._mode
+        if m in (self.MODE_ESP32_USB, self.MODE_DUAL_USB):
+            return self._ser is not None and self._ser.is_open
+        if m in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI):
+            return self.has_live_io_link(max_age_s=max_age_s)
+        return False
+
+    def has_live_io_link(self, max_age_s: float = 3.0) -> bool:
+        with self._lock:
+            sock = self._sock
+            udp_target = self._udp_target
+            runtime = dict(self._io_runtime)
+        if sock is None or udp_target is None:
+            return False
+        source = str(runtime.get("source") or "")
+        if source not in ("esp32-state", "esp32-ack"):
+            return False
+        last_update = float(runtime.get("last_update") or 0.0)
+        if last_update <= 0.0:
+            return False
+        return (time.time() - last_update) <= float(max_age_s)
+
+    def sound_transport_info(self) -> str:
+        m = self._mode
+        if m in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI):
+            with self._lock:
+                sock = self._sock
+                udp_target = self._udp_target
+                runtime = dict(self._io_runtime)
+            if sock is None or udp_target is None:
+                return "Sound link unavailable: ESP32 WiFi/UDP not connected"
+            if self.has_live_io_link():
+                return f"Sound link ready: ESP32 WiFi {udp_target[0]}:{udp_target[1]}"
+            source = str(runtime.get("source") or "")
+            if source == "waiting":
+                return f"Sound link standby: ESP32 WiFi {udp_target[0]}:{udp_target[1]} awaiting runtime reply"
+            last_update = float(runtime.get("last_update") or 0.0)
+            if last_update > 0.0:
+                age_s = max(0.0, time.time() - last_update)
+                return f"Sound link standby: ESP32 WiFi {udp_target[0]}:{udp_target[1]} runtime stale ({age_s:.1f}s)"
+            return f"Sound link standby: ESP32 WiFi {udp_target[0]}:{udp_target[1]} send path ready"
+        if self.can_send_sound():
+            if m in (self.MODE_ESP32_USB, self.MODE_DUAL_USB):
+                return "Sound link ready: ESP32 serial"
+            if self._udp_target is not None:
+                return f"Sound link ready: ESP32 WiFi {self._udp_target[0]}:{self._udp_target[1]}"
+            return "Sound link ready"
+        if m == self.MODE_WIFI_DEBUG_USB:
+            return "Sound link unavailable: ESP32 WiFi/UDP not connected"
+        if m == self.MODE_DUAL_ESP32_WIFI:
+            return "Sound link unavailable: primary ESP32 WiFi not connected"
+        return "Sound link unavailable"
 
     def connection_info(self) -> str:
         if not self.is_connected():
@@ -521,6 +771,19 @@ class SentryV2Comm:
         return (
             max(self.PAN_OUTPUT_MIN, min(self.PAN_OUTPUT_MAX, pan_out)),
             max(self.TILT_OUTPUT_MIN, min(self.TILT_OUTPUT_MAX, tilt_out)),
+        )
+
+    def _normalize_feedback_angles(self, pan: float, tilt: float) -> tuple[float, float]:
+        """Convert hardware servo readback angles back to Smart Sentry logical angles."""
+        pan_logical = max(self.PAN_OUTPUT_MIN, min(self.PAN_OUTPUT_MAX, float(pan)))
+        tilt_logical = max(self.TILT_OUTPUT_MIN, min(self.TILT_OUTPUT_MAX, float(tilt)))
+        if self.invert_pan:
+            pan_logical = self.PAN_OUTPUT_MAX - pan_logical
+        if self.invert_tilt:
+            tilt_logical = self.TILT_OUTPUT_MAX - tilt_logical
+        return (
+            max(self.PAN_OUTPUT_MIN, min(self.PAN_OUTPUT_MAX, pan_logical)),
+            max(self.TILT_OUTPUT_MIN, min(self.TILT_OUTPUT_MAX, tilt_logical)),
         )
 
     # ------------------------------------------------------------------ #
@@ -560,6 +823,45 @@ class SentryV2Comm:
                 return False
         if m in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI):
             return self._send_udp_payload({"pir_enabled": value}, label=f"UDP PIR P{value}")
+        return False
+
+    def send_sound(self, freq_hz: int, duration_ms: int, volume_pct: int = 100) -> bool:
+        freq = int(max(120, min(6000, int(freq_hz))))
+        duration = int(max(10, min(2000, int(duration_ms))))
+        volume = int(max(0, min(100, int(volume_pct))))
+        m = self._mode
+        if m in (self.MODE_ESP32_USB, self.MODE_DUAL_USB):
+            with self._lock:
+                ser = self._ser
+            try:
+                if ser is None or not ser.is_open:
+                    self._last_error = "ESP32 serial sound transport unavailable"
+                    return False
+                cmd = f"SOUND:{freq}:{duration}\n"
+                ser.write(cmd.encode("utf-8"))
+                self._last_cmd = cmd.rstrip()
+                self._last_error = ""
+                return True
+            except Exception as e:
+                self._last_error = str(e)
+                return False
+        if m in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI):
+            if not self.can_send_sound():
+                self._last_error = self.sound_transport_info()
+                return False
+            ok = self._send_udp_payload(
+                {
+                    "action": "sound",
+                    "freq_hz": freq,
+                    "duration_ms": duration,
+                    "volume_pct": volume,
+                },
+                label=f"UDP SOUND {freq}Hz {duration}ms @{volume}%",
+            )
+            if ok:
+                self._last_error = ""
+            return ok
+        self._last_error = "Sound transport unavailable for current connection mode"
         return False
 
     def send_command(
@@ -616,9 +918,108 @@ class SentryV2Comm:
             try:
                 self._poll_serial_events()
                 self._poll_udp_events()
+                self._poll_bus_servo_feedback()
             except Exception:
                 pass
             time.sleep(0.02)
+
+    def _poll_bus_servo_feedback(self) -> None:
+        # CHANGE WARNING: Debug Board readback shares the same COM port as bus-servo
+        # writes; keep polling serialized and conservative so read attempts cannot
+        # starve pan/tilt motion during active tracking.
+        if self._mode not in (self.MODE_DUAL_USB, self.MODE_WIFI_DEBUG_USB):
+            return
+        now = time.time()
+        if now < self._feedback_pause_until_s:
+            return
+        if now < self._feedback_next_poll_time:
+            return
+        if now - self._feedback_last_motion_time < self._feedback_post_move_delay_s:
+            return
+
+        with self._lock:
+            bus_ser = self._bus_ser
+            pan_servo_id = int(self.pan_servo_id)
+            tilt_servo_id = int(self.tilt_servo_id)
+        if bus_ser is None or not bus_ser.is_open:
+            return
+
+        pan_ticks = self._read_bus_servo_register(pan_servo_id, 0x38, 2)
+        tilt_ticks = self._read_bus_servo_register(tilt_servo_id, 0x38, 2)
+
+        if pan_ticks is None or tilt_ticks is None:
+            with self._lock:
+                self._feedback_waiting_miss_count += 1
+                self._servo_feedback["active"] = True
+                self._servo_feedback["source"] = "waiting"
+                if not self._servo_feedback.get("last_update"):
+                    self._servo_feedback["last_error"] = "Waiting for first servo feedback reply"
+                pause_s = 0.0
+                if self._feedback_waiting_miss_count >= 12:
+                    pause_s = 20.0
+                    self._servo_feedback["last_error"] = "Waiting for first servo feedback reply (polling paused)"
+                elif self._feedback_waiting_miss_count >= 4:
+                    pause_s = 5.0
+                    self._servo_feedback["last_error"] = "Waiting for first servo feedback reply (polling throttled)"
+                if pause_s > 0.0:
+                    self._feedback_pause_until_s = now + pause_s
+            self._feedback_next_poll_time = now + self._feedback_waiting_poll_interval_s
+            return
+
+        pan_deg, tilt_deg = self._normalize_feedback_angles(
+            self._ticks_to_deg(pan_ticks),
+            self._ticks_to_deg(tilt_ticks),
+        )
+        with self._lock:
+            self._feedback_waiting_miss_count = 0
+            self._feedback_pause_until_s = 0.0
+            self._servo_feedback.update(
+                {
+                    "active": True,
+                    "source": "debug-board",
+                    "pan_deg": pan_deg,
+                    "tilt_deg": tilt_deg,
+                    "pan_ticks": pan_ticks,
+                    "tilt_ticks": tilt_ticks,
+                    "last_update": now,
+                    "last_error": "",
+                }
+            )
+            self._feedback_next_poll_time = now + self._feedback_poll_interval_s
+        self._poll_bus_servo_diagnostics(now, pan_servo_id, tilt_servo_id)
+
+    def _poll_bus_servo_diagnostics(self, now: float, pan_servo_id: int, tilt_servo_id: int) -> None:
+        if now < self._feedback_diag_next_poll_time:
+            return
+        pan_load_raw = self._read_bus_servo_register(pan_servo_id, 0x3C, 2, timeout_s=0.05)
+        tilt_load_raw = self._read_bus_servo_register(tilt_servo_id, 0x3C, 2, timeout_s=0.05)
+        pan_voltage_raw = self._read_bus_servo_register(pan_servo_id, 0x3E, 1, timeout_s=0.05)
+        tilt_voltage_raw = self._read_bus_servo_register(tilt_servo_id, 0x3E, 1, timeout_s=0.05)
+
+        def _decode_signed_16(value: Optional[int]) -> Optional[int]:
+            if value is None:
+                return None
+            raw = int(value) & 0xFFFF
+            return raw - 0x10000 if raw >= 0x8000 else raw
+
+        def _decode_voltage(raw_value: Optional[int]) -> Optional[float]:
+            if raw_value is None:
+                return None
+            return float(int(raw_value)) / 10.0
+
+        with self._lock:
+            self._servo_feedback.update(
+                {
+                    "pan_load_raw": _decode_signed_16(pan_load_raw),
+                    "tilt_load_raw": _decode_signed_16(tilt_load_raw),
+                    "pan_voltage_raw": None if pan_voltage_raw is None else int(pan_voltage_raw),
+                    "tilt_voltage_raw": None if tilt_voltage_raw is None else int(tilt_voltage_raw),
+                    "pan_voltage_v": _decode_voltage(pan_voltage_raw),
+                    "tilt_voltage_v": _decode_voltage(tilt_voltage_raw),
+                    "diag_last_update": now,
+                }
+            )
+            self._feedback_diag_next_poll_time = now + self._feedback_diag_poll_interval_s
 
     def _poll_serial_events(self) -> None:
         with self._lock:
@@ -675,7 +1076,18 @@ class SentryV2Comm:
             return
         if not isinstance(message, dict):
             return
-        if str(message.get("t") or "").strip().lower() != "pir_event":
+        message_type = str(message.get("t") or "").strip().lower()
+        if message_type == "state":
+            payload = message.get("p") or {}
+            if isinstance(payload, dict):
+                self._apply_io_runtime_state(payload, source="esp32-state", timestamp_ms=message.get("ts"))
+            return
+        if message_type == "ack":
+            payload = message.get("state") or {}
+            if isinstance(payload, dict):
+                self._apply_io_runtime_state(payload, source="esp32-ack", timestamp_ms=message.get("ts"))
+            return
+        if message_type != "pir_event":
             return
         payload = message.get("p") or {}
         if not isinstance(payload, dict):
@@ -714,24 +1126,35 @@ class SentryV2Comm:
         pan_out, tilt_out = self._normalize_output_angles(pan, tilt)
         m = self._mode
         if m == self.MODE_ESP32_USB:
-            return self._send_ascii(pan_out, tilt_out, fire=0, via_serial=True)
+            ok = self._send_ascii(pan_out, tilt_out, fire=0, via_serial=True)
+            if ok:
+                self._last_error = ""
+            return ok
         if m == self.MODE_DUAL_USB:
             ok_bus = self._send_bus_servo(pan_out, tilt_out, move_time_ms=move_time_ms)
             if ok_bus:
+                self._last_error = ""
                 self._send_io_serial(0)
             return ok_bus
         if m == self.MODE_WIFI_DEBUG_USB:
             ok_bus = self._send_bus_servo(pan_out, tilt_out, move_time_ms=move_time_ms)
             if ok_bus:
+                self._last_error = ""
                 # Keep mode-2 movement aligned with the earlier working path by
                 # refreshing the IO-side safety/mode state when WiFi is present,
                 # while still allowing pan/tilt movement to succeed if WiFi drops.
                 self._send_io_udp(0)
             return ok_bus
         if m == self.MODE_WIFI_FULL:
-            return self._send_wifi_full(pan_out, tilt_out, fire=0, move_time_ms=move_time_ms)
+            ok = self._send_wifi_full(pan_out, tilt_out, fire=0, move_time_ms=move_time_ms)
+            if ok:
+                self._last_error = ""
+            return ok
         if m == self.MODE_DUAL_ESP32_WIFI:
-            return self._send_servo_udp(pan_out, tilt_out, move_time_ms=move_time_ms)
+            ok = self._send_servo_udp(pan_out, tilt_out, move_time_ms=move_time_ms)
+            if ok:
+                self._last_error = ""
+            return ok
         return False
 
     def send_fire_burst(
@@ -768,6 +1191,48 @@ class SentryV2Comm:
     def set_safety(self, armed: bool, pan: float, tilt: float) -> bool:
         self.safety_armed = armed
         return self.send_command(pan, tilt)
+
+    def send_trigger_runtime_config(self) -> bool:
+        m = self._mode
+        if m in (self.MODE_ESP32_USB, self.MODE_DUAL_USB):
+            return self._send_trigger_runtime_config_serial()
+        payload: Dict[str, Any] = {
+            "action": "config",
+            "trigger": {
+                "mode": 1 if self.trigger_mode_bb else 0,
+                "servo_rest_deg": int(max(0, min(180, int(self.trigger_servo_rest_deg)))),
+                "servo_fire_deg": int(max(0, min(180, int(self.trigger_servo_fire_deg)))),
+                "servo_speed_dps": int(max(10, min(5000, int(self.trigger_servo_speed_dps)))),
+            },
+            "pir": {
+                "event_blink": 1 if self.pir_event_blink_enabled else 0,
+            },
+        }
+        ok = self._send_udp_payload(payload, label="UDP CFG trigger-servo/pir-led")
+        if ok:
+            self._last_error = ""
+        return ok
+
+    def _send_trigger_runtime_config_serial(self) -> bool:
+        with self._lock:
+            ser = self._ser
+        try:
+            if ser is None or not ser.is_open:
+                return False
+            rest_deg = int(max(0, min(180, int(self.trigger_servo_rest_deg))))
+            fire_deg = int(max(rest_deg, min(180, int(self.trigger_servo_fire_deg))))
+            speed_dps = int(max(10, min(5000, int(self.trigger_servo_speed_dps))))
+            pir_blink = 1 if self.pir_event_blink_enabled else 0
+            ser.write(f"U{rest_deg}\n".encode("utf-8"))
+            ser.write(f"V{fire_deg}\n".encode("utf-8"))
+            ser.write(f"H{speed_dps}\n".encode("utf-8"))
+            ser.write(f"B{pir_blink}\n".encode("utf-8"))
+            self._last_cmd = f"SER CFG U{rest_deg} V{fire_deg} H{speed_dps} B{pir_blink}"
+            self._last_error = ""
+            return True
+        except Exception as e:
+            self._last_error = str(e)
+            return False
 
     # ------------------------------------------------------------------ #
     #  ASCII protocol  (modes 0, 3)
@@ -856,6 +1321,10 @@ class SentryV2Comm:
         d = max(0.0, min(270.0, float(deg)))
         return int(round((d / 270.0) * 4095.0))
 
+    def _ticks_to_deg(self, ticks: int) -> float:
+        raw = max(0, min(4095, int(ticks)))
+        return (float(raw) / 4095.0) * 270.0
+
     def _bus_checksum(self, payload: bytes) -> int:
         s = sum(payload) & 0xFF
         if self._bus_checksum_mode == "xor":
@@ -868,6 +1337,88 @@ class SentryV2Comm:
         chk = self._bus_checksum(payload)
         return b"\xFF\xFF" + payload + bytes([chk])
 
+    def _build_read_packet(self, servo_id: int, register_addr: int, read_len: int) -> bytes:
+        sid = int(servo_id) & 0xFF
+        addr = int(register_addr) & 0xFF
+        size = max(1, min(8, int(read_len)))
+        payload = bytes([sid, 0x04, 0x02, addr, size])
+        chk = self._bus_checksum(payload)
+        return b"\xFF\xFF" + payload + bytes([chk])
+
+    def _extract_bus_reply_payload(self, response: bytes, servo_id: int) -> Optional[bytes]:
+        data = bytes(response or b"")
+        start = -1
+        header_len = 0
+        for candidate in (b"\xFF\xFF", b"\xFF\xF5"):
+            idx = data.find(candidate)
+            if idx >= 0:
+                start = idx
+                header_len = len(candidate)
+                break
+        if start < 0 or len(data) < start + header_len + 4:
+            return None
+        packet = data[start:]
+        packet = packet[header_len - 2:]
+        if len(packet) < 6 or packet[2] != (int(servo_id) & 0xFF):
+            return None
+        declared_len = int(packet[3])
+        total_len = declared_len + 4
+        if declared_len < 2 or len(packet) < total_len:
+            return None
+        packet = packet[:total_len]
+        checksum = self._bus_checksum(packet[2:-1])
+        if checksum != packet[-1]:
+            return None
+        if packet[4] != 0x00:
+            return None
+        return bytes(packet[5:-1])
+
+    def _read_bus_servo_register(
+        self,
+        servo_id: int,
+        register_addr: int,
+        read_len: int,
+        *,
+        timeout_s: float = 0.06,
+    ) -> Optional[int]:
+        with self._lock:
+            bus_ser = self._bus_ser
+        if bus_ser is None or not bus_ser.is_open:
+            return None
+        try:
+            with self._bus_io_lock:
+                try:
+                    bus_ser.reset_input_buffer()
+                except Exception:
+                    pass
+                bus_ser.write(self._build_read_packet(servo_id, register_addr, read_len))
+                try:
+                    bus_ser.flush()
+                except Exception:
+                    pass
+
+                end = time.time() + float(timeout_s)
+                buf = bytearray()
+                while time.time() < end and len(buf) < 64:
+                    try:
+                        chunk = bus_ser.read(64)
+                    except Exception:
+                        chunk = b""
+                    if chunk:
+                        buf.extend(chunk)
+                        payload = self._extract_bus_reply_payload(bytes(buf), servo_id)
+                        if payload is not None and len(payload) >= int(read_len):
+                            value = 0
+                            for byte in payload[: int(read_len)]:
+                                value = (value << 8) | int(byte)
+                            return value
+                    else:
+                        time.sleep(0.005)
+        except Exception as exc:
+            with self._lock:
+                self._servo_feedback["last_error"] = str(exc)
+        return None
+
     def _bus_servo_reply_matches_servo(self, rx: bytes, servo_id: int) -> bool:
         try:
             data = bytes(rx or b"")
@@ -879,32 +1430,34 @@ class SentryV2Comm:
         try:
             if active_ser is None or not active_ser.is_open:
                 return b""
-            try:
-                active_ser.reset_input_buffer()
-            except Exception:
-                pass
-            active_ser.write(self._build_ping_packet(servo_id))
-            try:
-                active_ser.flush()
-            except Exception:
-                pass
-
-            end = time.time() + float(timeout_s)
-            buf = bytearray()
-            while time.time() < end and len(buf) < 64:
+            with self._bus_io_lock:
                 try:
-                    chunk = active_ser.read(64)
+                    active_ser.reset_input_buffer()
                 except Exception:
-                    chunk = b""
-                if chunk:
-                    buf.extend(chunk)
-                    if len(buf) >= 4:
-                        break
-                else:
-                    time.sleep(0.01)
+                    pass
+                active_ser.write(self._build_ping_packet(servo_id))
+                try:
+                    active_ser.flush()
+                except Exception:
+                    pass
+
+                end = time.time() + float(timeout_s)
+                buf = bytearray()
+                while time.time() < end and len(buf) < 64:
+                    try:
+                        chunk = active_ser.read(64)
+                    except Exception:
+                        chunk = b""
+                    if chunk:
+                        buf.extend(chunk)
+                        if len(buf) >= 4:
+                            break
+                    else:
+                        time.sleep(0.01)
             
-            # Validate response: must start with 0xFF 0xFF (servo response header)
-            if len(buf) >= 4 and buf[0] == 0xFF and buf[1] == 0xFF:
+            # Accept both direct-servo replies (FF FF ...) and the observed
+            # debug-board forwarded reply header (FF F5 ...).
+            if len(buf) >= 4 and buf[0] == 0xFF and buf[1] in (0xFF, 0xF5):
                 return bytes(buf)
             else:
                 # Not a valid servo response - return empty to indicate no servo detected
@@ -953,13 +1506,21 @@ class SentryV2Comm:
         tilt: float,
         move_time_ms: Optional[int] = None,
     ) -> bool:
+        # CHANGE WARNING: This write path shares the Debug Board serial link with
+        # background feedback polling. Keep actual packet writes inside the bus IO
+        # lock and push the next feedback poll out so engagement bursts do not
+        # deadlock into repeated write timeouts on marginal hardware.
         """Send pan/tilt to debug board via bus servo binary packets."""
+        now = time.time()
         with self._lock:
             bus_ser = self._bus_ser
             pan_servo_id = self.pan_servo_id
             tilt_servo_id = self.tilt_servo_id
             checksum_mode = str(self._bus_checksum_mode or "auto").lower()
             default_move_time = self.bus_servo_time_ms
+            last_pan_ticks = self._last_bus_pan_ticks
+            last_tilt_ticks = self._last_bus_tilt_ticks
+            allow_axis_dedup = self._has_fresh_servo_feedback_locked(now)
         try:
             if bus_ser is None or not bus_ser.is_open:
                 return False
@@ -967,21 +1528,38 @@ class SentryV2Comm:
             move_time = max(0, min(1000, move_time))
             pan_ticks = self._deg_to_ticks(pan)
             tilt_ticks = self._deg_to_ticks(tilt)
+            send_pan = True
+            send_tilt = True
+            if allow_axis_dedup:
+                send_pan = last_pan_ticks is None or pan_ticks != int(last_pan_ticks)
+                send_tilt = last_tilt_ticks is None or tilt_ticks != int(last_tilt_ticks)
+
+            if not send_pan and not send_tilt:
+                self._last_cmd = f"BUS hold P{pan:.0f} T{tilt:.0f} @{move_time}ms [{checksum_mode}]"
+                return True
 
             def _write_pair(candidate_mode: str) -> None:
                 original_mode = self._bus_checksum_mode
                 self._bus_checksum_mode = candidate_mode
                 try:
-                    pan_pkt = self._build_servo_packet(pan_servo_id, pan_ticks, move_time)
-                    tilt_pkt = self._build_servo_packet(tilt_servo_id, tilt_ticks, move_time)
+                    pan_pkt = self._build_servo_packet(pan_servo_id, pan_ticks, move_time) if send_pan else None
+                    tilt_pkt = self._build_servo_packet(tilt_servo_id, tilt_ticks, move_time) if send_tilt else None
                 finally:
                     self._bus_checksum_mode = original_mode
-                bus_ser.write(pan_pkt)
-                bus_ser.write(tilt_pkt)
-                try:
-                    bus_ser.flush()
-                except Exception:
-                    pass
+                with self._bus_io_lock:
+                    if pan_pkt is not None:
+                        bus_ser.write(pan_pkt)
+                    if tilt_pkt is not None:
+                        bus_ser.write(tilt_pkt)
+                    try:
+                        bus_ser.flush()
+                    except Exception:
+                        pass
+                with self._lock:
+                    if pan_pkt is not None:
+                        self._last_bus_pan_ticks = pan_ticks
+                    if tilt_pkt is not None:
+                        self._last_bus_tilt_ticks = tilt_ticks
 
             if checksum_mode == "auto":
                 for candidate_mode in ("sub", "xor"):
@@ -990,9 +1568,25 @@ class SentryV2Comm:
             else:
                 _write_pair(checksum_mode)
 
-            self._last_cmd = f"BUS P{pan:.0f} T{tilt:.0f} @{move_time}ms [{checksum_mode}]"
+            self._feedback_last_motion_time = now
+            self._feedback_next_poll_time = max(
+                self._feedback_next_poll_time,
+                now + self._feedback_post_move_delay_s,
+            )
+            sent_axes = []
+            if send_pan:
+                sent_axes.append(f"P{pan:.0f}")
+            if send_tilt:
+                sent_axes.append(f"T{tilt:.0f}")
+            self._last_cmd = f"BUS {' '.join(sent_axes)} @{move_time}ms [{checksum_mode}]"
             return True
         except Exception as e:
+            self._reset_bus_motion_cache()
+            self._feedback_last_motion_time = now
+            self._feedback_next_poll_time = max(
+                self._feedback_next_poll_time,
+                now + self._feedback_waiting_poll_interval_s,
+            )
             self._last_error = str(e)
             return False
 

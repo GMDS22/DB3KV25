@@ -165,6 +165,10 @@ class EngagementConfig:
     auto_trigger_enabled: bool = False
     # --- Trigger mode (False = Water/MOSFET, True = Projectile/BB Servo) ---
     trigger_mode_bb: bool = False
+    # Projectile trigger-servo tuning pushed to the ESP32 at runtime.
+    trigger_servo_rest_deg: int = 0
+    trigger_servo_fire_deg: int = 45
+    trigger_servo_speed_dps: int = 360
     # --- Precision aiming for small / distant targets ---
     precision_aim_enabled: bool = True
     # Seconds to allow PID refinement after initial snap-aim
@@ -311,6 +315,8 @@ class PIRGuardConfig:
     """PIR sensor integration for blind-spot detection."""
     # Master enable/disable for all PIR features
     pir_enabled: bool = False
+    # Blink the ESP32 status LED / GPIO2 mirror when a PIR event is detected.
+    pir_event_blink_enabled: bool = False
     # Number of PIR sensors (typically 3)
     pir_count: int = 3
     # Individual sensor configs
@@ -341,6 +347,13 @@ class PIRGuardConfig:
     # Ignore near-simultaneous events from different PIR sensors so one target
     # crossing overlapping sensor cones is treated as a single zone hit.
     cross_sensor_lockout_ms: int = 800
+
+
+@dataclass
+class SoundConfig:
+    """Runtime sound cue settings."""
+    enabled: bool = True
+    volume_pct: int = 100
 
 
 @dataclass
@@ -393,6 +406,7 @@ class SentryV2Config:
     guard: GuardConfig = field(default_factory=GuardConfig)
     no_fire_masks: List[NoFireMaskConfig] = field(default_factory=list)
     pir_guard: PIRGuardConfig = field(default_factory=PIRGuardConfig)
+    sound: SoundConfig = field(default_factory=SoundConfig)
 
     # --- Overlay / HUD ---
     show_overlay: bool = True
@@ -494,6 +508,7 @@ class SentryV2Config:
             if isinstance(sensor_data, dict):
                 sensors.append(PIRSensorConfig(**sensor_data))
         pir_cfg = PIRGuardConfig(sensors=sensors, **pir_raw)
+        sound_cfg = SoundConfig(**dict(d.get("sound", {})))
         
         return cls(
             connection=cn,
@@ -504,6 +519,7 @@ class SentryV2Config:
             guard=gd,
             no_fire_masks=masks,
             pir_guard=pir_cfg,
+            sound=sound_cfg,
             show_overlay=d.get("show_overlay", True),
             show_threat_scores=d.get("show_threat_scores", False),
             show_engagement_zone=d.get("show_engagement_zone", False),

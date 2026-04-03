@@ -4,12 +4,12 @@ This guide flashes ESP32 firmware sketches using the included Arduino CLI.
 
 Canonical sketch mapping is maintained in [ESP32_CURRENT_SKETCH.md](ESP32_CURRENT_SKETCH.md).
 
-Selected runtime topology: dual ESP32 WiFi.
+Selected runtime topology: Smart Sentry WiFi baseline.
 
-- Primary ESP32 (IO/accessories): WiFi/UDP only during normal operation
-- Secondary ESP32 (servos): WiFi/UDP servo control with integrated Yahboom driver
-- No runtime USB dependency for either board
-- No ESP32 USB serial required at runtime
+- Primary baseline ESP32: WiFi/UDP control for motion, trigger, PIR, relays, and telemetry
+- Optional secondary ESP32: separate WiFi servo board for Dual ESP32 WiFi mode
+- ESP32 USB remains useful for flashing and diagnostics
+- Current single-board WiFi baseline is the Smart Sentry UDP PIR sketch
 
 ## Prereqs
 - Board: ESP32 DevKit v1 (WROOM-32)
@@ -36,7 +36,7 @@ From repo root:
 
 ```powershell
 # Primary ESP32 (IO/accessories) - Full WiFi UDP sketch
-.\tools\flash_esp32_udp.ps1 -Port COM5
+.\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino"
 
 # Secondary ESP32 (servos) - Yahboom Servo Driver UDP sketch
 .\tools\flash_esp32_udp.ps1 -Port COM6 -Sketch "arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino"
@@ -48,7 +48,7 @@ For fully wireless operation with separate boards for IO and servos:
 
 ```powershell
 # Primary ESP32 (IO/accessories/fire/safety/LED/laser/PIR)
-.\tools\flash_esp32_udp.ps1 -Port COM5
+.\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino"
 
 # Secondary ESP32 (Yahboom servo driver board)
 .\tools\flash_esp32_udp.ps1 -Port COM6 -Sketch "arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino"
@@ -82,9 +82,21 @@ Add -InstallCore if you want the script to attempt core install:
 
 ## Sketch Locations
 - Full WiFi UDP runtime:
-	- arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino
+	- arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino
 - USB Serial IO + PIR runtime (current serial/dual-port firmware):
 	- arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
+
+The Smart Sentry WiFi baseline sketch currently adds:
+- GPIO2 status LED / external blink mirror support
+- Runtime projectile trigger-servo rest angle, fire angle, and speed settings
+- Optional PIR-event blink suppression controlled by the app
+- Periodic pan, tilt, and total current telemetry in `state` packets
+
+Upload the Smart Sentry WiFi baseline sketch:
+
+```powershell
+.\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino"
+```
 
 Upload USB Serial IO + PIR sketch:
 
@@ -100,14 +112,16 @@ Upload USB Serial IO + PIR sketch:
 - WiFi AP SSID: DB3000-ESP32
 - WiFi AP password: db3000pass
 - UDP port: 9000
+- Default AP IP: 192.168.4.1
 
 ## Pin Assignments
 - GPIO16: UART2 RX from Debug Board TX
 - GPIO17: UART2 TX to Debug Board RX
+- GPIO2: Status LED / external blink mirror
 - GPIO27: Trigger MOSFET (Water)
 - GPIO13: Trigger Servo (Projectile)
 - GPIO32: LED Relay
 - GPIO33: Laser Relay
 - GPIO36: Pan current sensor
-- GPIO39: Tilt current sensor
-- GPIO34: Total current sensor
+- GPIO39: Tilt current sensor when PIR is disabled, otherwise PIR sensor 2
+- GPIO34: Total current sensor when PIR is disabled, otherwise PIR sensor 1

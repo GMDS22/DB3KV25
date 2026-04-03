@@ -10,5 +10,6 @@ torch>=1.12.0
 scikit-learn>=1.0.0
 yt-dlp>=2025.1.0
 
-# Optional build helper (if using cx_Freeze for portable executable builds)
+# Optional build helpers for portable executable builds
 cx-Freeze>=6.10
+PyInstaller>=6.0

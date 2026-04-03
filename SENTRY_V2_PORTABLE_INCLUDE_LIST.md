@@ -25,6 +25,7 @@ This document defines the intended **portable-only** surface for Smart Sentry v2
 - app/sentry_v2/sentry_v2_tab.py
 - app/sentry_v2/sentry_v2_tooltips.py
 - app/sentry_v2/sentry_v2_video_canvas.py
+- app/sentry_v2/sound_engine.py
 - app/sentry_v2/simple_tracker.py
 - app/sentry_v2/target_filter.py
 - app/sentry_v2/threat_scorer.py
@@ -35,6 +36,10 @@ This document defines the intended **portable-only** surface for Smart Sentry v2
 - app/config/sentry_v2_custom_presets.json
 - app/config/sentry_v2_prompted_targets.json
 - app/LOGO.png
+
+## Compatibility-only mirrored asset
+
+- app/app/config/sentry_v2_settings.json only if legacy settings-path mirroring is intentionally retained; it is not the canonical runtime settings file
 
 ## Required detection model folders
 

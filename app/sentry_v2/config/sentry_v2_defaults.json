@@ -32,7 +32,10 @@
     "max_queue_length": 5,
     "optimize_slew_order": true,
     "return_delay": 1.5,
-    "engagement_speed": 80
+    "engagement_speed": 80,
+    "trigger_servo_rest_deg": 0,
+    "trigger_servo_fire_deg": 45,
+    "trigger_servo_speed_dps": 360
   },
   "guard": {
     "guard_pan": 90.0,
@@ -41,6 +44,14 @@
     "camera_vfov": 45.0,
     "frame_width": 640,
     "frame_height": 480
+  },
+  "pir_guard": {
+    "pir_enabled": false,
+    "pir_event_blink_enabled": false
+  },
+  "sound": {
+    "enabled": true,
+    "volume_pct": 100
   },
   "show_overlay": true,
   "scope_view_enabled": false,

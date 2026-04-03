@@ -7,15 +7,18 @@
 ## Essential Files - Already Exist ✅
 
 ### 1. ESP32 Firmware
-**File**: [arduino/DB3000_ESP32_UDP_PIR/DB3000_ESP32_UDP_PIR.ino](arduino/DB3000_ESP32_UDP_PIR/DB3000_ESP32_UDP_PIR.ino)
+**File**: [arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino](arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino)
 - **Purpose**: Main firmware for Waveshare ESP32 board
 - **Status**: Production-ready (tested with Debug Board communication)
 - **Key Features**:
-  - WiFi AP mode (192.168.4.2 SSID: "DB3000-Turret")
-  - UDP server on port 9001
+  - WiFi AP mode (192.168.4.1 SSID: "DB3000-ESP32")
+  - UDP server on port 9000
   - JSON+CRC32 packet parsing
   - Pan/Tilt servo control (ID1/ID2)
   - UART2 GPIO16/17 support (already present for Debug Board)
+  - GPIO2 status LED / external blink mirror
+  - Runtime trigger-servo tuning and PIR-event blink control
+  - Periodic pan/tilt/total current telemetry in `state` packets
   - Boot diagnostics printed to serial (115,200 baud)
 - **Phase 0 Role**: Flash this to Waveshare board; verify boot messages
 
@@ -35,7 +38,7 @@
 - **Purpose**: Handles all WiFi UDP communication with ESP32
 - **Key Classes**: `SentryV2Comm` (singleton pattern)
 - **Methods Used in Phase 0**:
-  - `connect()` - Establish UDP connection to 192.168.4.2:9001
+  - `connect()` - Establish UDP connection to 192.168.4.1:9000
   - `send_servo_command(pan, tilt, time)` - Send pan/tilt position (in degrees 0-180)
   - Supports "WiFi Full" mode (MODE_WIFI_FULL = 3)
 - **Phase 0 Role**: Already handles UDP packet building; will use existing methods
@@ -48,8 +51,8 @@
 - **Saved Location**: `app/config/sentry_v2_settings.json`
 - **Key Settings for Phase 0**:
   - `connection_type: int` - Set to 3 (MODE_WIFI_FULL)
-  - `esp_ip: str` - Should be "192.168.4.2"
-  - `esp_port: int` - Should be 9001
+  - `udp_host: str` - Should be "192.168.4.1"
+  - `udp_port: int` - Should be 9000
   - `pan_servo_id: int` - Should be 1 (default)
   - `tilt_servo_id: int` - Should be 2 (default)
 - **Phase 0 Role**: Configure connection before testing
@@ -66,10 +69,9 @@
   - Capture any error messages during servo control
 - **Output To Capture**:
   - `[BOOT] DB3000_ESP32_UDP_PIR  v1`
-  - `[BOOT] Starting WiFi AP: "DB3000-Turret"`
-  - `[BOOT] WiFi ready at IP: 192.168.4.2`
+  - `[BOOT] WiFi AP 'DB3000-ESP32': OK  IP=192.168.4.1`
   - `[BOOT] UART2 baud=1000000 RX=GPIO16 TX=GPIO17`
-  - `[UDP] Listening on port 9001`
+  - `[BOOT] UDP port 9000 ready`
 
 ---
 
@@ -78,7 +80,7 @@
 - **Purpose**: Command-line tool to flash firmware to ESP32
 - **Phase 0 Usage**:
   ```bash
-  tools\arduino-cli\arduino-cli.exe upload -p COM31 --fqbn esp32:esp32:esp32 arduino\DB3000_ESP32_UDP_PIR\DB3000_ESP32_UDP_PIR.ino
+  tools\arduino-cli\arduino-cli.exe upload -p COM31 --fqbn esp32:esp32:esp32 arduino\SMART_SENTRY_V2_0_ESP32_UDP_PIR\SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino
   ```
 - **Note**: Replace `COM31` with actual COM port of Waveshare board
 
@@ -138,8 +140,8 @@
   ```json
   {
     "connection_type": 3,
-    "esp_ip": "192.168.4.2",
-    "esp_port": 9001,
+    "udp_host": "192.168.4.1",
+    "udp_port": 9000,
     "pan_servo_id": 1,
     "tilt_servo_id": 2,
     "bus_servo_time_ms": 55
@@ -161,12 +163,9 @@
 - **Expected Content**:
   ```
   [BOOT] DB3000_ESP32_UDP_PIR  v1
-  [BOOT] Pin Setup...
-  [BOOT] Starting WiFi AP: "DB3000-Turret"
-  [BOOT] WiFi ready at IP: 192.168.4.2
+  [BOOT] WiFi AP 'DB3000-ESP32': OK  IP=192.168.4.1
   [BOOT] UART2 baud=1000000 RX=GPIO16 TX=GPIO17
-  [BOOT] Debug Board UART initialized
-  [UDP] Listening on port 9001
+  [BOOT] UDP port 9000 ready
   ```
 
 ---
@@ -216,7 +215,7 @@
 
 | Category | File | Status | Phase 0 Role |
 |----------|------|--------|-------------|
-| **Firmware** | `arduino/DB3000_ESP32_UDP_PIR/DB3000_ESP32_UDP_PIR.ino` | ✅ Exists | Flash to Waveshare |
+| **Firmware** | `arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino` | ✅ Exists | Flash to Waveshare |
 | **GUI** | `run.py` | ✅ Exists | Launch application |
 | **Comm** | `app/sentry_v2/sentry_v2_comm.py` | ✅ Exists | Send pan/tilt commands |
 | **Config** | `app/sentry_v2/sentry_v2_config.py` | ✅ Exists | Manage settings |
@@ -243,7 +242,7 @@
 
 ### Execution Steps
 1. [ ] Identify ESP32 COM port (Device Manager or `python -m serial.tools.list_ports`)
-2. [ ] Flash firmware: `arduino-cli upload -p COMXX --fqbn esp32:esp32:esp32 arduino\DB3000_ESP32_UDP_PIR\DB3000_ESP32_UDP_PIR.ino`
+2. [ ] Flash firmware: `arduino-cli upload -p COMXX --fqbn esp32:esp32:esp32 arduino\SMART_SENTRY_V2_0_ESP32_UDP_PIR\SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino`
 3. [ ] Monitor boot messages: `python read_serial.py` (verify UART2 message appears)
 4. [ ] Connect PC to WiFi "DB3000-Turret" or ensure network routing works
 5. [ ] Launch application: `python run.py`
@@ -273,7 +272,7 @@
 | Board won't flash | `arduino-cli: connection failed` | Check USB cable, COM port, drivers (CH340) |
 | No WiFi connection | Boot hangs at "WiFi init", SSID not visible | Restart router, verify firmware has WiFi enabled |
 | Servos unresponsive | Motors silent, no movement | Check servo power (9-12V), verify power connector |
-| Packet timeout | PC app shows "ESP32 not responding" | Check firewall, verify UDP port 9001 open |
+| Packet timeout | PC app shows "ESP32 not responding" | Check firewall, verify UDP port 9000 open |
 | Boot log not visible | `read_serial.py` can't open port | Install CH340 driver, verify correct COM port |
 | Servo jitter | Servo oscillates ±10°, won't settle | Check power supply ripple, reduce bus servo time |
 | Latency spikes | varies from 20ms to 500ms | WiFi interference, reduce YOLO detection workload |

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 
 def _configure_ml_runtime_env() -> None:
@@ -35,13 +36,18 @@ def _preload_torch_runtime() -> None:
 _configure_ml_runtime_env()
 _preload_torch_runtime()
 
+APP_DIR = Path(__file__).resolve().parent
+app_dir_str = str(APP_DIR)
+if app_dir_str not in sys.path:
+    sys.path.insert(0, app_dir_str)
+
 from PyQt5.QtWidgets import QApplication, QMainWindow
 
 try:
-    from db3k_meta import get_app_title
+    from smart_sentry_meta import get_app_title
 except Exception:
     def get_app_title() -> str:
-        return "Smart Sentry"
+        return "Smart Sentry v2"
 
 try:
     from theme_manager import ThemeManager
@@ -61,7 +67,7 @@ from sentry_v2.sentry_v2_tab import (
 class SentryV2StandaloneWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle(f"{get_app_title()} - Smart Sentry v2")
+        self.setWindowTitle(get_app_title())
 
         self.sentry_v2_tab = SentryV2TabWidget(self)
         self.sentry_v2_tab.set_host_main_window(None)

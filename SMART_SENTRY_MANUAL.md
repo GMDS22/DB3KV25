@@ -2,8 +2,8 @@
 
 > **Version:** 2.1.0  
 > **Module Path:** `app/sentry_v2/`  
-> **Last Updated:** 2026-03-16  
-> **Status:** Verified against current implementation; Smart Sentry v2 now runs as a standalone app, keeps its own settings file, defaults blank camera source to camera `0`, and retains the protected aiming/firing baseline
+> **Last Updated:** 2026-04-04  
+> **Status:** Verified against current implementation; Smart Sentry v2 runs as a standalone app, keeps its canonical runtime settings in `app/config/sentry_v2_settings.json`, mirrors a legacy nested settings copy for compatibility, supports quick-start startup deferral, includes procedural sound controls with transport-aware status, and exposes runtime snapshot export in the live UI.
 
 ---
 
@@ -39,6 +39,14 @@ Smart Sentry v2 is a standalone turret control application launched from the DB3
 
 On single-camera systems, Smart Sentry should normally use camera index `0` unless the operator explicitly selects another camera or stream source.
 
+### Recent Verified Standalone Upgrades
+
+- **Quick startup policy:** launch can defer auto camera open, auto-connect, and YOLO load until the operator requests them
+- **Sound system:** procedural non-blocking buzzer cues now route through `sound_engine.py` and `SentryV2Comm` with transport-aware status and persisted volume
+- **Runtime diagnostics:** the status area now includes pinned hardware-monitor cards plus a live sound-link readout
+- **Snapshot export:** the Controls page can write timestamped JSON and Markdown runtime snapshots under the repo snapshot folder
+- **Settings compatibility:** the canonical runtime settings file remains authoritative while the legacy nested settings file is kept synchronized for compatibility
+
 ### Verified Current Integration Notes
 
 - **Current standalone implementation:** Smart Sentry v2 is no longer hosted inside the main app and no longer depends on pushed main-app frames.
@@ -66,6 +74,8 @@ SentryV2TabWidget (UI host)
 │   ├── TargetFilter      (class/size/zone filtering)
 │   ├── ThreatScorer      (multi-factor threat ranking)
 │   └── EngagementPlanner (queue ordering, pixel→pan/tilt)
+├── SentryV2SoundEngine   (non-blocking procedural tone scheduling)
+├── SentryV2VideoCanvas   (interactive video/status display surface)
 └── SentryV2Overlay       (HUD drawing on frame)
 ```
 
@@ -102,7 +112,7 @@ _show_frame(frame) → QLabel.setPixmap()
 ## 2. FILE REFERENCE
 
 ### `__init__.py` (16 lines)
-Package root. Exports all public classes and defines `__version__ = "2.0.0"`.
+Package root. Exports the primary Smart Sentry v2 runtime classes and defines `__version__ = "2.0.0"`.
 
 **Exports:** `SentryV2Config`, `SentryV2Engine`, `SentryV2State`, `SentryV2Comm`, `SentryV2Detector`, `TargetFilter`, `DetectedObject`, `ThreatScorer`, `TrackedTarget`, `EngagementPlanner`, `EngagementOrder`, `SentryV2Overlay`, `SentryV2TabWidget`
 
@@ -122,11 +132,11 @@ All configuration in `@dataclass` structures with JSON save/load.
 | `ConnectionConfig` | Hardware topology | `connection_type`, ports/bauds, UDP host/port, servo IDs, camera, inversions |
 | `SentryV2Config` | Top-level container | All sub-configs + overlay flags + `save()`/`load()` |
 
-**Persistence:** `app/config/sentry_v2_settings.json` (auto-created)
+**Persistence:** `app/config/sentry_v2_settings.json` (canonical runtime file, auto-created). A synchronized legacy mirror may also be written to `app/app/config/sentry_v2_settings.json` for compatibility with older paths.
 
 ---
 
-### `sentry_v2_tab.py` (~1850 lines)
+### `sentry_v2_tab.py` (~10k+ lines)
 The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 
 **Class:** `SentryV2TabWidget(QWidget)`
@@ -149,15 +159,18 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 
 **UI Tabs Built:**
 1. **Connection** — Port selection, connection modes, camera controls, servo settings
-2. **Detection** — Mode selector, YOLO model loader, contour/color/motion settings
-3. **Filter** — Class whitelist, confidence threshold, size filter, engagement zone
-4. **Scoring** — 7 threat weight sliders
-5. **Engagement** — Burst/cooldown/PID settings, auto-trigger, trigger mode
-6. **Guard** — Guard position, patrol mode, sweep/waypoint/random parameters
-7. **Controls** — Manual pan/tilt arrows, fire button, LED/laser/safety toggles
-8. **Status** — Live stats, engagement log
+2. **Master Profiles** — high-level preset families and profile application
+3. **Detection** — Mode selector, YOLO model loader, contour/color/motion settings
+4. **Prompted Targets** — prompted-target library and guided target matching tools
+5. **Target Filter** — Class whitelist, confidence threshold, size filter, engagement zone
+6. **Threat AI** — threat-weight tuning and optional ML refinement controls
+7. **Engage** — Burst/cooldown/PID settings, auto-trigger, trigger mode, aim-lock presets
+8. **Guard** — Guard position, patrol mode, sweep/waypoint/random parameters
+9. **Controls** — Manual pan/tilt matrix, sound controls, runtime snapshot export, LED/laser/safety toggles
 
-**Verified current layout note:** the live UI currently renders 7 settings tabs inside a right-side scroll panel, with the status/log area placed below those tabs rather than as its own tab.
+**Verified current layout note:** the live UI currently renders 9 settings tabs inside a right-side scroll panel, with a pinned header above the tabs and compact Status/Log areas below rather than as separate tabs.
+
+**Verified current runtime note:** the Controls page now includes persisted Sound ON/OFF and volume controls, while the Status area surfaces live sound-link transport state alongside the hardware monitor.
 
 ---
 
@@ -208,6 +221,30 @@ Standalone 4-mode serial/UDP/bus-servo communication.
 **Class:** `SentryV2Comm`
 
 See [Section 3: Connection System](#3-connection-system) for full details.
+
+---
+
+### `sound_engine.py` (~230 lines)
+Non-blocking procedural sound scheduler used by the standalone UI.
+
+**Class:** `SentryV2SoundEngine`
+
+**Responsibilities:**
+- Queue short tone phrases without blocking the UI or comm worker
+- Apply per-event cooldowns for settings, detection, lock, fire, guard, and PIR cues
+- Keep transport details out of the UI by emitting abstract tone requests only
+
+---
+
+### `sentry_v2_video_canvas.py` (~200 lines)
+Interactive video canvas used for the main preview and prompted-target workflows.
+
+**Class:** `SentryV2VideoCanvas`
+
+**Responsibilities:**
+- Display scaled live or static pixmaps with consistent aspect handling
+- Support placeholder imagery/text when the camera is closed
+- Provide an interactive canvas surface for prompted-target selection flows
 
 ---
 

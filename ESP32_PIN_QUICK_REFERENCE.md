@@ -1,4 +1,4 @@
-# ESP32 Pin Quick Reference - DB3000 IO Telemetry with PIR
+# ESP32 Pin Quick Reference - Smart Sentry ESP32 WiFi / PIR Baseline
 
 ## ESP32 GPIO Pin Map
 
@@ -35,6 +35,8 @@ ESP32 Development Board
 |------|------|----------|-----------|
 | 27 | PIN_TRIGGER_MOSFET | Water trigger relay (latching) | Pin 27 |
 | 13 | PIN_TRIGGER_SERVO | Projectile servo trigger (PWM 50Hz) | Pin 13 |
+| 4 | PIN_BUZZER | Passive buzzer / tone output | Pin 4 |
+| 2 | PIN_STATUS_LED | Status LED / external blink mirror | Pin 2 |
 | 32 | PIN_LED_RELAY | LED on/off relay | Pin 32 |
 | 33 | PIN_LASER_RELAY | Laser on/off relay | Pin 33 |
 | 25 | PIN_ACC_RELAY | Accessory relay | Pin 25 |
@@ -51,8 +53,8 @@ ESP32 Development Board
 |------|----------|---------|-----------|
 | 1 | TX0 | USB Serial (Host commands) | USB |
 | 3 | RX0 | USB Serial (Responses) | USB |
-| 16 | TX2 | Debug Board Link | COM9 (optional) |
-| 17 | RX2 | Debug Board Link | COM9 (optional) |
+| 16 | RX2 | Debug Board TX into ESP32 UART2 | Debug Board link |
+| 17 | TX2 | ESP32 TX out to Debug Board UART2 | Debug Board link |
 
 ## Electrical Specifications
 
@@ -82,6 +84,7 @@ Signal Logic:
 - No motion  → LOW  (0V)
 - Motion detected → HIGH (3.3V) for 1-5 seconds
 - Debounce in firmware: 200ms minimum between reports
+- PIR-triggered GPIO2 blinking is firmware-configurable and can be disabled from Smart Sentry.
 ```
 
 ## Breadboard Layout Example
@@ -130,6 +133,7 @@ PC Running Smart Sentry
 │  - 3V3 ←─ +3.3V from USB   │
 │                             │
 │  Outputs:                   │
+│  - GPIO 2  → [LED] Status   │
 │  - GPIO 27 → [MOSFET] Water │
 │  - GPIO 13 → [PWM] Servo    │
 │  - GPIO 32 → [Relay] LED    │
@@ -172,6 +176,10 @@ GND, 3V3, 36, 39, 34, 35, 32, 33, 25, 26, 19, 18, 17, 16, 4, 0, 2, 15, 13, 12, 1
 ```
 
 ## Firmware Configuration Checklist
+
+- Current WiFi baseline sketch: `arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino`
+- Current USB serial IO sketch: `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
+- GPIO4 passive buzzer is required if Smart Sentry sound cues should play on-board.
 
 ### Before Flashing
 - [ ] Arduino IDE or PlatformIO installed

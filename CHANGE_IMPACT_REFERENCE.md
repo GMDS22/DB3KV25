@@ -108,7 +108,7 @@ A quick-reference help panel for the ESP32 wiring scheme.
 **Access**: `Help -> ESP32 Pin Assignments`
 **Content**: Table in this section is loaded by `open_pin_assignment_window` at runtime so the Help menu stays in sync.
 **Firmware**:
-- UDP link mode: `arduino/DB3000_ESP32_UDP_Link/DB3000_ESP32_UDP_Link.ino`
+- UDP link mode: `arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino`
 - USB serial IO mode (Dual Port primary COM, e.g. COM10): `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino` (current)
 **Flash workflow**: See `ESP32_UDP_FLASH.md` and `tools/flash_esp32_udp.ps1`.
 **Single source of truth for active sketches**: `ESP32_CURRENT_SKETCH.md`.
@@ -117,13 +117,14 @@ A quick-reference help panel for the ESP32 wiring scheme.
 |---|---|---|
 | GPIO16 | UART2 RX (debug board TX - pan/tilt bus) | Serial In |
 | GPIO17 | UART2 TX (debug board RX - pan/tilt bus) | Serial Out |
+| GPIO2 | Status LED / external blink mirror | Digital Out |
 | GPIO27 | Trigger MOSFET (Water) | Digital Out |
 | GPIO13 | Trigger Servo (Projectile) | PWM |
 | GPIO32 | LED Relay | Digital Out |
 | GPIO33 | Laser Relay | Digital Out |
 | GPIO36 | Pan Current Sensor | ADC1 Input |
-| GPIO39 | Tilt Current Sensor | ADC1 Input |
-| GPIO34 | Total Current Sensor | ADC1 Input |
+| GPIO39 | Tilt Current Sensor when PIR is disabled, otherwise PIR sensor 2 | ADC1/Input |
+| GPIO34 | Total Current Sensor when PIR is disabled, otherwise PIR sensor 1 | ADC1/Input |
 
 ---
 
@@ -207,6 +208,16 @@ Whenever you see the instruction "INITIATE SERVO UPGRADE", you MUST review this 
 
 ## 1. Overview
 
+### Smart Sentry v2 Runtime ESP32 Notes
+
+- In Smart Sentry v2 mode 2, the ESP32 WiFi board now owns runtime-configurable projectile trigger-servo tuning (rest angle, fire angle, travel speed) and PIR-event LED blink behavior.
+- Keep app-side saved settings, connect-time UDP config sync, and the flashed `arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino` defaults aligned, or trigger behavior can differ before the first app sync after boot.
+- UI pinout text and connection-mode wording must stay consistent with the actual mode-2 split: Debug Board USB for pan/tilt motion, ESP32 WiFi for trigger/PIR/accessories.
+- Runtime trigger-servo tuning in `app/sentry_v2/sentry_v2_tab.py` must not be gated by connection-type UI assumptions. `app/sentry_v2/sentry_v2_comm.py` is the transport authority and already decides whether those settings go out over serial or UDP.
+- Smart Sentry v2 sound cues follow the same transport-authority rule as trigger runtime sync: `app/sentry_v2/sound_engine.py` should emit abstract tone requests, while `app/sentry_v2/sentry_v2_comm.py` alone decides whether those requests leave over serial `SOUND:<freq>:<duration>` or the ESP32 UDP sound action.
+- In mode 2 specifically, do not treat a live Debug Board USB port as proof that sound is available. Buzzer cues ride the ESP32 WiFi/UDP IO path, so the sound controls and runtime checks must surface when that WiFi side is missing even if pan/tilt movement still works through the Debug Board.
+- The current Smart Sentry WiFi baseline still prints the legacy boot banner `DB3000_ESP32_UDP_PIR  v1`, so sketch-path documentation must be treated as authoritative when validating what is actually flashed.
+
 ### Purpose
 
 This document serves as the **single authoritative reference** for understanding cross-system dependencies and change impacts in the AutoTracker codebase. It exists to **prevent regressions** caused by incomplete modifications.
@@ -230,8 +241,36 @@ This document serves as the **single authoritative reference** for understanding
 ### Smart Sentry v2 Startup Coupling
 
 - Smart Sentry v2 startup behavior is coupled across `app/sentry_v2/sentry_v2_tab.py`, `app/sentry_v2/sentry_v2_config.py`, and `app/config/sentry_v2_settings.json`.
+- If the legacy nested settings file `app/app/config/sentry_v2_settings.json` is kept for compatibility, it must remain an exact mirror of the canonical runtime settings file rather than a second independently tuned profile.
+- Active tracking behavior is now also heavily shaped by the saved runtime profile itself: restrictive YOLO class filters, semantic-confirm thresholds, and aim-lock gates in the saved settings can make Smart Sentry appear motion-dead even when the engine and transport layers are healthy.
 - Launch-time auto camera open, auto-connect, and YOLO auto-load should be treated as a single startup policy, because enabling them together materially changes perceived startup latency and device side effects.
 - If you change Sentry startup defaults, update both the persisted config keys and `RECENT_UPDATES.json`, and verify that manual camera open, manual connect, and manual YOLO load still work from a cold launch.
+- Smart Sentry v2 standalone window height is coupled across `app/run_sentry_v2.py` and the right-pane tab container in `app/sentry_v2/sentry_v2_tab.py`. Because each settings page scrolls internally, the outer settings tab widget must advertise a compact height based on the visible page rather than hidden advanced-page content, or Qt can expand the whole standalone window vertically to fit tabs that are never meant to be shown at once.
+
+### Smart Sentry v2 UI Metadata Coupling
+
+- Smart Sentry v2 tooltip coverage is coupled across preset `tooltip_key` values and control wiring in `app/sentry_v2/sentry_v2_tab.py` and the canonical text dictionary in `app/sentry_v2/sentry_v2_tooltips.py`.
+- New expert controls, preset families, or transport-specific fields should not ship without tooltip text and an explicit `_apply_tooltip(...)` call where applicable; missing entries fail silently and make advanced runtime tuning look undocumented.
+- Manual Movement limit-jump buttons in `app/sentry_v2/sentry_v2_tab.py` must keep using the same clamped absolute-move path as Home and Move to Guard so the UI cannot bypass saved pan/tilt bounds when operators jump straight to min/max positions.
+- The Manual Movement cluster in `app/sentry_v2/sentry_v2_tab.py` now depends on a centered fixed-size control matrix: directional step buttons should stay visually distinct from absolute-position presets, and any new diagonal or corner actions must reuse the same tooltip wiring and guard-clamped move helpers instead of creating ad hoc movement paths.
+- When a Smart Sentry v2 settings row starts packing multiple long preset labels into one horizontal strip, prefer a compact `QComboBox` plus explicit apply button over shrinking text or letting labels clip. The Engage tab's aim-lock and center-fire preset rows are now the reference pattern for this.
+
+### Smart Sentry v2 Runtime Snapshot Coupling
+
+- Runtime snapshot export in `app/sentry_v2/sentry_v2_tab.py` is intentionally read-only and should pull from the existing live objects (`self.config`, `self.engine`, `self._comm`, live camera state, and current YOLO selection/load state) rather than maintain a second shadow runtime model that can drift out of sync.
+- If snapshot content or file locations change, keep the repo-level `snapshots/` output folder, the canonical settings/custom-preset/prompted-library references, and the Markdown summary aligned so exported diagnostics remain portable and immediately useful for bug reports.
+
+### Smart Sentry v2 Hybrid Motion Gate Coupling
+
+- `motion_gate_threshold` in `app/sentry_v2/sentry_v2_config.py` is part of the real runtime gate for Smart Sentry v2 hybrid motion+YOLO modes, not just a UI hint.
+- Detection presets, tooltips, and `app/sentry_v2/sentry_v2_detector.py` must stay aligned for modes 4 and 5; otherwise operators end up tuning a dead control and misdiagnosing detector behavior.
+
+### Smart Sentry v2 Move Dispatch Coupling
+
+- `app/sentry_v2/sentry_v2_tab.py` routes manual arrows, Home/Move to Guard, and engine-driven tracking slews through the same background comm worker before they reach `app/sentry_v2/sentry_v2_comm.py`.
+- Manual recovery commands must keep short-lived priority over automatic tracking updates; otherwise a live tracking frame can overwrite a D-pad/Home command before it is sent, making manual controls look dead even though the transport thread is still healthy.
+- Automatic move coalescing is allowed, but only for other automatic moves. Do not collapse or replace an already-queued manual move with a later engine move.
+- Move failure reporting must stay path-specific. If a movement send fails, do not fall back to unrelated last-command labels from trigger-config or accessory tasks, or runtime logs will misattribute the failure and hide the real broken transport.
 
 ---
 
@@ -1382,6 +1421,12 @@ Sentry Mode is an intelligent guard turret system that learns target movement pa
 - In mode 2, connect-time home/initial movement must use the movement-only path rather than the combined `send_command(...)` path, otherwise a missing ESP32 WiFi link can make startup look like pan/tilt motion is broken even when the Debug Board movement link is fine.
 - Re-test manual Home / Move to Guard behavior after changing queueing, return timing, or PIR cue flow. Those controls are only stable if the engine-side queue and active cue state are canceled before GUARDING resumes.
 - Home / Move to Guard must also reset remembered target aim anchors, loss-recovery anchors, return timers, and patrol anchors. Canceling only the visible queue is not enough; otherwise the next engine tick can still drift back toward stale pre-Home engagement memory after the turret already reached guard.
+- Smart Sentry v2 bus-servo feedback polling in `app/sentry_v2/sentry_v2_comm.py` shares the same Debug Board serial link used for pan/tilt writes. Keep polling conservative and pause briefly after movement commands; aggressive readback can steal bandwidth from movement and make tracking look jittery even when the aim logic is unchanged.
+- Smart Sentry v2 feedback-fed pose sync in `app/sentry_v2/sentry_v2_tab.py` must treat Debug Board readback as delayed telemetry, not immediate ground truth. During active slews, only promote servo feedback into `engine.current_pan/current_tilt` after the commanded move has had time to settle or the measured pose is already close to the commanded target; otherwise precision aim and fire micro-adjustment will chase stale angles and oscillate.
+- Smart Sentry v2 live video responsiveness depends on keeping the own-camera path in `app/sentry_v2/sentry_v2_tab.py` lean: avoid redundant full-frame copies and keep OpenCV capture buffering shallow where the backend supports it. If you reintroduce extra frame cloning or deep camera buffering, the feed can feel sluggish even though tracking logic and detector timing are unchanged.
+- The Smart Sentry v2 pinned Status monitor now combines two telemetry sources: Yahboom bus-servo register reads from the Debug Board COM link for position/voltage/load, and ESP32 WiFi state packets for safety/current-fault/current status. If either parser changes, re-check the top-of-panel monitor together with movement responsiveness so one transport does not silently regress while the other still looks healthy.
+- Yahboom YB-SD35M debug-board replies are not always framed as `FF FF ...`; live captures from the vendor PC software showed valid reply packets starting with `FF F5 ...` for both ping and register reads. Future edits to `app/sentry_v2/sentry_v2_comm.py`, `tools/yahboom_servo_debugger.py`, or any servo test script must preserve support for both `FF FF` and `FF F5` reply headers or Smart Sentry will falsely report `Waiting for first servo feedback reply` even while the servos are answering.
+- Before changing Smart Sentry bus-servo feedback parsing again, run `python test_bus_servo_read.py COMxx --ids 1 2 --register position` or use `tools/yahboom_servo_debugger.py` and confirm the live hardware replies still decode correctly. Treat that validation as required whenever servo feedback logic changes.
 | [app/sentry_mode/path_analyzer.py](app/sentry_mode/path_analyzer.py) | Identifies repeated patterns (Fréchet distance) |
 | [app/sentry_mode/trajectory_predictor.py](app/sentry_mode/trajectory_predictor.py) | Kalman filter predictions |
 | [app/sentry_mode/peripheral_sensor.py](app/sentry_mode/peripheral_sensor.py) | Kill zone detection |

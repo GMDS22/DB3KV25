@@ -441,14 +441,16 @@ class SentryV2Detector:
     #  Hybrid modes
     # ------------------------------------------------------------------ #
 
-    def _has_motion_diff(self, frame: np.ndarray) -> bool:
+    def _has_motion_diff(self, frame: np.ndarray, *, update_prev: bool = True) -> bool:
         """Quick frame-diff motion gate — returns True if motion exceeds threshold."""
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         if self._prev_frame is None:
-            self._prev_frame = gray
+            if update_prev:
+                self._prev_frame = gray
             return False
         diff = cv2.absdiff(self._prev_frame, gray)
-        self._prev_frame = gray.copy()
+        if update_prev:
+            self._prev_frame = gray.copy()
         score = float(np.sum(diff)) / diff.size
         return score > (self.motion_gate_threshold / 100.0)
 
@@ -458,6 +460,8 @@ class SentryV2Detector:
         return self._gate_primary_boxes(backsub_boxes, diff_boxes, min_overlap=0.10)
 
     def _detect_hybrid_diff_yolo(self, frame: np.ndarray) -> list:
+        if not self._has_motion_diff(frame, update_prev=False):
+            return []
         diff_boxes = self._detect_frame_diff(frame)
         if not diff_boxes:
             return []
@@ -467,6 +471,8 @@ class SentryV2Detector:
     def _detect_hybrid_backsub_yolo(self, frame: np.ndarray) -> list:
         backsub_boxes = self._detect_backsub(frame)
         if not backsub_boxes:
+            return []
+        if not self._has_motion_diff(frame):
             return []
         yolo_boxes = self._detect_yolo(frame)
         return self._gate_primary_boxes(yolo_boxes, backsub_boxes, min_overlap=0.12)

@@ -4,6 +4,82 @@
   "items": [
     {
       "date": "2026-04-03",
+      "title": "Smart Sentry v2 sound transport and volume update: app/sentry_v2/sentry_v2_comm.py now checks the actual ESP32 sound transport instead of treating a mode-2 Debug Board USB link as sufficient for buzzer playback, so sound no longer silently queues into a missing WiFi path. app/sentry_v2/sentry_v2_tab.py now adds an always-visible pinned sound row in the Status panel with live transport state plus a persisted volume slider, and arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino now accepts volume_pct in the sound action payload and applies it as buzzer duty level after reflash."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 procedural sound integration: app/sentry_v2/sound_engine.py now schedules non-blocking randomized buzzer cues for settings changes, new detections, tracking movement, aim lock, firing, PIR events, guard scanning, and target loss, while app/sentry_v2/sentry_v2_tab.py adds a persistent Sound ON/OFF toggle and routes tone requests through the existing comm worker so UI responsiveness and transport abstraction are preserved. app/sentry_v2/sentry_v2_comm.py now supports SOUND transport over serial and a dedicated UDP sound action for ESP32-backed modes, and the canonical arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino firmware now drives a passive buzzer on GPIO4 with non-blocking timed tone playback."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Firmware documentation sync: ESP32_CURRENT_SKETCH.md, ESP32_UDP_FLASH.md, CHANGE_IMPACT_REFERENCE.md, PHASE_0_FILES_REQUIRED.md, ESP32_PIN_QUICK_REFERENCE.md, and ESP32_WIFI_UART_DEBUGBOARD_MIGRATION_SUMMARY.md now treat arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino as the canonical Smart Sentry WiFi baseline, correct the WiFi defaults to 192.168.4.1:9000 / SSID DB3000-ESP32, document GPIO2 status LED support and runtime PIR-trigger blink control, and note that the newer sketch still prints the legacy DB3000_ESP32_UDP_PIR boot banner."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 trigger-runtime and tracking-profile correction: app/sentry_v2/sentry_v2_tab.py now pushes projectile trigger-servo runtime tuning through the comm layer for any live transport instead of treating it as WiFi-only, applies those trigger-servo fields when engagement or master presets are loaded, refreshes the trigger travel summary, surfaces an explicit warning if the connect-time initial movement send fails, and keeps move-failure logs tied to movement errors rather than stale trigger-config labels. app/sentry_v2/sentry_v2_comm.py now clears stale error state after successful movement and trigger-runtime sends, while the active canonical and mirrored Sentry v2 settings files have been relaxed away from the overly restrictive person-only sniper profile so YOLO tracking can qualify targets again under normal live use. CHANGE_IMPACT_REFERENCE.md now documents both the transport-authority rule for trigger runtime sync and the risk of misdiagnosing motion failures from saved-profile over-tightening or stale command labels."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 manual-control and diagnostics update: app/sentry_v2/sentry_v2_tab.py now rearranges the Manual Movement panel into a centered fixed-size control matrix, adds one-tap Min/Max Pan and Min/Max Tilt jump buttons plus corner presets that reuse the same clamped absolute-move path as Home/Move to Guard, adds diagonal step buttons with distinct arrow styling, adds an Export Runtime Snapshot action that writes timestamped JSON plus Markdown summaries under the repo snapshots folder using live config, engine, comm, camera, YOLO, and file-reference state, and converts the Engage tab's crowded aim-lock and center-fire preset button strips into compact combo-plus-apply controls so long labels no longer clip inside tight rows. app/sentry_v2/sentry_v2_tooltips.py now documents the expanded movement presets, snapshot export, and preset selectors, and CHANGE_IMPACT_REFERENCE.md records both the manual-control matrix coupling and the requirement for snapshot export to stay sourced from live runtime objects rather than duplicate caches."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 UI review fixes: app/sentry_v2/sentry_v2_tab.py now uses a compact settings-tab container that reports height from the visible scroll page instead of hidden advanced tabs, preventing the standalone window from inflating vertically at startup, and it now wires tooltip coverage into previously undocumented Prompted Targets, no-fire masks, scope-view, PIR lockout, custom master-profile, and guard-overlay controls. app/sentry_v2/sentry_v2_tooltips.py now includes the missing expert-control and preset tooltip text, and CHANGE_IMPACT_REFERENCE.md documents both the compact-tab height coupling and the requirement to keep tooltip metadata aligned with live controls and preset keys."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 live-video latency trim: app/sentry_v2/sentry_v2_tab.py now avoids several redundant full-frame copies on the own-camera path, keeps the cached display frame by reference instead of cloning it again, and requests shallow capture buffering for live OpenCV sources where the backend supports it. This reduces UI-side video sluggishness and lowers end-to-end display latency without changing detector behavior or engagement logic."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 precision pose-sync fix: app/sentry_v2/sentry_v2_tab.py now records when pan/tilt commands were issued and how long the commanded move is expected to take, then refuses to overwrite engine.current_pan/current_tilt with fresh-but-delayed Debug Board servo feedback until that move has had time to settle or the measured pose is already close to the commanded target. This prevents the precision aiming loop from re-basing itself onto stale in-flight readback and repeatedly chasing the wrong angle during live tracking and fire micro-adjustment."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 settings-path and motion-gate correction: app/sentry_v2/sentry_v2_detector.py now makes the existing motion_gate_threshold materially gate the hybrid FrameDiff+YOLO and BackSub+YOLO detector paths before YOLO is trusted, and app/sentry_v2/sentry_v2_tab.py now keeps the legacy nested settings file synchronized with the canonical app/config/sentry_v2_settings.json runtime file during load and save so standalone tuning cannot silently drift between two conflicting Sentry v2 settings copies. CHANGE_IMPACT_REFERENCE.md now documents both couplings so future preset/startup edits keep detector behavior and settings persistence aligned."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 move-dispatch priority fix: app/sentry_v2/sentry_v2_tab.py now uses a small coalescing move queue instead of a single pending move slot, gives manual arrows/Home/Move to Guard a short priority window over engine-generated tracking slews, and prevents automatic tracking updates from overwriting an already-queued manual recovery move before it reaches the Debug Board. This addresses a shared-runtime path where manual controls could appear dead and tracking motion could be collapsed away under live detector/engine activity even though the background comm worker and COM34 transport were still running."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 top-of-panel hardware monitor: app/sentry_v2/sentry_v2_tab.py now pins a live hardware-monitor block at the top of the Status group showing safety/fire-path state, Debug Board servo feedback health, bus-servo voltage, load/torque proxy, and ESP32 current telemetry when available. app/sentry_v2/sentry_v2_comm.py now parses periodic ESP32 WiFi state packets for safety/current-fault/current values and supplements servo position feedback with conservative voltage/load register reads from the Yahboom bus servos. The active arduino/DB3000_ESP32_UDP_PIR/DB3000_ESP32_UDP_PIR.ino source now includes pan/tilt/total current values in its periodic state packet so the UI can show real mA telemetry after the firmware is reflashed." 
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 pan-axis resend safeguard: app/sentry_v2/sentry_v2_comm.py no longer suppresses repeated pan/tilt writes from the Debug Board movement path unless there is fresh live servo feedback proving the last commanded pose is real, and it now clears the remembered bus-servo command cache after a write failure. This prevents a stale 'already sent' cache entry from leaving a non-responding pan axis stuck while the UI and engine continue issuing movement commands in open-loop mode."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 servo-protocol documentation and validation update: CHANGE_IMPACT_REFERENCE.md now records that Yahboom debug-board reply packets may use an FF F5 header and that live validation is required before changing feedback parsing again, while test_bus_servo_read.py has been cleaned up into a reusable validation utility that accepts both FF FF and FF F5 reply headers and can verify readback from explicit servo IDs and named registers on live hardware."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 servo-feedback protocol fix: vendor-captured YB-SD35M replies from the Yahboom debug board were observed to use an FF F5 reply header rather than FF FF, so app/sentry_v2/sentry_v2_comm.py now accepts both reply forms for ping and register-read parsing and tools/yahboom_servo_debugger.py mirrors that same compatibility. This removes the false 'Waiting for first servo feedback reply' state when the servos are actually answering through the debug board."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Local Yahboom servo debug replacement added: tools/yahboom_servo_debugger.py provides a resizable Windows-friendly fallback utility for the YB-SD35M debug board with raw TX/RX logging, port open/close, ping, position read, position write, and ID write support so servo diagnostics no longer depend on the vendor Servo debugging platform v2.1 window layout bug."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 Debug Board bus-IO contention fix: app/sentry_v2/sentry_v2_comm.py now serializes bus-servo ping/readback traffic with pan/tilt write packets on the shared Debug Board COM link, backs feedback polling off more aggressively after movement or repeated no-reply readback attempts, and avoids resending unchanged axis packets on every bus-servo move. This reduces mode-2 Write timeout stalls and cuts unnecessary Debug Board traffic on marginal pan/tilt links while the first servo-feedback reply is still unavailable."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 projectile-trigger runtime tuning update: app/sentry_v2/sentry_v2_tab.py now exposes saved projectile trigger-servo rest angle, fire angle, and travel speed controls, pushes those values to the mode-2 ESP32 over WiFi at connect-time and on change, adds a saved PIR-event LED blink toggle, moves the Connection panel's Connect button above the Connection Mode section, and refreshes the WiFi pinout dialog to show GPIO2 status-mirror wiring and the current WiFi-plus-Debug-USB transport split. The active arduino/DB3000_ESP32_UDP_PIR/DB3000_ESP32_UDP_PIR.ino firmware now applies those trigger-servo settings at runtime and can suppress PIR-driven LED blinking when requested."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "ESP32 mode-2 firmware debug-indicator update: arduino/DB3000_ESP32_UDP_PIR/DB3000_ESP32_UDP_PIR.ino now drives GPIO2 as the explicit status blink output so an external LED can mirror incoming command activity even when the onboard ESP32 LED is hidden inside the turret base."
+    },
+    {
+      "date": "2026-04-03",
+      "title": "Smart Sentry v2 first servo-feedback slice: app/sentry_v2/sentry_v2_comm.py now performs conservative background Debug Board bus-servo position polling for pan and tilt, normalizes that readback into Smart Sentry's logical angle frame, and app/sentry_v2/sentry_v2_tab.py now shows live commanded-versus-measured angle status while also feeding fresh measured pose back into the engine before each frame update. This adds a production readback path for verifying real servo response and lets live tracking plan from measured turret pose without yet introducing a deeper closed-loop controller."
+    },
+    {
+      "date": "2026-04-03",
       "title": "Smart Sentry v2 recovery-status readout: app/sentry_v2/sentry_v2_tab.py now exposes the engine's current loss-recovery phase and most recent reacquire note in the pinned Status panel, so pursuit/local-search/expanding-scan behavior is visible at runtime without relying only on overlay text or serial logs."
     },
     {

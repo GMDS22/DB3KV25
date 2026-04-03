@@ -18,10 +18,13 @@ Provides:
 
 from __future__ import annotations
 
+from collections import deque
 import json
 import os
 import queue
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -35,9 +38,10 @@ from PyQt5.QtWidgets import (
     QSpacerItem, QScrollArea, QDoubleSpinBox, QSpinBox,
     QComboBox, QListWidget, QListWidgetItem, QAbstractItemView,
     QTabWidget, QTextEdit, QGridLayout, QLineEdit, QSplitter, QMessageBox,
+    QProgressBar,
     QFileDialog,
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject, QProcess, QProcessEnvironment
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject, QProcess, QProcessEnvironment, QSize
 from PyQt5.QtGui import QImage, QPixmap, QColor, QIcon
 
 from .sentry_v2_config import (
@@ -61,6 +65,7 @@ from .prompted_targets import (
 )
 from .sentry_v2_video_canvas import SentryV2VideoCanvas
 from .simple_tracker import SimpleBBoxTracker
+from .sound_engine import SentryV2SoundEngine
 from .sentry_v2_tooltips import SENTRY_V2_TOOLTIPS
 from .sentry_v2_config import (
     SENTRY_PAN_MAX,
@@ -77,6 +82,33 @@ class NoWheelScrollFilter(QObject):
         if event.type() == QEvent.Wheel:
             return True  # Block the wheel event
         return super().eventFilter(obj, event)
+
+
+class CompactSettingsTabWidget(QTabWidget):
+    """Tab widget that stays compact because each settings page scrolls independently."""
+
+    _MIN_COMPACT_HEIGHT = 360
+    _MAX_COMPACT_HEIGHT = 640
+
+    def _compact_height(self) -> int:
+        tab_bar = self.tabBar()
+        tab_height = 0
+        if tab_bar is not None:
+            estimated_tab_stack = max(220, self.count() * 38 + 32)
+            tab_height = min(tab_bar.sizeHint().height(), estimated_tab_stack)
+        current = self.currentWidget()
+        page_height = 0
+        if current is not None:
+            page_height = max(current.minimumSizeHint().height(), current.sizeHint().height()) + 24
+        return max(self._MIN_COMPACT_HEIGHT, tab_height, min(max(tab_height, page_height), self._MAX_COMPACT_HEIGHT))
+
+    def minimumSizeHint(self) -> QSize:
+        hint = super().minimumSizeHint()
+        return QSize(hint.width(), self._compact_height())
+
+    def sizeHint(self) -> QSize:
+        hint = super().sizeHint()
+        return QSize(hint.width(), self._compact_height())
 
 
 # Detection mode list (same indices as main app)
@@ -118,10 +150,13 @@ COLOR_PRESETS: List[str] = [
 CUSTOM_MASTER_PRESET_PATH = Path(__file__).resolve().parents[1] / "config" / "sentry_v2_custom_presets.json"
 SENTRY_V2_SETTINGS_PATH = Path(__file__).resolve().parents[1] / "config" / "sentry_v2_settings.json"
 LEGACY_SENTRY_V2_SETTINGS_PATH = Path(__file__).resolve().parents[1] / "app" / "config" / "sentry_v2_settings.json"
+SENTRY_V2_SNAPSHOT_DIR = Path(__file__).resolve().parents[2] / "snapshots"
 SENTRY_V2_PANEL_MIN_WIDTH = 560
 SENTRY_V2_PANEL_DEFAULT_WIDTH = 620
 SENTRY_V2_VIDEO_MIN_WIDTH = 120
 SENTRY_V2_WIDGET_MIN_WIDTH = SENTRY_V2_PANEL_MIN_WIDTH + SENTRY_V2_VIDEO_MIN_WIDTH + 28
+ESP32_DEFAULT_WIFI_SSID = "DB3000-ESP32"
+ESP32_DEFAULT_WIFI_PASSWORD = "db3000pass"
 
 DETECTION_PRESETS = {
     "frame_diff": {
@@ -1258,13 +1293,13 @@ ENGAGEMENT_PRESETS = {
             "cycle_cooldown": 2.00,
             "max_queue_length": 1,
             "optimize_slew_order": False,
-            "engagement_speed": 54,
+            "engagement_speed": 62,
             "precision_aim_enabled": True,
-            "precision_settle_time": 0.62,
-            "precision_max_step": 0.55,
+            "precision_settle_time": 0.50,
+            "precision_max_step": 0.72,
             "precision_deadzone_pan_deg": 0.10,
             "precision_deadzone_tilt_deg": 0.08,
-            "precision_error_ema": 0.46,
+            "precision_error_ema": 0.40,
             "fire_requires_lock": True,
             "aim_lock_pan_tolerance": 0.30,
             "aim_lock_tilt_tolerance": 0.24,
@@ -1292,13 +1327,13 @@ ENGAGEMENT_PRESETS = {
             "cycle_cooldown": 1.30,
             "max_queue_length": 1,
             "optimize_slew_order": False,
-            "engagement_speed": 78,
+            "engagement_speed": 90,
             "precision_aim_enabled": True,
-            "precision_settle_time": 0.28,
-            "precision_max_step": 1.05,
+            "precision_settle_time": 0.20,
+            "precision_max_step": 1.30,
             "precision_deadzone_pan_deg": 0.13,
             "precision_deadzone_tilt_deg": 0.10,
-            "precision_error_ema": 0.36,
+            "precision_error_ema": 0.30,
             "fire_requires_lock": True,
             "aim_lock_pan_tolerance": 0.42,
             "aim_lock_tilt_tolerance": 0.34,
@@ -1326,13 +1361,13 @@ ENGAGEMENT_PRESETS = {
             "cycle_cooldown": 1.00,
             "max_queue_length": 1,
             "optimize_slew_order": False,
-            "engagement_speed": 84,
+            "engagement_speed": 96,
             "precision_aim_enabled": True,
-            "precision_settle_time": 0.22,
-            "precision_max_step": 1.25,
+            "precision_settle_time": 0.14,
+            "precision_max_step": 1.55,
             "precision_deadzone_pan_deg": 0.16,
             "precision_deadzone_tilt_deg": 0.13,
-            "precision_error_ema": 0.34,
+            "precision_error_ema": 0.28,
             "fire_requires_lock": True,
             "aim_lock_pan_tolerance": 0.52,
             "aim_lock_tilt_tolerance": 0.42,
@@ -1360,13 +1395,13 @@ ENGAGEMENT_PRESETS = {
             "cycle_cooldown": 0.90,
             "max_queue_length": 1,
             "optimize_slew_order": False,
-            "engagement_speed": 76,
+            "engagement_speed": 86,
             "precision_aim_enabled": True,
-            "precision_settle_time": 0.32,
-            "precision_max_step": 0.90,
+            "precision_settle_time": 0.22,
+            "precision_max_step": 1.18,
             "precision_deadzone_pan_deg": 0.08,
             "precision_deadzone_tilt_deg": 0.07,
-            "precision_error_ema": 0.50,
+            "precision_error_ema": 0.42,
             "fire_requires_lock": True,
             "aim_lock_pan_tolerance": 0.26,
             "aim_lock_tilt_tolerance": 0.21,
@@ -1394,13 +1429,13 @@ ENGAGEMENT_PRESETS = {
             "cycle_cooldown": 0.75,
             "max_queue_length": 1,
             "optimize_slew_order": False,
-            "engagement_speed": 82,
+            "engagement_speed": 92,
             "precision_aim_enabled": True,
-            "precision_settle_time": 0.26,
-            "precision_max_step": 1.10,
+            "precision_settle_time": 0.16,
+            "precision_max_step": 1.42,
             "precision_deadzone_pan_deg": 0.07,
             "precision_deadzone_tilt_deg": 0.06,
-            "precision_error_ema": 0.54,
+            "precision_error_ema": 0.44,
             "fire_requires_lock": True,
             "aim_lock_pan_tolerance": 0.20,
             "aim_lock_tilt_tolerance": 0.16,
@@ -1428,13 +1463,13 @@ ENGAGEMENT_PRESETS = {
             "cycle_cooldown": 0.55,
             "max_queue_length": 1,
             "optimize_slew_order": False,
-            "engagement_speed": 92,
+            "engagement_speed": 100,
             "precision_aim_enabled": True,
-            "precision_settle_time": 0.18,
-            "precision_max_step": 1.45,
+            "precision_settle_time": 0.10,
+            "precision_max_step": 1.80,
             "precision_deadzone_pan_deg": 0.06,
             "precision_deadzone_tilt_deg": 0.05,
-            "precision_error_ema": 0.58,
+            "precision_error_ema": 0.46,
             "fire_requires_lock": True,
             "aim_lock_pan_tolerance": 0.16,
             "aim_lock_tilt_tolerance": 0.13,
@@ -1462,13 +1497,13 @@ ENGAGEMENT_PRESETS = {
             "cycle_cooldown": 0.60,
             "max_queue_length": 1,
             "optimize_slew_order": False,
-            "engagement_speed": 88,
+            "engagement_speed": 94,
             "precision_aim_enabled": True,
-            "precision_settle_time": 0.22,
-            "precision_max_step": 1.20,
+            "precision_settle_time": 0.14,
+            "precision_max_step": 1.48,
             "precision_deadzone_pan_deg": 0.07,
             "precision_deadzone_tilt_deg": 0.06,
-            "precision_error_ema": 0.52,
+            "precision_error_ema": 0.42,
             "fire_requires_lock": True,
             "aim_lock_pan_tolerance": 0.22,
             "aim_lock_tilt_tolerance": 0.18,
@@ -1496,13 +1531,13 @@ ENGAGEMENT_PRESETS = {
             "cycle_cooldown": 2.50,
             "max_queue_length": 1,
             "optimize_slew_order": False,
-            "engagement_speed": 68,
+            "engagement_speed": 78,
             "precision_aim_enabled": True,
-            "precision_settle_time": 0.38,
-            "precision_max_step": 0.80,
+            "precision_settle_time": 0.26,
+            "precision_max_step": 1.05,
             "precision_deadzone_pan_deg": 0.10,
             "precision_deadzone_tilt_deg": 0.08,
-            "precision_error_ema": 0.50,
+            "precision_error_ema": 0.42,
             "fire_requires_lock": True,
             "aim_lock_pan_tolerance": 0.40,
             "aim_lock_tilt_tolerance": 0.32,
@@ -1848,6 +1883,24 @@ QWidget#sentryV2Root QPushButton[buttonRole="dpad"]:pressed {
     background-color: #223446;
     border-color: #4f7599;
 }
+QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"] {
+    background-color: #2f4760;
+    border: 1px solid #7ea9d0;
+    border-radius: 12px;
+    color: #f7fbff;
+    font-weight: 700;
+    font-size: 15px;
+    min-height: 40px;
+    padding: 6px 8px;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"]:hover {
+    background-color: #395676;
+    border-color: #95c1e7;
+}
+QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"]:pressed {
+    background-color: #253a4d;
+    border-color: #628db5;
+}
 QWidget#sentryV2Root QPushButton[buttonRole="mode"] {
     background-color: #234033;
     border-color: #366a53;
@@ -2021,6 +2074,7 @@ class SentryV2TabWidget(QWidget):
     _cam_url_ready = pyqtSignal(str, str, int, int, int)             # display_label, source_text, w, h, gen
     _cam_url_status = pyqtSignal(str)                                # live status text from URL-open bg thread
     _yolo_load_result = pyqtSignal(bool, str, str)                   # ok, model_name, error_text
+    wifi_autojoin_result = pyqtSignal(bool, str)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -2035,7 +2089,10 @@ class SentryV2TabWidget(QWidget):
         self._comm.invert_pan = self.config.connection.invert_pan
         self._comm.invert_tilt = self.config.connection.invert_tilt
         self._comm.trigger_mode_bb = self.config.engagement.trigger_mode_bb
+        self._sync_comm_runtime_settings_from_config()
         self._comm.set_on_pir_event(self._emit_comm_pir_event)
+        self._sound_engine = SentryV2SoundEngine(self._queue_sound_tone)
+        self._sound_engine.set_enabled(bool(getattr(self.config.sound, "enabled", True)))
 
         # Standalone detector
         self._detector = SentryV2Detector()
@@ -2097,6 +2154,8 @@ class SentryV2TabWidget(QWidget):
         self._burst_phase_on: bool = False
         self._last_commanded_pan: float = self.config.guard.guard_pan
         self._last_commanded_tilt: float = self.config.guard.guard_tilt
+        self._last_commanded_pose_time_s: float = 0.0
+        self._last_commanded_move_time_ms: int = self._get_manual_move_time_ms()
         self._last_tracking_move_time_ms: int = 0
         self._last_tracking_suppression_s: float = 0.0
         self._last_reacquire_note_seen: str = ""
@@ -2106,6 +2165,13 @@ class SentryV2TabWidget(QWidget):
         self._last_detected_objects: List[DetectedObject] = []
         self._last_display_frame: Optional[np.ndarray] = None
         self._last_raw_frame: Optional[np.ndarray] = None
+        self._sound_prev_visible_targets: int = 0
+        self._sound_prev_qualified_targets: int = 0
+        self._sound_lock_active: bool = False
+        self._last_sound_transport_warn_s: float = 0.0
+        self._pir_last_event_sensor: Optional[int] = None
+        self._pir_last_event_time_s: float = 0.0
+        self._pir_event_count: int = 0
         self._last_camera_source_text: str = str(self.config.connection.camera_source or "").strip() or "0"
         self._last_camera_width: int = int(self.config.connection.camera_width)
         self._last_camera_height: int = int(self.config.connection.camera_height)
@@ -2126,7 +2192,9 @@ class SentryV2TabWidget(QWidget):
         self._connection_busy: bool = False
         self._comm_task_queue: "queue.Queue[object]" = queue.Queue()
         self._pending_move_lock = threading.Lock()
-        self._pending_move_command: Optional[Tuple[float, float, int, int]] = None
+        self._pending_move_commands = deque()
+        self._manual_move_priority_until: float = 0.0
+        self._manual_position_hold_s: float = 1.25
         self._comm_worker_stop = threading.Event()
         self._comm_worker = threading.Thread(target=self._comm_worker_loop, name="sentry-v2-comm-worker", daemon=True)
         self._comm_worker.start()
@@ -2161,15 +2229,29 @@ class SentryV2TabWidget(QWidget):
         self._yolo_loading: bool = False
         self._startup_autoconnect_active: bool = False
         self._startup_autoconnect_retry: int = 0
+        self._pending_quiet_save: bool = False
+        self._last_wifi_autojoin_attempt_s: float = 0.0
+        self._last_wifi_link_refresh_s: float = 0.0
+        self._wifi_autojoin_inflight: bool = False
+        self._wifi_runtime_refresh_inflight: bool = False
+        self._last_wifi_autojoin_note: str = ""
 
         # Build UI
         self._build_ui()
         self._apply_theme()
 
+        self._quiet_save_timer = QTimer(self)
+        self._quiet_save_timer.setSingleShot(True)
+        self._quiet_save_timer.timeout.connect(self._flush_quiet_config_save)
+
         # Status refresh timer
         self._status_timer = QTimer(self)
         self._status_timer.timeout.connect(self._refresh_status)
-        self._status_timer.start(500)
+        self._status_timer.start(1200)
+        self._link_watchdog_timer = QTimer(self)
+        self._link_watchdog_timer.timeout.connect(self._connection_watchdog_tick)
+        self._link_watchdog_timer.start(2000)
+        self.wifi_autojoin_result.connect(self._on_wifi_autojoin_result)
         self._schedule_startup_tasks()
 
     def _load_settings_config(self) -> SentryV2Config:
@@ -2190,8 +2272,22 @@ class SentryV2TabWidget(QWidget):
                 cfg.save(str(canonical))
             except Exception as exc:
                 print(f"[SENTRY_V2_TAB] Failed to migrate legacy settings to canonical path: {exc}", flush=True)
+        self._sync_legacy_settings_copy(cfg)
 
         return cfg
+
+    def _sync_legacy_settings_copy(self, cfg: Optional[SentryV2Config] = None) -> None:
+        """Keep the legacy nested settings path aligned with the canonical runtime file."""
+        cfg = cfg or self.config
+        if cfg is None:
+            return
+        try:
+            cfg.save(str(LEGACY_SENTRY_V2_SETTINGS_PATH))
+        except Exception as exc:
+            if hasattr(self, "_log_text") and getattr(self, "_log_text", None) is not None:
+                self._log(f"Legacy settings sync error: {exc}")
+            else:
+                print(f"[SENTRY_V2_TAB] Legacy settings sync error: {exc}", flush=True)
 
     def _portable_path_string(self, path_obj: Path) -> str:
         """Prefer repo-relative paths so settings stay portable across machines."""
@@ -2272,16 +2368,23 @@ class SentryV2TabWidget(QWidget):
         self._comm_worker_stop.set()
         self._detector_worker_stop.set()
         with self._pending_move_lock:
-            self._pending_move_command = None
+            self._pending_move_commands.clear()
+            self._manual_move_priority_until = 0.0
         with self._detector_frame_lock:
             self._detector_pending_frame = None
         try:
             self._comm_task_queue.put_nowait(None)
         except Exception:
             pass
+        try:
+            self._sound_engine.close()
+        except Exception:
+            pass
         self._cam_timer.stop()
         self._burst_timer.stop()
         self._status_timer.stop()
+        self._link_watchdog_timer.stop()
+        self._quiet_save_timer.stop()
         try:
             self.engine.stop()
         except Exception:
@@ -2308,7 +2411,7 @@ class SentryV2TabWidget(QWidget):
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(4, 4, 4, 4)
-        # CHANGE WARNING: Keep settings tab pages horizontally ignorable so hidden page size hints do not force the right pane wider than the visible viewport.
+        # CHANGE WARNING: Keep the settings tab container compact in both axes. Hidden pages must not force the right pane wider or taller than the visible viewport because each page already scrolls independently.
 
         self._main_splitter = QSplitter(Qt.Horizontal)
         self._main_splitter.setChildrenCollapsible(False)
@@ -2373,12 +2476,13 @@ class SentryV2TabWidget(QWidget):
         panel_layout.addWidget(pinned_top)
 
         # Sub-tabs for settings categories
-        self._settings_tabs = QTabWidget()
+        self._settings_tabs = CompactSettingsTabWidget()
         self._settings_tabs.setTabPosition(QTabWidget.West)
         self._settings_tabs.setUsesScrollButtons(False)
         self._settings_tabs.tabBar().setExpanding(False)
         self._settings_tabs.tabBar().setElideMode(Qt.ElideNone)
-        self._settings_tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self._settings_tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        self._settings_tabs.currentChanged.connect(lambda _index: QTimer.singleShot(0, self._settings_tabs.updateGeometry))
 
         self._settings_tabs.addTab(self._wrap_settings_tab(self._build_connection_tab()), "Connection")
         self._settings_tabs.addTab(self._wrap_settings_tab(self._build_master_profiles_tab()), "Master Profiles")
@@ -2459,6 +2563,8 @@ class SentryV2TabWidget(QWidget):
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setMinimumHeight(0)
+        scroll.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
         scroll.setWidget(content)
         return scroll
 
@@ -2724,14 +2830,17 @@ class SentryV2TabWidget(QWidget):
         select_row.addWidget(QLabel("Saved preset:"))
         self._combo_custom_master_profiles = QComboBox()
         self._combo_custom_master_profiles.currentIndexChanged.connect(self._on_custom_master_profile_selected)
+        self._apply_tooltip(self._combo_custom_master_profiles, "custom_master_profile_select")
         select_row.addWidget(self._combo_custom_master_profiles, 1)
         btn_use_active_custom = QPushButton("Use Active")
         self._set_button_role(btn_use_active_custom, "utility")
         btn_use_active_custom.clicked.connect(self._select_active_custom_master_profile_for_edit)
+        self._apply_tooltip(btn_use_active_custom, "custom_master_use_active")
         select_row.addWidget(btn_use_active_custom)
         btn_new_custom = QPushButton("New")
         self._set_button_role(btn_new_custom, "utility")
         btn_new_custom.clicked.connect(self._clear_custom_master_profile_editor)
+        self._apply_tooltip(btn_new_custom, "custom_master_new")
         select_row.addWidget(btn_new_custom)
         save_lay.addLayout(select_row)
 
@@ -2739,14 +2848,17 @@ class SentryV2TabWidget(QWidget):
         save_row.addWidget(QLabel("Preset name:"))
         self._edit_custom_master_name = QLineEdit()
         self._edit_custom_master_name.setPlaceholderText("Example: Yellow Indoor Sniper")
+        self._apply_tooltip(self._edit_custom_master_name, "custom_master_name")
         save_row.addWidget(self._edit_custom_master_name, 1)
         self._btn_update_custom_master = QPushButton("Update Selected")
         self._set_button_role(self._btn_update_custom_master, "utility")
         self._btn_update_custom_master.clicked.connect(self._update_selected_custom_master_profile)
+        self._apply_tooltip(self._btn_update_custom_master, "custom_master_update")
         save_row.addWidget(self._btn_update_custom_master)
         btn_save_custom = QPushButton("Save As New")
         self._set_button_role(btn_save_custom, "utility")
         btn_save_custom.clicked.connect(self._save_new_custom_master_profile)
+        self._apply_tooltip(btn_save_custom, "custom_master_save_as_new")
         save_row.addWidget(btn_save_custom)
         save_lay.addLayout(save_row)
         self._lbl_custom_master_info = QLabel(
@@ -2949,6 +3061,15 @@ class SentryV2TabWidget(QWidget):
 
         lay.addWidget(cam_grp)
 
+        # Connect / disconnect
+        btn_row = QHBoxLayout()
+        self._btn_connect = QPushButton("Connect")
+        self._set_button_role(self._btn_connect, "primary")
+        self._btn_connect.clicked.connect(self._toggle_connection)
+        self._apply_tooltip(self._btn_connect, "connect_toggle")
+        btn_row.addWidget(self._btn_connect)
+        lay.addLayout(btn_row)
+
         # Connection mode selector
         type_grp = QGroupBox("Connection Mode")
         type_lay = QVBoxLayout(type_grp)
@@ -3126,15 +3247,6 @@ class SentryV2TabWidget(QWidget):
         self._apply_tooltip(self._chk_invert_tilt, "invert_tilt")
         inv_lay.addWidget(self._chk_invert_tilt)
         lay.addWidget(inv_grp)
-
-        # Connect / disconnect
-        btn_row = QHBoxLayout()
-        self._btn_connect = QPushButton("Connect")
-        self._set_button_role(self._btn_connect, "primary")
-        self._btn_connect.clicked.connect(self._toggle_connection)
-        self._apply_tooltip(self._btn_connect, "connect_toggle")
-        btn_row.addWidget(self._btn_connect)
-        lay.addLayout(btn_row)
 
         # Status
         self._lbl_conn_status = QLabel("Disconnected")
@@ -3396,12 +3508,15 @@ class SentryV2TabWidget(QWidget):
         self._chk_prompted_enabled = QCheckBox("Enable Prompted Targets")
         self._chk_prompted_enabled.setChecked(bool(self.config.prompted_targets_enabled))
         self._chk_prompted_enabled.toggled.connect(self._on_prompted_settings_changed)
+        self._apply_tooltip(self._chk_prompted_enabled, "prompted_enabled")
         runtime_lay.addWidget(self._chk_prompted_enabled)
         self._chk_prompted_auto_fire = QCheckBox("Allow Auto-Fire For Prompted Matches")
         self._chk_prompted_auto_fire.setChecked(bool(self.config.prompted_allow_auto_fire))
         self._chk_prompted_auto_fire.toggled.connect(self._on_prompted_settings_changed)
+        self._apply_tooltip(self._chk_prompted_auto_fire, "prompted_auto_fire")
         runtime_lay.addWidget(self._chk_prompted_auto_fire)
         self._chk_prompted_append_selected = QCheckBox("Append imports to selected target")
+        self._apply_tooltip(self._chk_prompted_append_selected, "prompted_append_selected")
         runtime_lay.addWidget(self._chk_prompted_append_selected)
         lay.addWidget(runtime_grp)
 
@@ -3410,6 +3525,7 @@ class SentryV2TabWidget(QWidget):
         naming_lay.addWidget(QLabel("Base name:"))
         self._edit_prompted_name = QLineEdit()
         self._edit_prompted_name.setPlaceholderText("Example: Yellow Drill")
+        self._apply_tooltip(self._edit_prompted_name, "prompted_name")
         naming_lay.addWidget(self._edit_prompted_name, 1)
         lay.addWidget(naming_grp)
 
@@ -3418,14 +3534,17 @@ class SentryV2TabWidget(QWidget):
         self._btn_prompted_live = QPushButton("Add From Live")
         self._set_button_role(self._btn_prompted_live, "primary")
         self._btn_prompted_live.clicked.connect(self._toggle_prompted_live_capture)
+        self._apply_tooltip(self._btn_prompted_live, "prompted_live")
         import_lay.addWidget(self._btn_prompted_live, 0, 0)
         self._btn_prompted_image = QPushButton("Browse Image")
         self._set_button_role(self._btn_prompted_image, "utility")
         self._btn_prompted_image.clicked.connect(self._browse_prompted_image)
+        self._apply_tooltip(self._btn_prompted_image, "prompted_image")
         import_lay.addWidget(self._btn_prompted_image, 0, 1)
         self._btn_prompted_video = QPushButton("Browse Video")
         self._set_button_role(self._btn_prompted_video, "utility")
         self._btn_prompted_video.clicked.connect(self._browse_prompted_video)
+        self._apply_tooltip(self._btn_prompted_video, "prompted_video")
         import_lay.addWidget(self._btn_prompted_video, 0, 2)
         self._lbl_prompted_status = QLabel("")
         self._lbl_prompted_status.setWordWrap(True)
@@ -3438,6 +3557,7 @@ class SentryV2TabWidget(QWidget):
         self._prompted_target_list = QListWidget()
         self._prompted_target_list.itemChanged.connect(self._on_prompted_target_item_changed)
         self._prompted_target_list.itemSelectionChanged.connect(self._on_prompted_target_selected)
+        self._apply_tooltip(self._prompted_target_list, "prompted_target_list")
         library_lay.addWidget(self._prompted_target_list)
 
         detail_grid = QGridLayout()
@@ -3447,12 +3567,14 @@ class SentryV2TabWidget(QWidget):
         self._spin_prompted_min_score.setRange(0.05, 0.99)
         self._spin_prompted_min_score.setSingleStep(0.01)
         self._spin_prompted_min_score.valueChanged.connect(self._on_prompted_profile_settings_changed)
+        self._apply_tooltip(self._spin_prompted_min_score, "prompted_min_score")
         detail_grid.addWidget(self._spin_prompted_min_score, 0, 1)
 
         detail_grid.addWidget(QLabel("Confirm hits:"), 0, 2)
         self._spin_prompted_confirm_hits = QSpinBox()
         self._spin_prompted_confirm_hits.setRange(1, 10)
         self._spin_prompted_confirm_hits.valueChanged.connect(self._on_prompted_profile_settings_changed)
+        self._apply_tooltip(self._spin_prompted_confirm_hits, "prompted_confirm_hits")
         detail_grid.addWidget(self._spin_prompted_confirm_hits, 0, 3)
 
         detail_grid.addWidget(QLabel("Lost timeout:"), 1, 0)
@@ -3461,6 +3583,7 @@ class SentryV2TabWidget(QWidget):
         self._spin_prompted_lost_timeout.setRange(0.10, 10.0)
         self._spin_prompted_lost_timeout.setSingleStep(0.10)
         self._spin_prompted_lost_timeout.valueChanged.connect(self._on_prompted_profile_settings_changed)
+        self._apply_tooltip(self._spin_prompted_lost_timeout, "prompted_lost_timeout")
         detail_grid.addWidget(self._spin_prompted_lost_timeout, 1, 1)
 
         detail_grid.addWidget(QLabel("Search padding:"), 1, 2)
@@ -3468,12 +3591,14 @@ class SentryV2TabWidget(QWidget):
         self._spin_prompted_search_padding.setRange(16, 512)
         self._spin_prompted_search_padding.setSingleStep(8)
         self._spin_prompted_search_padding.valueChanged.connect(self._on_prompted_profile_settings_changed)
+        self._apply_tooltip(self._spin_prompted_search_padding, "prompted_search_padding")
         detail_grid.addWidget(self._spin_prompted_search_padding, 1, 3)
 
         detail_grid.addWidget(QLabel("Global scan every:"), 2, 0)
         self._spin_prompted_global_interval = QSpinBox()
         self._spin_prompted_global_interval.setRange(1, 30)
         self._spin_prompted_global_interval.valueChanged.connect(self._on_prompted_profile_settings_changed)
+        self._apply_tooltip(self._spin_prompted_global_interval, "prompted_global_interval")
         detail_grid.addWidget(self._spin_prompted_global_interval, 2, 1)
 
         self._lbl_prompted_examples = QLabel("Examples: 0")
@@ -3484,14 +3609,17 @@ class SentryV2TabWidget(QWidget):
         self._btn_prompted_rename = QPushButton("Rename")
         self._set_button_role(self._btn_prompted_rename, "utility")
         self._btn_prompted_rename.clicked.connect(self._rename_selected_prompted_target)
+        self._apply_tooltip(self._btn_prompted_rename, "prompted_rename")
         button_row.addWidget(self._btn_prompted_rename)
         self._btn_prompted_remove_last_example = QPushButton("Remove Last")
         self._set_button_role(self._btn_prompted_remove_last_example, "utility")
         self._btn_prompted_remove_last_example.clicked.connect(self._remove_last_prompted_example)
+        self._apply_tooltip(self._btn_prompted_remove_last_example, "prompted_remove_last_example")
         button_row.addWidget(self._btn_prompted_remove_last_example)
         self._btn_prompted_remove = QPushButton("Remove")
         self._set_button_role(self._btn_prompted_remove, "utility")
         self._btn_prompted_remove.clicked.connect(self._remove_selected_prompted_target)
+        self._apply_tooltip(self._btn_prompted_remove, "prompted_remove")
         button_row.addWidget(self._btn_prompted_remove)
         library_lay.addLayout(button_row)
         lay.addWidget(library_grp, 1)
@@ -3741,6 +3869,7 @@ class SentryV2TabWidget(QWidget):
     # ------------------------------------------------------------------ #
 
     def _build_engagement_tab(self) -> QWidget:
+        """CHANGE WARNING: Engagement preset controls here feed directly into live fire-gate tolerances; keep compact UI changes wired to the same preset application methods rather than duplicating tolerance logic."""
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.setContentsMargins(4, 4, 4, 4)
@@ -3793,6 +3922,43 @@ class SentryV2TabWidget(QWidget):
         self._apply_tooltip(self._combo_trigger_mode, "trigger_mode")
         trig_row.addWidget(self._combo_trigger_mode)
         lay.addLayout(trig_row)
+
+        trigger_servo_grp = QGroupBox("Projectile Trigger Servo")
+        trigger_servo_lay = QGridLayout(trigger_servo_grp)
+        trigger_servo_lay.setHorizontalSpacing(6)
+        trigger_servo_lay.setVerticalSpacing(4)
+
+        trigger_servo_lay.addWidget(QLabel("Rest angle:"), 0, 0)
+        self._spin_trigger_servo_rest_deg = QSpinBox()
+        self._spin_trigger_servo_rest_deg.setRange(0, 180)
+        self._spin_trigger_servo_rest_deg.setValue(int(getattr(self.config.engagement, "trigger_servo_rest_deg", 0)))
+        self._spin_trigger_servo_rest_deg.valueChanged.connect(self._on_trigger_servo_settings_changed)
+        self._apply_tooltip(self._spin_trigger_servo_rest_deg, "trigger_servo_rest_deg")
+        trigger_servo_lay.addWidget(self._spin_trigger_servo_rest_deg, 0, 1)
+
+        trigger_servo_lay.addWidget(QLabel("Fire angle:"), 0, 2)
+        self._spin_trigger_servo_fire_deg = QSpinBox()
+        self._spin_trigger_servo_fire_deg.setRange(0, 180)
+        self._spin_trigger_servo_fire_deg.setValue(int(getattr(self.config.engagement, "trigger_servo_fire_deg", 45)))
+        self._spin_trigger_servo_fire_deg.valueChanged.connect(self._on_trigger_servo_settings_changed)
+        self._apply_tooltip(self._spin_trigger_servo_fire_deg, "trigger_servo_fire_deg")
+        trigger_servo_lay.addWidget(self._spin_trigger_servo_fire_deg, 0, 3)
+
+        trigger_servo_lay.addWidget(QLabel("Speed (deg/s):"), 1, 0)
+        self._spin_trigger_servo_speed_dps = QSpinBox()
+        self._spin_trigger_servo_speed_dps.setRange(10, 5000)
+        self._spin_trigger_servo_speed_dps.setSingleStep(10)
+        self._spin_trigger_servo_speed_dps.setValue(int(getattr(self.config.engagement, "trigger_servo_speed_dps", 360)))
+        self._spin_trigger_servo_speed_dps.valueChanged.connect(self._on_trigger_servo_settings_changed)
+        self._apply_tooltip(self._spin_trigger_servo_speed_dps, "trigger_servo_speed_dps")
+        trigger_servo_lay.addWidget(self._spin_trigger_servo_speed_dps, 1, 1)
+
+        self._lbl_trigger_travel = QLabel("")
+        self._lbl_trigger_travel.setStyleSheet("color: #97a8b8; font-size: 10px;")
+        trigger_servo_lay.addWidget(self._lbl_trigger_travel, 1, 2, 1, 2)
+
+        lay.addWidget(trigger_servo_grp)
+        self._refresh_trigger_servo_summary()
 
         # Min threat to engage
         row = QHBoxLayout()
@@ -3922,12 +4088,18 @@ class SentryV2TabWidget(QWidget):
 
         preset_row = QHBoxLayout()
         preset_row.addWidget(QLabel("Preset:"))
+        self._combo_aim_gate_preset = QComboBox()
+        self._compact_combo_box(self._combo_aim_gate_preset, minimum_chars=18)
         for preset_name, preset in AIM_LOCK_FIRE_GATE_PRESETS.items():
-            btn = QPushButton(preset["label"])
-            self._set_button_role(btn, "utility")
-            self._apply_tooltip(btn, preset.get("tooltip_key", ""))
-            btn.clicked.connect(lambda _checked=False, name=preset_name: self._apply_aim_lock_fire_gate_preset(name))
-            preset_row.addWidget(btn)
+            self._combo_aim_gate_preset.addItem(str(preset["label"]), preset_name)
+        self._apply_tooltip(self._combo_aim_gate_preset, "aim_gate_preset_combo")
+        preset_row.addWidget(self._combo_aim_gate_preset, 1)
+
+        btn_apply_aim_gate_preset = QPushButton("Apply Preset")
+        self._set_button_role(btn_apply_aim_gate_preset, "utility")
+        btn_apply_aim_gate_preset.clicked.connect(self._apply_selected_aim_lock_fire_gate_preset)
+        self._apply_tooltip(btn_apply_aim_gate_preset, "aim_gate_preset_combo")
+        preset_row.addWidget(btn_apply_aim_gate_preset)
         preset_row.addStretch(1)
         advanced_lay.addLayout(preset_row, 0, 0, 1, 2)
 
@@ -4010,7 +4182,9 @@ class SentryV2TabWidget(QWidget):
         advanced_lay.addLayout(fire_enter_row, 5, 1)
 
         advanced_lay.addWidget(QLabel("Center fire radius (deg):"), 6, 0)
-        center_radius_row = QHBoxLayout()
+        center_radius_row = QVBoxLayout()
+
+        center_radius_edit_row = QHBoxLayout()
         self._spin_center_fire_radius = QDoubleSpinBox()
         self._spin_center_fire_radius.setRange(0.02, 1.00)
         self._spin_center_fire_radius.setSingleStep(0.01)
@@ -4018,27 +4192,33 @@ class SentryV2TabWidget(QWidget):
         self._spin_center_fire_radius.setValue(
             max(0.02, min(1.0, (self.config.engagement.fire_trigger_enter_pan_tolerance + self.config.engagement.fire_trigger_enter_tilt_tolerance) * 0.5))
         )
-        center_radius_row.addWidget(self._spin_center_fire_radius)
+        self._apply_tooltip(self._spin_center_fire_radius, "center_fire_radius")
+        center_radius_edit_row.addWidget(self._spin_center_fire_radius)
+
         btn_apply_center_radius = QPushButton("Apply Radius")
         self._set_button_role(btn_apply_center_radius, "utility")
         btn_apply_center_radius.clicked.connect(self._on_apply_center_fire_radius)
-        center_radius_row.addWidget(btn_apply_center_radius)
+        self._apply_tooltip(btn_apply_center_radius, "center_fire_radius")
+        center_radius_edit_row.addWidget(btn_apply_center_radius)
+        center_radius_row.addLayout(center_radius_edit_row)
 
-        btn_sniper_small = QPushButton("Sniper Small")
-        self._set_button_role(btn_sniper_small, "utility")
-        btn_sniper_small.clicked.connect(lambda _checked=False: self._apply_sniper_center_radius_profile("small"))
-        center_radius_row.addWidget(btn_sniper_small)
+        center_radius_preset_row = QHBoxLayout()
+        self._combo_center_radius_preset = QComboBox()
+        self._compact_combo_box(self._combo_center_radius_preset, minimum_chars=18)
+        self._combo_center_radius_preset.addItem("Sniper Small", "small")
+        self._combo_center_radius_preset.addItem("Sniper Medium", "medium")
+        self._combo_center_radius_preset.addItem("Sniper Large", "large")
+        self._apply_tooltip(self._combo_center_radius_preset, "center_fire_radius_profile")
+        center_radius_preset_row.addWidget(self._combo_center_radius_preset, 1)
 
-        btn_sniper_medium = QPushButton("Sniper Medium")
-        self._set_button_role(btn_sniper_medium, "utility")
-        btn_sniper_medium.clicked.connect(lambda _checked=False: self._apply_sniper_center_radius_profile("medium"))
-        center_radius_row.addWidget(btn_sniper_medium)
+        btn_apply_center_radius_preset = QPushButton("Load Sniper Preset")
+        self._set_button_role(btn_apply_center_radius_preset, "utility")
+        btn_apply_center_radius_preset.clicked.connect(self._apply_selected_center_radius_profile)
+        self._apply_tooltip(btn_apply_center_radius_preset, "center_fire_radius_profile")
+        center_radius_preset_row.addWidget(btn_apply_center_radius_preset)
+        center_radius_row.addLayout(center_radius_preset_row)
 
-        btn_sniper_large = QPushButton("Sniper Large")
-        self._set_button_role(btn_sniper_large, "utility")
-        btn_sniper_large.clicked.connect(lambda _checked=False: self._apply_sniper_center_radius_profile("large"))
-        center_radius_row.addWidget(btn_sniper_large)
-        self._style_button_row([btn_apply_center_radius, btn_sniper_small, btn_sniper_medium, btn_sniper_large], "utility")
+        self._style_button_row([btn_apply_center_radius, btn_apply_aim_gate_preset, btn_apply_center_radius_preset], "utility")
         advanced_lay.addLayout(center_radius_row, 6, 1)
 
         self._lbl_center_fire_radius_hint = QLabel("")
@@ -4413,6 +4593,7 @@ class SentryV2TabWidget(QWidget):
         self._chk_scope_view = QCheckBox("Enable scope view during ENGAGING")
         self._chk_scope_view.setChecked(self.config.scope_view_enabled)
         self._chk_scope_view.toggled.connect(self._on_scope_view_changed)
+        self._apply_tooltip(self._chk_scope_view, "scope_view_enabled")
         scope_lay.addWidget(self._chk_scope_view)
 
         scope_radius_row = QHBoxLayout()
@@ -4422,6 +4603,7 @@ class SentryV2TabWidget(QWidget):
         self._spin_scope_radius.setSingleStep(1)
         self._spin_scope_radius.setValue(int(self.config.scope_radius_pct))
         self._spin_scope_radius.valueChanged.connect(self._on_scope_view_changed)
+        self._apply_tooltip(self._spin_scope_radius, "scope_radius")
         scope_radius_row.addWidget(self._spin_scope_radius)
         scope_lay.addLayout(scope_radius_row)
 
@@ -4432,6 +4614,7 @@ class SentryV2TabWidget(QWidget):
         self._spin_scope_vignette.setSingleStep(5)
         self._spin_scope_vignette.setValue(int(self.config.scope_vignette_opacity))
         self._spin_scope_vignette.valueChanged.connect(self._on_scope_view_changed)
+        self._apply_tooltip(self._spin_scope_vignette, "scope_vignette")
         scope_vignette_row.addWidget(self._spin_scope_vignette)
         scope_lay.addLayout(scope_vignette_row)
 
@@ -4446,6 +4629,7 @@ class SentryV2TabWidget(QWidget):
         self._edit_mask_name = QLineEdit()
         self._edit_mask_name.setPlaceholderText("No-fire zone name")
         self._edit_mask_name.setText(self._next_no_fire_mask_name())
+        self._apply_tooltip(self._edit_mask_name, "no_fire_mask_name")
         name_row.addWidget(self._edit_mask_name)
         mask_lay.addLayout(name_row)
 
@@ -4453,20 +4637,24 @@ class SentryV2TabWidget(QWidget):
         self._btn_mask_capture.setCheckable(True)
         self._set_button_role(self._btn_mask_capture, "mode")
         self._btn_mask_capture.toggled.connect(self._on_mask_capture_toggled)
+        self._apply_tooltip(self._btn_mask_capture, "no_fire_mask_capture")
         mask_lay.addWidget(self._btn_mask_capture)
 
         draft_row = QHBoxLayout()
         self._btn_mask_finish = QPushButton("Finish Mask")
         self._set_button_role(self._btn_mask_finish, "utility")
         self._btn_mask_finish.clicked.connect(self._finish_no_fire_mask)
+        self._apply_tooltip(self._btn_mask_finish, "no_fire_mask_finish")
         draft_row.addWidget(self._btn_mask_finish)
         self._btn_mask_undo = QPushButton("Undo Vertex")
         self._set_button_role(self._btn_mask_undo, "utility")
         self._btn_mask_undo.clicked.connect(self._undo_no_fire_mask_vertex)
+        self._apply_tooltip(self._btn_mask_undo, "no_fire_mask_undo")
         draft_row.addWidget(self._btn_mask_undo)
         self._btn_mask_clear = QPushButton("Clear Draft")
         self._set_button_role(self._btn_mask_clear, "danger")
         self._btn_mask_clear.clicked.connect(self._clear_no_fire_mask_draft)
+        self._apply_tooltip(self._btn_mask_clear, "no_fire_mask_clear")
         draft_row.addWidget(self._btn_mask_clear)
         mask_lay.addLayout(draft_row)
 
@@ -4482,25 +4670,30 @@ class SentryV2TabWidget(QWidget):
         self._btn_mask_toggle = QPushButton("Toggle Selected")
         self._set_button_role(self._btn_mask_toggle, "utility")
         self._btn_mask_toggle.clicked.connect(self._toggle_selected_no_fire_masks)
+        self._apply_tooltip(self._btn_mask_toggle, "no_fire_mask_toggle")
         manage_row.addWidget(self._btn_mask_toggle)
         self._btn_mask_remove = QPushButton("Remove Selected")
         self._set_button_role(self._btn_mask_remove, "danger")
         self._btn_mask_remove.clicked.connect(self._remove_selected_no_fire_masks)
+        self._apply_tooltip(self._btn_mask_remove, "no_fire_mask_remove")
         manage_row.addWidget(self._btn_mask_remove)
         mask_lay.addLayout(manage_row)
 
         self._chk_show_no_fire_masks = QCheckBox("Show no-fire masks")
         self._chk_show_no_fire_masks.setChecked(self.config.show_no_fire_masks)
         self._chk_show_no_fire_masks.toggled.connect(self._on_overlay_changed)
+        self._apply_tooltip(self._chk_show_no_fire_masks, "show_no_fire_masks")
         mask_lay.addWidget(self._chk_show_no_fire_masks)
 
         self._chk_mask_trace = QCheckBox("Trace mask diagnostics")
         self._chk_mask_trace.setChecked(False)
+        self._apply_tooltip(self._chk_mask_trace, "mask_trace")
         mask_lay.addWidget(self._chk_mask_trace)
 
         self._btn_mask_trace_dump = QPushButton("Dump Snapshot")
         self._set_button_role(self._btn_mask_trace_dump, "utility")
         self._btn_mask_trace_dump.clicked.connect(self._dump_mask_trace_snapshot)
+        self._apply_tooltip(self._btn_mask_trace_dump, "mask_trace_dump")
         mask_lay.addWidget(self._btn_mask_trace_dump)
 
         lay.addWidget(mask_grp)
@@ -4516,6 +4709,12 @@ class SentryV2TabWidget(QWidget):
         self._chk_pir_enabled.toggled.connect(self._on_pir_enabled_changed)
         self._apply_tooltip(self._chk_pir_enabled, "pir_enabled")
         pir_lay.addWidget(self._chk_pir_enabled)
+
+        self._chk_pir_event_blink = QCheckBox("Blink ESP32 GPIO2 LED on PIR event")
+        self._chk_pir_event_blink.setChecked(bool(getattr(self.config.pir_guard, "pir_event_blink_enabled", False)))
+        self._chk_pir_event_blink.toggled.connect(self._on_pir_settings_changed)
+        self._apply_tooltip(self._chk_pir_event_blink, "pir_event_blink_enabled")
+        pir_lay.addWidget(self._chk_pir_event_blink)
 
         pir_hint = QLabel(
             "For roughly 120° physical spacing, keep one sensor as the active owner of a target crossing adjacent PIR cones. "
@@ -4641,6 +4840,7 @@ class SentryV2TabWidget(QWidget):
         self._spin_pir_cross_lockout_ms.setSingleStep(50)
         self._spin_pir_cross_lockout_ms.setValue(int(getattr(self.config.pir_guard, "cross_sensor_lockout_ms", 800)))
         self._spin_pir_cross_lockout_ms.valueChanged.connect(self._on_pir_settings_changed)
+        self._apply_tooltip(self._spin_pir_cross_lockout_ms, "pir_cross_lockout_ms")
         scan_row4.addWidget(self._spin_pir_cross_lockout_ms)
 
         self._btn_pir_layout_120 = QPushButton("Use 120° PIR")
@@ -4679,6 +4879,7 @@ class SentryV2TabWidget(QWidget):
         self._chk_guard_crosshair = QCheckBox("Show guard crosshair")
         self._chk_guard_crosshair.setChecked(self.config.show_guard_crosshair)
         self._chk_guard_crosshair.toggled.connect(self._on_overlay_changed)
+        self._apply_tooltip(self._chk_guard_crosshair, "show_guard_crosshair")
         lay.addWidget(self._chk_guard_crosshair)
 
         self._refresh_no_fire_mask_list()
@@ -4696,6 +4897,7 @@ class SentryV2TabWidget(QWidget):
     # ------------------------------------------------------------------ #
 
     def _build_controls_tab(self) -> QWidget:
+        """CHANGE WARNING: Manual controls here share the same clamped absolute-move path as Home/Move to Guard and now also host runtime snapshot export; keep this tab aligned with guard limits and live runtime state sources."""
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.setContentsMargins(4, 4, 4, 4)
@@ -4730,47 +4932,153 @@ class SentryV2TabWidget(QWidget):
         motion_note.setStyleSheet("color: #97a8b8; font-size: 10px;")
         dpad_lay.addWidget(motion_note)
 
-        # D-pad grid
+        # Centered manual movement grid
+        manual_button_w = 92
+        manual_button_h = 40
+        arrow_symbols = {
+            "up_left": "\u2196",
+            "up": "\u25B2",
+            "up_right": "\u2197",
+            "left": "\u25C0",
+            "right": "\u25B6",
+            "down_left": "\u2199",
+            "down": "\u25BC",
+            "down_right": "\u2198",
+        }
+
         grid = QGridLayout()
-        grid.setHorizontalSpacing(4)
-        grid.setVerticalSpacing(4)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(6)
+        for column in range(5):
+            grid.setColumnStretch(column, 1)
+
+        btn_top_left = QPushButton("TOP LEFT")
+        btn_top_left.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_top_left, "utility")
+        btn_top_left.clicked.connect(lambda: self._move_to_manual_corner("min", "max"))
+        self._apply_tooltip(btn_top_left, "manual_top_left")
+        grid.addWidget(btn_top_left, 0, 0, alignment=Qt.AlignCenter)
+
+        btn_diag_up_left = QPushButton(arrow_symbols["up_left"])
+        btn_diag_up_left.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_diag_up_left, "dpadArrow")
+        btn_diag_up_left.clicked.connect(lambda: self._manual_move(-1, 1))
+        self._apply_tooltip(btn_diag_up_left, "manual_up_left")
+        grid.addWidget(btn_diag_up_left, 0, 1, alignment=Qt.AlignCenter)
+
+        btn_max_tilt = QPushButton("MAX TILT")
+        btn_max_tilt.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_max_tilt, "utility")
+        btn_max_tilt.clicked.connect(lambda: self._move_to_manual_limit("tilt", "max"))
+        self._apply_tooltip(btn_max_tilt, "manual_max_tilt")
+        grid.addWidget(btn_max_tilt, 0, 2, alignment=Qt.AlignCenter)
+
+        btn_diag_up_right = QPushButton(arrow_symbols["up_right"])
+        btn_diag_up_right.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_diag_up_right, "dpadArrow")
+        btn_diag_up_right.clicked.connect(lambda: self._manual_move(1, 1))
+        self._apply_tooltip(btn_diag_up_right, "manual_up_right")
+        grid.addWidget(btn_diag_up_right, 0, 3, alignment=Qt.AlignCenter)
+
+        btn_top_right = QPushButton("TOP RIGHT")
+        btn_top_right.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_top_right, "utility")
+        btn_top_right.clicked.connect(lambda: self._move_to_manual_corner("max", "max"))
+        self._apply_tooltip(btn_top_right, "manual_top_right")
+        grid.addWidget(btn_top_right, 0, 4, alignment=Qt.AlignCenter)
+
         btn_up = QPushButton("\u25B2")  # up arrow
-        btn_up.setFixedSize(66, 54)
-        self._set_button_role(btn_up, "dpad")
+        btn_up.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_up, "dpadArrow")
         btn_up.clicked.connect(lambda: self._manual_move(0, 1))
         self._apply_tooltip(btn_up, "manual_up")
-        grid.addWidget(btn_up, 0, 1)
+        grid.addWidget(btn_up, 1, 2, alignment=Qt.AlignCenter)
+
+        btn_min_pan = QPushButton("MIN PAN")
+        btn_min_pan.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_min_pan, "utility")
+        btn_min_pan.clicked.connect(lambda: self._move_to_manual_limit("pan", "min"))
+        self._apply_tooltip(btn_min_pan, "manual_min_pan")
+        grid.addWidget(btn_min_pan, 2, 0, alignment=Qt.AlignCenter)
 
         btn_left = QPushButton("\u25C0")  # left arrow
-        btn_left.setFixedSize(66, 54)
-        self._set_button_role(btn_left, "dpad")
+        btn_left.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_left, "dpadArrow")
         btn_left.clicked.connect(lambda: self._manual_move(-1, 0))
         self._apply_tooltip(btn_left, "manual_left")
-        grid.addWidget(btn_left, 1, 0)
+        grid.addWidget(btn_left, 2, 1, alignment=Qt.AlignCenter)
 
         btn_home = QPushButton("HOME")
-        btn_home.setFixedSize(84, 62)
+        btn_home.setFixedSize(manual_button_w, manual_button_h)
         self._set_button_role(btn_home, "dpad")
         btn_home.setStyleSheet("font-size: 11px; letter-spacing: 0.5px;")
         self._apply_tooltip(btn_home, "manual_home")
         btn_home.clicked.connect(self._on_home_clicked)
-        grid.addWidget(btn_home, 1, 1)
+        grid.addWidget(btn_home, 2, 2, alignment=Qt.AlignCenter)
 
         btn_right = QPushButton("\u25B6")  # right arrow
-        btn_right.setFixedSize(66, 54)
-        self._set_button_role(btn_right, "dpad")
+        btn_right.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_right, "dpadArrow")
         btn_right.clicked.connect(lambda: self._manual_move(1, 0))
         self._apply_tooltip(btn_right, "manual_right")
-        grid.addWidget(btn_right, 1, 2)
+        grid.addWidget(btn_right, 2, 3, alignment=Qt.AlignCenter)
+
+        btn_max_pan = QPushButton("MAX PAN")
+        btn_max_pan.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_max_pan, "utility")
+        btn_max_pan.clicked.connect(lambda: self._move_to_manual_limit("pan", "max"))
+        self._apply_tooltip(btn_max_pan, "manual_max_pan")
+        grid.addWidget(btn_max_pan, 2, 4, alignment=Qt.AlignCenter)
 
         btn_down = QPushButton("\u25BC")  # down arrow
-        btn_down.setFixedSize(66, 54)
-        self._set_button_role(btn_down, "dpad")
+        btn_down.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_down, "dpadArrow")
         btn_down.clicked.connect(lambda: self._manual_move(0, -1))
         self._apply_tooltip(btn_down, "manual_down")
-        grid.addWidget(btn_down, 2, 1)
+        grid.addWidget(btn_down, 3, 2, alignment=Qt.AlignCenter)
+
+        btn_diag_down_left = QPushButton(arrow_symbols["down_left"])
+        btn_diag_down_left.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_diag_down_left, "dpadArrow")
+        btn_diag_down_left.clicked.connect(lambda: self._manual_move(-1, -1))
+        self._apply_tooltip(btn_diag_down_left, "manual_down_left")
+        grid.addWidget(btn_diag_down_left, 4, 1, alignment=Qt.AlignCenter)
+
+        btn_min_tilt = QPushButton("MIN TILT")
+        btn_min_tilt.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_min_tilt, "utility")
+        btn_min_tilt.clicked.connect(lambda: self._move_to_manual_limit("tilt", "min"))
+        self._apply_tooltip(btn_min_tilt, "manual_min_tilt")
+        grid.addWidget(btn_min_tilt, 4, 2, alignment=Qt.AlignCenter)
+
+        btn_diag_down_right = QPushButton(arrow_symbols["down_right"])
+        btn_diag_down_right.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_diag_down_right, "dpadArrow")
+        btn_diag_down_right.clicked.connect(lambda: self._manual_move(1, -1))
+        self._apply_tooltip(btn_diag_down_right, "manual_down_right")
+        grid.addWidget(btn_diag_down_right, 4, 3, alignment=Qt.AlignCenter)
+
+        btn_bottom_left = QPushButton("BOT LEFT")
+        btn_bottom_left.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_bottom_left, "utility")
+        btn_bottom_left.clicked.connect(lambda: self._move_to_manual_corner("min", "min"))
+        self._apply_tooltip(btn_bottom_left, "manual_bottom_left")
+        grid.addWidget(btn_bottom_left, 4, 0, alignment=Qt.AlignCenter)
+
+        btn_bottom_right = QPushButton("BOT RIGHT")
+        btn_bottom_right.setFixedSize(manual_button_w, manual_button_h)
+        self._set_button_role(btn_bottom_right, "utility")
+        btn_bottom_right.clicked.connect(lambda: self._move_to_manual_corner("max", "min"))
+        self._apply_tooltip(btn_bottom_right, "manual_bottom_right")
+        grid.addWidget(btn_bottom_right, 4, 4, alignment=Qt.AlignCenter)
 
         dpad_lay.addLayout(grid)
+
+        preset_note = QLabel("Corner presets use pan-and-tilt limit combinations, while arrow buttons use the configured step size. All manual controls share the same clamp path as guard/Home moves.")
+        preset_note.setWordWrap(True)
+        preset_note.setStyleSheet("color: #97a8b8; font-size: 10px;")
+        dpad_lay.addWidget(preset_note)
+
         lay.addWidget(dpad_grp)
 
         # --- Accessories ---
@@ -4836,7 +5144,54 @@ class SentryV2TabWidget(QWidget):
         self._apply_tooltip(self._btn_fire, "manual_fire")
         fire_lay.addWidget(self._btn_fire)
 
+        self._chk_sound_enabled = QCheckBox("Sound: ON")
+        self._chk_sound_enabled.setChecked(bool(getattr(self.config.sound, "enabled", True)))
+        self._chk_sound_enabled.toggled.connect(self._on_sound_enabled_changed)
+        self._apply_tooltip(self._chk_sound_enabled, "sound_enabled")
+        fire_lay.addWidget(self._chk_sound_enabled)
+
+        sound_row = QHBoxLayout()
+        sound_row.addWidget(QLabel("Volume:"))
+        self._slider_sound_volume = QSlider(Qt.Horizontal)
+        self._slider_sound_volume.setRange(0, 100)
+        self._slider_sound_volume.setSingleStep(5)
+        self._slider_sound_volume.setPageStep(10)
+        self._slider_sound_volume.setValue(int(max(0, min(100, int(getattr(self.config.sound, "volume_pct", 100) or 100)))))
+        self._slider_sound_volume.valueChanged.connect(self._on_sound_volume_changed)
+        self._apply_tooltip(self._slider_sound_volume, "sound_volume")
+        sound_row.addWidget(self._slider_sound_volume, 1)
+        self._lbl_sound_volume = QLabel("100%")
+        self._lbl_sound_volume.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._lbl_sound_volume.setStyleSheet("font-weight: bold; color: #dce9f7; font-size: 10px;")
+        sound_row.addWidget(self._lbl_sound_volume)
+        fire_lay.addLayout(sound_row)
+
+        self._lbl_sound_status = QLabel("Sound link: waiting")
+        self._lbl_sound_status.setWordWrap(True)
+        self._lbl_sound_status.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
+        fire_lay.addWidget(self._lbl_sound_status)
+
+        self._refresh_sound_toggle_text()
+        self._sync_sound_widgets()
+
         lay.addWidget(fire_grp)
+
+        snapshot_grp = QGroupBox("Runtime Snapshot")
+        snapshot_lay = QVBoxLayout(snapshot_grp)
+
+        snapshot_note = QLabel("Capture the current Smart Sentry runtime into timestamped JSON and Markdown files under the repo snapshots folder.")
+        snapshot_note.setWordWrap(True)
+        snapshot_note.setStyleSheet("color: #97a8b8; font-size: 10px;")
+        snapshot_lay.addWidget(snapshot_note)
+
+        self._btn_export_runtime_snapshot = QPushButton("Export Runtime Snapshot")
+        self._btn_export_runtime_snapshot.setMinimumHeight(34)
+        self._set_button_role(self._btn_export_runtime_snapshot, "utility")
+        self._btn_export_runtime_snapshot.clicked.connect(self._export_runtime_snapshot)
+        self._apply_tooltip(self._btn_export_runtime_snapshot, "export_runtime_snapshot")
+        snapshot_lay.addWidget(self._btn_export_runtime_snapshot)
+
+        lay.addWidget(snapshot_grp)
 
         lay.addStretch()
         return w
@@ -4847,39 +5202,125 @@ class SentryV2TabWidget(QWidget):
 
     def _build_status_group(self) -> QGroupBox:
         grp = QGroupBox("Status")
+        grp.setMinimumHeight(220)
+        grp.setMaximumHeight(278)
         lay = QVBoxLayout(grp)
-        self._lbl_state = QLabel("State: PAUSED")
-        self._lbl_state.setStyleSheet("font-weight: bold;")
-        self._lbl_state.setWordWrap(True)
-        lay.addWidget(self._lbl_state)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(6)
 
-        self._lbl_stats = QLabel("Targets: 0 | Qualified: 0 | Engaged: 0")
-        self._lbl_stats.setWordWrap(True)
-        lay.addWidget(self._lbl_stats)
+        def _make_status_card(title: str, value: str, accent: str) -> tuple[QFrame, QLabel]:
+            frame = QFrame()
+            frame.setStyleSheet(
+                f"QFrame {{background-color: #14263d; border: 1px solid #27476a; border-left: 3px solid {accent}; border-radius: 8px;}}"
+            )
+            frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            card_layout = QVBoxLayout(frame)
+            card_layout.setContentsMargins(8, 6, 8, 6)
+            card_layout.setSpacing(2)
 
-        self._lbl_angles = QLabel("Angles: Pan 0.0° [0..270] | Tilt 0.0° [0..110]")
-        self._lbl_angles.setStyleSheet("font-weight: bold;")
-        self._lbl_angles.setWordWrap(True)
-        lay.addWidget(self._lbl_angles)
+            title_lbl = QLabel(title)
+            title_lbl.setStyleSheet("color: #7fa3c7; font-size: 9px; font-weight: bold; letter-spacing: 0.6px;")
+            card_layout.addWidget(title_lbl)
 
-        self._lbl_angles_controls = QLabel("Current Commanded: Pan 0.0° | Tilt 0.0°")
-        self._lbl_angles_controls.setStyleSheet("font-weight: bold;")
-        self._lbl_angles_controls.setWordWrap(True)
-        lay.addWidget(self._lbl_angles_controls)
+            value_lbl = QLabel(value)
+            value_lbl.setWordWrap(True)
+            value_lbl.setStyleSheet("color: #e9f2ff; font-size: 18px; font-weight: bold;")
+            card_layout.addWidget(value_lbl)
+            return frame, value_lbl
 
-        self._lbl_no_fire_status = QLabel("No-fire mask: clear")
-        self._lbl_no_fire_status.setStyleSheet("font-weight: bold; color: #8fe3c4;")
+        self._lbl_hw_monitor_title = QLabel("Hardware • Tracking • Servo Snapshot")
+        self._lbl_hw_monitor_title.setStyleSheet("font-weight: bold; color: #cfe7ff; font-size: 10px;")
+        lay.addWidget(self._lbl_hw_monitor_title)
+
+        card_row = QHBoxLayout()
+        card_row.setSpacing(6)
+
+        state_card, self._lbl_state = _make_status_card("STATE", "PAUSED", "#7cc7ff")
+        fire_card, self._lbl_hw_safety = _make_status_card("FIRE PATH", "BLOCKED", "#ff9a7a")
+        target_card, self._lbl_stats = _make_status_card("TARGETS", "0 visible", "#8fe3c4")
+
+        card_row.addWidget(state_card, 1)
+        card_row.addWidget(fire_card, 1)
+        card_row.addWidget(target_card, 1)
+        lay.addLayout(card_row)
+
+        position_frame = QFrame()
+        position_frame.setStyleSheet("QFrame {background-color: #101e31; border: 1px solid #27476a; border-radius: 8px;}")
+        position_layout = QGridLayout(position_frame)
+        position_layout.setContentsMargins(8, 7, 8, 7)
+        position_layout.setHorizontalSpacing(8)
+        position_layout.setVerticalSpacing(4)
+
+        self._lbl_angles = QLabel("Pan 0.0°")
+        self._lbl_angles.setStyleSheet("font-weight: bold; color: #dce9f7;")
+        position_layout.addWidget(self._lbl_angles, 0, 0)
+
+        self._bar_pan_status = QProgressBar()
+        self._bar_pan_status.setRange(0, 1000)
+        self._bar_pan_status.setTextVisible(False)
+        self._bar_pan_status.setFixedHeight(10)
+        self._bar_pan_status.setStyleSheet(
+            "QProgressBar {background: #0c1625; border: 1px solid #27476a; border-radius: 5px;}"
+            "QProgressBar::chunk {background: #5ab7ff; border-radius: 4px;}"
+        )
+        position_layout.addWidget(self._bar_pan_status, 0, 1)
+
+        self._lbl_angles_controls = QLabel("Tilt 0.0°")
+        self._lbl_angles_controls.setStyleSheet("font-weight: bold; color: #dce9f7;")
+        position_layout.addWidget(self._lbl_angles_controls, 1, 0)
+
+        self._bar_tilt_status = QProgressBar()
+        self._bar_tilt_status.setRange(0, 1000)
+        self._bar_tilt_status.setTextVisible(False)
+        self._bar_tilt_status.setFixedHeight(10)
+        self._bar_tilt_status.setStyleSheet(
+            "QProgressBar {background: #0c1625; border: 1px solid #27476a; border-radius: 5px;}"
+            "QProgressBar::chunk {background: #8fe3c4; border-radius: 4px;}"
+        )
+        position_layout.addWidget(self._bar_tilt_status, 1, 1)
+
+        lay.addWidget(position_frame)
+
+        detail_grid = QGridLayout()
+        detail_grid.setHorizontalSpacing(10)
+        detail_grid.setVerticalSpacing(3)
+
+        self._lbl_motion_gate = QLabel("Tracking: idle")
+        self._lbl_motion_gate.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
+        self._lbl_motion_gate.setWordWrap(True)
+        detail_grid.addWidget(self._lbl_motion_gate, 0, 0)
+
+        self._lbl_servo_feedback = QLabel("Feedback: inactive")
+        self._lbl_servo_feedback.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
+        self._lbl_servo_feedback.setWordWrap(True)
+        detail_grid.addWidget(self._lbl_servo_feedback, 0, 1)
+
+        self._lbl_hw_servo_health = QLabel("Servo monitor: waiting")
+        self._lbl_hw_servo_health.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
+        self._lbl_hw_servo_health.setWordWrap(True)
+        detail_grid.addWidget(self._lbl_hw_servo_health, 1, 0)
+
+        self._lbl_hw_current = QLabel("Current: unavailable")
+        self._lbl_hw_current.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
+        self._lbl_hw_current.setWordWrap(True)
+        detail_grid.addWidget(self._lbl_hw_current, 1, 1)
+
+        self._lbl_no_fire_status = QLabel("No-fire: clear")
+        self._lbl_no_fire_status.setStyleSheet("font-weight: bold; color: #8fe3c4; font-size: 10px;")
         self._lbl_no_fire_status.setWordWrap(True)
-        lay.addWidget(self._lbl_no_fire_status)
+        detail_grid.addWidget(self._lbl_no_fire_status, 2, 0)
 
         self._lbl_recovery_status = QLabel("Recovery: idle")
-        self._lbl_recovery_status.setStyleSheet("font-weight: bold; color: #97a8b8;")
+        self._lbl_recovery_status.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
         self._lbl_recovery_status.setWordWrap(True)
-        lay.addWidget(self._lbl_recovery_status)
+        detail_grid.addWidget(self._lbl_recovery_status, 2, 1)
+
+        lay.addLayout(detail_grid)
 
         # Save config button
         btn_save = QPushButton("Save")
         self._set_button_role(btn_save, "primary")
+        btn_save.setMaximumHeight(28)
         btn_save.clicked.connect(self._save_config)
         self._apply_tooltip(btn_save, "save_settings")
         lay.addWidget(btn_save)
@@ -4950,7 +5391,7 @@ class SentryV2TabWidget(QWidget):
             return
         now = time.time()
         h, w_frame = frame.shape[:2]
-        self._last_raw_frame = frame.copy()
+        self._last_raw_frame = frame if _from_own_camera else frame.copy()
 
         raw_detections = detections or []
         if use_internal_detector and not _from_own_camera:
@@ -4970,7 +5411,9 @@ class SentryV2TabWidget(QWidget):
         det_objects = self._tracker.assign_tracks(base_objects + prompted_objects, now)
 
         # Run engine
+        self._sync_engine_pose_from_feedback()
         self.engine.update(det_objects, now)
+        self._update_sound_runtime_cues()
         self._last_detected_objects = list(det_objects)
 
         # Copy frame so overlay drawing doesn't corrupt main app's buffer
@@ -4982,7 +5425,7 @@ class SentryV2TabWidget(QWidget):
             display = self.overlay.apply_scope_view(display, self.engine)
         self._draw_no_fire_mask_draft(display)
         self._draw_color_gate_status(display, mode, use_internal_detector)
-        self._last_display_frame = display.copy()
+        self._last_display_frame = display
 
         # Update video label (only if show_video_feed is enabled)
         if self._show_video_feed:
@@ -5065,6 +5508,7 @@ class SentryV2TabWidget(QWidget):
         tilt = self.engine.current_tilt
         interval = self.config.engagement.burst_interval_ms
         self.overlay.note_fire_event(burst_count)
+        self._sound_engine.note_fire(burst_count, self._current_sound_area_ratio())
         if self._host_controls_hardware():
             self.fire_requested.emit(int(burst_count))
             self._log(f"FIRE! Burst: {burst_count}")
@@ -5073,14 +5517,17 @@ class SentryV2TabWidget(QWidget):
         self._log(f"FIRE! Burst: {burst_count}")
 
     def _on_engine_move(self, pan: float, tilt: float) -> None:
+        if time.time() < float(getattr(self, "_manual_move_priority_until", 0.0) or 0.0):
+            return
         move_delta = self._get_command_delta(pan, tilt)
         move_time_ms = self._get_tracking_move_time_ms(move_delta)
         self._last_tracking_move_time_ms = int(move_time_ms)
+        self._sound_engine.note_tracking_move(move_delta, self._current_sound_area_ratio())
         if self._host_controls_hardware():
             self.turret_move_requested.emit(float(pan), float(tilt))
         else:
             self._queue_move_command(pan, tilt, move_time_ms=move_time_ms)
-        self._remember_commanded_position(pan, tilt)
+        self._remember_commanded_position(pan, tilt, move_time_ms=move_time_ms)
         suppression_s = self._get_tracking_motion_suppression_s(move_delta)
         self._last_tracking_suppression_s = float(suppression_s)
         if suppression_s > 0.0:
@@ -5103,11 +5550,21 @@ class SentryV2TabWidget(QWidget):
                 self._report_runtime_warning("PIR signal emit failed", exc)
 
     def _on_comm_pir_event_received(self, sensor_id: int, timestamp: float) -> None:
+        self._pir_last_event_sensor = int(sensor_id)
+        self._pir_last_event_time_s = float(timestamp)
+        self._pir_event_count += 1
         self.engine.on_pir_sensor_fired(int(sensor_id), float(timestamp))
+        self._sound_engine.note_pir_event(sensor_id)
         if hasattr(self, "_lbl_pir_status"):
             self._update_pir_status_display()
         state_name = self.engine.state.name if self.engine else "?"
         self._log(f"PIR event: sensor {int(sensor_id)} (engine={state_name})")
+
+    def _set_label_content(self, label: QLabel, text: str, style: Optional[str] = None) -> None:
+        if label.text() != text:
+            label.setText(text)
+        if style is not None and label.styleSheet() != style:
+            label.setStyleSheet(style)
 
     # ------------------------------------------------------------------ #
     #  Connection handlers
@@ -5130,8 +5587,9 @@ class SentryV2TabWidget(QWidget):
             "<div style='font-size:13px; line-height:1.35;'>"
             "<div style='font-weight:700; color:#0f1720; margin-bottom:8px;'>ESP32 DevKit v1 full WiFi runtime</div>"
             "<div style='margin-bottom:8px; color:#1e2936;'>"
-            "PC to ESP32: WiFi/UDP only<br>"
-            "Debug Board to ESP32: UART2"
+            "PC to ESP32: WiFi/UDP for trigger, PIR, and accessories<br>"
+            "Debug Board to PC: USB serial for pan/tilt bus-servo motion<br>"
+            "ESP32 USB: flashing and diagnostics only"
             "</div>"
             "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
             "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO16</td><td style='padding:3px 8px; color:#1e2936;'>UART2 RX from Debug Board TX</td></tr>"
@@ -5141,6 +5599,7 @@ class SentryV2TabWidget(QWidget):
             "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
             "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO27</td><td style='padding:3px 8px; color:#1e2936;'>Trigger MOSFET (Water)</td></tr>"
             "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO13</td><td style='padding:3px 8px; color:#1e2936;'>Trigger Servo (Projectile)</td></tr>"
+            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO2</td><td style='padding:3px 8px; color:#1e2936;'>Status LED / external blink mirror</td></tr>"
             "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO32</td><td style='padding:3px 8px; color:#1e2936;'>LED Relay</td></tr>"
             "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO33</td><td style='padding:3px 8px; color:#1e2936;'>Laser Relay</td></tr>"
             "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO25</td><td style='padding:3px 8px; color:#1e2936;'>Accessory Relay (G token)</td></tr>"
@@ -5155,11 +5614,11 @@ class SentryV2TabWidget(QWidget):
             "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>Current Sensors</div>"
             "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
             "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO36</td><td style='padding:3px 8px; color:#1e2936;'>Pan Current</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO39</td><td style='padding:3px 8px; color:#1e2936;'>Tilt Current (shared pin when PIR is not used)</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO34</td><td style='padding:3px 8px; color:#1e2936;'>Total Current (shared pin when PIR is not used)</td></tr>"
+            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO39</td><td style='padding:3px 8px; color:#1e2936;'>Tilt Current when PIR is disabled, otherwise PIR Sensor 2</td></tr>"
+            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO34</td><td style='padding:3px 8px; color:#1e2936;'>Total Current when PIR is disabled, otherwise PIR Sensor 1</td></tr>"
             "</table>"
             "<div style='color:#334155; margin-top:8px;'>"
-            "ESP32 USB is still useful for flashing and bench diagnostics, but is not part of normal full-WiFi runtime control."
+            "GPIO2 can drive a visible external LED mirror, and PIR-event blinking can now be disabled from Smart Sentry when you do not want idle sensor activity flashing after the app closes."
             "</div>"
             "</div>"
         )
@@ -5409,11 +5868,17 @@ class SentryV2TabWidget(QWidget):
                     )
                     if ok:
                         if bool(kwargs.get("motion_enabled", True)):
-                            self._comm.send_movement(
+                            initial_move_ok = self._comm.send_movement(
                                 float(kwargs.get("initial_pan", 90.0)),
                                 float(kwargs.get("initial_tilt", 50.0)),
                                 move_time_ms=int(kwargs.get("initial_move_time_ms", 20)),
                             )
+                            if not initial_move_ok:
+                                self.command_result_ready.emit(
+                                    "move",
+                                    False,
+                                    getattr(self._comm, "_last_error", "") or "initial movement send failed after connect",
+                                )
                         pir_enabled = bool(kwargs.get("pir_enabled", False))
                         pir_ok = self._comm.send_pir_enabled(pir_enabled)
                         if pir_enabled and not pir_ok:
@@ -5491,6 +5956,8 @@ class SentryV2TabWidget(QWidget):
                 self._log(
                     "Connection warning: Debug Board pan/tilt movement is available, but ESP32 WiFi IO is unavailable. GPIO13 trigger-servo and PIR enable commands will not work until the WiFi link reconnects"
                 )
+            else:
+                self._queue_runtime_trigger_config_if_connected()
             self._startup_autoconnect_active = False
             self._startup_autoconnect_retry = 0
             self._schedule_auto_yolo_load(300)
@@ -5876,7 +6343,8 @@ class SentryV2TabWidget(QWidget):
             self._btn_return_to_camera.setEnabled(can_return)
 
     def _queue_local_frame(self, frame: np.ndarray) -> None:
-        self._test_media_last_frame = frame.copy()
+        if self._local_source_kind in {"test_video", "test_image"}:
+            self._test_media_last_frame = frame.copy()
         effective_frame = self._apply_source_zoom(frame)
         if self._show_video_feed and self._detector_worker_busy:
             if self._last_display_frame is not None and self._last_display_frame.shape[:2] == effective_frame.shape[:2]:
@@ -5890,7 +6358,7 @@ class SentryV2TabWidget(QWidget):
                 self._draw_color_gate_status(display, self.config.detection_mode.detection_mode, False)
                 self._show_frame(display)
         with self._detector_frame_lock:
-            self._detector_pending_frame = effective_frame.copy()
+            self._detector_pending_frame = effective_frame
 
     def _read_next_test_video_frame(self, *, force_step: bool = False) -> Optional[np.ndarray]:
         if self._cap is None or not self._cap.isOpened():
@@ -6002,6 +6470,13 @@ class SentryV2TabWidget(QWidget):
                 raise RuntimeError(f"Failed to open: {source_text}")
             self._finish_camera_open(cap, source_text, source_kind, requested_w, requested_h, request_frame_size)
 
+    @staticmethod
+    def _tune_capture_for_low_latency(cap: "cv2.VideoCapture") -> None:
+        try:
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        except Exception:
+            pass
+
     def _finish_camera_open(
         self,
         cap: "cv2.VideoCapture",
@@ -6018,6 +6493,7 @@ class SentryV2TabWidget(QWidget):
             except Exception:
                 pass
             return
+        self._tune_capture_for_low_latency(cap)
         if request_frame_size:
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, requested_w)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, requested_h)
@@ -6033,7 +6509,7 @@ class SentryV2TabWidget(QWidget):
         self._grab_fail_count = 0
         self._camera_recovery_attempts = 0
         self._camera_recovery_in_progress = False
-        self._cam_timer.start(33)
+        self._cam_timer.start(50)
         self._btn_cam.setText("Close Source")
 
         if source_kind == "camera":
@@ -6105,6 +6581,7 @@ class SentryV2TabWidget(QWidget):
                 if not cap.isOpened():
                     self._cam_url_error.emit(f"Failed to open stream: {display_label}")
                     return
+                self._tune_capture_for_low_latency(cap)
             except Exception as exc:
                 print(f"[URL-WORKER] VideoCapture exception: {exc}", flush=True)
                 self._cam_url_error.emit(f"VideoCapture error: {exc}")
@@ -6207,7 +6684,7 @@ class SentryV2TabWidget(QWidget):
         self._test_media_last_frame = None
         self._test_media_paused = False
         self._grab_fail_count = 0
-        self._cam_timer.start(33)
+        self._cam_timer.start(50)
         self._btn_cam.setText("Close Source")
         if w > 0 and h > 0:
             self._sync_source_dimensions(w, h)
@@ -6597,6 +7074,7 @@ class SentryV2TabWidget(QWidget):
             self._set_master_profile_label(self._match_master_profile_name())
             self._update_master_stack_summary()
         self._push_config()
+        self._note_sound_settings_changed()
 
     def _scan_yolo_models(self) -> None:
         """Populate the YOLO model combo from known YOLO model directories."""
@@ -6778,7 +7256,9 @@ class SentryV2TabWidget(QWidget):
             self._set_master_profile_label(self._match_master_profile_name())
             self._update_master_stack_summary()
         self._push_config()
+        self._note_sound_settings_changed()
         self._log(f"YOLO classes: {classes}")
+        self._note_sound_settings_changed()
 
     def _on_color_settings_changed(self) -> None:
         dm = self.config.detection_mode
@@ -6801,6 +7281,7 @@ class SentryV2TabWidget(QWidget):
             self._set_master_profile_label(self._match_master_profile_name())
             self._update_master_stack_summary()
         self._push_config()
+        self._note_sound_settings_changed()
 
     def _update_size_ratio_hints(self) -> None:
         if hasattr(self, "_lbl_contour_ratio") and hasattr(self, "_spin_min_contour") and hasattr(self, "_spin_max_contour"):
@@ -6865,6 +7346,7 @@ class SentryV2TabWidget(QWidget):
             self._set_master_profile_label(self._match_master_profile_name())
             self._update_master_stack_summary()
         self._push_config()
+        self._note_sound_settings_changed()
 
     def _on_filter_changed(self) -> None:
         self.config.target_filter.min_confidence = self._spin_min_conf.value()
@@ -6876,6 +7358,7 @@ class SentryV2TabWidget(QWidget):
             self._set_master_profile_label(self._match_master_profile_name())
             self._update_master_stack_summary()
         self._push_config()
+        self._note_sound_settings_changed()
 
     def _on_scoring_changed(self) -> None:
         ts = self.config.threat_scoring
@@ -7124,6 +7607,13 @@ class SentryV2TabWidget(QWidget):
             f"Center fire radius applied: {radius:.3f} deg (strict center trigger zone)"
         )
 
+    def _apply_selected_aim_lock_fire_gate_preset(self) -> None:
+        if not hasattr(self, "_combo_aim_gate_preset"):
+            return
+        preset_name = str(self._combo_aim_gate_preset.currentData() or "")
+        if preset_name:
+            self._apply_aim_lock_fire_gate_preset(preset_name)
+
     def _apply_sniper_center_radius_profile(self, profile: str) -> None:
         radius = SNIPER_CENTER_RADIUS_PRESETS.get(profile)
         if radius is None:
@@ -7133,6 +7623,13 @@ class SentryV2TabWidget(QWidget):
         self._spin_center_fire_radius.blockSignals(False)
         self._on_apply_center_fire_radius()
         self._log(f"Sniper center profile applied: {profile} ({float(radius):.3f} deg)")
+
+    def _apply_selected_center_radius_profile(self) -> None:
+        if not hasattr(self, "_combo_center_radius_preset"):
+            return
+        profile = str(self._combo_center_radius_preset.currentData() or "")
+        if profile:
+            self._apply_sniper_center_radius_profile(profile)
 
     def _on_guard_changed(self) -> None:
         g = self.config.guard
@@ -7184,6 +7681,7 @@ class SentryV2TabWidget(QWidget):
         self._spin_guard_tilt.blockSignals(False)
         self._push_config()
         self._refresh_status()
+        self._note_sound_settings_changed()
 
     def _on_guard_mode_changed(self, index: int) -> None:
         self.config.guard.guard_mode = index
@@ -7224,6 +7722,7 @@ class SentryV2TabWidget(QWidget):
         self.config.show_guard_crosshair = self._chk_guard_crosshair.isChecked()
         self.config.show_no_fire_masks = self._chk_show_no_fire_masks.isChecked()
         self.overlay.update_config(self.config)
+        self._note_sound_settings_changed()
 
     def _populate_camera_resolution_combo(self, width: int, height: int) -> None:
         self._combo_cam_resolution.blockSignals(True)
@@ -7271,11 +7770,14 @@ class SentryV2TabWidget(QWidget):
         self.config.scope_vignette_opacity = int(self._spin_scope_vignette.value())
         self._last_scope_view_active = self._scope_view_active()
         self._push_config()
+        self._note_sound_settings_changed()
 
     def _on_pir_enabled_changed(self, checked: bool) -> None:
         """Handle master PIR enable/disable."""
         self.config.pir_guard.pir_enabled = bool(checked)
         self._push_config()
+        self._save_config_quietly()
+        self._note_sound_settings_changed()
         if not self._host_controls_hardware() and self._comm.is_connected():
             self._queue_comm_task("send_pir_enabled", bool(checked))
         self._log(f"PIR guard {'enabled' if checked else 'disabled'}")
@@ -7305,7 +7807,12 @@ class SentryV2TabWidget(QWidget):
         pg.confirmation_timeout = self._spin_pir_confirm_timeout.value()
         pg.scan_on_no_detect = self._chk_pir_scan_enabled.isChecked()
         pg.cross_sensor_lockout_ms = int(self._spin_pir_cross_lockout_ms.value())
+        pg.pir_event_blink_enabled = bool(self._chk_pir_event_blink.isChecked())
+        self._sync_comm_runtime_settings_from_config()
         self._push_config()
+        self._save_config_quietly()
+        self._queue_runtime_trigger_config_if_connected()
+        self._note_sound_settings_changed()
 
     def _apply_pir_120_layout(self) -> None:
         recommended_pans = [270.0, 150.0, 30.0]
@@ -7364,14 +7871,27 @@ class SentryV2TabWidget(QWidget):
     def _update_pir_status_display(self) -> None:
         """Update PIR status label in Guard tab."""
         if not self.engine or not hasattr(self.engine, '_pir_manager'):
-            self._lbl_pir_status.setText("Status: Engine not ready")
+            self._set_label_content(self._lbl_pir_status, "Status: Engine not ready")
             return
         mgr = self.engine._pir_manager
         status_text = mgr.get_status_text()
         queued = mgr.peek_queue_count()
         if queued > 0:
             status_text += f"  [{queued} sensor(s) pending]"
-        self._lbl_pir_status.setText(f"Status: {status_text}")
+        runtime = self._comm.get_io_runtime_snapshot()
+        runtime_pir = runtime.get("pir_enabled")
+        runtime_text = "HW ?" if runtime_pir is None else ("HW ON" if int(runtime_pir) != 0 else "HW OFF")
+        last_sensor = self._pir_last_event_sensor
+        last_time = self._pir_last_event_time_s
+        if last_sensor is not None and last_time > 0.0:
+            age_s = max(0.0, time.time() - last_time)
+            last_text = f"Last S{int(last_sensor) + 1} {age_s:.1f}s ago"
+        else:
+            last_text = "Last none"
+        self._set_label_content(
+            self._lbl_pir_status,
+            f"Status: {status_text} | {runtime_text} | {last_text} | Count {self._pir_event_count}",
+        )
 
     def _scope_view_active_for_state(self, state: SentryV2State) -> bool:
         return bool(self.config.scope_view_enabled and state == SentryV2State.ENGAGING)
@@ -7522,10 +8042,78 @@ class SentryV2TabWidget(QWidget):
         self._save_config_quietly()
         self._log(f"Auto-trigger: {'ON' if checked else 'OFF'}")
 
+    def _refresh_trigger_servo_summary(self) -> None:
+        if not hasattr(self, "_lbl_trigger_travel"):
+            return
+        rest_deg = int(self._spin_trigger_servo_rest_deg.value())
+        fire_deg = int(self._spin_trigger_servo_fire_deg.value())
+        speed_dps = int(self._spin_trigger_servo_speed_dps.value())
+        travel_deg = abs(fire_deg - rest_deg)
+        est_ms = int(round((travel_deg / max(1, speed_dps)) * 1000.0)) if travel_deg else 0
+        self._lbl_trigger_travel.setText(f"Travel: {travel_deg} deg | Estimated move: {est_ms} ms")
+
+    def _apply_trigger_servo_widget_values_from_settings(self, settings: dict) -> None:
+        if not hasattr(self, "_spin_trigger_servo_rest_deg"):
+            return
+        widget_values = [
+            (
+                self._spin_trigger_servo_rest_deg,
+                int(settings.get("trigger_servo_rest_deg", self.config.engagement.trigger_servo_rest_deg)),
+            ),
+            (
+                self._spin_trigger_servo_fire_deg,
+                int(settings.get("trigger_servo_fire_deg", self.config.engagement.trigger_servo_fire_deg)),
+            ),
+            (
+                self._spin_trigger_servo_speed_dps,
+                int(settings.get("trigger_servo_speed_dps", self.config.engagement.trigger_servo_speed_dps)),
+            ),
+        ]
+        for widget, value in widget_values:
+            widget.blockSignals(True)
+            widget.setValue(int(value))
+            widget.blockSignals(False)
+        self._refresh_trigger_servo_summary()
+
+    def _sync_comm_runtime_settings_from_config(self) -> None:
+        engagement = self.config.engagement
+        pir_guard = self.config.pir_guard
+        self._comm.trigger_servo_rest_deg = int(getattr(engagement, "trigger_servo_rest_deg", 0))
+        self._comm.trigger_servo_fire_deg = int(getattr(engagement, "trigger_servo_fire_deg", 45))
+        self._comm.trigger_servo_speed_dps = int(getattr(engagement, "trigger_servo_speed_dps", 360))
+        self._comm.pir_event_blink_enabled = bool(getattr(pir_guard, "pir_event_blink_enabled", False))
+
+    def _queue_runtime_trigger_config_if_connected(self) -> None:
+        # CHANGE WARNING: runtime trigger-servo tuning is transport-specific in the
+        # comm layer, not here. If a live connection exists, let the comm layer
+        # choose serial vs UDP so these controls do not silently become WiFi-only.
+        if self._host_controls_hardware() or not self._comm.is_connected():
+            return
+        self._queue_comm_task("send_trigger_runtime_config")
+
+    def _on_trigger_servo_settings_changed(self) -> None:
+        rest_deg = int(self._spin_trigger_servo_rest_deg.value())
+        fire_deg = int(self._spin_trigger_servo_fire_deg.value())
+        if fire_deg < rest_deg:
+            fire_deg = rest_deg
+            self._spin_trigger_servo_fire_deg.blockSignals(True)
+            self._spin_trigger_servo_fire_deg.setValue(fire_deg)
+            self._spin_trigger_servo_fire_deg.blockSignals(False)
+        self.config.engagement.trigger_servo_rest_deg = rest_deg
+        self.config.engagement.trigger_servo_fire_deg = fire_deg
+        self.config.engagement.trigger_servo_speed_dps = int(self._spin_trigger_servo_speed_dps.value())
+        self._sync_comm_runtime_settings_from_config()
+        self._refresh_trigger_servo_summary()
+        self._push_config()
+        self._save_config_quietly()
+        self._queue_runtime_trigger_config_if_connected()
+        self._note_sound_settings_changed()
+
     def _on_trigger_mode_changed(self, index: int) -> None:
         is_bb = (index == 1)
         self.config.engagement.trigger_mode_bb = is_bb
         self._comm.trigger_mode_bb = is_bb
+        self._sync_comm_runtime_settings_from_config()
         if self._host_controls_hardware():
             pass
         elif self._comm.is_connected():
@@ -7535,6 +8123,8 @@ class SentryV2TabWidget(QWidget):
                 fire=0,
                 move_time_ms=self._get_manual_move_time_ms(),
             )
+            self._queue_runtime_trigger_config_if_connected()
+        self._note_sound_settings_changed()
         if not self._applying_master_preset:
             self._set_master_profile_label(self._match_master_profile_name())
             self._update_master_stack_summary()
@@ -7547,34 +8137,71 @@ class SentryV2TabWidget(QWidget):
     #  Manual control handlers
     # ------------------------------------------------------------------ #
 
+    def _move_to_absolute_position(self, pan: float, tilt: float, *, hold_guard: bool = False, log_message: str = "") -> None:
+        pan, tilt = self._clamp_manual_angles(pan, tilt)
+        move_time_ms = self._get_manual_move_time_ms()
+        self._manual_move_priority_until = max(
+            float(getattr(self, "_manual_move_priority_until", 0.0) or 0.0),
+            time.time() + float(getattr(self, "_manual_position_hold_s", 1.25) or 1.25),
+        )
+        if hold_guard:
+            self.engine.hold_current_guard_position(pan, tilt)
+        else:
+            self.engine.current_pan = pan
+            self.engine.current_tilt = tilt
+        if self._host_controls_hardware():
+            self.turret_move_requested.emit(float(pan), float(tilt))
+        else:
+            self._queue_move_command(pan, tilt, move_time_ms=move_time_ms, manual_override=True)
+        self._remember_commanded_position(pan, tilt, move_time_ms=move_time_ms)
+        self._suppress_motion_detection()
+        self._refresh_status()
+        if log_message:
+            self._log(log_message)
+
+    def _move_to_manual_limit(self, axis: str, direction: str) -> None:
+        guard = self.config.guard
+        pan = float(self.engine.current_pan)
+        tilt = float(self.engine.current_tilt)
+        if axis == "pan":
+            pan = float(guard.pan_max if direction == "max" else guard.pan_min)
+            label = "Max pan" if direction == "max" else "Min pan"
+        else:
+            tilt = float(guard.tilt_max if direction == "max" else guard.tilt_min)
+            label = "Max tilt" if direction == "max" else "Min tilt"
+        self._move_to_absolute_position(pan, tilt, log_message=f"Manual preset: {label} (P{pan:.0f} T{tilt:.0f})")
+
+    def _move_to_manual_corner(self, pan_side: str, tilt_side: str) -> None:
+        guard = self.config.guard
+        pan = float(guard.pan_max if pan_side == "max" else guard.pan_min)
+        tilt = float(guard.tilt_max if tilt_side == "max" else guard.tilt_min)
+        label = f"{'Right' if pan_side == 'max' else 'Left'} / {'Top' if tilt_side == 'max' else 'Bottom'}"
+        self._move_to_absolute_position(pan, tilt, log_message=f"Manual preset: {label} corner (P{pan:.0f} T{tilt:.0f})")
+
     def _manual_move(self, pan_dir: int, tilt_dir: int) -> None:
         step = self._spin_step.value()
         new_pan = self.engine.current_pan + pan_dir * step
         new_tilt = self.engine.current_tilt + tilt_dir * step
         new_pan, new_tilt = self._clamp_manual_angles(new_pan, new_tilt)
+        move_time_ms = self._get_manual_move_time_ms()
+        self._manual_move_priority_until = max(
+            float(getattr(self, "_manual_move_priority_until", 0.0) or 0.0),
+            time.time() + float(getattr(self, "_manual_position_hold_s", 1.25) or 1.25),
+        )
         self.engine.current_pan = new_pan
         self.engine.current_tilt = new_tilt
         if self._host_controls_hardware():
             self.manual_move_requested.emit(int(pan_dir * step), int(tilt_dir * step))
         else:
-            self._queue_move_command(new_pan, new_tilt, move_time_ms=self._get_manual_move_time_ms(), manual_override=True)
-        self._remember_commanded_position(new_pan, new_tilt)
+            self._queue_move_command(new_pan, new_tilt, move_time_ms=move_time_ms, manual_override=True)
+        self._remember_commanded_position(new_pan, new_tilt, move_time_ms=move_time_ms)
         self._suppress_motion_detection()
         self._refresh_status()
 
     def _on_home_clicked(self) -> None:
         pan = self._spin_guard_pan.value()
         tilt = self._spin_guard_tilt.value()
-        pan, tilt = self._clamp_manual_angles(pan, tilt)
-        self.engine.hold_current_guard_position(pan, tilt)
-        if self._host_controls_hardware():
-            self.turret_move_requested.emit(float(pan), float(tilt))
-        else:
-            self._queue_move_command(pan, tilt, move_time_ms=self._get_manual_move_time_ms(), manual_override=True)
-        self._remember_commanded_position(pan, tilt)
-        self._suppress_motion_detection()
-        self._refresh_status()
-        self._log("Go Home")
+        self._move_to_absolute_position(pan, tilt, hold_guard=True, log_message="Go Home")
 
     def _on_led_toggled(self, checked: bool) -> None:
         self._led_on = checked
@@ -7642,16 +8269,7 @@ class SentryV2TabWidget(QWidget):
     def _go_to_guard(self) -> None:
         pan = self._spin_guard_pan.value()
         tilt = self._spin_guard_tilt.value()
-        pan, tilt = self._clamp_manual_angles(pan, tilt)
-        self.engine.hold_current_guard_position(pan, tilt)
-        if self._host_controls_hardware():
-            self.turret_move_requested.emit(float(pan), float(tilt))
-        else:
-            self._queue_move_command(pan, tilt, move_time_ms=self._get_manual_move_time_ms(), manual_override=True)
-        self._remember_commanded_position(pan, tilt)
-        self._suppress_motion_detection()
-        self._refresh_status()
-        self._log(f"Moving to guard: P{pan:.0f} T{tilt:.0f}")
+        self._move_to_absolute_position(pan, tilt, hold_guard=True, log_message=f"Moving to guard: P{pan:.0f} T{tilt:.0f}")
 
     def _set_current_as_guard(self) -> None:
         pan = self.engine.current_pan
@@ -7696,17 +8314,611 @@ class SentryV2TabWidget(QWidget):
             self.config.prompted_library_path = self._portable_path_string(self._resolved_prompted_library_path())
             self.config.config_path = "app/config/sentry_v2_settings.json"
             self.config.save(str(SENTRY_V2_SETTINGS_PATH))
+            self._sync_legacy_settings_copy()
             self._save_prompted_target_library()
             self._log(f"Settings saved: {self.config.config_path}")
         except Exception as e:
             self._log(f"Save error: {e}")
 
     def _save_config_quietly(self) -> None:
+        self._pending_quiet_save = True
+        self._quiet_save_timer.start(450)
+
+    def _flush_quiet_config_save(self) -> None:
+        if not self._pending_quiet_save:
+            return
+        self._pending_quiet_save = False
         try:
             self.config.config_path = "app/config/sentry_v2_settings.json"
             self.config.save(str(SENTRY_V2_SETTINGS_PATH))
+            self._sync_legacy_settings_copy()
         except Exception as exc:
             self._log(f"Save error: {exc}")
+
+    def _windows_wifi_current_ssid(self) -> str:
+        if os.name != "nt":
+            return ""
+        try:
+            result = subprocess.run(
+                ["netsh", "wlan", "show", "interfaces"],
+                capture_output=True,
+                text=True,
+                timeout=6,
+                check=False,
+            )
+        except Exception:
+            return ""
+        output = f"{result.stdout}\n{result.stderr}"
+        for raw_line in output.splitlines():
+            line = raw_line.strip()
+            lower_line = line.lower()
+            if lower_line.startswith("ssid") and "bssid" not in lower_line and ":" in line:
+                return line.split(":", 1)[1].strip()
+        return ""
+
+    def _windows_wifi_network_available(self, ssid: str) -> bool:
+        if os.name != "nt" or not ssid:
+            return False
+        try:
+            result = subprocess.run(
+                ["netsh", "wlan", "show", "networks", "mode=bssid"],
+                capture_output=True,
+                text=True,
+                timeout=8,
+                check=False,
+            )
+        except Exception:
+            return False
+        return ssid.lower() in f"{result.stdout}\n{result.stderr}".lower()
+
+    def _windows_wifi_profile_exists(self, ssid: str) -> bool:
+        if os.name != "nt" or not ssid:
+            return False
+        try:
+            result = subprocess.run(
+                ["netsh", "wlan", "show", "profiles"],
+                capture_output=True,
+                text=True,
+                timeout=6,
+                check=False,
+            )
+        except Exception:
+            return False
+        return ssid.lower() in f"{result.stdout}\n{result.stderr}".lower()
+
+    def _windows_wifi_profile_text(self, ssid: str, *, include_key: bool = False) -> str:
+        if os.name != "nt" or not ssid:
+            return ""
+        command = ["netsh", "wlan", "show", "profile", f"name={ssid}"]
+        if include_key:
+            command.append("key=clear")
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=8,
+                check=False,
+            )
+        except Exception:
+            return ""
+        return f"{result.stdout}\n{result.stderr}"
+
+    def _windows_wifi_primary_interface_name(self) -> str:
+        if os.name != "nt":
+            return ""
+        try:
+            result = subprocess.run(
+                ["netsh", "wlan", "show", "interfaces"],
+                capture_output=True,
+                text=True,
+                timeout=6,
+                check=False,
+            )
+        except Exception:
+            return ""
+        output = f"{result.stdout}\n{result.stderr}"
+        for raw_line in output.splitlines():
+            line = raw_line.strip()
+            lower_line = line.lower()
+            if lower_line.startswith("name") and ":" in line:
+                return line.split(":", 1)[1].strip()
+        return ""
+
+    def _windows_wifi_delete_profile(self, ssid: str) -> None:
+        if os.name != "nt" or not ssid:
+            return
+        try:
+            subprocess.run(
+                ["netsh", "wlan", "delete", "profile", f"name={ssid}"],
+                capture_output=True,
+                text=True,
+                timeout=8,
+                check=False,
+            )
+        except Exception:
+            pass
+
+    def _windows_wifi_profile_is_compatible(self, ssid: str, password: str) -> bool:
+        profile_text = self._windows_wifi_profile_text(ssid, include_key=True).lower()
+        if not profile_text:
+            return False
+        auth_ok = "wpa2" in profile_text and "wpa3" not in profile_text
+        auto_ok = "connection mode    : connect automatically" in profile_text
+        key_ok = f"key content            : {password.lower()}" in profile_text
+        return auth_ok and auto_ok and key_ok
+
+    def _ensure_windows_wifi_profile(self, ssid: str, password: str) -> bool:
+        if self._windows_wifi_profile_exists(ssid) and self._windows_wifi_profile_is_compatible(ssid, password):
+            return True
+        if self._windows_wifi_profile_exists(ssid):
+            self._windows_wifi_delete_profile(ssid)
+        profile_xml = (
+            "<?xml version=\"1.0\"?>\n"
+            "<WLANProfile xmlns=\"http://www.microsoft.com/networking/WLAN/profile/v1\">\n"
+            f"  <name>{ssid}</name>\n"
+            "  <SSIDConfig>\n"
+            "    <SSID>\n"
+            f"      <name>{ssid}</name>\n"
+            "    </SSID>\n"
+            "  </SSIDConfig>\n"
+            "  <connectionType>ESS</connectionType>\n"
+            "  <connectionMode>auto</connectionMode>\n"
+            "  <MSM>\n"
+            "    <security>\n"
+            "      <authEncryption>\n"
+            "        <authentication>WPA2PSK</authentication>\n"
+            "        <encryption>AES</encryption>\n"
+            "        <useOneX>false</useOneX>\n"
+            "      </authEncryption>\n"
+            "      <sharedKey>\n"
+            "        <keyType>passPhrase</keyType>\n"
+            "        <protected>false</protected>\n"
+            f"        <keyMaterial>{password}</keyMaterial>\n"
+            "      </sharedKey>\n"
+            "    </security>\n"
+            "  </MSM>\n"
+            "</WLANProfile>\n"
+        )
+        temp_path = ""
+        try:
+            with tempfile.NamedTemporaryFile("w", suffix=".xml", delete=False, encoding="utf-8") as handle:
+                handle.write(profile_xml)
+                temp_path = handle.name
+            result = subprocess.run(
+                ["netsh", "wlan", "add", "profile", f"filename={temp_path}", "user=current"],
+                capture_output=True,
+                text=True,
+                timeout=8,
+                check=False,
+            )
+            return result.returncode == 0 and self._windows_wifi_profile_is_compatible(ssid, password)
+        except Exception:
+            return False
+        finally:
+            if temp_path:
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
+
+    def _start_windows_wifi_autojoin(self) -> None:
+        if self._wifi_autojoin_inflight or os.name != "nt":
+            return
+        mode = int(getattr(self.config.connection, "connection_type", 0) or 0)
+        if mode not in (2, 3, 4):
+            return
+        now = time.time()
+        if now - self._last_wifi_autojoin_attempt_s < 8.0:
+            return
+        ssid = ESP32_DEFAULT_WIFI_SSID
+        password = ESP32_DEFAULT_WIFI_PASSWORD
+        self._last_wifi_autojoin_attempt_s = now
+        self._wifi_autojoin_inflight = True
+
+        def _worker() -> None:
+            message = ""
+            ok = False
+            try:
+                current_ssid = self._windows_wifi_current_ssid()
+                if current_ssid == ssid:
+                    ok = True
+                    message = f"Windows WiFi already on {ssid}"
+                elif not self._windows_wifi_network_available(ssid):
+                    message = f"ESP32 WiFi SSID {ssid} not visible yet"
+                else:
+                    if not self._ensure_windows_wifi_profile(ssid, password):
+                        message = f"Failed to prepare Windows WiFi profile for {ssid}"
+                    else:
+                        interface_name = self._windows_wifi_primary_interface_name()
+                        connect_cmd = ["netsh", "wlan", "connect", f"name={ssid}", f"ssid={ssid}"]
+                        if interface_name:
+                            connect_cmd.append(f"interface={interface_name}")
+                        result = subprocess.run(
+                            connect_cmd,
+                            capture_output=True,
+                            text=True,
+                            timeout=10,
+                            check=False,
+                        )
+                        time.sleep(2.5)
+                        ok = self._windows_wifi_current_ssid() == ssid
+                        if ok:
+                            message = f"Windows WiFi connected to {ssid}"
+                        else:
+                            detail = (result.stdout or result.stderr or "connect failed").strip()
+                            message = f"Windows WiFi auto-connect failed: {detail}"
+            except Exception as exc:
+                message = f"Windows WiFi auto-connect error: {exc}"
+            self.wifi_autojoin_result.emit(ok, message)
+
+        threading.Thread(target=_worker, name="sentry-v2-wifi-autojoin", daemon=True).start()
+
+    def _on_wifi_autojoin_result(self, ok: bool, message: str) -> None:
+        self._wifi_autojoin_inflight = False
+        note = str(message or "").strip()
+        if not note or note == self._last_wifi_autojoin_note:
+            return
+        self._last_wifi_autojoin_note = note
+        if ok:
+            self._log(note)
+        elif "not visible yet" not in note.lower():
+            self._log(note)
+
+    def _connection_watchdog_tick(self) -> None:
+        if self._closing or self._host_controls_hardware() or self._connection_busy:
+            return
+        mode = int(getattr(self.config.connection, "connection_type", 0) or 0)
+        if mode not in (2, 3, 4):
+            return
+        self._start_windows_wifi_autojoin()
+        now = time.time()
+        current_ssid = self._windows_wifi_current_ssid() if os.name == "nt" else ""
+        on_esp32_wifi = current_ssid == ESP32_DEFAULT_WIFI_SSID
+
+        if mode == 3 and not self._comm.is_connected():
+            if not on_esp32_wifi:
+                return
+            if now - self._last_wifi_link_refresh_s >= 10.0:
+                self._last_wifi_link_refresh_s = now
+                self._auto_connect_on_startup(0)
+            return
+
+        io_runtime = self._comm.get_io_runtime_snapshot()
+        io_age = io_runtime.get("age_s")
+        io_stale = io_age is None or float(io_age) > 4.0
+        udp_ready = bool(getattr(self._comm, "_sock", None) is not None and getattr(self._comm, "_udp_target", None) is not None)
+
+        if mode in (2, 3) and (not udp_ready or io_stale):
+            if not on_esp32_wifi or self._wifi_runtime_refresh_inflight:
+                return
+            if now - self._last_wifi_link_refresh_s >= 10.0:
+                self._last_wifi_link_refresh_s = now
+                self._wifi_runtime_refresh_inflight = True
+                self._queue_comm_task(
+                    "refresh_wifi_runtime_link",
+                    str(self.config.connection.udp_host or "192.168.4.1"),
+                    int(self.config.connection.udp_port or 9000),
+                    bool(self.config.pir_guard.pir_enabled),
+                )
+
+    def _collect_runtime_snapshot(self) -> dict:
+        def _path_entry(path_obj: Path) -> dict:
+            try:
+                resolved = path_obj.resolve()
+            except Exception:
+                resolved = path_obj
+            return {
+                "path": self._portable_path_string(resolved),
+                "absolute_path": str(resolved),
+                "exists": resolved.exists(),
+            }
+
+        def _summarize_detection(det: object) -> Optional[dict]:
+            if det is None:
+                return None
+            result = {
+                "class_name": str(getattr(det, "class_name", "") or ""),
+                "source": str(getattr(det, "source", "") or ""),
+            }
+            score = getattr(det, "score", None)
+            if score is not None:
+                try:
+                    result["score"] = float(score)
+                except Exception:
+                    result["score"] = score
+            bbox_keys = ("x", "y", "w", "h")
+            if all(hasattr(det, key) for key in bbox_keys):
+                result["bbox"] = {
+                    "x": int(getattr(det, "x")),
+                    "y": int(getattr(det, "y")),
+                    "w": int(getattr(det, "w")),
+                    "h": int(getattr(det, "h")),
+                }
+            return result
+
+        def _summarize_tracked_target(target: object) -> dict:
+            det = getattr(target, "det", None)
+            return {
+                "track_id": str(getattr(target, "track_id", "") or ""),
+                "score": float(getattr(target, "score", 0.0) or 0.0),
+                "persistence": int(getattr(target, "persistence", 0) or 0),
+                "heading_x": float(getattr(target, "heading_x", 0.0) or 0.0),
+                "heading_y": float(getattr(target, "heading_y", 0.0) or 0.0),
+                "detection": _summarize_detection(det),
+            }
+
+        def _recent_log_lines(limit: int = 20) -> list[str]:
+            if not hasattr(self, "_log_text") or self._log_text is None:
+                return []
+            lines = [line.strip() for line in self._log_text.toPlainText().splitlines() if line.strip()]
+            return lines[-limit:]
+
+        raw_shape = None
+        if self._last_raw_frame is not None:
+            raw_shape = {
+                "width": int(self._last_raw_frame.shape[1]),
+                "height": int(self._last_raw_frame.shape[0]),
+                "channels": int(self._last_raw_frame.shape[2]) if len(self._last_raw_frame.shape) > 2 else 1,
+            }
+
+        display_shape = None
+        if self._last_display_frame is not None:
+            display_shape = {
+                "width": int(self._last_display_frame.shape[1]),
+                "height": int(self._last_display_frame.shape[0]),
+                "channels": int(self._last_display_frame.shape[2]) if len(self._last_display_frame.shape) > 2 else 1,
+            }
+
+        selected_model_path = str(self._combo_yolo_model.currentData() or "").strip() if hasattr(self, "_combo_yolo_model") else ""
+        detector_model_path = str(getattr(self._detector, "_yolo_model_path", "") or "").strip()
+        active_order = getattr(self.engine, "active_order", None)
+        active_target = getattr(active_order, "target", None)
+        active_detection = getattr(active_target, "det", None)
+        servo_feedback = self._comm.get_servo_feedback_snapshot()
+        io_runtime = self._comm.get_io_runtime_snapshot()
+
+        payload = {
+            "generated_at_local": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "generated_at_epoch_s": time.time(),
+            "config": self.config.to_dict(),
+            "engine_state": {
+                "state": self.engine.state.name,
+                "motion_enabled": bool(self.engine.is_motion_enabled()),
+                "current_pan": float(self.engine.current_pan),
+                "current_tilt": float(self.engine.current_tilt),
+                "guard_pan": float(self.config.guard.guard_pan),
+                "guard_tilt": float(self.config.guard.guard_tilt),
+                "queue_length": len(getattr(self.engine, "_queue", [])),
+                "queue_index": int(getattr(self.engine, "_queue_index", 0) or 0),
+                "engage_phase": str(getattr(self.engine, "_engage_phase", "") or ""),
+                "active_order": {
+                    "target": _summarize_tracked_target(active_target) if active_target is not None else None,
+                    "target_pan": float(getattr(active_order, "pan", 0.0) or 0.0) if active_order is not None else None,
+                    "target_tilt": float(getattr(active_order, "tilt", 0.0) or 0.0) if active_order is not None else None,
+                    "burst_count": int(getattr(active_order, "burst_count", 0) or 0) if active_order is not None else None,
+                    "detection": _summarize_detection(active_detection),
+                },
+                "visible_targets": [_summarize_tracked_target(target) for target in list(getattr(self.engine, "last_targets", []))[:8]],
+                "qualified_count": len(getattr(self.engine, "last_qualified", [])),
+                "engagement_log_entries": len(getattr(self.engine, "engagement_log", [])),
+                "last_reacquire_note": str(getattr(self.engine, "_last_reacquire_note", "") or ""),
+                "active_no_fire_mask": str(getattr(self.engine, "_last_no_fire_mask_name", "") or ""),
+                "loss_recovery_phase": str(getattr(self.engine, "_loss_recovery_phase", "") or ""),
+            },
+            "comm_telemetry": {
+                "is_connected": bool(self._comm.is_connected()),
+                "connection_status_label": str(self._lbl_conn_status.text()) if hasattr(self, "_lbl_conn_status") else "",
+                "host_hardware_managed": bool(self._host_controls_hardware()),
+                "configured_mode_index": int(self.config.connection.connection_type),
+                "configured_mode_label": SentryV2Comm.MODE_LABELS[int(self.config.connection.connection_type)] if 0 <= int(self.config.connection.connection_type) < len(SentryV2Comm.MODE_LABELS) else "Unknown",
+                "mode_index": int(getattr(self._comm, "_mode", 0) or 0),
+                "mode_label": SentryV2Comm.MODE_LABELS[int(getattr(self._comm, "_mode", 0) or 0)] if 0 <= int(getattr(self._comm, "_mode", 0) or 0) < len(SentryV2Comm.MODE_LABELS) else "Unknown",
+                "trigger_mode_bb": bool(self._comm.trigger_mode_bb),
+                "last_command": str(getattr(self._comm, "_last_cmd", "") or ""),
+                "last_error": str(getattr(self._comm, "_last_error", "") or ""),
+                "wifi_io_socket_active": bool(getattr(self._comm, "_sock", None) is not None),
+                "wifi_io_target": str(getattr(self._comm, "_udp_target", None) or ""),
+                "servo_feedback": servo_feedback,
+                "io_runtime": io_runtime,
+            },
+            "camera_status": {
+                "capture_open": bool(self._cap is not None and self._cap.isOpened()),
+                "source_kind": str(self._local_source_kind or ""),
+                "source_label": str(self._local_source_label or ""),
+                "remembered_source": str(self._last_camera_source_text or ""),
+                "requested_width": int(self._last_camera_width),
+                "requested_height": int(self._last_camera_height),
+                "selected_resolution": {
+                    "width": int(self._selected_camera_dimensions()[0]),
+                    "height": int(self._selected_camera_dimensions()[1]),
+                } if hasattr(self, "_combo_cam_resolution") else None,
+                "raw_frame": raw_shape,
+                "display_frame": display_shape,
+                "show_video_feed": bool(self._show_video_feed),
+                "test_media_paused": bool(self._test_media_paused),
+                "test_media_loop_enabled": bool(self._test_media_loop_enabled),
+                "grab_fail_count": int(self._grab_fail_count),
+                "camera_recovery_attempts": int(self._camera_recovery_attempts),
+                "camera_recovery_in_progress": bool(self._camera_recovery_in_progress),
+            },
+            "yolo_status": {
+                "status_label": str(self._lbl_yolo_status.text()) if hasattr(self, "_lbl_yolo_status") else "",
+                "selected_model_name": str(self._combo_yolo_model.currentText()) if hasattr(self, "_combo_yolo_model") else "",
+                "selected_model_path": self._portable_path_string(Path(selected_model_path)) if selected_model_path else "",
+                "loaded_model_path": self._portable_path_string(Path(detector_model_path)) if detector_model_path else "",
+                "detector_loaded": bool(getattr(self._detector, "_yolo_loaded", False)),
+                "target_classes": [str(name) for name in getattr(self._detector, "_yolo_target_classes", [])],
+                "allowed_classes": [str(name) for name in self.config.target_filter.allowed_classes],
+                "confidence": float(self.config.detection_mode.yolo_confidence),
+                "min_area": int(self.config.detection_mode.yolo_min_area),
+            },
+            "external_file_references": {
+                "settings_json": _path_entry(SENTRY_V2_SETTINGS_PATH),
+                "legacy_settings_json": _path_entry(LEGACY_SENTRY_V2_SETTINGS_PATH),
+                "custom_master_presets": _path_entry(CUSTOM_MASTER_PRESET_PATH),
+                "prompted_target_library": _path_entry(self._resolved_prompted_library_path()),
+                "snapshot_dir": _path_entry(SENTRY_V2_SNAPSHOT_DIR),
+                "selected_yolo_model": _path_entry(Path(selected_model_path)) if selected_model_path else None,
+                "candidate_yolo_model_dirs": [_path_entry(path_obj) for path_obj in self._candidate_yolo_model_dirs()],
+            },
+            "recent_log_lines": _recent_log_lines(),
+        }
+        return payload
+
+    def _render_runtime_snapshot_markdown(self, payload: dict) -> str:
+        engine_state = payload.get("engine_state", {})
+        comm = payload.get("comm_telemetry", {})
+        camera = payload.get("camera_status", {})
+        yolo = payload.get("yolo_status", {})
+        exported_files = payload.get("exported_files", {})
+        active_order = engine_state.get("active_order", {}) or {}
+        active_target = active_order.get("target") or {}
+        external_refs = payload.get("external_file_references", {})
+        recent_logs = payload.get("recent_log_lines", [])
+
+        lines = [
+            "# Smart Sentry v2 Runtime Snapshot",
+            "",
+            f"- Generated: {payload.get('generated_at_local', '')}",
+            f"- Engine state: {engine_state.get('state', '')}",
+            f"- Connection: {comm.get('connection_status_label', '')}",
+            f"- Camera: {camera.get('source_label', '') or camera.get('remembered_source', '')}",
+            f"- YOLO: {yolo.get('status_label', '')}",
+        ]
+
+        if exported_files:
+            lines.extend([
+                "",
+                "## Exported Files",
+                "",
+                f"- JSON: {exported_files.get('json', '')}",
+                f"- Markdown: {exported_files.get('markdown', '')}",
+            ])
+
+        lines.extend([
+            "",
+            "## Engine",
+            "",
+            f"- Motion enabled: {engine_state.get('motion_enabled')}",
+            f"- Current pan/tilt: {engine_state.get('current_pan')} / {engine_state.get('current_tilt')}",
+            f"- Guard pan/tilt: {engine_state.get('guard_pan')} / {engine_state.get('guard_tilt')}",
+            f"- Queue length/index: {engine_state.get('queue_length')} / {engine_state.get('queue_index')}",
+            f"- Engage phase: {engine_state.get('engage_phase', '')}",
+            f"- Visible targets: {len(engine_state.get('visible_targets', []))}",
+            f"- Qualified count: {engine_state.get('qualified_count')}",
+            f"- Active no-fire mask: {engine_state.get('active_no_fire_mask', '') or 'none'}",
+            f"- Last reacquire note: {engine_state.get('last_reacquire_note', '') or 'none'}",
+        ])
+
+        lines.extend([
+            "",
+            "## Active Target",
+            "",
+            f"- Track ID: {active_target.get('track_id', '') or 'none'}",
+            f"- Class: {((active_target.get('detection') or {}).get('class_name', '')) or 'none'}",
+            f"- Score: {active_target.get('score', '') if active_target else 'none'}",
+            f"- Aim pan/tilt: {active_order.get('target_pan', '')} / {active_order.get('target_tilt', '')}",
+            f"- Burst count: {active_order.get('burst_count', '')}",
+        ])
+
+        lines.extend([
+            "",
+            "## Communications",
+            "",
+            f"- Connected: {comm.get('is_connected')}",
+            f"- Host managed: {comm.get('host_hardware_managed')}",
+            f"- Mode: {comm.get('mode_label', '')}",
+            f"- Trigger mode uses BB servo: {comm.get('trigger_mode_bb')}",
+            f"- Last command: {comm.get('last_command', '') or 'none'}",
+            f"- Last error: {comm.get('last_error', '') or 'none'}",
+        ])
+
+        servo_feedback = comm.get("servo_feedback", {}) or {}
+        io_runtime = comm.get("io_runtime", {}) or {}
+        lines.extend([
+            "",
+            "## Telemetry",
+            "",
+            f"- Servo feedback age (s): {servo_feedback.get('age_s')}",
+            f"- Servo feedback pan/tilt: {servo_feedback.get('pan_deg')} / {servo_feedback.get('tilt_deg')}",
+            f"- IO runtime source: {io_runtime.get('source', '')}",
+            f"- IO runtime age (s): {io_runtime.get('age_s')}",
+            f"- Safety/mode: {io_runtime.get('safety')} / {io_runtime.get('mode')}",
+            f"- Current fault: {io_runtime.get('current_fault')}",
+            f"- Total current (mA): {io_runtime.get('total_mA')}",
+        ])
+
+        lines.extend([
+            "",
+            "## Camera",
+            "",
+            f"- Capture open: {camera.get('capture_open')}",
+            f"- Source kind: {camera.get('source_kind', '')}",
+            f"- Source label: {camera.get('source_label', '') or camera.get('remembered_source', '')}",
+            f"- Requested resolution: {camera.get('requested_width')} x {camera.get('requested_height')}",
+            f"- Raw frame: {camera.get('raw_frame')}",
+            f"- Display frame: {camera.get('display_frame')}",
+            f"- Recovery attempts/in progress: {camera.get('camera_recovery_attempts')} / {camera.get('camera_recovery_in_progress')}",
+        ])
+
+        lines.extend([
+            "",
+            "## YOLO",
+            "",
+            f"- Selected model: {yolo.get('selected_model_name', '')}",
+            f"- Selected model path: {yolo.get('selected_model_path', '') or 'none'}",
+            f"- Loaded model path: {yolo.get('loaded_model_path', '') or 'none'}",
+            f"- Detector loaded: {yolo.get('detector_loaded')}",
+            f"- Allowed classes: {', '.join(yolo.get('allowed_classes', [])) or 'all'}",
+            f"- Confidence/min area: {yolo.get('confidence')} / {yolo.get('min_area')}",
+        ])
+
+        lines.extend([
+            "",
+            "## External Files",
+            "",
+        ])
+        for key, value in external_refs.items():
+            if value is None:
+                lines.append(f"- {key}: none")
+                continue
+            if isinstance(value, list):
+                joined = ", ".join(str(item.get("path", "")) for item in value)
+                lines.append(f"- {key}: {joined}")
+                continue
+            lines.append(f"- {key}: {value.get('path', '')} (exists={value.get('exists')})")
+
+        if recent_logs:
+            lines.extend([
+                "",
+                "## Recent Log Lines",
+                "",
+                "```text",
+                *recent_logs,
+                "```",
+            ])
+
+        return "\n".join(lines) + "\n"
+
+    def _export_runtime_snapshot(self) -> None:
+        try:
+            SENTRY_V2_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+            payload = self._collect_runtime_snapshot()
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            json_path = SENTRY_V2_SNAPSHOT_DIR / f"sentry_v2_runtime_snapshot_{timestamp}.json"
+            md_path = SENTRY_V2_SNAPSHOT_DIR / f"sentry_v2_runtime_snapshot_{timestamp}.md"
+            payload["exported_files"] = {
+                "json": self._portable_path_string(json_path),
+                "markdown": self._portable_path_string(md_path),
+            }
+            markdown = self._render_runtime_snapshot_markdown(payload)
+            json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            md_path.write_text(markdown, encoding="utf-8")
+            self._log(f"Runtime snapshot exported: {self._portable_path_string(json_path)}")
+            self._log(f"Runtime snapshot summary: {self._portable_path_string(md_path)}")
+        except Exception as exc:
+            self._log(f"Runtime snapshot export failed: {exc}")
 
     def _resolved_prompted_library_path(self) -> Path:
         configured = Path(str(self.config.prompted_library_path or "app/config/sentry_v2_prompted_targets.json"))
@@ -8929,12 +10141,14 @@ class SentryV2TabWidget(QWidget):
         if isinstance(preset_name_or_settings, dict):
             settings = preset_name_or_settings
             preset_label = None
+            preset_log_label = "custom/master settings"
         else:
             preset = ENGAGEMENT_PRESETS.get(preset_name_or_settings)
             if not preset:
                 return
             settings = self._resolved_engagement_preset_settings(preset)
             preset_label = preset_name_or_settings
+            preset_log_label = str(preset["label"])
 
         self._applying_engagement_preset = True
         try:
@@ -8945,6 +10159,7 @@ class SentryV2TabWidget(QWidget):
             self._combo_trigger_mode.blockSignals(True)
             self._combo_trigger_mode.setCurrentIndex(1 if settings["trigger_mode_bb"] else 0)
             self._combo_trigger_mode.blockSignals(False)
+            self._apply_trigger_servo_widget_values_from_settings(settings)
 
             widget_values = [
                 (self._spin_min_threat, settings["min_threat_score"]),
@@ -8995,14 +10210,16 @@ class SentryV2TabWidget(QWidget):
             for key, value in settings.items():
                 setattr(eg, key, value)
             self._comm.trigger_mode_bb = bool(settings["trigger_mode_bb"])
+            self._sync_comm_runtime_settings_from_config()
             self._sync_single_target_ui()
             self._on_engagement_changed()
+            self._queue_runtime_trigger_config_if_connected()
             if preset_label:
                 self._set_engagement_preset_label(preset_label)
             if not self._applying_master_preset:
                 self._set_master_profile_label(self._match_master_profile_name())
                 self._update_master_stack_summary()
-            self._log(f"Engagement preset: {preset['label']}")
+            self._log(f"Engagement preset: {preset_log_label}")
         finally:
             self._applying_engagement_preset = False
 
@@ -9057,8 +10274,33 @@ class SentryV2TabWidget(QWidget):
         if not self._pan_tilt_motion_enabled and not manual_override:
             return
         move_time = int(self._get_manual_move_time_ms() if move_time_ms is None else move_time_ms)
+        queued_move = (float(pan), float(tilt), int(fire), move_time, bool(manual_override))
+        now = time.time()
         with self._pending_move_lock:
-            self._pending_move_command = (float(pan), float(tilt), int(fire), move_time)
+            if manual_override:
+                # CHANGE WARNING: manual arrows/Home/Move to Guard share this
+                # worker with engine tracking slews. Keep manual recovery moves
+                # briefly dominant so a live tracking frame cannot overwrite them
+                # before they are sent to the Debug Board.
+                self._manual_move_priority_until = max(
+                    self._manual_move_priority_until,
+                    now + float(getattr(self, "_manual_position_hold_s", 1.25) or 1.25),
+                )
+                if self._pending_move_commands:
+                    self._pending_move_commands = deque(
+                        cmd for cmd in self._pending_move_commands if bool(cmd[4])
+                    )
+                self._pending_move_commands.append(queued_move)
+            else:
+                if now < self._manual_move_priority_until:
+                    return
+                if self._pending_move_commands and not bool(self._pending_move_commands[-1][4]):
+                    self._pending_move_commands[-1] = queued_move
+                else:
+                    self._pending_move_commands.append(queued_move)
+
+            while len(self._pending_move_commands) > 6:
+                self._pending_move_commands.popleft()
 
     def _queue_comm_task(self, task_name: str, *args, **kwargs) -> None:
         if self._closing:
@@ -9090,20 +10332,23 @@ class SentryV2TabWidget(QWidget):
 
             move_command = None
             with self._pending_move_lock:
-                if self._pending_move_command is not None:
-                    move_command = self._pending_move_command
-                    self._pending_move_command = None
+                if self._pending_move_commands:
+                    move_command = self._pending_move_commands.popleft()
             if move_command is not None and not self._closing:
                 try:
-                    pan, tilt, fire, move_time = move_command
+                    pan, tilt, fire, move_time, _manual_override = move_command
                     if int(fire) != 0:
                         ok = self._comm.send_command(pan, tilt, fire=fire, move_time_ms=move_time)
+                        detail = getattr(self._comm, "_last_error", "") or getattr(self._comm, "_last_cmd", "") or ""
                     else:
                         ok = self._comm.send_movement(pan, tilt, move_time_ms=move_time)
+                        detail = getattr(self._comm, "_last_cmd", "") or ""
+                        if not ok:
+                            detail = getattr(self._comm, "_last_error", "") or "movement command failed"
                     self.command_result_ready.emit(
                         "move",
                         bool(ok),
-                        getattr(self._comm, "_last_error", "") or getattr(self._comm, "_last_cmd", "") or "",
+                        detail,
                     )
                 except Exception as exc:
                     self.command_result_ready.emit("move", False, str(exc))
@@ -9141,17 +10386,43 @@ class SentryV2TabWidget(QWidget):
             ok = self._comm.send_pir_enabled(*args, **kwargs)
             self.command_result_ready.emit("send_pir_enabled", bool(ok), getattr(self._comm, "_last_error", "") or getattr(self._comm, "_last_cmd", "") or "")
             return
+        if task_name == "send_sound":
+            ok = self._comm.send_sound(*args, **kwargs)
+            self.command_result_ready.emit("send_sound", bool(ok), getattr(self._comm, "_last_error", "") or getattr(self._comm, "_last_cmd", "") or "")
+            return
+        if task_name == "send_trigger_runtime_config":
+            ok = self._comm.send_trigger_runtime_config(*args, **kwargs)
+            self.command_result_ready.emit("send_trigger_runtime_config", bool(ok), getattr(self._comm, "_last_error", "") or getattr(self._comm, "_last_cmd", "") or "")
+            return
+        if task_name == "refresh_wifi_runtime_link":
+            host = str(args[0]) if len(args) >= 1 else str(self.config.connection.udp_host or "192.168.4.1")
+            port = int(args[1]) if len(args) >= 2 else int(self.config.connection.udp_port or 9000)
+            pir_enabled = bool(args[2]) if len(args) >= 3 else bool(self.config.pir_guard.pir_enabled)
+            ok = self._comm.refresh_primary_udp_link(host, port)
+            detail = getattr(self._comm, "_last_error", "") or getattr(self._comm, "_last_cmd", "") or ""
+            if ok:
+                self._comm.send_trigger_runtime_config()
+                self._comm.send_pir_enabled(pir_enabled)
+                detail = f"WiFi runtime link refreshed: {host}:{port}"
+            self.command_result_ready.emit("refresh_wifi_runtime_link", bool(ok), detail)
+            return
 
     def _on_command_result_ready(self, command_name: str, ok: bool, detail: str) -> None:
         if self._closing:
             return
         if hasattr(self, "_lbl_last_cmd") and getattr(self._comm, "_last_cmd", ""):
             self._lbl_last_cmd.setText(f"Last: {self._comm._last_cmd}")
+        if command_name == "refresh_wifi_runtime_link":
+            self._wifi_runtime_refresh_inflight = False
         if ok:
+            if command_name == "refresh_wifi_runtime_link":
+                self._log(str(detail or "WiFi runtime link refreshed"))
             return
         detail_text = str(detail or "command failed")
         if command_name == "move":
             self._log(f"Move failed: {detail_text}")
+        elif command_name == "refresh_wifi_runtime_link":
+            self._log(f"WiFi runtime refresh failed: {detail_text}")
         else:
             self._log(f"{command_name} failed: {detail_text}")
 
@@ -9188,9 +10459,41 @@ class SentryV2TabWidget(QWidget):
             max(tilt_min, min(tilt_max, tilt)),
         )
 
-    def _remember_commanded_position(self, pan: float, tilt: float) -> None:
+    def _sync_engine_pose_from_feedback(self) -> None:
+        # CHANGE WARNING: Precision aiming uses engine.current_pan/current_tilt as
+        # its live reference. Do not overwrite that reference with delayed bus-servo
+        # readback while a new commanded move is still in flight, or the precision
+        # loop will chase stale feedback and oscillate.
+        feedback = self._comm.get_servo_feedback_snapshot()
+        feedback_age = feedback.get("age_s")
+        feedback_pan = feedback.get("pan_deg")
+        feedback_tilt = feedback.get("tilt_deg")
+        if feedback_pan is None or feedback_tilt is None or feedback_age is None:
+            return
+        if float(feedback_age) > 1.0:
+            return
+        now = time.time()
+        commanded_pan = float(getattr(self, "_last_commanded_pan", feedback_pan))
+        commanded_tilt = float(getattr(self, "_last_commanded_tilt", feedback_tilt))
+        command_age_s = now - float(getattr(self, "_last_commanded_pose_time_s", 0.0) or 0.0)
+        move_time_s = max(0.0, float(getattr(self, "_last_commanded_move_time_ms", 0) or 0) / 1000.0)
+        settle_window_s = max(0.18, min(1.25, move_time_s + 0.18))
+        feedback_to_command_err = max(
+            abs(float(feedback_pan) - commanded_pan),
+            abs(float(feedback_tilt) - commanded_tilt),
+        )
+        if command_age_s < settle_window_s and feedback_to_command_err > 1.5:
+            return
+        pan, tilt = self._clamp_manual_angles(float(feedback_pan), float(feedback_tilt))
+        self.engine.current_pan = pan
+        self.engine.current_tilt = tilt
+
+    def _remember_commanded_position(self, pan: float, tilt: float, *, move_time_ms: Optional[int] = None) -> None:
         self._last_commanded_pan = float(pan)
         self._last_commanded_tilt = float(tilt)
+        self._last_commanded_pose_time_s = time.time()
+        if move_time_ms is not None:
+            self._last_commanded_move_time_ms = max(0, int(move_time_ms))
 
     def _get_command_delta(self, pan: float, tilt: float) -> float:
         prev_pan = float(getattr(self, "_last_commanded_pan", pan))
@@ -9203,12 +10506,19 @@ class SentryV2TabWidget(QWidget):
     def _get_tracking_move_time_ms(self, move_delta: float) -> int:
         base_time = int(max(20, int(self.config.connection.bus_servo_time_ms)))
         speed_value = int(np.clip(self.config.engagement.engagement_speed, 10, 100))
-        dynamic_time = int(round(np.interp(speed_value, [10, 100], [120, 35])))
+
+        # Manual move-time should still influence tracking, but it should not act
+        # as a hard floor or all presets collapse toward the same slow feel.
+        dynamic_time = int(round(np.interp(speed_value, [10, 100], [145, 16])))
+        manual_influence = float(np.interp(speed_value, [10, 100], [1.00, 0.18]))
+        tracking_time = int(round(dynamic_time + ((base_time - 20) * manual_influence)))
+
         if move_delta <= 0.8:
-            dynamic_time = max(dynamic_time, 70)
+            tracking_time = max(tracking_time, int(round(np.interp(speed_value, [10, 100], [92, 28]))))
         elif move_delta <= 2.5:
-            dynamic_time = max(dynamic_time, 55)
-        return int(max(base_time, dynamic_time))
+            tracking_time = max(tracking_time, int(round(np.interp(speed_value, [10, 100], [70, 20]))))
+
+        return int(max(16, min(220, tracking_time)))
 
     def _get_tracking_motion_suppression_s(self, move_delta: float) -> float:
         mode = int(self.config.detection_mode.detection_mode)
@@ -9236,6 +10546,114 @@ class SentryV2TabWidget(QWidget):
         if move_delta <= 2.5:
             return min(base_suppression, 0.06)
         return min(base_suppression, 0.09)
+
+    def _queue_sound_tone(self, freq_hz: int, duration_ms: int) -> None:
+        if self._closing or self._host_controls_hardware():
+            return
+        if not bool(getattr(self.config.sound, "enabled", True)):
+            return
+        volume_pct = self._sound_volume_pct()
+        if volume_pct <= 0:
+            return
+        if not self._comm.can_send_sound():
+            now = time.time()
+            if now - float(getattr(self, "_last_sound_transport_warn_s", 0.0) or 0.0) >= 5.0:
+                self._last_sound_transport_warn_s = now
+                self._log(self._comm.sound_transport_info())
+            return
+        self._queue_comm_task("send_sound", int(freq_hz), int(duration_ms), volume_pct)
+
+    def _current_sound_area_ratio(self) -> Optional[float]:
+        active_order = getattr(self.engine, "active_order", None)
+        active_det = getattr(getattr(active_order, "target", None), "det", None)
+        if active_det is not None and hasattr(active_det, "area_ratio"):
+            try:
+                return float(active_det.area_ratio)
+            except Exception:
+                return None
+        targets = list(getattr(self.engine, "last_targets", []) or [])
+        if targets:
+            det = getattr(targets[0], "det", None)
+            if det is not None and hasattr(det, "area_ratio"):
+                try:
+                    return float(det.area_ratio)
+                except Exception:
+                    return None
+        return None
+
+    def _update_sound_runtime_cues(self) -> None:
+        visible_targets = int(len(getattr(self.engine, "last_targets", []) or []))
+        qualified_targets = int(len(getattr(self.engine, "last_qualified", []) or []))
+        had_visible = self._sound_prev_visible_targets > 0
+        has_visible = visible_targets > 0
+        had_qualified = self._sound_prev_qualified_targets > 0
+        has_qualified = qualified_targets > 0
+        area_ratio = self._current_sound_area_ratio()
+
+        if has_visible and not had_visible:
+            self._sound_engine.note_detection_acquired(area_ratio, qualified=has_qualified)
+        elif has_qualified and not had_qualified:
+            self._sound_engine.note_detection_acquired(area_ratio, qualified=True)
+        elif had_visible and not has_visible:
+            self._sound_engine.note_target_lost()
+
+        lock_frames = int(getattr(self.engine, "_aim_lock_frames", 0) or 0)
+        lock_required = max(1, int(getattr(self.config.engagement, "aim_lock_required_frames", 1) or 1))
+        lock_active = bool(
+            self.engine.state == SentryV2State.ENGAGING
+            and getattr(self.engine, "active_order", None) is not None
+            and lock_frames >= lock_required
+        )
+        if lock_active and not self._sound_lock_active:
+            self._sound_engine.note_target_lock(area_ratio)
+
+        self._sound_prev_visible_targets = visible_targets
+        self._sound_prev_qualified_targets = qualified_targets
+        self._sound_lock_active = lock_active
+
+    def _note_sound_settings_changed(self) -> None:
+        if bool(getattr(self.config.sound, "enabled", True)):
+            self._sound_engine.note_settings_changed()
+
+    def _sound_volume_pct(self) -> int:
+        return int(max(0, min(100, int(getattr(self.config.sound, "volume_pct", 100) or 100))))
+
+    def _sync_sound_widgets(self) -> None:
+        enabled = bool(getattr(self.config.sound, "enabled", True))
+        volume_pct = self._sound_volume_pct()
+        for attr_name in ("_chk_sound_enabled",):
+            if hasattr(self, attr_name):
+                widget = getattr(self, attr_name)
+                widget.blockSignals(True)
+                widget.setChecked(enabled)
+                widget.blockSignals(False)
+        if hasattr(self, "_slider_sound_volume"):
+            self._slider_sound_volume.blockSignals(True)
+            self._slider_sound_volume.setValue(volume_pct)
+            self._slider_sound_volume.setEnabled(enabled)
+            self._slider_sound_volume.blockSignals(False)
+        if hasattr(self, "_lbl_sound_volume"):
+            self._lbl_sound_volume.setText("Muted" if volume_pct <= 0 else f"{volume_pct}%")
+
+    def _refresh_sound_toggle_text(self) -> None:
+        if hasattr(self, "_chk_sound_enabled"):
+            self._chk_sound_enabled.setText(f"Sound: {'ON' if self._chk_sound_enabled.isChecked() else 'OFF'}")
+
+    def _on_sound_enabled_changed(self, checked: bool) -> None:
+        self.config.sound.enabled = bool(checked)
+        self._sound_engine.set_enabled(bool(checked))
+        self._sync_sound_widgets()
+        self._refresh_sound_toggle_text()
+        self._save_config_quietly()
+        if checked:
+            self._sound_engine.note_settings_changed()
+
+    def _on_sound_volume_changed(self, value: int) -> None:
+        self.config.sound.volume_pct = int(max(0, min(100, int(value))))
+        self._sync_sound_widgets()
+        self._save_config_quietly()
+        if bool(getattr(self.config.sound, "enabled", True)) and self._sound_volume_pct() > 0:
+            self._sound_engine.note_settings_changed()
 
     def _suppress_motion_detection(self, seconds: Optional[float] = None) -> None:
         suppress_for = self.config.detection_mode.motion_ignore_after_move_s if seconds is None else seconds
@@ -9430,49 +10848,232 @@ class SentryV2TabWidget(QWidget):
                 self._log("[WARN] YOLO detection active but no model loaded — load a model in the Detection tab")
                 self._set_yolo_status("error", "YOLO mode active but no model loaded — click Load in Detection tab")
 
-        self._lbl_state.setText(f"State: {stats['state']}")
-        self._lbl_stats.setText(
-            f"Targets: {stats['targets_visible']} | "
-            f"Qualified: {stats['targets_qualified']} | "
-            f"Engaged: {stats['engagements_total']}\n"
-            f"Err P/T: {stats['last_err_pan_deg']:+.2f}/{stats['last_err_tilt_deg']:+.2f} | "
-            f"Lock: {stats['aim_lock_frames']} | "
-            f"Move: {int(getattr(self, '_last_tracking_move_time_ms', 0))}ms | "
-            f"Suppress: {float(getattr(self, '_last_tracking_suppression_s', 0.0)):.2f}s | "
-            f"Pan/Tilt: {'ON' if stats.get('motion_enabled', True) else 'OFF'}"
+        state_name = str(stats['state'] or 'PAUSED').strip().upper()
+        motion_enabled = bool(stats.get('motion_enabled', True))
+        state_color = {
+            'PAUSED': '#97a8b8',
+            'GUARDING': '#7cc7ff',
+            'ENGAGING': '#8fe3c4',
+            'RETURNING': '#ffd27a',
+        }.get(state_name, '#dce9f7')
+        self._set_label_content(
+            self._lbl_state,
+            f"<span style='font-size:18px; font-weight:700;'>{state_name}</span><br>"
+            f"<span style='font-size:10px; color:#9fb4c9;'>Pan/Tilt {'ON' if motion_enabled else 'OFF'}</span>",
+            f"color: {state_color};",
         )
+
+        visible_targets = int(stats.get('targets_visible', 0) or 0)
+        qualified_targets = int(stats.get('targets_qualified', 0) or 0)
+        engaged_targets = int(stats.get('engagements_total', 0) or 0)
+        if state_name in {"GUARDING", "RETURNING"} and visible_targets <= 0:
+            self._sound_engine.note_guard_tick(
+                scanning=bool(
+                    state_name == "RETURNING"
+                    or int(getattr(self.config.guard, "guard_mode", 0) or 0) != 0
+                    or bool(getattr(self.engine, "_pir_cue_mode", False))
+                    or bool(getattr(self.engine, "_pir_scan_mode", False))
+                )
+            )
+        self._set_label_content(
+            self._lbl_stats,
+            "<span style='font-size:16px; font-weight:700;'>"
+            f"{visible_targets}</span><span style='font-size:10px; color:#9fb4c9;'> vis</span>  "
+            f"<span style='font-size:16px; font-weight:700;'>{qualified_targets}</span><span style='font-size:10px; color:#9fb4c9;'> ready</span>  "
+            f"<span style='font-size:16px; font-weight:700;'>{engaged_targets}</span><span style='font-size:10px; color:#9fb4c9;'> eng</span>",
+            "color: #8fe3c4;",
+        )
+        if hasattr(self, "_lbl_motion_gate"):
+            if not motion_enabled:
+                gate_text = "Tracking: Auto Motion OFF"
+                gate_color = "#ffae42"
+            elif visible_targets > 0 and qualified_targets <= 0:
+                gate_text = "Tracking: visible targets filtered before engage"
+                gate_color = "#ffd27a"
+            elif qualified_targets > 0:
+                gate_text = "Tracking: qualified target ready"
+                gate_color = "#8fe3c4"
+            else:
+                gate_text = "Tracking: idle"
+                gate_color = "#97a8b8"
+            self._set_label_content(
+                self._lbl_motion_gate,
+                f"{gate_text} | Lock {int(stats.get('aim_lock_frames', 0) or 0)} | "
+                f"Move {int(getattr(self, '_last_tracking_move_time_ms', 0))}ms | "
+                f"Suppress {float(getattr(self, '_last_tracking_suppression_s', 0.0)):.2f}s",
+                f"font-weight: bold; color: {gate_color}; font-size: 10px;",
+            )
         current_pan = float(self.engine.current_pan)
         current_tilt = float(self.engine.current_tilt)
         guard = self.config.guard
-        self._lbl_angles.setText(
-            f"Angles: Pan {current_pan:.1f}° [{guard.pan_min:.0f}..{guard.pan_max:.0f}] | "
-            f"Tilt {current_tilt:.1f}° [{guard.tilt_min:.0f}..{guard.tilt_max:.0f}]"
-        )
+        pan_span = max(0.1, float(guard.pan_max) - float(guard.pan_min))
+        tilt_span = max(0.1, float(guard.tilt_max) - float(guard.tilt_min))
+        pan_progress = int(max(0, min(1000, round(((current_pan - float(guard.pan_min)) / pan_span) * 1000.0))))
+        tilt_progress = int(max(0, min(1000, round(((current_tilt - float(guard.tilt_min)) / tilt_span) * 1000.0))))
+        self._set_label_content(self._lbl_angles, f"Pan {current_pan:.1f}°  [{guard.pan_min:.0f}..{guard.pan_max:.0f}]")
+        self._bar_pan_status.setValue(pan_progress)
         if hasattr(self, "_lbl_angles_controls"):
-            self._lbl_angles_controls.setText(
-                f"Current Commanded: Pan {current_pan:.1f}° | Tilt {current_tilt:.1f}°"
+            commanded_pan = float(getattr(self, "_last_commanded_pan", current_pan))
+            commanded_tilt = float(getattr(self, "_last_commanded_tilt", current_tilt))
+            self._set_label_content(
+                self._lbl_angles_controls,
+                f"Tilt {current_tilt:.1f}°  [{guard.tilt_min:.0f}..{guard.tilt_max:.0f}]   Cmd {commanded_pan:.1f}/{commanded_tilt:.1f}°",
             )
+            self._bar_tilt_status.setValue(tilt_progress)
+        feedback = self._comm.get_servo_feedback_snapshot()
+        io_runtime = self._comm.get_io_runtime_snapshot()
+        if hasattr(self, "_lbl_hw_safety"):
+            io_age = io_runtime.get("age_s")
+            io_is_live = io_age is not None and float(io_age) <= 2.0
+            safety_value = io_runtime.get("safety") if io_is_live else None
+            mode_value = io_runtime.get("mode") if io_is_live else None
+            current_fault = io_runtime.get("current_fault") if io_is_live else None
+            if safety_value is None:
+                safety_text = "ARMED" if self._safety_armed else "LOCKED"
+            else:
+                safety_text = "ARMED" if int(safety_value) == 0 else "LOCKED"
+            if mode_value is None:
+                trigger_text = "Projectile" if self.config.engagement.trigger_mode_bb else "Water"
+            else:
+                trigger_text = "Projectile" if int(mode_value) == 1 else "Water"
+            fire_blocked = (safety_text != "ARMED") or bool(current_fault)
+
+        if hasattr(self, "_lbl_sound_status"):
+            sound_enabled = bool(getattr(self.config.sound, "enabled", True))
+            if not sound_enabled:
+                sound_text = "Sound disabled"
+                sound_color = "#97a8b8"
+            else:
+                sound_text = self._comm.sound_transport_info()
+                if self._comm.is_sound_link_verified():
+                    sound_color = "#8fe3c4"
+                elif self._comm.can_send_sound():
+                    sound_color = "#ffd27a"
+                else:
+                    sound_color = "#ffae42"
+            self._set_label_content(
+                self._lbl_sound_status,
+                f"{sound_text} | Volume {self._sound_volume_pct()}%",
+                f"font-weight: bold; color: {sound_color}; font-size: 10px;",
+            )
+            fire_path_text = "BLOCKED" if fire_blocked else "CLEAR"
+            if current_fault is None:
+                current_fault_text = "unknown"
+                color = "#ffd27a" if safety_text == "ARMED" else "#ff8a7a"
+            else:
+                current_fault_text = "TRIPPED" if bool(current_fault) else "clear"
+                color = "#ff8a7a" if bool(current_fault) or safety_text != "ARMED" else "#8fe3c4"
+            self._set_label_content(
+                self._lbl_hw_safety,
+                f"<span style='font-size:18px; font-weight:700;'>{fire_path_text}</span><br>"
+                f"<span style='font-size:10px; color:#9fb4c9;'>Safety {safety_text} • {trigger_text} • Fault {current_fault_text}</span>",
+                f"color: {color};",
+            )
+        if hasattr(self, "_lbl_hw_servo_health"):
+            feedback_age = feedback.get("age_s")
+            diag_age = feedback.get("diag_age_s")
+            source = str(feedback.get("source") or "inactive")
+            if feedback_age is not None and float(feedback_age) <= 1.5:
+                status_word = "live"
+                color = "#8fe3c4"
+            elif source == "waiting":
+                status_word = "waiting"
+                color = "#ffd27a"
+            elif feedback_age is not None:
+                status_word = "stale"
+                color = "#ffd27a"
+            else:
+                status_word = "inactive"
+                color = "#97a8b8"
+            pan_voltage = feedback.get("pan_voltage_v")
+            tilt_voltage = feedback.get("tilt_voltage_v")
+            pan_load = feedback.get("pan_load_raw")
+            tilt_load = feedback.get("tilt_load_raw")
+            voltage_text = (
+                f"Pan {float(pan_voltage):.1f}V | Tilt {float(tilt_voltage):.1f}V"
+                if pan_voltage is not None and tilt_voltage is not None
+                else "Voltage: waiting"
+            )
+            load_text = (
+                f"Load P {int(pan_load):+d} | T {int(tilt_load):+d}"
+                if pan_load is not None and tilt_load is not None
+                else "Load waiting"
+            )
+            age_text = f"diag {float(diag_age):.1f}s" if diag_age is not None else "diag --"
+            self._set_label_content(
+                self._lbl_hw_servo_health,
+                f"Servo {status_word} • {voltage_text} • {load_text} • {age_text}",
+                f"font-weight: bold; color: {color}; font-size: 10px;",
+            )
+        if hasattr(self, "_lbl_hw_current"):
+            io_age = io_runtime.get("age_s")
+            io_is_live = io_age is not None and float(io_age) <= 2.0
+            pan_m_a = io_runtime.get("pan_mA") if io_is_live else None
+            tilt_m_a = io_runtime.get("tilt_mA") if io_is_live else None
+            total_m_a = io_runtime.get("total_mA") if io_is_live else None
+            current_fault = io_runtime.get("current_fault") if io_is_live else None
+            if pan_m_a is None and tilt_m_a is None and total_m_a is None:
+                if io_runtime.get("source") in ("esp32-state", "esp32-ack"):
+                    text = "Current: firmware state has no live mA yet"
+                    color = "#ffd27a"
+                elif io_runtime.get("source") == "waiting":
+                    text = "Current: waiting for ESP32 state"
+                    color = "#97a8b8"
+                else:
+                    text = "Current: unavailable in this connection mode"
+                    color = "#97a8b8"
+            else:
+                pan_text = f"Pan {int(pan_m_a)}mA" if pan_m_a is not None else "Pan n/a"
+                tilt_text = f"Tilt {int(tilt_m_a)}mA" if tilt_m_a is not None else "Tilt n/a"
+                total_text = f"Total {int(total_m_a)}mA" if total_m_a is not None else "Total n/a"
+                text = f"Current: {pan_text} | {tilt_text} | {total_text}"
+                color = "#ff8a7a" if bool(current_fault) else "#8fe3c4"
+            self._set_label_content(self._lbl_hw_current, text, f"font-weight: bold; color: {color}; font-size: 10px;")
+        if hasattr(self, "_lbl_servo_feedback"):
+            feedback_age = feedback.get("age_s")
+            feedback_pan = feedback.get("pan_deg")
+            feedback_tilt = feedback.get("tilt_deg")
+            if feedback_pan is not None and feedback_tilt is not None and feedback_age is not None:
+                pan_err = float(feedback_pan) - current_pan
+                tilt_err = float(feedback_tilt) - current_tilt
+                is_stale = float(feedback_age) > 1.5
+                status_word = "stale" if is_stale else "live"
+                self._set_label_content(
+                    self._lbl_servo_feedback,
+                    f"Feedback {status_word} • Meas {float(feedback_pan):.1f}/{float(feedback_tilt):.1f}° • "
+                    f"Err {pan_err:+.1f}/{tilt_err:+.1f}° • age {float(feedback_age):.2f}s",
+                    "font-weight: bold; color: #ffd27a; font-size: 10px;" if is_stale else "font-weight: bold; color: #8fe3c4; font-size: 10px;",
+                )
+            else:
+                source = str(feedback.get("source") or "inactive")
+                last_error = str(feedback.get("last_error") or "").strip()
+                if source == "waiting":
+                    message = last_error or "Waiting for first servo feedback reply"
+                    color = "#ffd27a"
+                elif source == "disconnected":
+                    message = "Disconnected"
+                    color = "#97a8b8"
+                else:
+                    message = "Inactive in this connection mode"
+                    color = "#97a8b8"
+                self._set_label_content(self._lbl_servo_feedback, f"Feedback: {message}", f"font-weight: bold; color: {color}; font-size: 10px;")
         blocked_mask = str(stats.get('no_fire_mask') or '')
         if hasattr(self, "_lbl_no_fire_status"):
             if blocked_mask:
-                self._lbl_no_fire_status.setText(f"No-fire mask: BLOCKED by {blocked_mask}")
-                self._lbl_no_fire_status.setStyleSheet("font-weight: bold; color: #ff8a7a;")
+                self._set_label_content(self._lbl_no_fire_status, f"No-fire: blocked by {blocked_mask}", "font-weight: bold; color: #ff8a7a; font-size: 10px;")
             else:
-                self._lbl_no_fire_status.setText("No-fire mask: clear")
-                self._lbl_no_fire_status.setStyleSheet("font-weight: bold; color: #8fe3c4;")
+                self._set_label_content(self._lbl_no_fire_status, "No-fire: clear", "font-weight: bold; color: #8fe3c4; font-size: 10px;")
         if hasattr(self, "_lbl_recovery_status"):
             loss_phase = str(stats.get('loss_recovery_phase') or '').strip()
             if loss_phase:
                 phase_text = loss_phase.replace('_', ' ').title()
                 reacquire_note = str(stats.get('reacquire_note') or '').strip()
                 if reacquire_note:
-                    self._lbl_recovery_status.setText(f"Recovery: {phase_text} | Note: {reacquire_note}")
+                    self._set_label_content(self._lbl_recovery_status, f"Recovery: {phase_text} • {reacquire_note}", "font-weight: bold; color: #ffd27a; font-size: 10px;")
                 else:
-                    self._lbl_recovery_status.setText(f"Recovery: {phase_text}")
-                self._lbl_recovery_status.setStyleSheet("font-weight: bold; color: #ffd27a;")
+                    self._set_label_content(self._lbl_recovery_status, f"Recovery: {phase_text}", "font-weight: bold; color: #ffd27a; font-size: 10px;")
             else:
-                self._lbl_recovery_status.setText("Recovery: idle")
-                self._lbl_recovery_status.setStyleSheet("font-weight: bold; color: #97a8b8;")
+                self._set_label_content(self._lbl_recovery_status, "Recovery: idle", "font-weight: bold; color: #97a8b8; font-size: 10px;")
         if blocked_mask != self._last_blocked_mask_seen:
             if blocked_mask:
                 self._log(f"No-fire mask active: {blocked_mask}")
@@ -9491,7 +11092,7 @@ class SentryV2TabWidget(QWidget):
         if hasattr(self, "_lbl_last_cmd"):
             cmd = self._comm._last_cmd
             if cmd:
-                self._lbl_last_cmd.setText(f"Last: {cmd}")
+                self._set_label_content(self._lbl_last_cmd, f"Last: {cmd}")
         
         # Update PIR status display in Guard tab
         if hasattr(self, "_lbl_pir_status"):
