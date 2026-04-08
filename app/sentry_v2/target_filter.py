@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — Target Filter
+SMART SENTRY V3 — Target Filter
 
 Decides which YOLO detections qualify as engageable targets based on
 user-defined criteria (class, confidence, size, zone).
@@ -49,6 +49,10 @@ class DetectedObject:
     source: str = "yolo"
     frame_width: int = 640
     frame_height: int = 480
+    identity_label: str = ""
+    identity_confidence: float = 0.0
+    identity_profile_id: str = ""
+    friendly_identity: bool = False
 
     # Derived
     @property

@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — Standalone Communication
+SMART SENTRY V3 — Standalone Communication
 
 Handles direct serial (USB COM) and UDP (WiFi) communication with the ESP32
 and optional Debug Board, independent of the main application's serial pipeline.
@@ -40,7 +40,7 @@ from .sentry_v2_config import (
 
 
 class SentryV2Comm:
-    """Self-contained ESP32 + Debug Board communication for Smart Sentry v2."""
+    """Self-contained ESP32 + Debug Board communication for SMART SENTRY V3."""
 
     PAN_OUTPUT_MIN = SENTRY_PAN_MIN
     PAN_OUTPUT_MAX = SENTRY_PAN_MAX
@@ -111,6 +111,8 @@ class SentryV2Comm:
         self.trigger_servo_rest_deg: int = 0
         self.trigger_servo_fire_deg: int = 45
         self.trigger_servo_speed_dps: int = 360
+        self.rest_pan: float = 90.0
+        self.rest_tilt: float = 55.0
         self.pir_event_blink_enabled: bool = False
 
         # Direction inversion
@@ -170,11 +172,53 @@ class SentryV2Comm:
             "source": "inactive",
             "safety": None,
             "mode": None,
+            "switch_in": None,
+            "hw_arm_enabled": None,
+            "control_source_mode": "",
+            "control_source_active": "",
+            "rc_link_active": None,
+            "rc_override_active": None,
+            "rc_failsafe_active": None,
+            "rc_frame_age_ms": None,
+            "rc_channels": {},
             "current_fault": None,
             "pir_enabled": None,
             "pan_mA": None,
+            "pan_mA_valid": None,
             "tilt_mA": None,
+            "tilt_mA_valid": None,
             "total_mA": None,
+            "total_mA_valid": None,
+            "last_update": 0.0,
+            "last_error": "",
+        }
+        self._bridge_caps: Dict[str, Any] = {
+            "active": False,
+            "source": "inactive",
+            "role": "",
+            "rc_input_supported": None,
+            "rc_input_planned": "",
+            "rc_mode_supported": None,
+            "rc_mode_default": "",
+            "rc_receiver_model": "",
+            "rc_source_switch_channel": None,
+            "switch_supported": None,
+            "switch_role": "",
+            "switch_active_low": None,
+            "switch_pullup_enabled": None,
+            "sound_supported": None,
+            "speaker_supported": None,
+            "current_pan_supported": None,
+            "current_tilt_supported": None,
+            "current_total_supported": None,
+            "led_relay_assigned": None,
+            "laser_relay_assigned": None,
+            "trigger_servo_assigned": None,
+            "buzzer_volume_assigned": None,
+            "speaker_volume_assigned": None,
+            "header_reference_locked": None,
+            "pins": {},
+            "raw": {},
             "last_update": 0.0,
             "last_error": "",
         }
@@ -229,11 +273,56 @@ class SentryV2Comm:
                 "source": str(source or "inactive"),
                 "safety": None,
                 "mode": None,
+                "switch_in": None,
+                "hw_arm_enabled": None,
+                "control_source_mode": "",
+                "control_source_active": "",
+                "rc_link_active": None,
+                "rc_override_active": None,
+                "rc_failsafe_active": None,
+                "rc_frame_age_ms": None,
+                "rc_channels": {},
                 "current_fault": None,
                 "pir_enabled": None,
                 "pan_mA": None,
+                "pan_mA_valid": None,
                 "tilt_mA": None,
+                "tilt_mA_valid": None,
                 "total_mA": None,
+                "total_mA_valid": None,
+                "last_update": 0.0,
+                "last_error": str(last_error or ""),
+            }
+
+    def _reset_bridge_caps_state(self, *, active: bool, source: str, last_error: str = "") -> None:
+        with self._lock:
+            self._bridge_caps = {
+                "active": bool(active),
+                "source": str(source or "inactive"),
+                "role": "",
+                "rc_input_supported": None,
+                "rc_input_planned": "",
+                "rc_mode_supported": None,
+                "rc_mode_default": "",
+                "rc_receiver_model": "",
+                "rc_source_switch_channel": None,
+                "switch_supported": None,
+                "switch_role": "",
+                "switch_active_low": None,
+                "switch_pullup_enabled": None,
+                "sound_supported": None,
+                "speaker_supported": None,
+                "current_pan_supported": None,
+                "current_tilt_supported": None,
+                "current_total_supported": None,
+                "led_relay_assigned": None,
+                "laser_relay_assigned": None,
+                "trigger_servo_assigned": None,
+                "buzzer_volume_assigned": None,
+                "speaker_volume_assigned": None,
+                "header_reference_locked": None,
+                "pins": {},
+                "raw": {},
                 "last_update": 0.0,
                 "last_error": str(last_error or ""),
             }
@@ -241,23 +330,67 @@ class SentryV2Comm:
     def get_io_runtime_snapshot(self) -> Dict[str, Any]:
         with self._lock:
             snapshot = dict(self._io_runtime)
+            rc_channels = snapshot.get("rc_channels") or {}
+            snapshot["rc_channels"] = dict(rc_channels) if isinstance(rc_channels, dict) else {}
         last_update = float(snapshot.get("last_update") or 0.0)
         snapshot["age_s"] = max(0.0, time.time() - last_update) if last_update > 0.0 else None
         return snapshot
 
+    def get_bridge_caps_snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            snapshot = dict(self._bridge_caps)
+            pins = snapshot.get("pins") or {}
+            raw = snapshot.get("raw") or {}
+            snapshot["pins"] = dict(pins) if isinstance(pins, dict) else {}
+            snapshot["raw"] = dict(raw) if isinstance(raw, dict) else {}
+        last_update = float(snapshot.get("last_update") or 0.0)
+        snapshot["age_s"] = max(0.0, time.time() - last_update) if last_update > 0.0 else None
+        return snapshot
+
+    @staticmethod
+    def _runtime_update_time_from_timestamp(timestamp_ms: Any = None) -> float:
+        """Convert remote timestamps to a local freshness clock.
+
+        Bridge packets currently use ESP32 millis-since-boot in `ts`, while the app
+        freshness checks compare `last_update` against `time.time()`. Treat only
+        epoch-like millisecond timestamps as absolute wall clock values; otherwise
+        use local receipt time so fresh bridge replies are not marked stale.
+        """
+        now = time.time()
+        if timestamp_ms is None:
+            return now
+        try:
+            ts_s = float(timestamp_ms) / 1000.0
+        except Exception:
+            return now
+        if ts_s >= 946684800.0:
+            return ts_s
+        return now
+
     def _apply_io_runtime_state(self, payload: Dict[str, Any], *, source: str, timestamp_ms: Any = None) -> None:
         if not isinstance(payload, dict):
             return
-        try:
-            update_time = float(timestamp_ms) / 1000.0 if timestamp_ms is not None else time.time()
-        except Exception:
-            update_time = time.time()
+        update_time = self._runtime_update_time_from_timestamp(timestamp_ms)
 
         def _maybe_int(value: Any) -> Optional[int]:
             try:
                 return int(value)
             except Exception:
                 return None
+
+        def _maybe_bool(value: Any) -> Optional[bool]:
+            if value is None:
+                return None
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, (int, float)):
+                return bool(value)
+            text = str(value).strip().lower()
+            if text in {"1", "true", "yes", "on", "enabled", "valid"}:
+                return True
+            if text in {"0", "false", "no", "off", "disabled", "invalid"}:
+                return False
+            return None
 
         with self._lock:
             runtime = self._io_runtime
@@ -269,6 +402,45 @@ class SentryV2Comm:
             mode = _maybe_int(payload.get("mode"))
             if mode is not None:
                 runtime["mode"] = mode
+            switch_in = _maybe_int(payload.get("switch_in"))
+            if switch_in is not None:
+                runtime["switch_in"] = switch_in
+            hw_arm_enabled = _maybe_int(payload.get("hw_arm_enabled"))
+            if hw_arm_enabled is not None:
+                runtime["hw_arm_enabled"] = hw_arm_enabled
+            if "control_source_mode" in payload:
+                runtime["control_source_mode"] = str(payload.get("control_source_mode") or "")
+            if "control_source_active" in payload:
+                runtime["control_source_active"] = str(payload.get("control_source_active") or "")
+            for key in ("rc_link_active", "rc_override_active", "rc_failsafe_active"):
+                if key in payload:
+                    value = payload.get(key)
+                    runtime[key] = None if value is None else bool(value)
+            rc_frame_age_ms = _maybe_int(payload.get("rc_frame_age_ms"))
+            if rc_frame_age_ms is not None:
+                runtime["rc_frame_age_ms"] = rc_frame_age_ms
+            rc_payload = payload.get("rc")
+            if isinstance(rc_payload, dict):
+                rc_channels: Dict[str, int] = {}
+                for channel_index in range(1, 7):
+                    key = f"ch{channel_index}_us"
+                    parsed = _maybe_int(rc_payload.get(key))
+                    if parsed is not None:
+                        rc_channels[key] = parsed
+                if rc_channels:
+                    runtime["rc_channels"] = rc_channels
+                link_active = rc_payload.get("link_active")
+                if link_active is not None:
+                    runtime["rc_link_active"] = bool(link_active)
+                override_active = rc_payload.get("override_active")
+                if override_active is not None:
+                    runtime["rc_override_active"] = bool(override_active)
+                failsafe_active = rc_payload.get("failsafe_active")
+                if failsafe_active is not None:
+                    runtime["rc_failsafe_active"] = bool(failsafe_active)
+                frame_age = _maybe_int(rc_payload.get("frame_age_ms"))
+                if frame_age is not None:
+                    runtime["rc_frame_age_ms"] = frame_age
             current_fault = payload.get("current_fault")
             if current_fault is not None:
                 runtime["current_fault"] = bool(current_fault)
@@ -279,8 +451,66 @@ class SentryV2Comm:
                 parsed = _maybe_int(payload.get(key))
                 if parsed is not None:
                     runtime[key] = parsed
+            for key in ("pan_mA_valid", "tilt_mA_valid", "total_mA_valid"):
+                if key in payload:
+                    runtime[key] = _maybe_bool(payload.get(key))
             runtime["last_update"] = update_time
             runtime["last_error"] = ""
+
+    def _apply_bridge_caps(self, payload: Dict[str, Any], *, source: str, timestamp_ms: Any = None) -> None:
+        if not isinstance(payload, dict):
+            return
+        update_time = self._runtime_update_time_from_timestamp(timestamp_ms)
+
+        with self._lock:
+            caps = self._bridge_caps
+            caps["active"] = True
+            caps["source"] = str(source or "esp32-cap")
+            caps["role"] = str(payload.get("role") or caps.get("role") or "")
+            if "rc_input_supported" in payload:
+                value = payload.get("rc_input_supported")
+                caps["rc_input_supported"] = None if value is None else bool(value)
+            if "rc_input_planned" in payload:
+                caps["rc_input_planned"] = str(payload.get("rc_input_planned") or "")
+            if "rc_mode_supported" in payload:
+                value = payload.get("rc_mode_supported")
+                caps["rc_mode_supported"] = None if value is None else bool(value)
+            if "rc_mode_default" in payload:
+                caps["rc_mode_default"] = str(payload.get("rc_mode_default") or "")
+            if "rc_receiver_model" in payload:
+                caps["rc_receiver_model"] = str(payload.get("rc_receiver_model") or "")
+            if "rc_source_switch_channel" in payload:
+                try:
+                    caps["rc_source_switch_channel"] = int(payload.get("rc_source_switch_channel"))
+                except Exception:
+                    caps["rc_source_switch_channel"] = None
+            for key in (
+                "switch_supported",
+                "switch_active_low",
+                "switch_pullup_enabled",
+                "sound_supported",
+                "speaker_supported",
+                "current_pan_supported",
+                "current_tilt_supported",
+                "current_total_supported",
+                "led_relay_assigned",
+                "laser_relay_assigned",
+                "trigger_servo_assigned",
+                "buzzer_volume_assigned",
+                "speaker_volume_assigned",
+                "header_reference_locked",
+            ):
+                if key in payload:
+                    value = payload.get(key)
+                    caps[key] = None if value is None else bool(value)
+            if "switch_role" in payload:
+                caps["switch_role"] = str(payload.get("switch_role") or "")
+            pins = payload.get("pins")
+            if isinstance(pins, dict):
+                caps["pins"] = dict(pins)
+            caps["raw"] = dict(payload)
+            caps["last_update"] = update_time
+            caps["last_error"] = ""
 
     def _has_fresh_servo_feedback_locked(self, now: Optional[float] = None, *, max_age_s: float = 1.5) -> bool:
         feedback = self._servo_feedback
@@ -331,6 +561,10 @@ class SentryV2Comm:
             source="waiting" if self._mode in (self.MODE_DUAL_USB, self.MODE_WIFI_DEBUG_USB) else "inactive",
         )
         self._reset_io_runtime_state(
+            active=self._mode in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI),
+            source="waiting" if self._mode in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI) else "inactive",
+        )
+        self._reset_bridge_caps_state(
             active=self._mode in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI),
             source="waiting" if self._mode in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI) else "inactive",
         )
@@ -550,13 +784,14 @@ class SentryV2Comm:
         ok = self._open_udp(host, port)
         if ok:
             self._start_receiver()
+            self._send_udp_message("hello", None, label="UDP hello")
         return ok
 
     @staticmethod
     def _compact_json(obj: Dict[str, Any]) -> bytes:
         return json.dumps(obj, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 
-    def _build_udp_packet(self, payload: Dict[str, Any]) -> bytes:
+    def _build_udp_message(self, message_type: str, payload: Optional[Dict[str, Any]] = None) -> bytes:
         with self._lock:
             self._udp_seq = (self._udp_seq + 1) & 0x7FFFFFFF
             if self._udp_seq == 0:
@@ -564,14 +799,18 @@ class SentryV2Comm:
             seq = self._udp_seq
         msg = {
             "v": 1,
-            "t": "cmd",
+            "t": str(message_type or "cmd"),
             "seq": seq,
             "ts": int(time.time() * 1000),
-            "p": payload,
         }
+        if payload is not None:
+            msg["p"] = payload
         raw = self._compact_json(msg)
         msg["crc"] = f"{(zlib.crc32(raw) & 0xFFFFFFFF):08x}"
         return self._compact_json(msg)
+
+    def _build_udp_packet(self, payload: Dict[str, Any]) -> bytes:
+        return self._build_udp_message("cmd", payload)
 
     def _send_udp_payload(self, payload: Dict[str, Any], *, label: str) -> bool:
         with self._lock:
@@ -587,6 +826,23 @@ class SentryV2Comm:
         except Exception as e:
             self._last_error = str(e)
             self._reset_io_runtime_state(active=True, source="waiting", last_error=self._last_error)
+            return False
+
+    def _send_udp_message(self, message_type: str, payload: Optional[Dict[str, Any]] = None, *, label: str) -> bool:
+        with self._lock:
+            sock = self._sock
+            udp_target = self._udp_target
+        try:
+            if sock is None or udp_target is None:
+                return False
+            data = self._build_udp_message(message_type, payload)
+            sock.sendto(data, udp_target)
+            self._last_cmd = label
+            return True
+        except Exception as e:
+            self._last_error = str(e)
+            self._reset_io_runtime_state(active=True, source="waiting", last_error=self._last_error)
+            self._reset_bridge_caps_state(active=True, source="waiting", last_error=self._last_error)
             return False
 
     def _send_udp_payload_secondary(self, payload: Dict[str, Any], *, label: str) -> bool:
@@ -654,6 +910,7 @@ class SentryV2Comm:
         self._reset_bus_motion_cache()
         self._reset_servo_feedback_state(active=False, source="disconnected")
         self._reset_io_runtime_state(active=False, source="disconnected")
+        self._reset_bridge_caps_state(active=False, source="disconnected")
 
     def is_connected(self) -> bool:
         m = self._mode
@@ -737,6 +994,22 @@ class SentryV2Comm:
         if m == self.MODE_DUAL_ESP32_WIFI:
             return "Sound link unavailable: primary ESP32 WiFi not connected"
         return "Sound link unavailable"
+
+    def _bridge_optional_feature_supported(self, feature_name: str) -> bool:
+        m = self._mode
+        if m not in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI):
+            return True
+        with self._lock:
+            caps = dict(self._bridge_caps)
+        if not bool(caps.get("active")):
+            return True
+        value = caps.get(feature_name)
+        return value is not False
+
+    def _bridge_optional_feature_noop(self, feature_name: str, label: str) -> bool:
+        self._last_cmd = f"{label} ignored: bridge reports {feature_name}=false"
+        self._last_error = ""
+        return True
 
     def connection_info(self) -> str:
         if not self.is_connected():
@@ -864,12 +1137,23 @@ class SentryV2Comm:
         self._last_error = "Sound transport unavailable for current connection mode"
         return False
 
+    def send_sweep(self) -> bool:
+        m = self._mode
+        if m in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI):
+            ok = self._send_udp_payload({"action": "sweep"}, label="UDP SWEEP")
+            if ok:
+                self._last_error = ""
+            return ok
+        self._last_error = "Sweep action requires ESP32 WiFi/UDP transport"
+        return False
+
     def send_command(
         self,
         pan: float,
         tilt: float,
         fire: int = 0,
         move_time_ms: Optional[int] = None,
+        allow_rest_tilt: bool = False,
     ) -> bool:
         """Build and send a full protocol command. Returns True if sent."""
         pan_out, tilt_out = self._normalize_output_angles(pan, tilt)
@@ -885,7 +1169,7 @@ class SentryV2Comm:
             ok_io = self._send_io_udp(fire)
             return ok_bus and ok_io
         elif m == self.MODE_WIFI_FULL:
-            return self._send_wifi_full(pan_out, tilt_out, fire, move_time_ms=move_time_ms)
+            return self._send_wifi_full(pan_out, tilt_out, fire, move_time_ms=move_time_ms, allow_rest_tilt=allow_rest_tilt)
         elif m == self.MODE_DUAL_ESP32_WIFI:
             # Send servo commands to secondary ESP32
             ok_servo = self._send_servo_udp(pan_out, tilt_out, move_time_ms=move_time_ms)
@@ -905,6 +1189,8 @@ class SentryV2Comm:
             daemon=True,
         )
         self._receiver_thread.start()
+        if self._sock is not None and self._udp_target is not None:
+            self._send_udp_message("hello", None, label="UDP hello")
 
     def _stop_receiver(self) -> None:
         self._receiver_stop.set()
@@ -1083,9 +1369,14 @@ class SentryV2Comm:
                 self._apply_io_runtime_state(payload, source="esp32-state", timestamp_ms=message.get("ts"))
             return
         if message_type == "ack":
-            payload = message.get("state") or {}
+            payload = message.get("p") or message.get("state") or {}
             if isinstance(payload, dict):
                 self._apply_io_runtime_state(payload, source="esp32-ack", timestamp_ms=message.get("ts"))
+            return
+        if message_type == "cap":
+            payload = message.get("p") or {}
+            if isinstance(payload, dict):
+                self._apply_bridge_caps(payload, source="esp32-cap", timestamp_ms=message.get("ts"))
             return
         if message_type != "pir_event":
             return
@@ -1118,6 +1409,7 @@ class SentryV2Comm:
         tilt: float,
         *,
         move_time_ms: Optional[int] = None,
+        allow_rest_tilt: bool = False,
     ) -> bool:
         """Send pan/tilt movement without coupling bus-servo motion to IO delivery.
 
@@ -1146,7 +1438,7 @@ class SentryV2Comm:
                 self._send_io_udp(0)
             return ok_bus
         if m == self.MODE_WIFI_FULL:
-            ok = self._send_wifi_full(pan_out, tilt_out, fire=0, move_time_ms=move_time_ms)
+            ok = self._send_wifi_full(pan_out, tilt_out, fire=0, move_time_ms=move_time_ms, allow_rest_tilt=allow_rest_tilt)
             if ok:
                 self._last_error = ""
             return ok
@@ -1171,10 +1463,16 @@ class SentryV2Comm:
                 time.sleep(delay)
 
     def set_led(self, on: bool, pan: float, tilt: float) -> bool:
+        if not self._bridge_optional_feature_supported("led_relay_assigned"):
+            self.led_on = False
+            return self._bridge_optional_feature_noop("led_relay_assigned", "LED")
         self.led_on = on
         return self.send_command(pan, tilt)
 
     def set_laser(self, on: bool, pan: float, tilt: float) -> bool:
+        if not self._bridge_optional_feature_supported("laser_relay_assigned"):
+            self.laser_on = False
+            return self._bridge_optional_feature_noop("laser_relay_assigned", "Laser")
         self.laser_on = on
         return self.send_command(pan, tilt)
 
@@ -1196,6 +1494,8 @@ class SentryV2Comm:
         m = self._mode
         if m in (self.MODE_ESP32_USB, self.MODE_DUAL_USB):
             return self._send_trigger_runtime_config_serial()
+        if not self._bridge_optional_feature_supported("trigger_servo_assigned"):
+            return self._bridge_optional_feature_noop("trigger_servo_assigned", "Trigger runtime config")
         payload: Dict[str, Any] = {
             "action": "config",
             "trigger": {
@@ -1204,11 +1504,36 @@ class SentryV2Comm:
                 "servo_fire_deg": int(max(0, min(180, int(self.trigger_servo_fire_deg)))),
                 "servo_speed_dps": int(max(10, min(5000, int(self.trigger_servo_speed_dps)))),
             },
+            "rest": {
+                "pan": float(max(self.PAN_OUTPUT_MIN, min(self.PAN_OUTPUT_MAX, float(self.rest_pan)))),
+                "tilt": float(max(self.TILT_OUTPUT_MIN, min(self.TILT_OUTPUT_MAX, float(self.rest_tilt)))),
+            },
             "pir": {
                 "event_blink": 1 if self.pir_event_blink_enabled else 0,
             },
         }
         ok = self._send_udp_payload(payload, label="UDP CFG trigger-servo/pir-led")
+        if ok:
+            self._last_error = ""
+        return ok
+
+    def set_control_source_mode(self, mode: str) -> bool:
+        requested_mode = str(mode or "app").strip().lower()
+        if requested_mode not in ("app", "rc", "auto"):
+            self._last_error = f"Unsupported control source mode: {mode}"
+            return False
+        m = self._mode
+        if m not in (self.MODE_WIFI_DEBUG_USB, self.MODE_WIFI_FULL, self.MODE_DUAL_ESP32_WIFI):
+            self._last_error = "Control source mode requires ESP32 WiFi bridge mode"
+            return False
+        ok = self._send_udp_payload(
+            {
+                "action": "rc_mode",
+                "mode": requested_mode,
+                "control_source_mode": requested_mode,
+            },
+            label=f"UDP RC MODE {requested_mode}",
+        )
         if ok:
             self._last_error = ""
         return ok
@@ -1241,7 +1566,6 @@ class SentryV2Comm:
     def _build_ascii(self, pan: float, tilt: float, fire: int = 0) -> str:
         p = int(max(self.PAN_OUTPUT_MIN, min(self.PAN_OUTPUT_MAX, round(pan))))
         t = int(max(self.TILT_OUTPUT_MIN, min(self.TILT_OUTPUT_MAX, round(tilt))))
-        print(f"DEBUG: SERIALIZED: P{p} T{t} (from pan={pan:.3f}, tilt={tilt:.3f})")
         f = int(bool(fire))
         led = 1 if self.led_on else 0
         laser = 1 if self.laser_on else 0
@@ -1253,7 +1577,6 @@ class SentryV2Comm:
 
     def _send_ascii(self, pan: float, tilt: float, fire: int, *, via_serial: bool) -> bool:
         cmd = self._build_ascii(pan, tilt, fire)
-        print(f"DEBUG: USB SEND: {cmd.rstrip()}")
         with self._lock:
             ser = self._ser
             sock = self._sock
@@ -1281,6 +1604,7 @@ class SentryV2Comm:
         fire: int,
         *,
         move_time_ms: Optional[int] = None,
+        allow_rest_tilt: bool = False,
     ) -> bool:
         payload: Dict[str, Any] = {
             "pan_cmd": int(max(self.PAN_OUTPUT_MIN, min(self.PAN_OUTPUT_MAX, round(pan)))),
@@ -1293,6 +1617,8 @@ class SentryV2Comm:
             "acc": 1 if self.acc_on else 0,
             "spare": 1 if self.spare_on else 0,
         }
+        if allow_rest_tilt:
+            payload["allow_rest_tilt"] = 1
         if move_time_ms is not None:
             payload["move_time_ms"] = int(max(0, min(5000, int(move_time_ms))))
         label = (

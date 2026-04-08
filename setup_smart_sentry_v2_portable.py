@@ -1,55 +1,33 @@
-from cx_Freeze import Executable, setup
+import sys
 
-build_exe_options = {
-    "include_msvcr": True,
-    "optimize": 1,
-    "packages": [
-        "os",
-        "sys",
-        "cv2",
-        "numpy",
-        "serial",
-        "ultralytics",
-        "torch",
-        "sklearn",
-        "yt_dlp",
-    ],
-    "includes": [
-        "PyQt5.QtCore",
-        "PyQt5.QtGui",
-        "PyQt5.QtWidgets",
-    ],
-    "excludes": [
-        "tkinter",
-        "pytest",
-        "matplotlib.tests",
-    ],
-    "include_files": [
-        ("app/sentry_v2", "app/sentry_v2"),
-        ("app/config", "app/config"),
-        ("app/app/config", "app/app/config"),
-        ("YOLO_MODELS", "YOLO_MODELS"),
-        ("app/models", "app/models"),
-        ("app/YOLO_MODELS", "app/YOLO_MODELS"),
-        ("app/LOGO.png", "app/LOGO.png"),
-        ("requirements-sentry-v2-portable.txt", "requirements-sentry-v2-portable.txt"),
-        ("SENTRY_V2_PORTABLE_INCLUDE_LIST.md", "SENTRY_V2_PORTABLE_INCLUDE_LIST.md"),
-        ("SENTRY_V2_PORTABLE_FIX_LOG_2026-03-24.md", "SENTRY_V2_PORTABLE_FIX_LOG_2026-03-24.md"),
-    ],
-}
+from cx_Freeze import Executable, setup
+from smart_sentry_build_config import build_exe_options, read_active_version
+
+
+sys.setrecursionlimit(max(10000, sys.getrecursionlimit()))
+
+
+ACTIVE_VERSION = read_active_version()
+
+build_exe_options = build_exe_options(
+    include_models=True,
+    include_sklearn=True,
+    include_ytdlp=True,
+)
+
 
 executables = [
     Executable(
-        script="app/run_sentry_v2.py",
-        target_name="SMART_SENTRY_V2_0.exe",
+        script="run.py",
+        target_name="SMART_SENTRY.exe",
         base="Win32GUI",
     )
 ]
 
 setup(
-    name="SMART_SENTRY_V2_0_PORTABLE",
-    version="2.0.0",
-    description="Smart Sentry v2 portable build",
+    name="SMART_SENTRY_PORTABLE",
+    version=ACTIVE_VERSION,
+    description=f"SMART SENTRY portable build for V{ACTIVE_VERSION}",
     options={"build_exe": build_exe_options},
     executables=executables,
 )

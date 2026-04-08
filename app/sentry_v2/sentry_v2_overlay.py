@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — Overlay (HUD Rendering)
+SMART SENTRY V3 — Overlay (HUD Rendering)
 
 Draws a simplified HUD focused on one moving target at a time.
 """
@@ -216,11 +216,16 @@ class SentryV2Overlay:
         scoped = np.clip(scoped, 0, 255).astype(np.uint8)
 
         flash = self._fire_flash_strength()
-        ring_color = _COL_FIRE_FLASH if flash > 0.0 else self._get_crosshair_color(engine)
+        ring_color = _COL_FIRE_FLASH if flash > 0.0 else _COL_WHITE
+        inner_ring_color = _COL_FIRE_FLASH if flash > 0.0 else _COL_BLACK
+        crosshair_color = _COL_FIRE_FLASH if flash > 0.0 else _COL_BLACK
+        tick_color = _COL_BLACK
 
         # Outer ring (scope boundary)
-        cv2.circle(scoped, (center_x, center_y), scope_radius + 2, _COL_BLACK, 4, cv2.LINE_AA)
-        cv2.circle(scoped, (center_x, center_y), scope_radius + 2, ring_color, 2, cv2.LINE_AA)
+        cv2.circle(scoped, (center_x, center_y), scope_radius + 4, _COL_BLACK, 5, cv2.LINE_AA)
+        cv2.circle(scoped, (center_x, center_y), scope_radius + 4, ring_color, 2, cv2.LINE_AA)
+        cv2.circle(scoped, (center_x, center_y), scope_radius - 6, _COL_BLACK, 2, cv2.LINE_AA)
+        cv2.circle(scoped, (center_x, center_y), scope_radius - 6, inner_ring_color, 1, cv2.LINE_AA)
 
         # Fire-flash: pulsing expanded ring
         if flash > 0.0:
@@ -235,12 +240,12 @@ class SentryV2Overlay:
 
         # Scope crosshair lines with center gap
         gap = max(10, scope_radius // 10)
-        arm_end = scope_radius - 2
-        arm_color = ring_color
+        arm_end = scope_radius - 10
+        arm_color = crosshair_color
 
         def _scope_arm(p1: tuple, p2: tuple) -> None:
-            cv2.line(scoped, p1, p2, _COL_BLACK, 3, cv2.LINE_AA)
-            cv2.line(scoped, p1, p2, arm_color, 1, cv2.LINE_AA)
+            cv2.line(scoped, p1, p2, _COL_BLACK, 4, cv2.LINE_AA)
+            cv2.line(scoped, p1, p2, arm_color, 2, cv2.LINE_AA)
 
         _scope_arm((center_x - arm_end, center_y), (center_x - gap, center_y))
         _scope_arm((center_x + gap, center_y), (center_x + arm_end, center_y))
@@ -253,20 +258,11 @@ class SentryV2Overlay:
             # Horizontal arm ticks
             for tx in (center_x - tick_d, center_x + tick_d):
                 cv2.line(scoped, (tx, center_y - tick_h), (tx, center_y + tick_h),
-                         _COL_BLACK, 2, cv2.LINE_AA)
-                cv2.line(scoped, (tx, center_y - tick_h), (tx, center_y + tick_h),
-                         arm_color, 1, cv2.LINE_AA)
+                         tick_color, 1, cv2.LINE_AA)
             # Vertical arm ticks
             for ty in (center_y - tick_d, center_y + tick_d):
                 cv2.line(scoped, (center_x - tick_h, ty), (center_x + tick_h, ty),
-                         _COL_BLACK, 2, cv2.LINE_AA)
-                cv2.line(scoped, (center_x - tick_h, ty), (center_x + tick_h, ty),
-                         arm_color, 1, cv2.LINE_AA)
-
-        # Center dot
-        dot_r = max(6, scope_radius // 18)
-        cv2.circle(scoped, (center_x, center_y), dot_r, _COL_BLACK, 3, cv2.LINE_AA)
-        cv2.circle(scoped, (center_x, center_y), dot_r, ring_color if flash > 0.0 else _COL_WHITE, 1, cv2.LINE_AA)
+                         tick_color, 1, cv2.LINE_AA)
 
         # Phase label
         engage_phase = str(getattr(engine, "_engage_phase", ""))
@@ -538,23 +534,24 @@ class SentryV2Overlay:
         self._put_text(frame, label, (bx, label_y), _FS_SMALL, col)
 
     def _build_target_name(self, target: TrackedTarget) -> str:
+        identity_label = str(getattr(target.det, "identity_label", "") or "").strip()
+        if identity_label:
+            return identity_label
         class_name = (target.det.class_name or "").strip().lower()
         color_name = (self.cfg.detection_mode.color_preset or "").strip().lower()
         if class_name and class_name not in {"moving_object", "unknown"}:
-            return f"moving {class_name}"
+            return class_name
         if color_name and color_name not in {"", "any", "custom"}:
-            return f"{color_name} moving object"
-        return "moving object"
+            return f"{color_name} object"
+        return "object"
 
     def _draw_state_badge(self, frame: np.ndarray, engine: SentryV2Engine) -> None:
         state = engine.state
         name = state.name
         col = self._get_crosshair_color(engine)
         margin = 10
-        _, th, _ = self._text_size(frame, "SMART SENTRY V2", _FS_TINY)
         _, nh, _ = self._text_size(frame, name, _FS_LARGE)
-        self._put_text(frame, "SMART SENTRY V2", (margin, margin + th), _FS_TINY, _COL_PANEL_MUTED)
-        self._put_text(frame, name, (margin, margin + th + 4 + nh), _FS_LARGE, col)
+        self._put_text(frame, name, (margin, margin + nh), _FS_LARGE, col)
 
     def _draw_auto_trigger_badge(self, frame: np.ndarray) -> None:
         enabled = bool(self.cfg.engagement.auto_trigger_enabled)
@@ -608,10 +605,9 @@ class SentryV2Overlay:
             lines.append(f"REACQ {stats['reacquire_note']}")
 
         margin = 10
-        # Place below state badge: approx two text rows
-        _, sh, _ = self._text_size(frame, "SMART SENTRY V2", _FS_TINY)
+        # Place below the state badge.
         _, nh, _ = self._text_size(frame, "ENGAGING", _FS_LARGE)
-        y = margin + sh + 4 + nh + 14
+        y = margin + nh + 14
         self._put_text(frame, "TRACKING DIAGNOSTICS", (margin, y), _FS_TINY, _COL_PANEL_MUTED)
         _, lh, _ = self._text_size(frame, lines[0], _FS_SMALL)
         y += lh + 6

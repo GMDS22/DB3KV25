@@ -23,7 +23,9 @@ Located in the Smart Sentry v2 **Guard** tab, a new **"PIR Guard (Blind-Spot Det
    - **Scan Tilt Range** (5-90°): Vertical sweep depth around cue point
    - **Grid Resolution** (2-6): Density of scan points (higher = finer grid, slower scan)
    - **Scan Speed** (1.0-30.0 deg/s): Rate of adaptive scan traversal
-   - **Confirmation Timeout** (0.5-10.0 s): How long to wait for camera confirmation at cue point
+  - **Cue Hold** (0.05-2.0 s): Visible hold time at the exact cue point before localized hunting begins
+  - **Confirmation Timeout** (0.5-10.0 s): Broader PIR confirmation budget
+  - **Search Style** (`Hunting` / `Fast Reacquire`): Shared behavior preference for PIR and target-loss hunting
    - **Scan on No-Detection**: Toggle whether to auto-scan if target not found at cue point
 
 4. **Live Status Display**
@@ -47,24 +49,25 @@ No Cue → Continue Normal Guard Patrol
     ↓
 Cue Received → Slew to Cue Angle
     ↓
-Wait Settle Time (350ms)
+Short Cue Hold
     ↓
 Check Camera for Targets
     ↓
 Target Found → Engage Normally
     ↓
-No Target → IF Scan Enabled: Run Adaptive Scan Grid
-           → IF Scan Disabled: Return to Guard Patrol
+No Target → IF Scan Enabled: Run Localized PIR Hunt, then widen scan coverage
+       → IF Scan Disabled: Return to configured Guard/Home position
     ↓
 Scan Complete with Target → Engage
-Scan Timeout → Return to Guard Patrol
+Scan Timeout → Return to configured Guard/Home position
 ```
 
 ### Adaptive Scan Grid
 - Centered on PIR cue point
-- Generates NxN grid using configurable resolution (N=2-6)
-- Traverses points with configurable dwell settle time (250ms)
-- Returns to guard patrol on completion or timeout
+- Starts with a denser local hunt near the cue instead of lingering at center
+- Biases early horizontal points toward the triggered sensor zone before mirroring outward
+- Still widens through the configured scan range and resolution after the local hunt
+- Returns to the configured guard/home position on completion or timeout
 
 ### Safe Defaults (No Behavior Change When Disabled)
 - `pir_enabled = False` (master disable)
@@ -133,7 +136,7 @@ Logic Flow:
     4. In confirmation → wait settle, check camera
     5. If target found → normal engagement
     6. If not and scan enabled → run adaptive scan
-    7. If scan completes/times out → return to patrol
+    7. If scan completes/times out → return to configured guard/home position
 ```
 
 #### 4. **sentry_v2_comm.py** (~30 lines added)

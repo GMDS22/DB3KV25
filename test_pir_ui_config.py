@@ -21,6 +21,7 @@ from app.sentry_v2.sentry_v2_config import (
     SENTRY_TILT_MIN,
     SENTRY_TILT_MAX,
 )
+from app.sentry_v2.sentry_v2_engine import SentryV2Engine, SentryV2State
 
 
 def test_pir_config_structure():
@@ -59,6 +60,9 @@ def test_pir_config_serialization():
     config.pir_guard.sensors[0].cue_tilt = 45.0
     config.pir_guard.scan_pan_range = 30.0
     config.pir_guard.scan_grid_resolution = 4
+    config.pir_guard.cue_hold_time_s = 0.12
+    config.pir_guard.search_style = "fast_reacquire"
+    config.pir_guard.search_rounds = 2
     
     # Serialize to dict
     config_dict = config.to_dict()
@@ -70,6 +74,9 @@ def test_pir_config_serialization():
     assert pir_dict['sensors'][0]['enabled'] == True, "Serialized sensor[0].enabled not preserved"
     assert pir_dict['sensors'][0]['cue_pan'] == 270.0, "Serialized cue_pan not preserved"
     assert pir_dict['scan_grid_resolution'] == 4, "Serialized grid resolution not preserved"
+    assert pir_dict['cue_hold_time_s'] == 0.12, "Serialized cue hold not preserved"
+    assert pir_dict['search_style'] == "fast_reacquire", "Serialized search style not preserved"
+    assert pir_dict['search_rounds'] == 2, "Serialized search rounds not preserved"
     
     # Deserialize back
     config2 = SentryV2Config.from_dict(config_dict)
@@ -77,6 +84,9 @@ def test_pir_config_serialization():
     assert config2.pir_guard.sensors[0].enabled == True, "Deserialized sensor[0].enabled lost"
     assert config2.pir_guard.sensors[0].cue_pan == 270.0, "Deserialized cue_pan lost"
     assert config2.pir_guard.scan_grid_resolution == 4, "Deserialized grid resolution lost"
+    assert config2.pir_guard.cue_hold_time_s == 0.12, "Deserialized cue hold lost"
+    assert config2.pir_guard.search_style == "fast_reacquire", "Deserialized search style lost"
+    assert config2.pir_guard.search_rounds == 2, "Deserialized search rounds lost"
     
     print("  ✓ PIR config serialization/deserialization working")
 
@@ -119,17 +129,27 @@ def test_pir_scan_settings():
     assert 5 <= pg.scan_tilt_range <= 90, "scan_tilt_range out of expected range"
     assert 2 <= pg.scan_grid_resolution <= 6, "scan_grid_resolution out of expected range"
     assert 1 <= pg.scan_speed <= 30, "scan_speed out of expected range"
+    assert 0.05 <= pg.cue_hold_time_s <= 2.0, "cue_hold_time_s out of expected range"
     assert 0.5 <= pg.confirmation_timeout <= 10, "confirmation_timeout out of expected range"
+    assert pg.scan_pan_range == 45.0, "scan_pan_range should default to 45 degrees"
+    assert pg.scan_tilt_range == 45.0, "scan_tilt_range should default to 45 degrees"
+    assert pg.search_rounds == 1, "search_rounds should default to 1"
     assert isinstance(pg.scan_on_no_detect, bool), "scan_on_no_detect should be bool"
     
     # Test modifications
     pg.scan_grid_resolution = 5
+    pg.cue_hold_time_s = 0.10
     pg.confirmation_timeout = 2.5
     pg.scan_on_no_detect = False
+    pg.search_style = "hunting"
+    pg.search_rounds = 3
     
     assert pg.scan_grid_resolution == 5
+    assert pg.cue_hold_time_s == 0.10
     assert pg.confirmation_timeout == 2.5
     assert pg.scan_on_no_detect == False
+    assert pg.search_style == "hunting"
+    assert pg.search_rounds == 3
     
     print("  ✓ PIR scan settings validated")
 
@@ -160,8 +180,45 @@ def test_pir_manager_creation():
     print(f"    Initial status: {status}")
 
 
+def test_pir_no_detect_returns_guard_home():
+    """Verify PIR no-target completion commands the configured guard/home position."""
+    print("[Test 6/6] PIR No-Detect Return Home...")
+
+    config = SentryV2Config()
+    config.guard.guard_mode = 0
+    config.guard.guard_pan = 135.0
+    config.guard.guard_tilt = 35.0
+    config.pir_guard.pir_enabled = True
+    config.pir_guard.scan_on_no_detect = True
+    config.pir_guard.cue_hold_time_s = 0.05
+    config.pir_guard.scan_grid_resolution = 2
+    config.pir_guard.scan_speed = 12.0
+    config.pir_guard.sensors[0].enabled = True
+    config.pir_guard.sensors[0].cue_pan = 210.0
+    config.pir_guard.sensors[0].cue_tilt = 55.0
+
+    engine = SentryV2Engine(config)
+    engine.start()
+    engine.on_pir_sensor_fired(0, 1.0)
+
+    now = 1.0
+    for _ in range(60):
+        now += 0.6
+        engine.update([], now)
+        if not engine._pir_cue_mode:
+            break
+
+    assert engine.state == SentryV2State.GUARDING, "Engine should remain in guarding after PIR no-detect completion"
+    assert engine.current_pan == config.guard.guard_pan, "PIR no-detect completion should command guard pan"
+    assert engine.current_tilt == config.guard.guard_tilt, "PIR no-detect completion should command guard tilt"
+    assert engine._pir_cue_mode == False, "PIR cue mode should be cleared after no-detect completion"
+    assert engine._pir_scan_mode == False, "PIR scan mode should be cleared after no-detect completion"
+
+    print("  ✓ PIR no-detect completion returns to configured guard/home position")
+
+
 def main():
-    print("\n=== Smart Sentry v2 PIR UI Configuration Tests ===\n")
+    print("\n=== SMART SENTRY V3 PIR UI Configuration Tests ===\n")
     
     try:
         test_pir_config_structure()
@@ -169,8 +226,9 @@ def main():
         test_pir_sensor_angles()
         test_pir_scan_settings()
         test_pir_manager_creation()
+        test_pir_no_detect_returns_guard_home()
         
-        print("\n✓ All 5 tests passed!\n")
+        print("\n✓ All 6 tests passed!\n")
         return 0
     
     except AssertionError as e:

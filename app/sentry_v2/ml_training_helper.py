@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — ML Training Helper
+SMART SENTRY V3 — ML Training Helper
 
 Manages engagement logging and model training.
 Collects data from user engagement decisions and trains the ML scorer.

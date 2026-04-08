@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — ML Training Logger
+SMART SENTRY V3 — ML Training Logger
 
 Collects engagement and manual targeting data for ML model training.
 Tracks both automatic Sentry decisions and manual user targeting.
@@ -205,6 +205,30 @@ class MLTrainingLogger:
             "fire_examples": fires,
             "ignore_examples": ignores,
             "by_source": dict(by_source),
+        }
+
+    def summary_stats(self) -> Dict:
+        """Compatibility summary used by the UI/engine helpers."""
+        stats = self.get_stats()
+        total = int(stats.get("total_examples", 0))
+        engaged = int(stats.get("fire_examples", 0))
+        ignored = int(stats.get("ignore_examples", 0))
+        engagement_rate = (float(engaged) / float(total)) if total > 0 else 0.0
+
+        class_distribution = defaultdict(int)
+        for ex in self.examples:
+            class_name = str(ex.class_name or "unknown").strip() or "unknown"
+            class_distribution[class_name] += 1
+
+        return {
+            "total_records": total,
+            "engaged_count": engaged,
+            "ignored_count": ignored,
+            "engagement_rate": engagement_rate,
+            "class_distribution": dict(class_distribution),
+            "by_source": dict(stats.get("by_source", {})),
+            "data_file": str(self.data_file),
+            "data_file_exists": bool(self.data_file.exists()),
         }
 
     def clear(self) -> None:

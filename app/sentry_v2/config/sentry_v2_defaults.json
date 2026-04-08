@@ -51,7 +51,9 @@
   },
   "sound": {
     "enabled": true,
-    "volume_pct": 100
+    "volume_pct": 100,
+    "personality": "sentinel",
+    "attitude_pct": 60
   },
   "show_overlay": true,
   "scope_view_enabled": false,

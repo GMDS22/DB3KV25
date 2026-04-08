@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — Standalone Detector
+SMART SENTRY V3 — Standalone Detector
 
 Self-contained detection pipeline supporting all 11 detection modes,
 independent of the main application's detection code.
@@ -70,11 +70,15 @@ COLOR_TOLERANCE_BY_PRESET: Dict[str, Dict[str, int]] = {
 
 
 class SentryV2Detector:
-    """Self-contained multi-mode detector for Smart Sentry v2."""
+    """Self-contained multi-mode detector for SMART SENTRY V3."""
 
     def __init__(self) -> None:
         # Frame-diff state
         self._prev_frame: Optional[np.ndarray] = None
+        # Resize acceleration is intentionally limited to pure motion-only modes.
+        # Hybrid modes keep full-resolution gating to avoid small-target regressions.
+        self._motion_resize_max_dim: int = 960
+        self._morph_kernel = np.ones((3, 3), np.uint8)
 
         # Background subtractor (lazy init)
         self._back_sub: Optional[cv2.BackgroundSubtractorMOG2] = None
@@ -87,6 +91,7 @@ class SentryV2Detector:
         self._yolo_model = None
         self._yolo_loaded: bool = False
         self._yolo_model_path: str = ""
+        self._last_error: str = ""
         self._yolo_target_classes: List[str] = ["person"]
 
         # Detection parameters
@@ -122,6 +127,7 @@ class SentryV2Detector:
         """Load a YOLO model from *model_path*. Returns True on success."""
         model_path = os.path.abspath(model_path)
         if self._yolo_loaded and self._yolo_model_path == model_path:
+            self._last_error = ""
             return True
         try:
             if not os.path.isfile(model_path):
@@ -134,10 +140,13 @@ class SentryV2Detector:
             self._yolo_model = YOLO(model_path)
             self._yolo_model_path = model_path
             self._yolo_loaded = True
+            self._last_error = ""
             return True
         except Exception as e:
+            self._last_error = str(e)
             print(f"[SENTRY_V2_DET] YOLO load failed: {e}")
             self._yolo_loaded = False
+            self._yolo_model_path = ""
             return False
 
     def set_yolo_classes(self, classes: str) -> None:
@@ -204,13 +213,45 @@ class SentryV2Detector:
     def _motion_detection_suppressed(self) -> bool:
         return time.time() < self._motion_suppressed_until
 
+    def _prepare_motion_frame(
+        self,
+        frame: np.ndarray,
+        *,
+        allow_resize: bool = True,
+    ) -> tuple[np.ndarray, float]:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        h, w = gray.shape[:2]
+        max_dim = max(h, w)
+        if not allow_resize or max_dim <= self._motion_resize_max_dim:
+            return gray, 1.0
+        scale = float(self._motion_resize_max_dim) / float(max_dim)
+        resized = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+        return resized, scale
+
+    def _prepare_backsub_frame(
+        self,
+        frame: np.ndarray,
+        *,
+        allow_resize: bool = True,
+    ) -> tuple[np.ndarray, float]:
+        h, w = frame.shape[:2]
+        max_dim = max(h, w)
+        if not allow_resize or max_dim <= self._motion_resize_max_dim:
+            return frame, 1.0
+        scale = float(self._motion_resize_max_dim) / float(max_dim)
+        resized = cv2.resize(frame, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+        return resized, scale
+
     # ------------------------------------------------------------------ #
     #  Frame Difference  (mode 0)
     # ------------------------------------------------------------------ #
 
-    def _detect_frame_diff(self, frame: np.ndarray) -> list:
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    def _detect_frame_diff(self, frame: np.ndarray, *, allow_resize: bool = True) -> list:
+        gray, scale = self._prepare_motion_frame(frame, allow_resize=allow_resize)
         if self._motion_detection_suppressed():
+            self._prev_frame = gray.copy()
+            return []
+        if self._prev_frame is not None and self._prev_frame.shape != gray.shape:
             self._prev_frame = gray.copy()
             return []
         if self._prev_frame is None:
@@ -223,9 +264,8 @@ class SentryV2Detector:
         blur = cv2.GaussianBlur(diff, (k, k), 0)
         _, thresh = cv2.threshold(blur, self.threshold, 255, cv2.THRESH_BINARY)
 
-        kernel = np.ones((3, 3), np.uint8)
-        opened = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=1)
-        dilated = cv2.dilate(opened, kernel, iterations=self.dilate_iters)
+        opened = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, self._morph_kernel, iterations=1)
+        dilated = cv2.dilate(opened, self._morph_kernel, iterations=self.dilate_iters)
 
         contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         return self._contours_to_boxes(
@@ -233,13 +273,14 @@ class SentryV2Detector:
             score=0.62,
             class_id=CLASS_ID_MOTION,
             frame_shape=frame.shape,
+            scale=scale,
         )
 
     # ------------------------------------------------------------------ #
     #  Background Subtraction  (mode 1)
     # ------------------------------------------------------------------ #
 
-    def _detect_backsub(self, frame: np.ndarray) -> list:
+    def _detect_backsub(self, frame: np.ndarray, *, allow_resize: bool = True) -> list:
         if self._back_sub is None:
             self._back_sub = cv2.createBackgroundSubtractorMOG2(
                 history=self._BACKSUB_HISTORY,
@@ -248,7 +289,8 @@ class SentryV2Detector:
             )
             self._backsub_warmup = 0
 
-        filtered = cv2.GaussianBlur(frame, (5, 5), 0)
+        processing_frame, scale = self._prepare_backsub_frame(frame, allow_resize=allow_resize)
+        filtered = cv2.GaussianBlur(processing_frame, (5, 5), 0)
         mask = self._back_sub.apply(filtered)
         if self._motion_detection_suppressed():
             return []
@@ -256,15 +298,15 @@ class SentryV2Detector:
         if self._backsub_warmup < self._BACKSUB_WARMUP_FRAMES:
             return []
 
-        kernel = np.ones((3, 3), np.uint8)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=max(1, self.dilate_iters))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, self._morph_kernel, iterations=1)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, self._morph_kernel, iterations=max(1, self.dilate_iters))
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         return self._contours_to_boxes(
             contours,
             score=0.7,
             class_id=CLASS_ID_FOREGROUND,
             frame_shape=frame.shape,
+            scale=scale,
         )
 
     # ------------------------------------------------------------------ #
@@ -443,7 +485,11 @@ class SentryV2Detector:
 
     def _has_motion_diff(self, frame: np.ndarray, *, update_prev: bool = True) -> bool:
         """Quick frame-diff motion gate — returns True if motion exceeds threshold."""
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray, _ = self._prepare_motion_frame(frame, allow_resize=False)
+        if self._prev_frame is not None and self._prev_frame.shape != gray.shape:
+            if update_prev:
+                self._prev_frame = gray.copy()
+            return False
         if self._prev_frame is None:
             if update_prev:
                 self._prev_frame = gray
@@ -455,21 +501,21 @@ class SentryV2Detector:
         return score > (self.motion_gate_threshold / 100.0)
 
     def _detect_hybrid_diff_backsub(self, frame: np.ndarray) -> list:
-        backsub_boxes = self._detect_backsub(frame)
-        diff_boxes = self._detect_frame_diff(frame)
+        backsub_boxes = self._detect_backsub(frame, allow_resize=False)
+        diff_boxes = self._detect_frame_diff(frame, allow_resize=False)
         return self._gate_primary_boxes(backsub_boxes, diff_boxes, min_overlap=0.10)
 
     def _detect_hybrid_diff_yolo(self, frame: np.ndarray) -> list:
         if not self._has_motion_diff(frame, update_prev=False):
             return []
-        diff_boxes = self._detect_frame_diff(frame)
+        diff_boxes = self._detect_frame_diff(frame, allow_resize=False)
         if not diff_boxes:
             return []
         yolo_boxes = self._detect_yolo(frame)
         return self._gate_primary_boxes(yolo_boxes, diff_boxes, min_overlap=0.12)
 
     def _detect_hybrid_backsub_yolo(self, frame: np.ndarray) -> list:
-        backsub_boxes = self._detect_backsub(frame)
+        backsub_boxes = self._detect_backsub(frame, allow_resize=False)
         if not backsub_boxes:
             return []
         if not self._has_motion_diff(frame):
@@ -479,7 +525,7 @@ class SentryV2Detector:
 
     def _detect_hybrid_color_diff(self, frame: np.ndarray) -> list:
         color_boxes = self._detect_color(frame)
-        diff_boxes = self._detect_frame_diff(frame)
+        diff_boxes = self._detect_frame_diff(frame, allow_resize=False)
         if self.color_preset not in ("", "any"):
             # In specific-color mode, motion must overlap the selected color.
             result = self._gate_primary_boxes(
@@ -509,7 +555,7 @@ class SentryV2Detector:
 
     def _detect_hybrid_color_backsub(self, frame: np.ndarray) -> list:
         color_boxes = self._detect_color(frame)
-        backsub_boxes = self._detect_backsub(frame)
+        backsub_boxes = self._detect_backsub(frame, allow_resize=False)
         if self.color_preset not in ("", "any"):
             # In specific-color mode, foreground motion must overlap selected color.
             result = self._gate_primary_boxes(
@@ -584,8 +630,8 @@ class SentryV2Detector:
 
     def _detect_motion_locked_filtered(self, frame: np.ndarray) -> list:
         motion_boxes = self._merge_boxes(
-            self._detect_frame_diff(frame),
-            self._detect_backsub(frame),
+            self._detect_frame_diff(frame, allow_resize=False),
+            self._detect_backsub(frame, allow_resize=False),
         )
         if not motion_boxes:
             return []
@@ -669,6 +715,7 @@ class SentryV2Detector:
         self, contours, *, min_area: float = -1, max_area: float = -1,
         score: float = 1.0, class_id: int = 0,
         frame_shape: Optional[Tuple[int, int, int]] = None,
+        scale: float = 1.0,
     ) -> list:
         mn = min_area if min_area >= 0 else self.min_contour
         mx = max_area if max_area >= 0 else self.max_contour
@@ -676,10 +723,19 @@ class SentryV2Detector:
         frame_h = int(frame_shape[0]) if frame_shape is not None else 0
         frame_w = int(frame_shape[1]) if frame_shape is not None else 0
         frame_area = float(max(1, frame_h * frame_w)) if frame_h and frame_w else 0.0
+        scale_value = float(scale) if scale and scale > 0.0 else 1.0
+        area_scale = scale_value * scale_value
         for c in contours:
             a = float(cv2.contourArea(c))
+            if area_scale != 1.0:
+                a /= area_scale
             if mn < a < mx:
                 x, y, w, h = cv2.boundingRect(c)
+                if scale_value != 1.0:
+                    x = int(round(x / scale_value))
+                    y = int(round(y / scale_value))
+                    w = int(round(w / scale_value))
+                    h = int(round(h / scale_value))
                 if w <= 2 or h <= 2:
                     continue
                 bbox_area = float(max(1, w * h))

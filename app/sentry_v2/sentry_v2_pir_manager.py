@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — PIR Sensor Manager
+SMART SENTRY V3 — PIR Sensor Manager
 
 Manages PIR sensor state, debouncing, and cue generation for blind-spot detection.
 """
@@ -46,6 +46,146 @@ class SentryV2PIRManager:
         self._scan_index: int = 0
         self._scan_point_visited: set = set()  # Track visited points during scan
         self._scan_reference_point: Optional[Tuple[float, float]] = None
+
+    def _search_style(self, override: Optional[str] = None) -> str:
+        style = str(override or getattr(self.cfg, "search_style", "hunting") or "hunting").strip().lower()
+        if style in {"fast", "fast_reacquire", "fast-reacquire", "reacquire"}:
+            return "fast_reacquire"
+        return "hunting"
+
+    def _sensor_pan_bias(self, sensor_id: Optional[int], center_pan: float) -> float:
+        if sensor_id is not None and 0 <= int(sensor_id) < len(self.cfg.sensors):
+            cue_pan = float(self.cfg.sensors[int(sensor_id)].cue_pan)
+        else:
+            cue_pan = float(center_pan)
+        delta = cue_pan - 135.0
+        if abs(delta) < 4.0:
+            return 0.0
+        return 1.0 if delta > 0.0 else -1.0
+
+    def _append_unique_point(
+        self,
+        points: List[Tuple[float, float]],
+        seen: set[Tuple[float, float]],
+        pan: float,
+        tilt: float,
+    ) -> None:
+        point = (
+            max(0.0, min(270.0, float(pan))),
+            max(0.0, min(110.0, float(tilt))),
+        )
+        if point in seen:
+            return
+        seen.add(point)
+        points.append(point)
+
+    def _point_distance(
+        self,
+        source: Tuple[float, float],
+        target: Tuple[float, float],
+    ) -> float:
+        pan_delta = abs(float(target[0]) - float(source[0]))
+        tilt_delta = abs(float(target[1]) - float(source[1]))
+        return pan_delta + (tilt_delta * 1.15)
+
+    def _smooth_path(
+        self,
+        points: List[Tuple[float, float]],
+        start: Tuple[float, float],
+    ) -> List[Tuple[float, float]]:
+        remaining = list(points)
+        ordered: List[Tuple[float, float]] = []
+        current = (float(start[0]), float(start[1]))
+        while remaining:
+            next_index = min(
+                range(len(remaining)),
+                key=lambda idx: self._point_distance(current, remaining[idx]),
+            )
+            point = remaining.pop(next_index)
+            ordered.append(point)
+            current = point
+        return ordered
+
+    def _apply_search_rounds(
+        self,
+        points: List[Tuple[float, float]],
+        center_pan: float,
+        center_tilt: float,
+        search_style: str,
+    ) -> List[Tuple[float, float]]:
+        rounds = max(1, int(getattr(self.cfg, "search_rounds", 1) or 1))
+        if not points:
+            return []
+
+        ordered_rounds: List[Tuple[float, float]] = []
+        seen: set[Tuple[float, float]] = set()
+        current_start = (float(center_pan), float(center_tilt))
+        scale_step = 0.18 if search_style == "fast_reacquire" else 0.12
+
+        for round_index in range(rounds):
+            scale = 1.0 + (scale_step * round_index)
+            round_points: List[Tuple[float, float]] = []
+            round_seen: set[Tuple[float, float]] = set()
+            for point_pan, point_tilt in points:
+                scaled_pan = center_pan + ((point_pan - center_pan) * scale)
+                scaled_tilt = center_tilt + ((point_tilt - center_tilt) * scale)
+                self._append_unique_point(round_points, round_seen, scaled_pan, scaled_tilt)
+            for point in self._smooth_path(round_points, current_start):
+                if point in seen:
+                    continue
+                seen.add(point)
+                ordered_rounds.append(point)
+            current_start = ordered_rounds[-1] if ordered_rounds else current_start
+
+        return ordered_rounds
+
+    def _local_hunt_points(
+        self,
+        center_pan: float,
+        center_tilt: float,
+        pan_range: float,
+        tilt_range: float,
+        sensor_id: Optional[int],
+        search_style: str,
+    ) -> List[Tuple[float, float]]:
+        points: List[Tuple[float, float]] = []
+        seen: set[Tuple[float, float]] = set()
+        bias_pan = self._sensor_pan_bias(sensor_id, center_pan)
+        bias_primary = bias_pan if abs(bias_pan) >= 0.1 else 1.0
+
+        if search_style == "fast_reacquire":
+            near_pan = max(1.2, pan_range * 0.32)
+            near_tilt = max(0.8, tilt_range * 0.32)
+            mid_pan = max(near_pan + 0.6, pan_range * 0.58)
+            mid_tilt = max(near_tilt + 0.4, tilt_range * 0.55)
+        else:
+            near_pan = max(1.0, pan_range * 0.22)
+            near_tilt = max(0.7, tilt_range * 0.24)
+            mid_pan = max(near_pan + 0.8, pan_range * 0.46)
+            mid_tilt = max(near_tilt + 0.5, tilt_range * 0.44)
+
+        local_pattern = [
+            (bias_primary * near_pan, 0.0),
+            (bias_primary * near_pan * 0.62, near_tilt * 0.80),
+            (bias_primary * near_pan * 0.62, -near_tilt * 0.80),
+            (0.0, near_tilt),
+            (0.0, -near_tilt),
+            (-bias_primary * near_pan * 0.42, 0.0),
+            (bias_primary * mid_pan, 0.0),
+            (bias_primary * mid_pan * 0.72, mid_tilt * 0.82),
+            (bias_primary * mid_pan * 0.72, -mid_tilt * 0.82),
+        ]
+        if search_style != "fast_reacquire":
+            local_pattern.extend([
+                (-bias_primary * near_pan * 0.48, near_tilt * 0.75),
+                (-bias_primary * near_pan * 0.48, -near_tilt * 0.75),
+                (0.0, mid_tilt),
+                (0.0, -mid_tilt),
+            ])
+
+        for pan_offset, tilt_offset in local_pattern:
+            self._append_unique_point(points, seen, center_pan + pan_offset, center_tilt + tilt_offset)
+        return self._apply_search_rounds(points, center_pan, center_tilt, search_style)
         
     def update_config(self, config: PIRGuardConfig) -> None:
         """Hot-reload configuration."""
@@ -139,34 +279,70 @@ class SentryV2PIRManager:
 
         return None
     
-    def generate_scan_grid(self, center_pan: float, center_tilt: float) -> List[Tuple[float, float]]:
+    def generate_scan_grid(
+        self,
+        center_pan: float,
+        center_tilt: float,
+        sensor_id: Optional[int] = None,
+        search_style: Optional[str] = None,
+    ) -> List[Tuple[float, float]]:
         """
-        Generate a scan grid centered at the cue point.
-        Returns list of (pan, tilt) points to visit.
+        Generate an ordered search pattern centered at the cue point.
+        Returns list of (pan, tilt) points to visit, starting at center and
+        expanding outward in the same kind of center-first search rhythm used
+        by target-loss recovery.
         """
         pan_range = self._effective_scan_pan_range()
         tilt_range = self.cfg.scan_tilt_range
         resolution = self.cfg.scan_grid_resolution
-        
-        grid = []
-        
-        # Generate grid points
-        for i in range(resolution):
-            for j in range(resolution):
-                # Normalized position (-1 to 1)
-                norm_pan = (i - (resolution - 1) / 2.0) / max(1, (resolution - 1) / 2.0) if resolution > 1 else 0.0
-                norm_tilt = (j - (resolution - 1) / 2.0) / max(1, (resolution - 1) / 2.0) if resolution > 1 else 0.0
-                
-                p = center_pan + norm_pan * pan_range
-                t = center_tilt + norm_tilt * tilt_range
-                
-                # Clamp to valid ranges
-                p = max(0.0, min(270.0, p))
-                t = max(0.0, min(110.0, t))
-                
-                grid.append((p, t))
-        
-        return grid
+
+        def _clamp_point(pan: float, tilt: float) -> Tuple[float, float]:
+            return (
+                max(0.0, min(270.0, float(pan))),
+                max(0.0, min(110.0, float(tilt))),
+            )
+
+        if resolution <= 1:
+            return [_clamp_point(center_pan, center_tilt)]
+
+        points: List[Tuple[float, float]] = []
+        seen: set[Tuple[float, float]] = set()
+        style = self._search_style(search_style)
+
+        def _append_point(pan: float, tilt: float) -> None:
+            self._append_unique_point(points, seen, pan, tilt)
+
+        _append_point(center_pan, center_tilt)
+
+        for point_pan, point_tilt in self._local_hunt_points(
+            center_pan,
+            center_tilt,
+            pan_range,
+            tilt_range,
+            sensor_id,
+            style,
+        ):
+            _append_point(point_pan, point_tilt)
+
+        ring_count = max(1, int(resolution) - 1)
+        pan_bias = self._sensor_pan_bias(sensor_id, center_pan)
+        pan_order = [1.0, -1.0] if pan_bias >= 0.0 else [-1.0, 1.0]
+        for ring in range(1, ring_count + 1):
+            scale = float(ring) / float(ring_count)
+            pan_step = pan_range * scale
+            tilt_step = tilt_range * scale
+
+            # Center-first expanding search: early points stay biased toward
+            # the firing sensor's sector before the pattern mirrors outward.
+            for sign in pan_order:
+                _append_point(center_pan + (pan_step * sign), center_tilt)
+            _append_point(center_pan, center_tilt + tilt_step)
+            _append_point(center_pan, center_tilt - tilt_step)
+            for sign in pan_order:
+                _append_point(center_pan + (pan_step * sign), center_tilt + tilt_step)
+                _append_point(center_pan + (pan_step * sign), center_tilt - tilt_step)
+
+        return self._apply_search_rounds(points, center_pan, center_tilt, style)
 
     def _effective_scan_pan_range(self) -> float:
         configured = float(max(5.0, self.cfg.scan_pan_range))
@@ -192,13 +368,27 @@ class SentryV2PIRManager:
         non_overlap_limit = max(5.0, min_separation * 0.45)
         return float(min(configured, non_overlap_limit))
     
-    def start_scan(self, center_pan: float, center_tilt: float) -> None:
+    def start_scan(
+        self,
+        center_pan: float,
+        center_tilt: float,
+        sensor_id: Optional[int] = None,
+        search_style: Optional[str] = None,
+    ) -> None:
         """Start an adaptive scan at the cue location."""
         self._scan_active = True
-        self._scan_points = self.generate_scan_grid(center_pan, center_tilt)
+        self._scan_points = self.generate_scan_grid(
+            center_pan,
+            center_tilt,
+            sensor_id=sensor_id,
+            search_style=search_style,
+        )
+        center_point = (float(max(0.0, min(270.0, center_pan))), float(max(0.0, min(110.0, center_tilt))))
+        if len(self._scan_points) > 1 and self._scan_points[0] == center_point:
+            self._scan_points = self._scan_points[1:]
         self._scan_index = 0
         self._scan_point_visited.clear()
-        self._scan_reference_point = (float(center_pan), float(center_tilt))
+        self._scan_reference_point = center_point
     
     def get_next_scan_point(self) -> Optional[Tuple[float, float]]:
         """Get the next point in the scan grid. Returns None if scan complete."""

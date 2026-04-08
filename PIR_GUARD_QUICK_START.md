@@ -1,13 +1,12 @@
 # PIR Guard Quick Start Guide
 
 ## Feature Summary
-3-sensor blind-spot motion detection with adaptive turret search when no target confirmed. Uses existing Smart Sentry v2 guard mode.
+3-sensor blind-spot motion detection with cue-first confirmation, a short cue hold, and a localized hunt around the triggered zone when no target is confirmed at the cue point. Uses the live Smart Sentry v2.3.2 Guard workflow.
 
 ## Enabling PIR Guard
 
 ### Step 1: Open Smart Sentry v2
-- Launch the main DADBOT app
-- Switch to **Smart Sentry v2** tab
+- Launch Smart Sentry v2 from its standalone launcher
 - Click the **Guard** settings tab
 
 ### Step 2: Enable PIR Master Switch
@@ -19,27 +18,30 @@
 For each sensor (1, 2, 3):
 1. Check **"Active"** checkbox to enable that sensor
 2. Set **Pan** angle (0-270°) where sensor covers
-   - 270° = left rear
-   - 150° = front left
-   - 30° = front right
+   - Current default 3-zone layout is 45°, 135°, 225° across the 0-270° arc
+   - Adjust these to match your actual physical mounting
 3. Set **Tilt** angle (0-110°) for that sensor
-   - 15° = slightly upward from center
-4. Leave **Debounce** at default (200ms minimum between fires)
+   - Current default is 35° for each zone
+4. Leave **Debounce** at the default unless you are chasing repeat-trigger noise
+   - Current default is 500 ms per sensor
 
 ### Step 4: Configure Scan Behavior
-- **Scan Pan Range**: Width of area to search left/right (default 25°)
-- **Scan Tilt Range**: Height of area to search up/down (default 15°)
-- **Grid Resolution**: How many points to scan (3-4 recommended, higher = slower but thorough)
+- **Scan Pan Range**: Width of area to search left/right from the cue point (current default 45°)
+- **Scan Tilt Range**: Height of area to search up/down (current default 45°)
+- **Grid Resolution**: How many points to scan per axis (current default 3, so a 3x3 grid)
 - **Scan Speed**: How fast to move between scan points (12°/s default)
-- **Confirmation Timeout**: How long to wait at cue point before starting scan (1.0s default)
+- **Cue Hold**: How long to stay at the exact cue point before leaving it for the local hunt (current default 0.18 s)
+- **Confirmation Timeout**: Broader PIR confirmation budget (current default 1.2 s)
+- **Search Style**: `Hunting` for a more careful local-zone search first, or `Fast Reacquire` for less dwell and quicker widening
+- **Hunt Rounds**: Shared number of hunt passes used by PIR and target-loss recovery (current default 1)
 - Check **"Scan on No-Detection"** to auto-search if target not found at cue
 
 ### Step 5: Test
 - Wave hand in front of each sensor
 - Turret should slew to that sensor's cue angle
-- If no target found, turret will run scan grid
+- If no target is found at the cue point, the turret should immediately start an offset scan move
 - If target appears during scan, it will engage normally
-- If scan times out, returns to guard patrol
+- If scan completes without a target, current builds immediately command the configured guard/home position
 
 ## Behavior Explained
 
@@ -52,31 +54,39 @@ For each sensor (1, 2, 3):
    ↓
 3. Turret slews to sensor's configured Pan/Tilt cue angles
    ↓
-4. Wait "Confirmation Timeout" seconds for camera to find target
+4. Wait the short "Cue Hold" time for camera confirmation at the exact cue point
    ↓
 5a. Target found → Engage normally (fire automatically if rules allow)
    ↓
 5b. No target found AND "Scan on No-Detection" enabled
     ↓
-    Run adaptive scan grid around cue point
+    Run localized hunt around cue point, then widen through the PIR zone
     ↓
     a) Target found during scan → Engage normally
-    b) Scan completes → Return to guard patrol
+   b) Scan completes → Return to configured guard/home position
 ```
+
+Important live behavior detail:
+
+- The cue point already covers the center of the search area.
+- In current builds, the first scan move after a no-detect is the first offset point, not the center again.
+- The early hunt points stay close to the triggered zone before the wider search fans out.
+- `Cue Hold` is the intentional wait before the hunt. There is no intentional stationary wait after the hunt completes.
+- If you do not see a visible offset move, either `Cue Hold` is still too high for your preference, `Scan on No-Detection` is off, or you are on an older build.
 
 ## Default Sensor Setup (If You Don't Change Angles)
 
 | Sensor | Pan | Tilt | Coverage |
 |--------|-----|------|----------|
-| 1 | 270° | 15° | Left rear |
-| 2 | 150° | 15° | Front left |
-| 3 | 30° | 15° | Front right |
+| 1 | 45° | 35° | Right zone |
+| 2 | 135° | 35° | Front zone |
+| 3 | 225° | 35° | Left zone |
 
-This covers ~270° around the turret base. Adjust angles to match where your actual sensors are mounted.
+This covers the full 0-270° pan arc with three equal 90° sectors. Adjust angles to match where your actual sensors are mounted.
 
 ## Scan Grid Example
 
-With **Grid Resolution = 3** and **Scan Pan Range = 25°, Tilt Range = 15°**:
+With **Grid Resolution = 3** and **Scan Pan Range = 45°, Tilt Range = 45°**:
 
 Turret will scan a 3×3 grid (9 points) around the cue point:
 ```
@@ -87,7 +97,7 @@ Turret will scan a 3×3 grid (9 points) around the cue point:
       BL    BM    BR
 ```
 
-Each point gets held for ~250ms while camera looks for targets. Total scan time ~2-3 seconds.
+Current live behavior visits the cue center during the confirmation phase, then begins the scan from one of the offset points. Total scan time depends on your scan speed, settle time, and grid size.
 
 ## Tuning Tips
 
@@ -101,12 +111,16 @@ Each point gets held for ~250ms while camera looks for targets. Total scan time 
 - Scan Speed: 15-25 deg/s (faster movement)
 - Grid Range: Smaller (15° × 10°)
 
-### Conservative (Wait Longer for Camera)
-- Confirmation Timeout: 2-3 seconds
-- Scan On No-Detect: Disabled (return to patrol instead)
+### Conservative (Wait Longer At Cue)
+- Cue Hold: 0.25-0.40 seconds
+- Confirmation Timeout: 1.2-2.0 seconds
+- Scan On No-Detect: Disabled (return to guard/home instead of scanning)
+
+Important: if you are trying to remove a pause after the PIR hunt finishes, do not look for a separate post-hunt dwell setting. That pause is not an intended feature. Reduce `Cue Hold` only for the pre-hunt wait, and update to a build with the explicit return-home fix if the turret still stays parked after a completed no-target hunt.
 
 ### Aggressive (Quick Search)
-- Confirmation Timeout: 0.5 seconds
+- Cue Hold: 0.08-0.14 seconds
+- Search Style: Fast Reacquire
 - Scan On No-Detect: Enabled
 - Grid Resolution: 2
 
@@ -114,12 +128,12 @@ Each point gets held for ~250ms while camera looks for targets. Total scan time 
 
 Settings saved automatically to:
 ```
-app/config/sentry_v2_settings.json
+app/config/smart_sentry_v2_3_2_settings.json
 ```
 
 To reset PIR settings to defaults:
 1. Close the app
-2. Open `sentry_v2_settings.json`
+2. Open `smart_sentry_v2_3_2_settings.json`
 3. Delete or clear the `"pir_guard"` section
 4. Save and restart app
 
@@ -134,8 +148,15 @@ To reset PIR settings to defaults:
 
 ### Turret Keeps Returning to Patrol
 - [ ] Check "Scan on No-Detection" is enabled if you want scanning
-- [ ] Reduce "Confirmation Timeout" so it starts scanning sooner
+- [ ] Reduce "Cue Hold" so it leaves the cue sooner
 - [ ] Increase "Grid Resolution" to check more points
+
+### Turret Slews to Cue But Search Still Looks Motionless
+- [ ] Confirm `Scan on No-Detection` is enabled
+- [ ] Confirm your build includes the updated offset-first scan behavior
+- [ ] Increase `Scan Pan Range` slightly if your offsets are too small to notice
+- [ ] Lower `Cue Hold` if you want the offset hunt to begin sooner
+- [ ] Use `Fast Reacquire` if you want less dwell and quicker widening
 
 ### Turret Scans Too Slowly
 - [ ] Increase "Scan Speed" (12-20 deg/s is typical)
@@ -162,10 +183,13 @@ A: Currently 3 sensors maximum (fixed in code). Can be expanded to support more 
 A: Smart Sentry ignores missing data. If no PIR event is received, turret performs normal guard patrol.
 
 **Q: Can PIR events interrupt an active engagement?**
-A: No. PIR only affects the GUARDING state. If turret is already firing, PIR is ignored.
+A: PIR cues do not hijack a confirmed active engagement. Current Smart Sentry behavior queues or defers PIR-driven work so blind-spot sensing remains available without abruptly stealing control from an existing camera-confirmed target.
 
 **Q: Does PIR work with all detection modes?**
 A: Yes. PIR is independent of detection mode (YOLO, color, difference, etc.). The scan grid uses whatever detector is currently active.
+
+**Q: Why does the turret move to the cue point first and only then search?**
+A: That is the intended live contract. PIR is treated as a blind-spot cue, not a target confirmation. Smart Sentry first checks the configured cue point briefly, then starts a local hunt around that zone only if the camera still sees nothing.
 
 ## Next Steps After Setup
 

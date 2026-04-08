@@ -4,7 +4,11 @@ This document defines the intended **portable-only** surface for Smart Sentry v2
 
 ## Required entrypoints
 
-- run_sentry_v2.py
+- run.py
+
+## Compatibility entrypoints retained only so older launch paths still resolve
+
+- run_smart_sentry_v3.py
 - app/run_sentry_v2.py
 
 ## Required Smart Sentry v2 package files
@@ -37,14 +41,15 @@ This document defines the intended **portable-only** surface for Smart Sentry v2
 - app/config/sentry_v2_prompted_targets.json
 - app/LOGO.png
 
-## Compatibility-only mirrored asset
-
-- app/app/config/sentry_v2_settings.json only if legacy settings-path mirroring is intentionally retained; it is not the canonical runtime settings file
-
 ## Required detection model folders
 
-- app/models/
-- app/YOLO_MODELS/
+- YOLO_MODELS/
+
+This is the only supported source-side and operator-facing portable-release model folder. Do not mirror models into app/models/ or app/YOLO_MODELS/.
+
+For the packaged release, keep the public drop location at the release root as `F:\SMART SENTRY V2.3.1\YOLO_MODELS`. Bundled fallback weights may also exist under `SMART_SENTRY_V2_3_1_FILES\YOLO_MODELS`, but that support-folder copy is not the operator-facing drop target.
+
+Use Python 3.11 in `F:\SMART SENTRY V2\.venv311` as the standard packaging interpreter. Do not treat `.venv` or a system 3.12 install as the default release environment.
 
 ## Required dependency manifest
 

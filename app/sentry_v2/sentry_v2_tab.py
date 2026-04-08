@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — Tab Widget (PyQt5 UI)
+SMART SENTRY V2.3.2 — Tab Widget (PyQt5 UI)
 
 Self-contained tab for the main DADBOT application.
 Provides:
@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from collections import deque
 import json
+import importlib
 import os
 import queue
 import subprocess
@@ -28,7 +29,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -37,16 +38,46 @@ from PyQt5.QtWidgets import (
     QCheckBox, QSlider, QGroupBox, QFrame, QSizePolicy,
     QSpacerItem, QScrollArea, QDoubleSpinBox, QSpinBox,
     QComboBox, QListWidget, QListWidgetItem, QAbstractItemView,
-    QTabWidget, QTextEdit, QGridLayout, QLineEdit, QSplitter, QMessageBox,
+    QTabWidget, QTabBar, QTextEdit, QGridLayout, QLineEdit, QSplitter, QMessageBox,
     QProgressBar,
     QFileDialog,
+    QBoxLayout,
+    QShortcut,
+    QStyle,
+    QStylePainter,
+    QStyleOptionTab,
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject, QProcess, QProcessEnvironment, QSize
-from PyQt5.QtGui import QImage, QPixmap, QColor, QIcon
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject, QProcess, QProcessEnvironment, QSize, QUrl, QRectF, QPointF, QRect
+from PyQt5.QtGui import QImage, QPixmap, QColor, QIcon, QDesktopServices, QPainter, QPainterPath, QPen, QKeySequence
+try:
+    from PyQt5.QtTextToSpeech import QTextToSpeech
+except Exception:
+    QTextToSpeech = None
+try:
+    from runtime_paths import app_root_path, runtime_root_path
+except ImportError:
+    from app.runtime_paths import app_root_path, runtime_root_path
+
+
+def _windows_hidden_subprocess_kwargs() -> dict:
+    if os.name != "nt":
+        return {}
+    kwargs: dict = {}
+    creationflags = int(getattr(subprocess, "CREATE_NO_WINDOW", 0) or 0)
+    if creationflags:
+        kwargs["creationflags"] = creationflags
+    startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
+    if startupinfo_cls is not None:
+        startupinfo = startupinfo_cls()
+        startupinfo.dwFlags |= int(getattr(subprocess, "STARTF_USESHOWWINDOW", 0) or 0)
+        startupinfo.wShowWindow = 0
+        kwargs["startupinfo"] = startupinfo
+    return kwargs
 
 from .sentry_v2_config import (
     SentryV2Config,
     EngagementConfig,
+    ThemeConfig,
     YOLO_COCO_CLASSES,
     NoFireMaskConfig,
     NoFireMaskVertex,
@@ -67,6 +98,7 @@ from .sentry_v2_video_canvas import SentryV2VideoCanvas
 from .simple_tracker import SimpleBBoxTracker
 from .sound_engine import SentryV2SoundEngine
 from .sentry_v2_tooltips import SENTRY_V2_TOOLTIPS
+from .face_identity import FaceIdentityLibrary, FaceIdentityRuntime, FaceMatchResult
 from .sentry_v2_config import (
     SENTRY_PAN_MAX,
     SENTRY_PAN_MIN,
@@ -111,6 +143,75 @@ class CompactSettingsTabWidget(QTabWidget):
         return QSize(hint.width(), self._compact_height())
 
 
+class ResponsiveIconTabBar(QTabBar):
+    """Top tab bar that grows icons and tab cells with the available panel width."""
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.setDrawBase(False)
+        self.setExpanding(True)
+        self.setElideMode(Qt.ElideNone)
+
+    def _metrics(self) -> Tuple[int, int, int]:
+        count = max(1, self.count())
+        parent = self.parentWidget()
+        current_width = self.width()
+        available_width = current_width if current_width > 0 else (parent.width() if parent is not None else 0)
+        available_width = max(300, available_width)
+        spacing_total = max(0, (count - 1) * 3)
+        tab_width = max(40, int((available_width - spacing_total) / count))
+        tab_height = max(48, min(92, int(tab_width * 0.84)))
+        icon_size = max(20, min(42, int(min(tab_width, tab_height) * 0.56)))
+        return tab_width, tab_height, icon_size
+
+    def _sync_icon_size(self) -> None:
+        _tab_width, _tab_height, icon_size = self._metrics()
+        size = QSize(icon_size, icon_size)
+        if self.iconSize() != size:
+            self.setIconSize(size)
+
+    def tabSizeHint(self, index: int) -> QSize:
+        _ = index
+        tab_width, tab_height, _icon_size = self._metrics()
+        return QSize(tab_width, tab_height)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._sync_icon_size()
+        self.updateGeometry()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        self._sync_icon_size()
+
+    def tabInserted(self, index: int) -> None:
+        super().tabInserted(index)
+        self._sync_icon_size()
+
+    def paintEvent(self, event) -> None:
+        _ = event
+        painter = QStylePainter(self)
+        icon_size = self.iconSize()
+        for index in range(self.count()):
+            option = QStyleOptionTab()
+            self.initStyleOption(option, index)
+            icon = QIcon(option.icon)
+            option.text = ""
+            option.icon = QIcon()
+            painter.drawControl(QStyle.CE_TabBarTabShape, option)
+            if icon.isNull():
+                continue
+            icon_rect = QRect(
+                option.rect.x() + max(0, (option.rect.width() - icon_size.width()) // 2),
+                option.rect.y() + max(0, (option.rect.height() - icon_size.height()) // 2),
+                icon_size.width(),
+                icon_size.height(),
+            )
+            mode = QIcon.Normal if option.state & QStyle.State_Enabled else QIcon.Disabled
+            state = QIcon.On if option.state & QStyle.State_Selected else QIcon.Off
+            icon.paint(painter, icon_rect, Qt.AlignCenter, mode, state)
+
+
 # Detection mode list (same indices as main app)
 DETECTION_MODES: List[str] = [
     "Frame Difference",            # 0
@@ -147,16 +248,215 @@ COLOR_PRESETS: List[str] = [
     "cyan", "white", "black", "grey", "custom",
 ]
 
-CUSTOM_MASTER_PRESET_PATH = Path(__file__).resolve().parents[1] / "config" / "sentry_v2_custom_presets.json"
-SENTRY_V2_SETTINGS_PATH = Path(__file__).resolve().parents[1] / "config" / "sentry_v2_settings.json"
-LEGACY_SENTRY_V2_SETTINGS_PATH = Path(__file__).resolve().parents[1] / "app" / "config" / "sentry_v2_settings.json"
-SENTRY_V2_SNAPSHOT_DIR = Path(__file__).resolve().parents[2] / "snapshots"
-SENTRY_V2_PANEL_MIN_WIDTH = 560
-SENTRY_V2_PANEL_DEFAULT_WIDTH = 620
-SENTRY_V2_VIDEO_MIN_WIDTH = 120
+SOUND_PERSONALITY_OPTIONS: List[Tuple[str, str]] = [
+    ("sentinel", "Sentinel"),
+    ("hunter", "Hunter"),
+    ("stealth", "Stealth"),
+    ("playful", "Playful"),
+]
+SOUND_PERSONALITY_LABELS = {key: label for key, label in SOUND_PERSONALITY_OPTIONS}
+
+HUMAN_VOICE_STYLE_PRESETS = {
+    "neutral": {"label": "Neutral Assistant", "rate": 100, "pitch": 100, "volume": 85},
+    "operator": {"label": "Quiet Operator", "rate": 92, "pitch": 94, "volume": 72},
+    "alert": {"label": "Alert Guard", "rate": 108, "pitch": 102, "volume": 92},
+    "warm": {"label": "Warm Greeter", "rate": 97, "pitch": 108, "volume": 86},
+}
+
+APP_ROOT_PATH = app_root_path()
+RUNTIME_ROOT_PATH = runtime_root_path()
+
+SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_2_custom_presets.json"
+SMART_SENTRY_V2_3_1_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_1_custom_presets.json"
+LEGACY_SMART_SENTRY_V3_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_custom_presets.json"
+LEGACY_SENTRY_V2_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "sentry_v2_custom_presets.json"
+SMART_SENTRY_V2_3_2_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_2_settings.json"
+SMART_SENTRY_V2_3_1_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_1_settings.json"
+LEGACY_SMART_SENTRY_V3_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_settings.json"
+LEGACY_SENTRY_V2_SETTINGS_PATH = APP_ROOT_PATH / "config" / "sentry_v2_settings.json"
+SMART_SENTRY_V2_3_2_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_2_prompted_targets.json"
+SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_1_prompted_targets.json"
+LEGACY_SMART_SENTRY_V3_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_prompted_targets.json"
+LEGACY_SENTRY_V2_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / "sentry_v2_prompted_targets.json"
+SMART_SENTRY_V2_3_2_FACE_LIBRARY_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_2_faces.json"
+SMART_SENTRY_SHORTCUT_KEYS_DOC_PATH = APP_ROOT_PATH.parent / "SMART_SENTRY_SHORTCUT_KEYS.md"
+SENTRY_V2_SNAPSHOT_DIR = RUNTIME_ROOT_PATH / "snapshots"
+SENTRY_V2_LOG_EXPORT_DIR = SENTRY_V2_SNAPSHOT_DIR / "serial_log_exports"
+SENTRY_V2_PANEL_MIN_WIDTH = 420
+SENTRY_V2_PANEL_DEFAULT_WIDTH = 520
+SENTRY_V2_VIDEO_MIN_WIDTH = 180
 SENTRY_V2_WIDGET_MIN_WIDTH = SENTRY_V2_PANEL_MIN_WIDTH + SENTRY_V2_VIDEO_MIN_WIDTH + 28
-ESP32_DEFAULT_WIFI_SSID = "DB3000-ESP32"
-ESP32_DEFAULT_WIFI_PASSWORD = "db3000pass"
+SMART_SENTRY_V2_WIFI_SSID = "SMART-SENTRY-V2.3"
+SMART_SENTRY_V2_WIFI_PASSWORD = "db3000pass"
+SMART_SENTRY_V3_WIFI_SSID = "SMART-SENTRY-V3"
+SMART_SENTRY_V3_WIFI_PASSWORD = "smartv3pass"
+SMART_SENTRY_RELEASE_TITLE = "Smart Sentry V2.3.2"
+SMART_SENTRY_RELEASE_SUBTITLE = "ESP32 WiFi + USB Control"
+SMART_SENTRY_RELEASE_BADGE = ""
+
+SETTINGS_TAB_SPECS: List[Tuple[str, str, str]] = [
+    ("Connection", "system", "#72decf"),
+    ("Master Profiles", "profiles", "#b4efc0"),
+    ("Detection Mode", "sensing", "#f2cf7c"),
+    ("Target Library", "library", "#efb184"),
+    ("Target Filter", "filter", "#9cc5ff"),
+    ("Threat Scoring", "threat", "#8fdef2"),
+    ("Engagement", "engage", "#ff9f9a"),
+    ("Guard", "guard", "#8ed7bf"),
+    ("Theme", "theme", "accent"),
+    ("Manual Control", "command", "#dde7ef"),
+    ("Facial Recognition", "facial", "#f6a6db"),
+    ("Shortcut Keys", "shortcuts", "#a5b2ff"),
+    ("AI Assistant", "ai", "#95e3f4"),
+]
+
+SETTINGS_TAB_NAV_LABELS = {
+    "Connection": "CONNECTION",
+    "Master Profiles": "MASTER PROFILES",
+    "Detection Mode": "DETECTION MODE",
+    "Target Library": "TARGET LIBRARY",
+    "Target Filter": "TARGET FILTER",
+    "Threat Scoring": "THREAT SCORING",
+    "Engagement": "ENGAGEMENT",
+    "Guard": "GUARD",
+    "Theme": "THEME",
+    "Manual Control": "MANUAL CONTROL",
+    "Facial Recognition": "FACIAL RECOGNITION",
+    "Shortcut Keys": "SHORTCUT KEYS",
+    "AI Assistant": "AI ASSISTANT",
+}
+
+
+def _build_settings_tab_icon(icon_key: str, color_value: str, size: int = 18) -> QIcon:
+    color = QColor(color_value)
+    stroke = QPen(color)
+    stroke.setWidthF(max(1.3, size * 0.10))
+    stroke.setCapStyle(Qt.RoundCap)
+    stroke.setJoinStyle(Qt.RoundJoin)
+
+    fill = QColor(color)
+    fill.setAlpha(58)
+
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing, True)
+    painter.setPen(stroke)
+    painter.setBrush(fill)
+
+    unit = float(size)
+    left = unit * 0.16
+    top = unit * 0.16
+    right = unit * 0.84
+    bottom = unit * 0.84
+    center_x = unit * 0.50
+    center_y = unit * 0.50
+
+    if icon_key == "system":
+        screen = QRectF(unit * 0.18, unit * 0.22, unit * 0.64, unit * 0.38)
+        painter.drawRoundedRect(screen, 2.2, 2.2)
+        painter.drawLine(QPointF(unit * 0.50, unit * 0.60), QPointF(unit * 0.50, unit * 0.74))
+        painter.drawLine(QPointF(unit * 0.34, unit * 0.74), QPointF(unit * 0.66, unit * 0.74))
+    elif icon_key == "profiles":
+        for offset in (0.00, 0.10, 0.20):
+            rect = QRectF(unit * (0.16 + offset), unit * (0.18 + offset), unit * 0.42, unit * 0.30)
+            painter.drawRoundedRect(rect, 2.0, 2.0)
+    elif icon_key == "sensing":
+        eye = QPainterPath()
+        eye.moveTo(left, center_y)
+        eye.quadTo(QPointF(center_x, top), QPointF(right, center_y))
+        eye.quadTo(QPointF(center_x, bottom), QPointF(left, center_y))
+        painter.drawPath(eye)
+        painter.setBrush(color)
+        painter.drawEllipse(QRectF(unit * 0.42, unit * 0.42, unit * 0.16, unit * 0.16))
+        painter.setBrush(fill)
+    elif icon_key == "library":
+        folder = QPainterPath()
+        folder.moveTo(unit * 0.16, unit * 0.34)
+        folder.lineTo(unit * 0.36, unit * 0.34)
+        folder.lineTo(unit * 0.42, unit * 0.26)
+        folder.lineTo(unit * 0.82, unit * 0.26)
+        folder.lineTo(unit * 0.82, unit * 0.74)
+        folder.lineTo(unit * 0.16, unit * 0.74)
+        folder.closeSubpath()
+        painter.drawPath(folder)
+    elif icon_key == "filter":
+        funnel = QPainterPath()
+        funnel.moveTo(unit * 0.18, unit * 0.24)
+        funnel.lineTo(unit * 0.82, unit * 0.24)
+        funnel.lineTo(unit * 0.58, unit * 0.48)
+        funnel.lineTo(unit * 0.58, unit * 0.76)
+        funnel.lineTo(unit * 0.42, unit * 0.66)
+        funnel.lineTo(unit * 0.42, unit * 0.48)
+        funnel.closeSubpath()
+        painter.drawPath(funnel)
+    elif icon_key == "threat":
+        shield = QPainterPath()
+        shield.moveTo(center_x, unit * 0.14)
+        shield.lineTo(unit * 0.78, unit * 0.26)
+        shield.lineTo(unit * 0.72, unit * 0.62)
+        shield.quadTo(QPointF(center_x, unit * 0.86), QPointF(unit * 0.28, unit * 0.62))
+        shield.lineTo(unit * 0.22, unit * 0.26)
+        shield.closeSubpath()
+        painter.drawPath(shield)
+        painter.drawLine(QPointF(center_x, unit * 0.30), QPointF(center_x, unit * 0.56))
+        painter.drawPoint(QPointF(center_x, unit * 0.70))
+    elif icon_key == "engage":
+        painter.drawEllipse(QRectF(unit * 0.24, unit * 0.24, unit * 0.52, unit * 0.52))
+        painter.drawLine(QPointF(center_x, unit * 0.10), QPointF(center_x, unit * 0.32))
+        painter.drawLine(QPointF(center_x, unit * 0.68), QPointF(center_x, unit * 0.90))
+        painter.drawLine(QPointF(unit * 0.10, center_y), QPointF(unit * 0.32, center_y))
+        painter.drawLine(QPointF(unit * 0.68, center_y), QPointF(unit * 0.90, center_y))
+    elif icon_key == "guard":
+        painter.drawArc(QRectF(unit * 0.30, unit * 0.16, unit * 0.40, unit * 0.36), 30 * 16, 120 * 16)
+        painter.drawRoundedRect(QRectF(unit * 0.24, unit * 0.42, unit * 0.52, unit * 0.34), 2.4, 2.4)
+    elif icon_key == "theme":
+        painter.drawEllipse(QRectF(unit * 0.16, unit * 0.18, unit * 0.60, unit * 0.60))
+        painter.setBrush(color)
+        for dot_x, dot_y in ((0.34, 0.32), (0.50, 0.28), (0.58, 0.42)):
+            painter.drawEllipse(QRectF(unit * dot_x, unit * dot_y, unit * 0.08, unit * 0.08))
+        painter.setBrush(fill)
+        painter.drawEllipse(QRectF(unit * 0.48, unit * 0.54, unit * 0.26, unit * 0.18))
+    elif icon_key == "command":
+        for line_x, knob_y in ((0.28, 0.36), (0.50, 0.56), (0.72, 0.30)):
+            painter.drawLine(QPointF(unit * line_x, unit * 0.20), QPointF(unit * line_x, unit * 0.80))
+            painter.setBrush(color)
+            painter.drawEllipse(QRectF(unit * (line_x - 0.07), unit * (knob_y - 0.07), unit * 0.14, unit * 0.14))
+            painter.setBrush(fill)
+    elif icon_key == "facial":
+        painter.drawEllipse(QRectF(unit * 0.28, unit * 0.18, unit * 0.44, unit * 0.38))
+        painter.drawArc(QRectF(unit * 0.32, unit * 0.34, unit * 0.36, unit * 0.22), 200 * 16, 140 * 16)
+        painter.drawLine(QPointF(unit * 0.18, unit * 0.24), QPointF(unit * 0.28, unit * 0.24))
+        painter.drawLine(QPointF(unit * 0.18, unit * 0.24), QPointF(unit * 0.18, unit * 0.34))
+        painter.drawLine(QPointF(unit * 0.82, unit * 0.24), QPointF(unit * 0.72, unit * 0.24))
+        painter.drawLine(QPointF(unit * 0.82, unit * 0.24), QPointF(unit * 0.82, unit * 0.34))
+        painter.drawLine(QPointF(unit * 0.18, unit * 0.76), QPointF(unit * 0.28, unit * 0.76))
+        painter.drawLine(QPointF(unit * 0.18, unit * 0.76), QPointF(unit * 0.18, unit * 0.66))
+        painter.drawLine(QPointF(unit * 0.82, unit * 0.76), QPointF(unit * 0.72, unit * 0.76))
+        painter.drawLine(QPointF(unit * 0.82, unit * 0.76), QPointF(unit * 0.82, unit * 0.66))
+    elif icon_key == "shortcuts":
+        painter.drawRoundedRect(QRectF(unit * 0.16, unit * 0.24, unit * 0.68, unit * 0.48), 3.0, 3.0)
+        for key_x in (0.26, 0.42, 0.58):
+            painter.drawRoundedRect(QRectF(unit * key_x, unit * 0.34, unit * 0.10, unit * 0.12), 1.8, 1.8)
+        painter.drawRoundedRect(QRectF(unit * 0.26, unit * 0.52, unit * 0.38, unit * 0.10), 1.8, 1.8)
+    elif icon_key == "ai":
+        painter.drawRoundedRect(QRectF(unit * 0.22, unit * 0.18, unit * 0.56, unit * 0.50), 3.0, 3.0)
+        painter.drawLine(QPointF(unit * 0.34, unit * 0.68), QPointF(unit * 0.28, unit * 0.82))
+        painter.drawLine(QPointF(unit * 0.66, unit * 0.68), QPointF(unit * 0.72, unit * 0.82))
+        painter.drawLine(QPointF(unit * 0.50, unit * 0.68), QPointF(unit * 0.50, unit * 0.86))
+        painter.drawEllipse(QRectF(unit * 0.34, unit * 0.34, unit * 0.08, unit * 0.08))
+        painter.drawEllipse(QRectF(unit * 0.58, unit * 0.34, unit * 0.08, unit * 0.08))
+        painter.drawArc(QRectF(unit * 0.38, unit * 0.38, unit * 0.24, unit * 0.18), 210 * 16, 120 * 16)
+    else:
+        painter.drawRoundedRect(QRectF(unit * 0.22, unit * 0.22, unit * 0.56, unit * 0.56), 3.0, 3.0)
+
+    painter.end()
+    return QIcon(pixmap)
+
+
+def _clamp_int_range(value: float, minimum: int, maximum: int) -> int:
+    return max(minimum, min(maximum, int(round(value))))
 
 DETECTION_PRESETS = {
     "frame_diff": {
@@ -784,6 +1084,49 @@ BUS_SERVO_TIME_PRESETS = {
         "move_time_ms": 28,
     },
 }
+
+_DEFAULT_ENGAGEMENT_LIMITS = EngagementConfig()
+_PRECISION_TILT_STEP_RATIO = float(_DEFAULT_ENGAGEMENT_LIMITS.precision_max_tilt_step) / max(
+    0.001,
+    float(_DEFAULT_ENGAGEMENT_LIMITS.precision_max_pan_step),
+)
+
+
+def _normalize_engagement_precision_limits(settings: dict, raw_settings: Optional[dict] = None) -> dict:
+    """Backfill per-axis precision limits from the legacy single-step control."""
+    resolved = dict(settings)
+    raw = raw_settings if isinstance(raw_settings, dict) else resolved
+
+    raw_step = raw.get("precision_max_step")
+    if raw_step is None:
+        return resolved
+
+    try:
+        step_value = float(raw_step)
+    except (TypeError, ValueError):
+        return resolved
+
+    promote_single_step = False
+    raw_pan = raw.get("precision_max_pan_step")
+    raw_tilt = raw.get("precision_max_tilt_step")
+    if raw_pan is None and raw_tilt is None:
+        promote_single_step = True
+    else:
+        try:
+            pan_is_default = abs(float(raw_pan) - float(_DEFAULT_ENGAGEMENT_LIMITS.precision_max_pan_step)) <= 0.005
+            tilt_is_default = abs(float(raw_tilt) - float(_DEFAULT_ENGAGEMENT_LIMITS.precision_max_tilt_step)) <= 0.005
+            step_differs = abs(step_value - float(_DEFAULT_ENGAGEMENT_LIMITS.precision_max_step)) > 0.005
+            promote_single_step = pan_is_default and tilt_is_default and step_differs
+        except (TypeError, ValueError):
+            promote_single_step = False
+
+    if promote_single_step:
+        pan_step = max(0.05, step_value)
+        tilt_step = max(0.05, pan_step * _PRECISION_TILT_STEP_RATIO)
+        resolved["precision_max_pan_step"] = round(pan_step, 3)
+        resolved["precision_max_tilt_step"] = round(tilt_step, 3)
+
+    return resolved
 
 MASTER_PROFILE_PRESETS = {
     "demo_observer": {
@@ -1662,6 +2005,150 @@ ENGAGEMENT_PRESETS = {
     },
 }
 
+_ENGAGEMENT_PRESET_ADVANCED_OVERRIDES = {
+    "demo_track": {
+        "precision_kp": 0.024,
+        "precision_kd": 0.014,
+        "precision_reversal_brake": 0.18,
+    },
+    "demo_track_multi": {
+        "precision_kp": 0.026,
+        "precision_kd": 0.014,
+        "precision_reversal_brake": 0.20,
+        "predictive_min_persistence_s": 0.10,
+    },
+    "indoor_precision": {
+        "precision_kp": 0.031,
+        "precision_kd": 0.014,
+        "precision_reversal_brake": 0.20,
+        "predictive_lead_time_s": 0.08,
+        "predictive_fire_extra_lead_s": 0.02,
+        "predictive_min_persistence_s": 0.12,
+    },
+    "balanced_response": {
+        "precision_kp": 0.038,
+        "precision_kd": 0.013,
+        "precision_reversal_brake": 0.24,
+        "predictive_lead_time_s": 0.14,
+        "predictive_fire_extra_lead_s": 0.03,
+        "predictive_min_persistence_s": 0.10,
+        "loss_direction_pursuit_s": 0.22,
+    },
+    "outdoor_chase": {
+        "precision_kp": 0.042,
+        "precision_kd": 0.015,
+        "precision_reversal_brake": 0.26,
+        "predictive_lead_time_s": 0.19,
+        "predictive_fire_extra_lead_s": 0.05,
+        "predictive_min_persistence_s": 0.08,
+        "predictive_max_lead_pan_deg": 4.2,
+        "predictive_max_lead_tilt_deg": 2.6,
+        "loss_direction_pursuit_s": 0.34,
+        "target_loss_timeout": 0.95,
+    },
+    "saturation_burst": {
+        "precision_kp": 0.047,
+        "precision_kd": 0.017,
+        "precision_reversal_brake": 0.24,
+        "predictive_lead_time_s": 0.22,
+        "predictive_fire_extra_lead_s": 0.06,
+        "predictive_min_persistence_s": 0.06,
+        "predictive_max_lead_pan_deg": 4.6,
+        "predictive_max_lead_tilt_deg": 2.8,
+        "loss_direction_pursuit_s": 0.30,
+        "target_loss_timeout": 0.90,
+    },
+    "dog_follow_center": {
+        "precision_kp": 0.040,
+        "precision_kd": 0.014,
+        "precision_reversal_brake": 0.24,
+        "predictive_lead_time_s": 0.15,
+        "predictive_fire_extra_lead_s": 0.03,
+        "predictive_min_persistence_s": 0.08,
+        "target_loss_timeout": 0.85,
+        "continuous_hunt_on_loss": True,
+    },
+    "cat_follow_center": {
+        "precision_kp": 0.043,
+        "precision_kd": 0.016,
+        "precision_reversal_brake": 0.22,
+        "predictive_lead_time_s": 0.18,
+        "predictive_fire_extra_lead_s": 0.04,
+        "predictive_min_persistence_s": 0.08,
+        "target_loss_timeout": 0.70,
+        "continuous_hunt_on_loss": True,
+    },
+    "rat_follow_center": {
+        "precision_kp": 0.048,
+        "precision_kd": 0.018,
+        "precision_reversal_brake": 0.20,
+        "predictive_lead_time_s": 0.20,
+        "predictive_fire_extra_lead_s": 0.04,
+        "predictive_min_persistence_s": 0.06,
+        "predictive_max_lead_pan_deg": 4.4,
+        "predictive_max_lead_tilt_deg": 2.4,
+        "target_loss_timeout": 0.50,
+        "continuous_hunt_on_loss": True,
+        "loss_direction_pursuit_s": 0.24,
+        "loss_local_search_pan_deg": 45.0,
+        "loss_local_search_tilt_deg": 45.0,
+        "loss_search_step_interval_s": 0.16,
+    },
+    "color_follow_track": {
+        "precision_kp": 0.043,
+        "precision_kd": 0.015,
+        "precision_reversal_brake": 0.24,
+        "target_loss_timeout": 0.65,
+        "continuous_hunt_on_loss": True,
+    },
+    "person_track_fire": {
+        "precision_kp": 0.036,
+        "precision_kd": 0.013,
+        "precision_reversal_brake": 0.25,
+        "predictive_lead_time_s": 0.14,
+        "predictive_fire_extra_lead_s": 0.03,
+        "predictive_min_persistence_s": 0.10,
+        "target_loss_timeout": 3.20,
+    },
+    "sniper_small_center": {
+        "precision_kp": 0.028,
+        "precision_kd": 0.015,
+        "precision_reversal_brake": 0.18,
+        "predictive_lead_time_s": 0.09,
+        "predictive_fire_extra_lead_s": 0.02,
+        "predictive_min_persistence_s": 0.14,
+        "predictive_max_lead_pan_deg": 2.6,
+        "predictive_max_lead_tilt_deg": 1.6,
+    },
+    "sniper_medium_center": {
+        "precision_kp": 0.030,
+        "precision_kd": 0.015,
+        "precision_reversal_brake": 0.20,
+        "predictive_lead_time_s": 0.11,
+        "predictive_fire_extra_lead_s": 0.03,
+        "predictive_min_persistence_s": 0.14,
+        "predictive_max_lead_pan_deg": 2.8,
+        "predictive_max_lead_tilt_deg": 1.8,
+    },
+    "sniper_large_center": {
+        "precision_kp": 0.032,
+        "precision_kd": 0.014,
+        "precision_reversal_brake": 0.22,
+        "predictive_lead_time_s": 0.12,
+        "predictive_fire_extra_lead_s": 0.03,
+        "predictive_min_persistence_s": 0.12,
+        "predictive_max_lead_pan_deg": 3.0,
+        "predictive_max_lead_tilt_deg": 2.0,
+    },
+}
+
+for _preset_name, _override_settings in _ENGAGEMENT_PRESET_ADVANCED_OVERRIDES.items():
+    if _preset_name not in ENGAGEMENT_PRESETS:
+        continue
+    _merged_settings = dict(ENGAGEMENT_PRESETS[_preset_name].get("settings", {}))
+    _merged_settings.update(_override_settings)
+    ENGAGEMENT_PRESETS[_preset_name]["settings"] = _normalize_engagement_precision_limits(_merged_settings, _merged_settings)
+
 AIM_LOCK_FIRE_GATE_PRESETS = {
     "stable_lock": {
         "label": "Stable Lock",
@@ -1722,71 +2209,129 @@ AIM_LOCK_FIRE_GATE_PRESETS = {
     },
 }
 
+SENTRY_V3_MUTED_TEXT_STYLE = "color: #b7a392; font-size: 10px;"
+SENTRY_V3_SUBTLE_TEXT_STYLE = "color: #c8b29d; font-size: 11px;"
+SENTRY_V3_SECTION_LABEL_STYLE = "font-weight: bold; color: #f0c392; padding-top: 4px;"
+SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE = "color: #b7a392; font-size: 10px;"
+SENTRY_V3_CAM_STATUS_WARNING_STYLE = "color: #d8a15c; font-size: 10px;"
+SENTRY_V3_CAM_STATUS_ERROR_STYLE = "color: #d86d5f; font-size: 10px;"
+SENTRY_V3_CAM_STATUS_OK_STYLE = "color: #92c37d; font-size: 10px;"
+SENTRY_V3_CONN_STATUS_ERROR_STYLE = "color: #d86d5f; font-weight: bold;"
+SENTRY_V3_CONN_STATUS_WARNING_STYLE = "color: #d8a15c; font-weight: bold;"
+SENTRY_V3_CONN_STATUS_OK_STYLE = "color: #92c37d; font-weight: bold;"
 SENTRY_V2_THEME = """
 QWidget#sentryV2Root {
-    background-color: #101720;
-    color: #e6edf3;
+    background-color: #171310;
+    color: #f1e8df;
     font-family: "Segoe UI";
     font-size: 10pt;
 }
 QWidget#sentryV2Root QLabel {
-    color: #d8e2ec;
+    color: #dacbbe;
 }
 QWidget#sentryV2Root QScrollArea,
 QWidget#sentryV2Root QScrollArea > QWidget > QWidget {
-    background-color: #101821;
+    background-color: #19130f;
     border: none;
 }
 QWidget#sentryV2Root QGroupBox {
-    background-color: #16212c;
-    border: 1px solid #304255;
-    border-radius: 12px;
-    margin-top: 12px;
-    padding: 12px 10px 10px 10px;
+    background-color: #241b16;
+    border: 1px solid #4d362a;
+    border-radius: 16px;
+    margin-top: 14px;
+    padding: 14px 12px 12px 12px;
     font-weight: 600;
 }
 QWidget#sentryV2Root QGroupBox::title {
     subcontrol-origin: margin;
-    left: 10px;
-    padding: 0 6px;
-    color: #86d7ff;
+    left: 12px;
+    padding: 0 8px;
+    color: #f2a65a;
 }
-QWidget#sentryV2Root QWidget#sentryV2PinnedBottom {
-    background-color: #101821;
-    border-top: 1px solid #2f4459;
-    border-radius: 10px 10px 0 0;
-    padding-top: 4px;
-}
+QWidget#sentryV2Root QWidget#sentryV2PinnedBottom,
 QWidget#sentryV2Root QWidget#sentryV2PinnedTop {
-    background-color: #101821;
-    border-bottom: 1px solid #2f4459;
-    border-radius: 0 0 10px 10px;
-    padding: 4px 0 2px 0;
+    background-color: transparent;
+    border: none;
+}
+QWidget#sentryV2Root QWidget#sentryV2LeftPane,
+QWidget#sentryV2Root QWidget#sentryV2RightPane {
+    background-color: transparent;
+    border: none;
+}
+QWidget#sentryV2Root QSplitter {
+    background-color: transparent;
+}
+QWidget#sentryV2Root QSplitter::handle {
+    background-color: transparent;
+    border: none;
+}
+QWidget#sentryV2Root QSplitter::handle:horizontal {
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    margin: 0;
+}
+QWidget#sentryV2Root QSplitter::handle:vertical {
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    margin: 0;
+}
+QWidget#sentryV2Root QFrame#sentryV3Hero {
+    background:qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #342117,
+        stop:0.58 #4b2c1d,
+        stop:1 #6d4125);
+    border: 1px solid #8d5d37;
+    border-radius: 18px;
+}
+QWidget#sentryV2Root QLabel#sentryV3HeroTitle {
+    color: #fff4ea;
+    font-size: 18pt;
+    font-weight: 700;
+}
+QWidget#sentryV2Root QLabel#sentryV3HeroSubtitle {
+    color: #e6cdb7;
+    font-size: 10.5pt;
+}
+QWidget#sentryV2Root QLabel#sentryV3HeroBadge {
+    background-color: rgba(28, 19, 13, 0.55);
+    color: #ffd9aa;
+    border: 1px solid #b17a49;
+    border-radius: 14px;
+    padding: 8px 14px;
+    font-size: 10pt;
+    font-weight: 700;
+}
+QWidget#sentryV2Root QWidget#sentryV2ToggleRow {
+    background-color: #1d1612;
+    border: 1px solid #433026;
+    border-radius: 14px;
 }
 QWidget#sentryV2Root QWidget#sentryV2PinnedBottom QGroupBox {
     margin-top: 8px;
-    padding: 10px 8px 8px 8px;
+    padding: 12px 10px 10px 10px;
 }
 QWidget#sentryV2Root QWidget#sentryV2PinnedBottom QLabel {
-    color: #d2dde7;
+    color: #d6c8bc;
 }
 QWidget#sentryV2Root QTabWidget::pane {
-    background-color: #131d28;
-    border: 1px solid #304255;
-    border-radius: 10px;
+    background-color: #1a1410;
+    border: 1px solid #50382b;
+    border-radius: 14px;
     top: -1px;
 }
 QWidget#sentryV2Root QTabBar::tab {
-    background-color: #1a2531;
-    border: 1px solid #304255;
-    border-radius: 8px;
-    padding: 4px 2px;
-    min-height: 30px;
+    background-color: #281f1a;
+    border: 1px solid #52382b;
+    border-radius: 10px;
+    padding: 6px 4px;
+    min-height: 34px;
 }
 QWidget#sentryV2Root QTabBar::tab:left {
-    min-width: 40px;
-    max-width: 48px;
-    margin-bottom: 3px;
+    min-width: 46px;
+    max-width: 54px;
+    margin-bottom: 4px;
 }
 QWidget#sentryV2Root QTabBar::tab:top {
     border-bottom: none;
@@ -1795,134 +2340,134 @@ QWidget#sentryV2Root QTabBar::tab:top {
     margin-right: 6px;
 }
 QWidget#sentryV2Root QTabBar::tab:selected {
-    background-color: #23374a;
-    border-color: #6ec4ff;
-    color: #f4fbff;
+    background-color: #5d3926;
+    border-color: #f2a65a;
+    color: #fff6ee;
 }
 QWidget#sentryV2Root QTabBar::tab:selected:left {
-    border-left: 3px solid #6ec4ff;
+    border-left: 4px solid #f2a65a;
 }
 QWidget#sentryV2Root QTabBar::tab:hover:!selected {
-    background-color: #213140;
-    color: #eef6ff;
+    background-color: #38261d;
+    color: #f8eee5;
 }
 QWidget#sentryV2Root QPushButton {
-    background-color: #22364a;
-    color: #edf5fb;
-    border: 1px solid #3d5e7a;
-    border-radius: 8px;
-    padding: 4px 8px;
-    min-height: 26px;
+    background-color: #4a2e22;
+    color: #f9f0e7;
+    border: 1px solid #8b5d43;
+    border-radius: 10px;
+    padding: 5px 10px;
+    min-height: 28px;
 }
 QWidget#sentryV2Root QPushButton:hover {
-    background-color: #2c4862;
-    border-color: #66a3cf;
+    background-color: #5b3929;
+    border-color: #d8a15c;
 }
 QWidget#sentryV2Root QPushButton:pressed {
-    background-color: #1c3042;
+    background-color: #3d251c;
 }
 QWidget#sentryV2Root QPushButton:checked {
-    background-color: #1f6c72;
-    border-color: #39b0ba;
-    color: #f6fffb;
+    background-color: #76511f;
+    border-color: #f2a65a;
+    color: #fff8f0;
 }
 QWidget#sentryV2Root QPushButton:disabled {
-    background-color: #1a2430;
-    color: #6f7d8a;
-    border-color: #2f3f50;
+    background-color: #2b211c;
+    color: #817366;
+    border-color: #483b34;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="primary"] {
-    background-color: #1c4f78;
-    border-color: #2f7fb9;
-    color: #f5fbff;
+    background-color: #8c4327;
+    border-color: #d47d4d;
+    color: #fff7ef;
     font-weight: 700;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="primary"]:hover {
-    background-color: #23608f;
-    border-color: #4c97cc;
+    background-color: #a24f2d;
+    border-color: #e39c6d;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="primary"]:pressed {
-    background-color: #173f5f;
+    background-color: #73351d;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="preset"] {
-    background-color: #24364a;
-    border-color: #41627f;
-    color: #f0f7fc;
+    background-color: #382921;
+    border-color: #735441;
+    color: #f5ece2;
     font-weight: 600;
     padding: 5px 8px;
     min-height: 30px;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="preset"]:hover {
-    background-color: #2b4259;
-    border-color: #5c85a8;
+    background-color: #463328;
+    border-color: #8d6a54;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="utility"] {
-    background-color: #1e2b38;
-    border-color: #31495f;
-    color: #dce7f2;
+    background-color: #302520;
+    border-color: #5f493d;
+    color: #eadfd4;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="utility"]:hover {
-    background-color: #243545;
-    border-color: #44627e;
+    background-color: #3b2d26;
+    border-color: #7b5d4e;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="dpad"] {
-    background-color: #2a3d52;
-    border: 1px solid #5b84aa;
+    background-color: #4a3629;
+    border: 1px solid #b28357;
     border-radius: 12px;
-    color: #f4fbff;
+    color: #fff3e7;
     font-weight: 700;
     font-size: 15px;
     min-height: 40px;
     padding: 6px 8px;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="dpad"]:hover {
-    background-color: #334b64;
-    border-color: #79a8d4;
+    background-color: #5a4331;
+    border-color: #d5a776;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="dpad"]:pressed {
-    background-color: #223446;
-    border-color: #4f7599;
+    background-color: #3b2c21;
+    border-color: #9b744f;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"] {
-    background-color: #2f4760;
-    border: 1px solid #7ea9d0;
+    background-color: #5b3125;
+    border: 1px solid #cf8656;
     border-radius: 12px;
-    color: #f7fbff;
+    color: #fff6ef;
     font-weight: 700;
     font-size: 15px;
     min-height: 40px;
     padding: 6px 8px;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"]:hover {
-    background-color: #395676;
-    border-color: #95c1e7;
+    background-color: #6b3c2c;
+    border-color: #e9ab77;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"]:pressed {
-    background-color: #253a4d;
-    border-color: #628db5;
+    background-color: #48291f;
+    border-color: #b9784c;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="mode"] {
-    background-color: #234033;
-    border-color: #366a53;
-    color: #eefbf4;
+    background-color: #38442a;
+    border-color: #6d8450;
+    color: #f0f8e8;
     font-weight: 600;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="mode"]:hover {
-    background-color: #2b4c3e;
-    border-color: #4d8569;
+    background-color: #435133;
+    border-color: #89a263;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="danger"] {
-    background-color: #5a2a2a;
-    border-color: #a54a4a;
-    color: #fff8f8;
+    background-color: #642c23;
+    border-color: #c06a58;
+    color: #fff2ee;
     font-weight: 700;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="danger"]:hover {
-    background-color: #703232;
-    border-color: #c85b5b;
+    background-color: #7a362a;
+    border-color: #da7b66;
 }
 QWidget#sentryV2Root QPushButton[buttonRole="danger"]:pressed {
-    background-color: #472020;
+    background-color: #52221b;
 }
 QWidget#sentryV2Root QLineEdit,
 QWidget#sentryV2Root QComboBox,
@@ -1930,13 +2475,13 @@ QWidget#sentryV2Root QSpinBox,
 QWidget#sentryV2Root QDoubleSpinBox,
 QWidget#sentryV2Root QListWidget,
 QWidget#sentryV2Root QTextEdit {
-    background-color: #0c1117;
-    color: #eef5fb;
-    border: 1px solid #31404e;
+    background-color: #14100d;
+    color: #f0e8df;
+    border: 1px solid #5b4739;
     border-radius: 8px;
     padding: 5px 7px;
-    selection-background-color: #2b8a6e;
-    selection-color: #ffffff;
+    selection-background-color: #b15d35;
+    selection-color: #fff7ef;
 }
 QWidget#sentryV2Root QLineEdit:focus,
 QWidget#sentryV2Root QComboBox:focus,
@@ -1944,17 +2489,17 @@ QWidget#sentryV2Root QSpinBox:focus,
 QWidget#sentryV2Root QDoubleSpinBox:focus,
 QWidget#sentryV2Root QListWidget:focus,
 QWidget#sentryV2Root QTextEdit:focus {
-    border-color: #5da6d8;
+    border-color: #e0a169;
 }
 QWidget#sentryV2Root QComboBox::drop-down {
     border: none;
     width: 22px;
 }
 QWidget#sentryV2Root QAbstractItemView {
-    background-color: #10171e;
-    color: #eef5fb;
-    border: 1px solid #31404e;
-    selection-background-color: #2b8a6e;
+    background-color: #18120f;
+    color: #f0e8df;
+    border: 1px solid #5b4739;
+    selection-background-color: #b15d35;
 }
 QWidget#sentryV2Root QCheckBox {
     spacing: 8px;
@@ -1963,42 +2508,42 @@ QWidget#sentryV2Root QCheckBox::indicator {
     width: 16px;
     height: 16px;
     border-radius: 4px;
-    border: 1px solid #4d6277;
-    background-color: #0c1117;
+    border: 1px solid #6d5749;
+    background-color: #14100d;
 }
 QWidget#sentryV2Root QCheckBox::indicator:checked {
-    background-color: #35b8c3;
-    border-color: #35b8c3;
+    background-color: #f2a65a;
+    border-color: #f2a65a;
 }
 QWidget#sentryV2Root QSlider::groove:horizontal {
     height: 6px;
     border-radius: 3px;
-    background-color: #243140;
+    background-color: #352820;
 }
 QWidget#sentryV2Root QSlider::handle:horizontal {
     width: 16px;
     margin: -5px 0;
     border-radius: 8px;
-    background-color: #78c8ff;
-    border: 1px solid #a5dafd;
+    background-color: #f2bb79;
+    border: 1px solid #ffd6a3;
 }
 QWidget#sentryV2Root QScrollBar:vertical {
-    background-color: #121922;
+    background-color: #19130f;
     width: 12px;
     margin: 2px;
 }
 QWidget#sentryV2Root QScrollBar::handle:vertical {
-    background-color: #395169;
+    background-color: #5d4535;
     border-radius: 6px;
     min-height: 24px;
 }
 QWidget#sentryV2Root QScrollBar:horizontal {
-    background-color: #121922;
+    background-color: #19130f;
     height: 12px;
     margin: 2px;
 }
 QWidget#sentryV2Root QScrollBar::handle:horizontal {
-    background-color: #395169;
+    background-color: #5d4535;
     border-radius: 6px;
     min-width: 24px;
 }
@@ -2010,34 +2555,264 @@ QWidget#sentryV2Root QScrollBar::sub-page {
     border: none;
 }
 QLabel#sentryV2Video {
-    background-color: #0b1016;
-    color: #6f7d8a;
-    border: 1px solid #2a3745;
-    border-radius: 12px;
+    background-color: #130e0b;
+    color: #a28d79;
+    border: 1px solid #50382b;
+    border-radius: 16px;
 }
 QTextEdit#sentryV2Log {
-    background-color: #0f1721;
-    border: 1px solid #33485f;
+    background-color: #17110e;
+    border: 1px solid #644635;
 }
 """
 
 SENTRY_V2_STANDALONE_THEME = """
 QMainWindow {
-    background-color: #0f141a;
-    color: #e6edf3;
+    background-color: #120e0c;
+    color: #f0e8df;
 }
 QToolTip {
-    background-color: #fff6c4;
-    color: #101820;
-    border: 1px solid #85754e;
+    background-color: #fde2b0;
+    color: #221610;
+    border: 1px solid #b07b49;
     padding: 4px 6px;
 }
 """
 
+THEME_PRESETS = {
+    "ember": {
+        "label": "Ember Forge",
+        "description": "Warm copper and charcoal styling close to the current Smart Sentry look.",
+        "is_light": False,
+        "root_bg": "#171310",
+        "surface": "#241b16",
+        "surface_alt": "#1d1612",
+        "panel": "#1a1410",
+        "field": "#14100d",
+        "border": "#50382b",
+        "text": "#f1e8df",
+        "muted": "#dacbbe",
+        "accent": "#f2a65a",
+        "accent_soft": "#d47d4d",
+        "hero_start": "#342117",
+        "hero_mid": "#4b2c1d",
+        "hero_end": "#6d4125",
+        "video_bg": "#130e0b",
+        "video_text": "#a28d79",
+        "tooltip_bg": "#fde2b0",
+        "tooltip_text": "#221610",
+    },
+    "graphite": {
+        "label": "Graphite Ops",
+        "description": "Neutral steel and slate for a flatter operator console.",
+        "is_light": False,
+        "root_bg": "#111418",
+        "surface": "#1a2027",
+        "surface_alt": "#151b21",
+        "panel": "#12181d",
+        "field": "#0f1419",
+        "border": "#384654",
+        "text": "#edf2f7",
+        "muted": "#b9c6d2",
+        "accent": "#8fb2d8",
+        "accent_soft": "#6f92b8",
+        "hero_start": "#18212b",
+        "hero_mid": "#243242",
+        "hero_end": "#31475d",
+        "video_bg": "#0d1116",
+        "video_text": "#8ea2b8",
+        "tooltip_bg": "#d8e3ee",
+        "tooltip_text": "#16202a",
+    },
+    "forest": {
+        "label": "Forest Watch",
+        "description": "Muted greens with a surveillance-console feel for outdoor setups.",
+        "is_light": False,
+        "root_bg": "#10150f",
+        "surface": "#182118",
+        "surface_alt": "#131a13",
+        "panel": "#111811",
+        "field": "#0d130d",
+        "border": "#34503b",
+        "text": "#edf4ea",
+        "muted": "#c3d5c4",
+        "accent": "#8fcf7c",
+        "accent_soft": "#6fa660",
+        "hero_start": "#1f3120",
+        "hero_mid": "#2b442c",
+        "hero_end": "#446a43",
+        "video_bg": "#0d120d",
+        "video_text": "#8ea58a",
+        "tooltip_bg": "#d9eed2",
+        "tooltip_text": "#162114",
+    },
+    "ocean": {
+        "label": "Ocean Relay",
+        "description": "Teal-blue glass for a cleaner, more technical telemetry look.",
+        "is_light": False,
+        "root_bg": "#0e1519",
+        "surface": "#152229",
+        "surface_alt": "#112026",
+        "panel": "#101b20",
+        "field": "#0b1519",
+        "border": "#315763",
+        "text": "#ebf5f7",
+        "muted": "#c1d8dd",
+        "accent": "#5cc9c9",
+        "accent_soft": "#4aa8b4",
+        "hero_start": "#123039",
+        "hero_mid": "#184451",
+        "hero_end": "#236678",
+        "video_bg": "#0a1114",
+        "video_text": "#86a9b2",
+        "tooltip_bg": "#d3eef0",
+        "tooltip_text": "#132228",
+    },
+    "crimson": {
+        "label": "Crimson Alert",
+        "description": "Deep red tactical styling with stronger alert contrast.",
+        "is_light": False,
+        "root_bg": "#180f11",
+        "surface": "#241517",
+        "surface_alt": "#1d1113",
+        "panel": "#180f11",
+        "field": "#130b0c",
+        "border": "#5e3438",
+        "text": "#f6eaeb",
+        "muted": "#dcc7ca",
+        "accent": "#ef7f74",
+        "accent_soft": "#d6655a",
+        "hero_start": "#381819",
+        "hero_mid": "#562223",
+        "hero_end": "#783132",
+        "video_bg": "#12090a",
+        "video_text": "#aa8b8d",
+        "tooltip_bg": "#f3d5ce",
+        "tooltip_text": "#291415",
+    },
+    "sand": {
+        "label": "Sand Table",
+        "description": "A lighter warm control room theme with dark text and softer contrast.",
+        "is_light": True,
+        "root_bg": "#e8dccb",
+        "surface": "#f4eadc",
+        "surface_alt": "#eadfce",
+        "panel": "#efe5d5",
+        "field": "#fff8f0",
+        "border": "#af967d",
+        "text": "#33261d",
+        "muted": "#5b4b40",
+        "accent": "#b86d2f",
+        "accent_soft": "#985725",
+        "hero_start": "#dbc09f",
+        "hero_mid": "#cfaf84",
+        "hero_end": "#c58e56",
+        "video_bg": "#f6ecde",
+        "video_text": "#6b5647",
+        "tooltip_bg": "#fff8ea",
+        "tooltip_text": "#32251b",
+    },
+    "violet_radar": {
+        "label": "Violet Radar",
+        "description": "Cool indigo surfaces with sharp radar-screen accents.",
+        "is_light": False,
+        "root_bg": "#12111a",
+        "surface": "#1b1828",
+        "surface_alt": "#171522",
+        "panel": "#13111c",
+        "field": "#0f0d16",
+        "border": "#4e4572",
+        "text": "#f1edfb",
+        "muted": "#cbc3e4",
+        "accent": "#a78bfa",
+        "accent_soft": "#8f73dd",
+        "hero_start": "#231c3a",
+        "hero_mid": "#332655",
+        "hero_end": "#513987",
+        "video_bg": "#0e0c14",
+        "video_text": "#958aad",
+        "tooltip_bg": "#ece5ff",
+        "tooltip_text": "#241b38",
+    },
+    "solar": {
+        "label": "Solar Signal",
+        "description": "High-energy amber and steel for a brighter operator deck.",
+        "is_light": False,
+        "root_bg": "#161311",
+        "surface": "#231c16",
+        "surface_alt": "#1d1712",
+        "panel": "#17120e",
+        "field": "#130f0b",
+        "border": "#6f5433",
+        "text": "#f8efe1",
+        "muted": "#e0cfbb",
+        "accent": "#ffbf47",
+        "accent_soft": "#dd9835",
+        "hero_start": "#463016",
+        "hero_mid": "#68441a",
+        "hero_end": "#91601f",
+        "video_bg": "#100c08",
+        "video_text": "#ab9372",
+        "tooltip_bg": "#fff1cb",
+        "tooltip_text": "#35230f",
+    },
+    "ice": {
+        "label": "Ice Array",
+        "description": "Bright frosted panels with blue telemetry accents.",
+        "is_light": True,
+        "root_bg": "#dfeaf1",
+        "surface": "#edf5fa",
+        "surface_alt": "#dfeaf1",
+        "panel": "#e7f0f6",
+        "field": "#f9fcfe",
+        "border": "#8ea8b8",
+        "text": "#1f2a33",
+        "muted": "#495b68",
+        "accent": "#2e8bc0",
+        "accent_soft": "#216f9d",
+        "hero_start": "#bdd8e8",
+        "hero_mid": "#9ec7df",
+        "hero_end": "#70a9cf",
+        "video_bg": "#f2f8fb",
+        "video_text": "#587080",
+        "tooltip_bg": "#ffffff",
+        "tooltip_text": "#22313c",
+    },
+}
+
+
+def _clamp_int(value: int, minimum: int, maximum: int) -> int:
+    return max(minimum, min(maximum, int(value)))
+
+
+def _hex_to_rgb(color: str) -> Tuple[int, int, int]:
+    value = color.strip().lstrip("#")
+    if len(value) != 6:
+        raise ValueError(f"Expected 6-digit hex color, got {color!r}")
+    return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16)
+
+
+def _mix_hex(color_a: str, color_b: str, ratio: float) -> str:
+    ratio = max(0.0, min(1.0, float(ratio)))
+    a_r, a_g, a_b = _hex_to_rgb(color_a)
+    b_r, b_g, b_b = _hex_to_rgb(color_b)
+    mixed = (
+        round(a_r + (b_r - a_r) * ratio),
+        round(a_g + (b_g - a_g) * ratio),
+        round(a_b + (b_b - a_b) * ratio),
+    )
+    return f"#{mixed[0]:02x}{mixed[1]:02x}{mixed[2]:02x}"
+
+
+def _rgba_hex(color: str, alpha_pct: int) -> str:
+    red, green, blue = _hex_to_rgb(color)
+    alpha = max(0.0, min(1.0, float(alpha_pct) / 100.0))
+    return f"rgba({red}, {green}, {blue}, {alpha:.3f})"
+
 
 class SentryV2TabWidget(QWidget):
     """
-    Complete Smart Sentry v2 tab widget.
+    Complete SMART SENTRY V2.3.2 tab widget.
 
     Signals for main app integration:
         turret_move_requested(pan, tilt)
@@ -2061,7 +2836,7 @@ class SentryV2TabWidget(QWidget):
     manual_move_requested = pyqtSignal(int, int)
     manual_fire_requested = pyqtSignal(int)
     connection_operation_finished = pyqtSignal(str, bool, str, object, str)
-    detection_result_ready = pyqtSignal(object, object)
+    detection_result_ready = pyqtSignal(object, object, int)
     command_result_ready = pyqtSignal(str, bool, str)
     sentry_enabled_changed = pyqtSignal(bool)
     detection_mode_changed = pyqtSignal(int)
@@ -2080,6 +2855,9 @@ class SentryV2TabWidget(QWidget):
         super().__init__(parent)
         self.setObjectName("sentryV2Root")
         self.setMinimumWidth(SENTRY_V2_WIDGET_MIN_WIDTH)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
 
         # Config (try loading saved, else defaults)
         self.config = self._load_settings_config()
@@ -2093,6 +2871,15 @@ class SentryV2TabWidget(QWidget):
         self._comm.set_on_pir_event(self._emit_comm_pir_event)
         self._sound_engine = SentryV2SoundEngine(self._queue_sound_tone)
         self._sound_engine.set_enabled(bool(getattr(self.config.sound, "enabled", True)))
+        self._sound_engine.set_profile(self._sound_personality_key(), self._sound_attitude_pct())
+        self._speech_engine = None
+        self._speech_available: bool = False
+        self._speech_voice_names: List[str] = []
+        self._speech_state_label: str = "waiting"
+        self._last_spoken_ai_response: str = ""
+        self._init_human_speech_engine()
+        self._face_library = self._load_face_identity_library()
+        self._face_runtime = FaceIdentityRuntime(self._face_library)
 
         # Standalone detector
         self._detector = SentryV2Detector()
@@ -2119,6 +2906,7 @@ class SentryV2TabWidget(QWidget):
         self._acc_on = False
         self._spare_on = False
         self._safety_armed = False
+        self._control_source_mode = "app"
 
         # Own camera
         self._cap: Optional[cv2.VideoCapture] = None
@@ -2147,6 +2935,23 @@ class SentryV2TabWidget(QWidget):
         self._burst_timer = QTimer(self)
         self._burst_timer.setSingleShot(True)
         self._burst_timer.timeout.connect(self._advance_fire_burst)
+        self._manual_sweep_timer = QTimer(self)
+        self._manual_sweep_timer.setSingleShot(True)
+        self._manual_sweep_timer.timeout.connect(self._advance_manual_sweep)
+        self._guided_move_timer = QTimer(self)
+        self._guided_move_timer.setSingleShot(True)
+        self._guided_move_timer.timeout.connect(self._advance_guided_move)
+        self._shutdown_rest_timer = QTimer(self)
+        self._shutdown_rest_timer.setSingleShot(True)
+        self._shutdown_rest_timer.timeout.connect(self._finalize_graceful_shutdown)
+        self._manual_sweep_steps: deque[tuple[float, float, int, str]] = deque()
+        self._manual_sweep_active: bool = False
+        self._guided_move_steps: deque[tuple[float, float, int]] = deque()
+        self._guided_move_active: bool = False
+        self._guided_move_finalize_guard: bool = False
+        self._guided_move_final_pan: float = self.config.guard.guard_pan
+        self._guided_move_final_tilt: float = self.config.guard.guard_tilt
+        self._guided_move_log_message: str = ""
         self._burst_remaining: int = 0
         self._burst_interval_ms: int = 50
         self._burst_pan: float = 90.0
@@ -2165,10 +2970,21 @@ class SentryV2TabWidget(QWidget):
         self._last_detected_objects: List[DetectedObject] = []
         self._last_display_frame: Optional[np.ndarray] = None
         self._last_raw_frame: Optional[np.ndarray] = None
+        self._display_frame_interval_s: float = 1.0 / 15.0
+        self._busy_display_frame_interval_s: float = 1.0 / 10.0
+        self._last_display_present_s: float = 0.0
+        self._force_next_display_refresh: bool = True
+        self._busy_preview_skip_target_boxes: bool = True
+        self._busy_preview_skip_scope_view: bool = True
+        self._preview_perf_mode: str = "startup"
         self._sound_prev_visible_targets: int = 0
         self._sound_prev_qualified_targets: int = 0
         self._sound_lock_active: bool = False
         self._last_sound_transport_warn_s: float = 0.0
+        self._last_face_matches: List[FaceMatchResult] = []
+        self._last_announced_identity_at: Dict[str, float] = {}
+        self._last_gesture_identity_at: Dict[str, float] = {}
+        self._shortcut_bindings: List[QShortcut] = []
         self._pir_last_event_sensor: Optional[int] = None
         self._pir_last_event_time_s: float = 0.0
         self._pir_event_count: int = 0
@@ -2189,12 +3005,18 @@ class SentryV2TabWidget(QWidget):
         self._applying_engagement_preset: bool = False
         self._cleanup_started: bool = False
         self._closing: bool = False
+        self._shutdown_in_progress: bool = False
+        self._shutdown_complete_callback: Optional[Callable[[], None]] = None
+        self._startup_rest_completed: bool = False
+        self._startup_rest_pending: bool = bool(getattr(self.config.guard, "rest_on_startup_enabled", True))
         self._connection_busy: bool = False
         self._comm_task_queue: "queue.Queue[object]" = queue.Queue()
         self._pending_move_lock = threading.Lock()
         self._pending_move_commands = deque()
         self._manual_move_priority_until: float = 0.0
         self._manual_position_hold_s: float = 1.25
+        self._guided_move_allow_rest_tilt: bool = False
+        self._last_visible_command_text: str = ""
         self._comm_worker_stop = threading.Event()
         self._comm_worker = threading.Thread(target=self._comm_worker_loop, name="sentry-v2-comm-worker", daemon=True)
         self._comm_worker.start()
@@ -2202,6 +3024,7 @@ class SentryV2TabWidget(QWidget):
         self._detector_pending_frame: Optional[np.ndarray] = None
         self._detector_worker_stop = threading.Event()
         self._detector_worker_busy: bool = False
+        self._detector_runtime_generation: int = 0
         self._last_detector_error: str = ""
         self._last_detector_error_seen: str = ""
         # URL stream reader thread state (background thread owns the cap for HTTP streams)
@@ -2220,6 +3043,7 @@ class SentryV2TabWidget(QWidget):
         self._active_master_profile_name: Optional[str] = None
         self._selected_custom_master_profile_name: Optional[str] = None
         self._responsive_button_grids: list[QGridLayout] = []
+        self._responsive_box_layouts: list[tuple[QBoxLayout, str]] = []
         self._load_custom_master_profiles()
         self.connection_operation_finished.connect(self._on_connection_operation_finished)
         self.detection_result_ready.connect(self._on_detection_result_ready)
@@ -2227,6 +3051,7 @@ class SentryV2TabWidget(QWidget):
         self.pir_event_received.connect(self._on_comm_pir_event_received)
         self._yolo_load_result.connect(self._on_yolo_load_result)
         self._yolo_loading: bool = False
+        self._yolo_runtime_prepared: bool = False
         self._startup_autoconnect_active: bool = False
         self._startup_autoconnect_retry: int = 0
         self._pending_quiet_save: bool = False
@@ -2235,10 +3060,28 @@ class SentryV2TabWidget(QWidget):
         self._wifi_autojoin_inflight: bool = False
         self._wifi_runtime_refresh_inflight: bool = False
         self._last_wifi_autojoin_note: str = ""
+        self._last_runtime_snapshot_json_path: Optional[Path] = None
+        self._last_runtime_snapshot_markdown_path: Optional[Path] = None
+        self._last_log_export_path: Optional[Path] = None
+        self._right_panel: Optional[QWidget] = None
+        self._tabs_nav_layout: Optional[QHBoxLayout] = None
+        self._tabs_nav_title_label: Optional[QLabel] = None
+        self._hero_layout: Optional[QHBoxLayout] = None
+        self._hero_action_row: Optional[QVBoxLayout] = None
+        self._hero_actions_layout: Optional[QVBoxLayout] = None
+        self._hero_title_label: Optional[QLabel] = None
+        self._hero_subtitle_label: Optional[QLabel] = None
+        self._hero_badge_label: Optional[QLabel] = None
+        self._manual_control_buttons: list[QPushButton] = []
+        self._responsive_lists: list[tuple[QListWidget, str]] = []
+        self._responsive_labels: list[tuple[QLabel, str]] = []
+        self._layout_restore_attempts: int = 0
+        self._layout_restore_complete: bool = False
 
         # Build UI
         self._build_ui()
         self._apply_theme()
+        self._install_global_shortcuts()
 
         self._quiet_save_timer = QTimer(self)
         self._quiet_save_timer.setSingleShot(True)
@@ -2255,39 +3098,40 @@ class SentryV2TabWidget(QWidget):
         self._schedule_startup_tasks()
 
     def _load_settings_config(self) -> SentryV2Config:
-        """Load settings from the canonical path and only fall back to legacy once if needed."""
-        canonical = SENTRY_V2_SETTINGS_PATH
-        legacy = LEGACY_SENTRY_V2_SETTINGS_PATH
-
-        selected = canonical if canonical.exists() else legacy
+        """Load settings from the canonical 2.3.2 path and migrate older aliases forward."""
+        canonical = SMART_SENTRY_V2_3_2_SETTINGS_PATH
+        selected = canonical
+        for candidate in [
+            SMART_SENTRY_V2_3_2_SETTINGS_PATH,
+            SMART_SENTRY_V2_3_1_SETTINGS_PATH,
+            LEGACY_SMART_SENTRY_V3_SETTINGS_PATH,
+            LEGACY_SENTRY_V2_SETTINGS_PATH,
+        ]:
+            if candidate.exists():
+                selected = candidate
+                break
 
         cfg = SentryV2Config.load(str(selected))
-        cfg.config_path = "app/config/sentry_v2_settings.json"
-        prompted = Path(str(cfg.prompted_library_path or "app/config/sentry_v2_prompted_targets.json"))
+        cfg.config_path = "app/config/smart_sentry_v2_3_2_settings.json"
+        prompted_value = str(cfg.prompted_library_path or "app/config/smart_sentry_v2_3_2_prompted_targets.json")
+        normalized_prompted = prompted_value.replace("\\", "/")
+        if normalized_prompted.endswith("smart_sentry_v3_prompted_targets.json") or normalized_prompted.endswith("sentry_v2_prompted_targets.json") or normalized_prompted.endswith("smart_sentry_v2_3_1_prompted_targets.json"):
+            cfg.prompted_library_path = "app/config/smart_sentry_v2_3_2_prompted_targets.json"
+        prompted = Path(str(cfg.prompted_library_path or "app/config/smart_sentry_v2_3_2_prompted_targets.json"))
         if prompted.is_absolute():
             cfg.prompted_library_path = self._portable_path_string(prompted)
 
-        if selected == legacy and legacy.exists():
+        if selected != canonical and selected.exists():
             try:
                 cfg.save(str(canonical))
             except Exception as exc:
-                print(f"[SENTRY_V2_TAB] Failed to migrate legacy settings to canonical path: {exc}", flush=True)
-        self._sync_legacy_settings_copy(cfg)
+                print(f"[SENTRY_V2_TAB] Failed to migrate legacy settings to canonical 2.3.2 path: {exc}", flush=True)
 
         return cfg
 
     def _sync_legacy_settings_copy(self, cfg: Optional[SentryV2Config] = None) -> None:
-        """Keep the legacy nested settings path aligned with the canonical runtime file."""
-        cfg = cfg or self.config
-        if cfg is None:
-            return
-        try:
-            cfg.save(str(LEGACY_SENTRY_V2_SETTINGS_PATH))
-        except Exception as exc:
-            if hasattr(self, "_log_text") and getattr(self, "_log_text", None) is not None:
-                self._log(f"Legacy settings sync error: {exc}")
-            else:
-                print(f"[SENTRY_V2_TAB] Legacy settings sync error: {exc}", flush=True)
+        """Legacy config aliases are no longer maintained for the 2.3.2 runtime package."""
+        return
 
     def _portable_path_string(self, path_obj: Path) -> str:
         """Prefer repo-relative paths so settings stay portable across machines."""
@@ -2297,14 +3141,28 @@ class SentryV2TabWidget(QWidget):
         except Exception:
             return str(path_obj)
 
+    def _custom_master_preset_path(self) -> Path:
+        if SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH.exists():
+            return SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH
+        if SMART_SENTRY_V2_3_1_CUSTOM_PRESET_PATH.exists():
+            return SMART_SENTRY_V2_3_1_CUSTOM_PRESET_PATH
+        if LEGACY_SMART_SENTRY_V3_CUSTOM_PRESET_PATH.exists():
+            return LEGACY_SMART_SENTRY_V3_CUSTOM_PRESET_PATH
+        if LEGACY_SENTRY_V2_CUSTOM_PRESET_PATH.exists():
+            return LEGACY_SENTRY_V2_CUSTOM_PRESET_PATH
+        return SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH
+
     def _schedule_startup_tasks(self) -> None:
         """CHANGE WARNING: Startup work here couples camera bring-up, transport auto-connect, and YOLO warmup; keep expensive work deferred when quick startup is enabled."""
         if bool(getattr(self.config, "quick_startup_enabled", True)):
-            self._log("Quick startup enabled: deferring auto camera open, auto-connect, and YOLO model load until requested.")
+            self._log("Quick startup enabled: deferring auto camera open and auto-connect; scheduling lazy YOLO model load.")
+            self._schedule_auto_yolo_load(2500)
+            QTimer.singleShot(0, self._schedule_startup_rest_move)
             return
         self._schedule_auto_yolo_load(1200)
         QTimer.singleShot(800, self._auto_open_camera_on_startup)
         QTimer.singleShot(1000, lambda: self._auto_connect_on_startup(0))
+        QTimer.singleShot(0, self._schedule_startup_rest_move)
 
     def _auto_open_camera_on_startup(self, _retry: int = 0) -> None:
         self._log(f"[CAM-DEBUG] _auto_open_camera_on_startup called: retry={_retry}, closing={self._closing}, has_source={self._has_local_source()}")
@@ -2314,8 +3172,7 @@ class SentryV2TabWidget(QWidget):
         try:
             self._toggle_camera()
         except Exception as exc:
-            self._lbl_cam_status.setText(f"Auto-open failed: {exc}")
-            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._set_camera_status(f"Auto-open failed: {exc}", "error")
             self._log(f"[CAM-DEBUG] Auto-open exception (attempt {_retry+1}): {exc}")
             if not self._closing and not self._has_local_source() and _retry < 3:
                 delay = 1500 * (_retry + 1)
@@ -2359,14 +3216,317 @@ class SentryV2TabWidget(QWidget):
         self._log(f"Auto-connecting in mode {mode} (attempt {_retry + 1})...")
         self._toggle_connection()
 
+    def _has_rest_move_transport(self) -> bool:
+        return bool(self._host_controls_hardware() or self._comm.is_connected())
+
+    def _rest_position(self) -> Tuple[float, float]:
+        guard = self.config.guard
+        pan_min, pan_max = sorted((float(guard.pan_min), float(guard.pan_max)))
+        rest_pan = min(pan_max, max(pan_min, float(getattr(guard, "rest_pan", guard.guard_pan))))
+        rest_tilt = min(SENTRY_TILT_MAX, max(SENTRY_TILT_MIN, float(getattr(guard, "rest_tilt", guard.guard_tilt))))
+        return rest_pan, rest_tilt
+
+    def _rest_position_text(self) -> str:
+        pan, tilt = self._rest_position()
+        return f"P{pan:.0f} T{tilt:.0f}"
+
+    def _play_rest_cue(self, *, closing: bool = False) -> None:
+        if not bool(getattr(self.config.sound, "enabled", True)):
+            return
+        if not bool(getattr(self.config.sound, "rest_cue_enabled", True)):
+            return
+        self._sound_engine.note_rest_position(closing=closing)
+
+    def _play_home_cue(self, *, waking_from_rest: bool = False) -> None:
+        if not bool(getattr(self.config.sound, "enabled", True)):
+            return
+        if not bool(getattr(self.config.sound, "rest_cue_enabled", True)):
+            return
+        self._sound_engine.note_home_position(waking_from_rest=waking_from_rest)
+
+    def _is_near_rest_position(self, pan: float, tilt: float, *, tolerance_deg: float) -> bool:
+        rest_pan, rest_tilt = self._rest_position()
+        return max(abs(float(pan) - rest_pan), abs(float(tilt) - rest_tilt)) <= float(max(1.0, tolerance_deg))
+
+    def _guided_move_profile(self, maneuver: str, start_pan: float, start_tilt: float) -> Tuple[float, float, float]:
+        guard = self.config.guard
+        approach_window = float(max(4.0, getattr(guard, "guided_move_approach_window_deg", 18.0) or 18.0))
+        if maneuver == "rest":
+            cruise_speed = float(max(2.0, getattr(guard, "rest_move_speed_dps", 14.0) or 14.0))
+            approach_speed = float(max(1.0, getattr(guard, "rest_move_approach_speed_dps", 5.0) or 5.0))
+            return cruise_speed, min(cruise_speed, approach_speed), approach_window
+
+        cruise_speed = float(max(2.0, getattr(guard, "home_move_speed_dps", 24.0) or 24.0))
+        approach_speed = float(max(1.0, getattr(guard, "home_move_approach_speed_dps", 11.0) or 11.0))
+        if self._is_near_rest_position(start_pan, start_tilt, tolerance_deg=max(6.0, approach_window * 0.45)):
+            cruise_speed *= 0.72
+            approach_speed *= 0.65
+        return cruise_speed, min(cruise_speed, approach_speed), approach_window
+
+    def _build_guided_move_steps(
+        self,
+        start_pan: float,
+        start_tilt: float,
+        target_pan: float,
+        target_tilt: float,
+        *,
+        maneuver: str,
+        cruise_speed_dps: float,
+        approach_speed_dps: float,
+        approach_window_deg: float,
+    ) -> list[tuple[float, float, int]]:
+        total_distance = max(abs(float(target_pan) - float(start_pan)), abs(float(target_tilt) - float(start_tilt)))
+        if total_distance < 0.35:
+            speed = max(1.0, float(approach_speed_dps))
+            move_time_ms = int(max(90, min(2200, round((max(total_distance, 0.1) / speed) * 1000.0))))
+            return [(float(target_pan), float(target_tilt), move_time_ms)]
+
+        window = max(4.0, float(approach_window_deg))
+        step_denominator = max(2.2, window * (0.22 if maneuver == "rest" else 0.26))
+        min_steps = 8 if maneuver == "rest" else 6
+        max_steps = 22 if maneuver == "rest" else 16
+        step_count = int(max(min_steps, min(max_steps, round(total_distance / step_denominator) + 2)))
+        min_stage_ms = 70 if maneuver == "rest" else 85
+        steps: list[tuple[float, float, int]] = []
+        prev_pan = float(start_pan)
+        prev_tilt = float(start_tilt)
+        for index in range(1, step_count + 1):
+            progress = float(index) / float(step_count)
+            eased = 1.0 - ((1.0 - progress) ** 2.45)
+            next_pan = float(start_pan) + ((float(target_pan) - float(start_pan)) * eased)
+            next_tilt = float(start_tilt) + ((float(target_tilt) - float(start_tilt)) * eased)
+            segment_distance = max(abs(next_pan - prev_pan), abs(next_tilt - prev_tilt), 0.05)
+            remaining_distance = max(abs(float(target_pan) - next_pan), abs(float(target_tilt) - next_tilt))
+            slowdown_mix = 1.0 - min(1.0, remaining_distance / window)
+            speed_dps = float(cruise_speed_dps) - ((float(cruise_speed_dps) - float(approach_speed_dps)) * slowdown_mix)
+            move_time_ms = int(round((segment_distance / max(1.0, speed_dps)) * 1000.0))
+            tail_bias_ms = 40.0 if maneuver == "rest" else 55.0
+            move_time_ms = int(max(min_stage_ms, min(2200, move_time_ms + int(round(tail_bias_ms * slowdown_mix)))))
+            steps.append((next_pan, next_tilt, move_time_ms))
+            prev_pan = next_pan
+            prev_tilt = next_tilt
+        return steps
+
+    @staticmethod
+    def _guided_move_interval_ms(move_time_ms: int, maneuver: str) -> int:
+        overlap_ratio = 0.52 if maneuver == "rest" else 0.58
+        minimum = 40 if maneuver == "rest" else 55
+        return int(max(minimum, min(900, round(float(move_time_ms) * overlap_ratio))))
+
+    def _finish_guided_move(self, *, cancelled: bool = False) -> None:
+        was_active = bool(self._guided_move_active)
+        finalize_guard = bool(self._guided_move_finalize_guard)
+        final_pan = float(self._guided_move_final_pan)
+        final_tilt = float(self._guided_move_final_tilt)
+        log_message = str(self._guided_move_log_message or "")
+        self._guided_move_timer.stop()
+        self._guided_move_steps.clear()
+        self._guided_move_active = False
+        self._guided_move_finalize_guard = False
+        self._guided_move_allow_rest_tilt = False
+        self._guided_move_log_message = ""
+        if not was_active:
+            return
+        if not cancelled and finalize_guard:
+            self.engine.hold_current_guard_position(final_pan, final_tilt)
+        if not cancelled:
+            self._refresh_status()
+            if log_message and not self._closing:
+                self._log(log_message)
+
+    def _advance_guided_move(self) -> None:
+        if self._closing:
+            self._finish_guided_move(cancelled=True)
+            return
+        if not self._guided_move_steps:
+            self._finish_guided_move(cancelled=False)
+            return
+
+        target_pan, target_tilt, move_time_ms = self._guided_move_steps.popleft()
+        self.engine.current_pan = float(target_pan)
+        self.engine.current_tilt = float(target_tilt)
+        if self._host_controls_hardware():
+            self.turret_move_requested.emit(float(target_pan), float(target_tilt))
+        else:
+            self._queue_move_command(
+                float(target_pan),
+                float(target_tilt),
+                move_time_ms=int(move_time_ms),
+                manual_override=True,
+                allow_rest_tilt=bool(self._guided_move_allow_rest_tilt),
+            )
+        self._remember_commanded_position(float(target_pan), float(target_tilt), move_time_ms=int(move_time_ms))
+        self._suppress_motion_detection()
+        self._refresh_status()
+        next_interval_ms = self._guided_move_interval_ms(int(move_time_ms), "rest" if self._guided_move_allow_rest_tilt else "home")
+        self._guided_move_timer.start(next_interval_ms)
+
+    def _start_guided_position_move(
+        self,
+        target_pan: float,
+        target_tilt: float,
+        *,
+        maneuver: str,
+        hold_guard: bool = False,
+        log_message: str = "",
+    ) -> int:
+        allow_rest_tilt = maneuver == "rest"
+        target_pan, target_tilt = self._clamp_manual_angles(target_pan, target_tilt, allow_rest_tilt=allow_rest_tilt)
+        start_pan, start_tilt = self._clamp_manual_angles(
+            float(self.engine.current_pan),
+            float(self.engine.current_tilt),
+            allow_rest_tilt=allow_rest_tilt,
+        )
+        if self._host_controls_hardware():
+            self._move_to_absolute_position(
+                target_pan,
+                target_tilt,
+                hold_guard=hold_guard,
+                log_message=log_message,
+                allow_rest_tilt=allow_rest_tilt,
+            )
+            return int(self._get_manual_move_time_ms())
+
+        total_distance = max(abs(target_pan - start_pan), abs(target_tilt - start_tilt))
+        if total_distance < 0.35:
+            self._move_to_absolute_position(target_pan, target_tilt, hold_guard=hold_guard, log_message=log_message)
+            return int(self._get_manual_move_time_ms())
+
+        self._finish_manual_sweep()
+        self._finish_guided_move(cancelled=True)
+        cruise_speed, approach_speed, approach_window = self._guided_move_profile(maneuver, start_pan, start_tilt)
+        steps = self._build_guided_move_steps(
+            start_pan,
+            start_tilt,
+            target_pan,
+            target_tilt,
+            maneuver=maneuver,
+            cruise_speed_dps=cruise_speed,
+            approach_speed_dps=approach_speed,
+            approach_window_deg=approach_window,
+        )
+        if not steps:
+            self._move_to_absolute_position(target_pan, target_tilt, hold_guard=hold_guard, log_message=log_message)
+            return int(self._get_manual_move_time_ms())
+
+        total_duration_ms = int(sum(step[2] + 80 for step in steps))
+        self._manual_move_priority_until = max(
+            float(getattr(self, "_manual_move_priority_until", 0.0) or 0.0),
+            time.time() + max(1.25, (float(total_duration_ms) / 1000.0) + 0.40),
+        )
+        self._guided_move_steps = deque((float(pan), float(tilt), int(move_time_ms)) for pan, tilt, move_time_ms in steps)
+        self._guided_move_active = True
+        self._guided_move_finalize_guard = bool(hold_guard)
+        self._guided_move_allow_rest_tilt = bool(allow_rest_tilt)
+        self._guided_move_final_pan = float(target_pan)
+        self._guided_move_final_tilt = float(target_tilt)
+        self._guided_move_log_message = str(log_message or "")
+        self._advance_guided_move()
+        return total_duration_ms
+
+    def _move_to_rest(self, *, reason: str = "manual", log_message: str = "") -> None:
+        pan, tilt = self._rest_position()
+        self._play_rest_cue(closing=(reason == "close"))
+        message = log_message or {
+            "startup": f"Startup rest position: {self._rest_position_text()}",
+            "close": f"Closing to rest position: {self._rest_position_text()}",
+        }.get(reason, f"Moving to rest: {self._rest_position_text()}")
+        return self._start_guided_position_move(pan, tilt, maneuver="rest", hold_guard=False, log_message=message)
+
+    def _schedule_startup_rest_move(self) -> None:
+        if self._closing or self._cleanup_started or self._shutdown_in_progress:
+            return
+        if not bool(getattr(self.config.guard, "rest_on_startup_enabled", True)):
+            self._startup_rest_pending = False
+            return
+        if self._startup_rest_completed:
+            return
+        if not self._has_rest_move_transport():
+            self._startup_rest_pending = True
+            return
+        self._startup_rest_pending = False
+        self._startup_rest_completed = True
+        delay_ms = max(0, int(getattr(self.config.guard, "rest_startup_delay_ms", 900) or 0))
+        QTimer.singleShot(delay_ms, self._execute_startup_rest_move)
+
+    def _execute_startup_rest_move(self) -> None:
+        if self._closing or self._cleanup_started or self._shutdown_in_progress:
+            return
+        if not bool(getattr(self.config.guard, "rest_on_startup_enabled", True)):
+            self._startup_rest_pending = False
+            return
+        if not self._has_rest_move_transport():
+            self._startup_rest_completed = False
+            self._startup_rest_pending = True
+            return
+        self._move_to_rest(reason="startup")
+
+    def begin_graceful_shutdown(self, on_complete: Optional[Callable[[], None]] = None) -> bool:
+        if on_complete is not None:
+            self._shutdown_complete_callback = on_complete
+        if self._cleanup_started:
+            callback = self._shutdown_complete_callback
+            self._shutdown_complete_callback = None
+            if callback is not None:
+                QTimer.singleShot(0, callback)
+            return True
+        if self._shutdown_in_progress:
+            return True
+
+        self._shutdown_in_progress = True
+        self._startup_rest_pending = False
+        try:
+            self._stop_fire_burst(send_release=True)
+        except Exception:
+            pass
+        try:
+            self._finish_manual_sweep()
+        except Exception:
+            pass
+        try:
+            self.engine.stop()
+        except Exception:
+            pass
+
+        if bool(getattr(self.config.guard, "rest_on_close_enabled", True)) and self._has_rest_move_transport():
+            planned_move_ms = int(self._move_to_rest(reason="close") or 0)
+            timeout_ms = max(
+                300,
+                int(getattr(self.config.guard, "rest_close_timeout_ms", 1600) or 1600),
+                planned_move_ms + 300,
+            )
+            self._shutdown_rest_timer.start(timeout_ms)
+        else:
+            QTimer.singleShot(0, self._finalize_graceful_shutdown)
+        return True
+
+    def _finalize_graceful_shutdown(self) -> None:
+        if self._cleanup_started:
+            return
+        self._shutdown_rest_timer.stop()
+        callback = self._shutdown_complete_callback
+        self._shutdown_complete_callback = None
+        self.cleanup()
+        if callback is not None:
+            QTimer.singleShot(0, callback)
+
     def cleanup(self) -> None:
         """Stop timers and release all resources. Safe to call multiple times."""
         if self._cleanup_started:
             return
         self._cleanup_started = True
         self._closing = True
+        app = QApplication.instance()
+        if app is not None:
+            try:
+                app.removeEventFilter(self)
+            except Exception:
+                pass
+        self._shutdown_in_progress = False
+        self._shutdown_rest_timer.stop()
         self._comm_worker_stop.set()
         self._detector_worker_stop.set()
+        self._guided_move_timer.stop()
         with self._pending_move_lock:
             self._pending_move_commands.clear()
             self._manual_move_priority_until = 0.0
@@ -2380,8 +3540,14 @@ class SentryV2TabWidget(QWidget):
             self._sound_engine.close()
         except Exception:
             pass
+        try:
+            self._stop_human_speech()
+        except Exception:
+            pass
         self._cam_timer.stop()
         self._burst_timer.stop()
+        self._manual_sweep_timer.stop()
+        self._guided_move_timer.stop()
         self._status_timer.stop()
         self._link_watchdog_timer.stop()
         self._quiet_save_timer.stop()
@@ -2395,14 +3561,20 @@ class SentryV2TabWidget(QWidget):
 
     def closeEvent(self, event):
         """Release camera and serial on close."""
-        self._closing = True
+        if self._cleanup_started:
+            try:
+                if event is not None:
+                    event.accept()
+            except Exception:
+                pass
+            super().closeEvent(event)
+            return
         try:
             if event is not None:
-                event.accept()
+                event.ignore()
         except Exception:
             pass
-        QTimer.singleShot(0, self.cleanup)
-        super().closeEvent(event)
+        self.begin_graceful_shutdown(on_complete=self.close)
 
     # ================================================================== #
     #  UI Construction
@@ -2410,7 +3582,7 @@ class SentryV2TabWidget(QWidget):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(4, 4, 4, 4)
+        root.setContentsMargins(8, 8, 8, 8)
         # CHANGE WARNING: Keep the settings tab container compact in both axes. Hidden pages must not force the right pane wider or taller than the visible viewport because each page already scrolls independently.
 
         self._main_splitter = QSplitter(Qt.Horizontal)
@@ -2421,6 +3593,7 @@ class SentryV2TabWidget(QWidget):
         self._layout_splitter = QSplitter(Qt.Vertical)
         self._layout_splitter.setChildrenCollapsible(False)
         self._layout_splitter.setHandleWidth(8)
+        self._layout_splitter.splitterMoved.connect(self._on_layout_splitter_moved)
 
         # --- Left: video feed ---
         self._video_label = SentryV2VideoCanvas("Waiting for video...")
@@ -2428,8 +3601,7 @@ class SentryV2TabWidget(QWidget):
         self._video_label.setAlignment(Qt.AlignCenter)
         self._video_label.setMinimumSize(SENTRY_V2_VIDEO_MIN_WIDTH, 180)
         self._video_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self._video_label.setStyleSheet("background-color: #0b1016; color: #6f7d8a;")
-        logo_path = Path(__file__).resolve().parents[1] / "LOGO.png"
+        logo_path = APP_ROOT_PATH / "LOGO.png"
         if logo_path.is_file():
             self._video_label.set_placeholder_pixmap(QPixmap(str(logo_path)))
             self._video_label.set_placeholder_text("Camera Off\nOpen Camera to Start")
@@ -2439,11 +3611,21 @@ class SentryV2TabWidget(QWidget):
         self._video_label.roiSelected.connect(self._on_video_roi_selected)
 
         left_panel = QWidget()
+        left_panel.setObjectName("sentryV2LeftPane")
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
         self._layout_splitter.addWidget(self._video_label)
-        self._layout_splitter.addWidget(self._build_log_group())
+
+        self._bottom_info_splitter = QSplitter(Qt.Horizontal)
+        self._bottom_info_splitter.setChildrenCollapsible(False)
+        self._bottom_info_splitter.setHandleWidth(8)
+        self._bottom_info_splitter.splitterMoved.connect(self._on_bottom_info_splitter_moved)
+        self._bottom_info_splitter.addWidget(self._build_log_group())
+        self._bottom_info_splitter.addWidget(self._build_status_group())
+        self._bottom_info_splitter.setStretchFactor(0, 2)
+        self._bottom_info_splitter.setStretchFactor(1, 3)
+        self._layout_splitter.addWidget(self._bottom_info_splitter)
         self._layout_splitter.setStretchFactor(0, 6)
         self._layout_splitter.setStretchFactor(1, 1)
         left_layout.addWidget(self._layout_splitter)
@@ -2457,53 +3639,171 @@ class SentryV2TabWidget(QWidget):
         pinned_top = QWidget()
         pinned_top.setObjectName("sentryV2PinnedTop")
         pinned_top_layout = QVBoxLayout(pinned_top)
-        pinned_top_layout.setContentsMargins(8, 4, 8, 4)
-        pinned_top_layout.setSpacing(4)
+        pinned_top_layout.setContentsMargins(4, 2, 4, 6)
+        pinned_top_layout.setSpacing(8)
+
+        hero = QFrame()
+        hero.setObjectName("sentryV3Hero")
+        hero_layout = QHBoxLayout(hero)
+        self._hero_layout = hero_layout
+        hero_layout.setContentsMargins(18, 14, 18, 14)
+        hero_layout.setSpacing(14)
+
+        hero_text_layout = QVBoxLayout()
+        hero_text_layout.setContentsMargins(0, 0, 0, 0)
+        hero_text_layout.setSpacing(2)
+        hero_title = QLabel(SMART_SENTRY_RELEASE_TITLE)
+        self._hero_title_label = hero_title
+        hero_title.setObjectName("sentryV3HeroTitle")
+        hero_title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        hero_subtitle = QLabel(SMART_SENTRY_RELEASE_SUBTITLE)
+        self._hero_subtitle_label = hero_subtitle
+        hero_subtitle.setObjectName("sentryV3HeroSubtitle")
+        hero_subtitle.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        hero_text_layout.addWidget(hero_title)
+        hero_text_layout.addWidget(hero_subtitle)
+        hero_layout.addLayout(hero_text_layout, stretch=1)
+
+        hero_actions_layout = QVBoxLayout()
+        self._hero_actions_layout = hero_actions_layout
+        hero_actions_layout.setContentsMargins(0, 0, 0, 0)
+        hero_actions_layout.setSpacing(8)
+        hero_actions_layout.setAlignment(Qt.AlignTop)
+
+        hero_action_row = QVBoxLayout()
+        self._hero_action_row = hero_action_row
+        hero_action_row.setContentsMargins(0, 0, 0, 0)
+        hero_action_row.setSpacing(8)
+
+        self._btn_header_wake = QPushButton("Wake Up")
+        self._btn_header_wake.setMinimumHeight(34)
+        self._set_button_role(self._btn_header_wake, "utility")
+        self._btn_header_wake.setToolTip("Move the turret back to the configured ready position.")
+        self._btn_header_wake.clicked.connect(self._on_home_clicked)
+        hero_action_row.addWidget(self._btn_header_wake)
+
+        self._btn_header_rest = QPushButton("Go Rest")
+        self._btn_header_rest.setMinimumHeight(34)
+        self._set_button_role(self._btn_header_rest, "utility")
+        self._btn_header_rest.setToolTip("Move the turret to the configured rest position.")
+        self._btn_header_rest.clicked.connect(self._on_rest_clicked)
+        hero_action_row.addWidget(self._btn_header_rest)
+
+        hero_actions_layout.addLayout(hero_action_row)
+
+        hero_badge = QLabel(SMART_SENTRY_RELEASE_BADGE)
+        self._hero_badge_label = hero_badge
+        hero_badge.setObjectName("sentryV3HeroBadge")
+        hero_badge.setVisible(bool(SMART_SENTRY_RELEASE_BADGE.strip()))
+        hero_actions_layout.addWidget(hero_badge, alignment=Qt.AlignRight | Qt.AlignTop)
+        hero_layout.addLayout(hero_actions_layout)
+        pinned_top_layout.addWidget(hero)
+
+        toggle_row = QWidget()
+        toggle_row.setObjectName("sentryV2ToggleRow")
+        toggle_row_layout = QHBoxLayout(toggle_row)
+        toggle_row_layout.setContentsMargins(12, 8, 12, 8)
+        toggle_row_layout.setSpacing(16)
 
         # Enable toggle
         self._chk_enable = QCheckBox("Enable Smart Sentry")
-        self._chk_enable.setStyleSheet("font-weight: bold; font-size: 13px;")
+        self._set_theme_role(self._chk_enable, "headlineToggle")
         self._chk_enable.toggled.connect(self._on_enable_toggled)
-        pinned_top_layout.addWidget(self._chk_enable)
+        toggle_row_layout.addWidget(self._chk_enable)
 
         # Show video feed toggle
         self._chk_show_video = QCheckBox("Show Video Feed")
+        self._set_theme_role(self._chk_show_video, "headlineToggle")
         self._chk_show_video.setChecked(True)
         self._chk_show_video.toggled.connect(self._on_show_video_toggled)
         self._chk_show_video.setToolTip("Toggle video display on/off (detection continues running)")
-        pinned_top_layout.addWidget(self._chk_show_video)
+        toggle_row_layout.addWidget(self._chk_show_video)
+        toggle_row_layout.addStretch(1)
+
+        self._btn_quick_keys = QPushButton("Quick Keys")
+        self._btn_quick_keys.setMinimumHeight(30)
+        self._set_button_role(self._btn_quick_keys, "utility")
+        self._btn_quick_keys.setToolTip("Open the Smart Sentry keyboard shortcut quick reference.")
+        self._btn_quick_keys.clicked.connect(self._open_shortcut_quick_view)
+        toggle_row_layout.addWidget(self._btn_quick_keys)
+        pinned_top_layout.addWidget(toggle_row)
 
         panel_layout.addWidget(pinned_top)
 
+        tabs_nav = QWidget()
+        tabs_nav.setObjectName("sentryV2TabsNav")
+        tabs_nav_layout = QHBoxLayout(tabs_nav)
+        self._tabs_nav_layout = tabs_nav_layout
+        tabs_nav_layout.setContentsMargins(6, 2, 6, 2)
+        tabs_nav_layout.setSpacing(10)
+        tabs_nav_title = QLabel("")
+        self._tabs_nav_title_label = tabs_nav_title
+        tabs_nav_title.setObjectName("sentryV2TabsNavTitle")
+        tabs_nav_title.setVisible(False)
+        tabs_nav_layout.addWidget(tabs_nav_title)
+        self._settings_nav_label = QLabel("")
+        self._settings_nav_label.setObjectName("sentryV2TabsNavCount")
+        tabs_nav_layout.addWidget(self._settings_nav_label)
+        tabs_nav_layout.addStretch(1)
+        self._btn_prev_settings_tab = QPushButton("‹")
+        self._btn_prev_settings_tab.setToolTip("Go to the previous settings tab")
+        self._btn_prev_settings_tab.clicked.connect(self._select_previous_settings_tab)
+        self._btn_prev_settings_tab.setMinimumSize(32, 32)
+        self._set_button_role(self._btn_prev_settings_tab, "dpadArrow")
+        tabs_nav_layout.addWidget(self._btn_prev_settings_tab)
+        self._btn_next_settings_tab = QPushButton("›")
+        self._btn_next_settings_tab.setToolTip("Go to the next settings tab")
+        self._btn_next_settings_tab.clicked.connect(self._select_next_settings_tab)
+        self._btn_next_settings_tab.setMinimumSize(32, 32)
+        self._set_button_role(self._btn_next_settings_tab, "dpadArrow")
+        tabs_nav_layout.addWidget(self._btn_next_settings_tab)
+        panel_layout.addWidget(tabs_nav)
+
         # Sub-tabs for settings categories
         self._settings_tabs = CompactSettingsTabWidget()
-        self._settings_tabs.setTabPosition(QTabWidget.West)
+        self._settings_tabs.setTabBar(ResponsiveIconTabBar(self._settings_tabs))
+        self._settings_tabs.setTabPosition(QTabWidget.North)
         self._settings_tabs.setUsesScrollButtons(False)
-        self._settings_tabs.tabBar().setExpanding(False)
+        self._settings_tabs.tabBar().setExpanding(True)
         self._settings_tabs.tabBar().setElideMode(Qt.ElideNone)
         self._settings_tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
         self._settings_tabs.currentChanged.connect(lambda _index: QTimer.singleShot(0, self._settings_tabs.updateGeometry))
+        self._settings_tabs.currentChanged.connect(self._update_settings_tab_nav_label)
 
-        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_connection_tab()), "Connection")
-        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_master_profiles_tab()), "Master Profiles")
-        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_detection_tab()), "Detection")
-        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_prompted_targets_tab()), "Prompted Targets")
-        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_filter_tab()), "Target Filter")
-        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_scoring_tab()), "Threat AI")
-        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_engagement_tab()), "Engage")
-        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_guard_tab()), "Guard")
-        self._settings_tabs.addTab(self._wrap_settings_tab(self._build_controls_tab()), "Controls")
+        self._settings_tab_titles = [title for title, _icon_key, _color in SETTINGS_TAB_SPECS]
+        settings_pages = [
+            self._build_connection_tab,
+            self._build_master_profiles_tab,
+            self._build_detection_tab,
+            self._build_prompted_targets_tab,
+            self._build_filter_tab,
+            self._build_scoring_tab,
+            self._build_engagement_tab,
+            self._build_guard_tab,
+            self._build_theme_tab,
+            self._build_controls_tab,
+            self._build_facial_recognition_tab,
+            self._build_shortcut_keys_tab,
+            self._build_ai_assistant_tab,
+        ]
+        for (title, _icon_key, _color), builder in zip(SETTINGS_TAB_SPECS, settings_pages):
+            index = self._settings_tabs.addTab(self._wrap_settings_tab(builder()), "")
+            self._settings_tabs.setTabToolTip(index, title)
+            self._settings_tabs.setTabWhatsThis(index, title)
         for index in range(self._settings_tabs.count()):
             page = self._settings_tabs.widget(index)
             if page is not None:
                 page.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self._apply_settings_tab_colors()
+        self._update_settings_tab_nav_label(self._settings_tabs.currentIndex())
 
         panel_layout.addWidget(self._settings_tabs, stretch=1)
 
         right_panel = QWidget()
+        self._right_panel = right_panel
+        right_panel.setObjectName("sentryV2RightPane")
         right_panel.setMinimumWidth(SENTRY_V2_PANEL_MIN_WIDTH)
-        right_panel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        right_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(6)
@@ -2511,20 +3811,29 @@ class SentryV2TabWidget(QWidget):
 
         pinned_bottom = QWidget()
         pinned_bottom.setObjectName("sentryV2PinnedBottom")
-        pinned_bottom_layout = QVBoxLayout(pinned_bottom)
+        pinned_bottom_layout = QHBoxLayout(pinned_bottom)
         pinned_bottom_layout.setContentsMargins(0, 0, 0, 0)
-        pinned_bottom_layout.setSpacing(4)
-        pinned_bottom_layout.addWidget(self._build_status_group())
+        pinned_bottom_layout.setSpacing(0)
+
+        self._btn_save_config = QPushButton("SAVE SETTINGS")
+        self._btn_save_config.setObjectName("sentryV2PinnedSave")
+        self._btn_save_config.setMinimumHeight(36)
+        self._btn_save_config.setMinimumWidth(0)
+        self._btn_save_config.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._set_button_role(self._btn_save_config, "primary")
+        self._btn_save_config.clicked.connect(self._save_config)
+        self._apply_tooltip(self._btn_save_config, "save_settings")
+        pinned_bottom_layout.addWidget(self._btn_save_config)
         right_layout.addWidget(pinned_bottom)
 
         self._main_splitter.addWidget(right_panel)
-        self._main_splitter.setStretchFactor(0, 3)
-        self._main_splitter.setStretchFactor(1, 0)
+        self._main_splitter.setStretchFactor(0, 5)
+        self._main_splitter.setStretchFactor(1, 3)
 
         root.addWidget(self._main_splitter)
 
-        QTimer.singleShot(0, self._apply_default_panel_width)
-        QTimer.singleShot(0, self._apply_saved_log_panel_height)
+        QTimer.singleShot(0, self._apply_saved_layout_state)
+        QTimer.singleShot(0, self._update_responsive_layout)
         QTimer.singleShot(0, self._reflow_all_responsive_button_grids)
 
         self._apply_all_tooltips()
@@ -2532,30 +3841,563 @@ class SentryV2TabWidget(QWidget):
 
 
     def _apply_theme(self) -> None:
-        self.setStyleSheet(SENTRY_V2_THEME)
+        tokens = self._theme_tokens()
+        radius = tokens["radius"]
+        radius_small = max(6, radius - 6)
+        radius_medium = max(8, radius - 4)
+        radius_large = radius + 4
+        ui_scale = float(tokens.get("ui_scale", 1.0) or 1.0)
+        base_font = tokens["base_font_pt"]
+        hero_title = tokens["hero_title_pt"]
+        hero_subtitle = tokens["hero_subtitle_pt"]
+        hero_badge = tokens["hero_badge_pt"]
+        nav_title = tokens["nav_title_pt"]
+        nav_count = tokens["nav_count_pt"]
+        status_font = tokens["status_font_pt"]
+        group_margin_top = max(10, int(round(12 * ui_scale)))
+        group_pad_top = max(10, int(round(12 * ui_scale)))
+        group_pad_side = max(8, int(round(10 * ui_scale)))
+        group_pad_bottom = max(8, int(round(10 * ui_scale)))
+        title_left = max(8, int(round(10 * ui_scale)))
+        title_pad_x = max(5, int(round(7 * ui_scale)))
+        badge_pad_y = max(7, int(round(7 * ui_scale)))
+        badge_pad_x = max(10, int(round(12 * ui_scale)))
+        tab_pad_y = max(7, int(round(7 * ui_scale)))
+        tab_pad_x = max(7, int(round(7 * ui_scale)))
+        tab_min_h = max(42, int(round(44 * ui_scale)))
+        button_pad_y = max(4, int(round(4 * ui_scale)))
+        button_pad_x = max(7, int(round(7 * ui_scale)))
+        button_min_h = max(23, int(round(21 * ui_scale)))
+        preset_pad_y = max(4, int(round(4 * ui_scale)))
+        preset_pad_x = max(6, int(round(6 * ui_scale)))
+        preset_min_h = max(24, int(round(22 * ui_scale)))
+        dpad_min_h = max(32, int(round(30 * ui_scale)))
+        dpad_pad_y = max(5, int(round(4 * ui_scale)))
+        dpad_pad_x = max(6, int(round(5 * ui_scale)))
+        field_pad_y = max(5, int(round(4 * ui_scale)))
+        field_pad_x = max(7, int(round(6 * ui_scale)))
+        checkbox_spacing = max(8, int(round(8 * ui_scale)))
+        checkbox_indicator = max(16, int(round(16 * ui_scale)))
+        slider_handle = max(16, int(round(16 * ui_scale)))
+        slider_margin = max(5, int(round(5 * ui_scale)))
+        scroll_thickness = max(12, int(round(12 * ui_scale)))
+        scroll_handle_min = max(24, int(round(24 * ui_scale)))
+        stylesheet = f"""
+QWidget#sentryV2Root {{
+    background-color: transparent;
+    color: {tokens['text']};
+    font-family: "Segoe UI Variable Text", "Segoe UI";
+    font-size: {base_font:.2f}pt;
+}}
+QWidget#sentryV2Root QLabel {{
+    color: {tokens['muted']};
+}}
+QWidget#sentryV2Root QScrollArea,
+QWidget#sentryV2Root QScrollArea > QWidget > QWidget {{
+    background-color: transparent;
+    border: none;
+}}
+QWidget#sentryV2Root QGroupBox {{
+    background-color: {tokens['surface_rgba']};
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_large}px;
+    margin-top: {group_margin_top}px;
+    padding: {group_pad_top}px {group_pad_side}px {group_pad_bottom}px {group_pad_side}px;
+    font-weight: 600;
+}}
+QWidget#sentryV2Root QGroupBox::title {{
+    subcontrol-origin: margin;
+    left: {title_left}px;
+    padding: 0 {title_pad_x}px;
+    color: {tokens['accent']};
+    font-size: {max(base_font, status_font + 0.2):.2f}pt;
+    font-weight: 700;
+}}
+QWidget#sentryV2Root QWidget#sentryV2PinnedBottom,
+QWidget#sentryV2Root QWidget#sentryV2PinnedTop {{
+    background-color: transparent;
+    border: none;
+}}
+QWidget#sentryV2Root QWidget#sentryV2LeftPane,
+QWidget#sentryV2Root QWidget#sentryV2RightPane {{
+    background-color: transparent;
+    border: none;
+}}
+QWidget#sentryV2Root QSplitter {{
+    background-color: transparent;
+}}
+QWidget#sentryV2Root QSplitter::handle {{
+    background-color: transparent;
+    border: none;
+}}
+QWidget#sentryV2Root QSplitter::handle:horizontal {{
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    margin: 0;
+}}
+QWidget#sentryV2Root QSplitter::handle:vertical {{
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    margin: 0;
+}}
+QWidget#sentryV2Root QFrame#sentryV3Hero {{
+    background:qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 {tokens['hero_start']},
+        stop:0.58 {tokens['hero_mid']},
+        stop:1 {tokens['hero_end']});
+    border: 1px solid {tokens['accent_soft']};
+    border-radius: {radius_large + 2}px;
+}}
+QWidget#sentryV2Root QLabel#sentryV3HeroTitle {{
+    color: {tokens['hero_text']};
+    font-family: "Segoe UI Variable Display", "Segoe UI Semibold", "Segoe UI";
+    font-size: {hero_title:.2f}pt;
+    font-weight: 800;
+}}
+QWidget#sentryV2Root QLabel#sentryV3HeroSubtitle {{
+    color: {tokens['hero_subtle']};
+    font-family: "Segoe UI Variable Text", "Segoe UI";
+    font-size: {hero_subtitle:.2f}pt;
+    font-weight: 600;
+}}
+QWidget#sentryV2Root QLabel#sentryV3HeroBadge {{
+    background-color: {tokens['hero_badge_bg']};
+    color: {tokens['hero_badge_text']};
+    border: 1px solid {tokens['accent_soft']};
+    border-radius: {radius_medium + 4}px;
+    padding: {badge_pad_y}px {badge_pad_x}px;
+    font-size: {hero_badge:.2f}pt;
+    font-weight: 800;
+}}
+QWidget#sentryV2Root QPushButton#sentryV2PinnedSave {{
+    min-height: {max(button_min_h + 6, 36)}px;
+    min-width: 0px;
+    font-size: {max(base_font + 0.8, 10.8):.2f}pt;
+    font-weight: 800;
+}}
+QWidget#sentryV2Root QWidget#sentryV2TabsNav {{
+    background-color: {tokens['surface_alt_rgba']};
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_medium + 2}px;
+    padding: 4px 8px;
+}}
+QWidget#sentryV2Root QLabel#sentryV2TabsNavTitle {{
+    color: {tokens['hero_text']};
+    font-family: "Segoe UI Variable Display", "Segoe UI Semibold", "Segoe UI";
+    font-size: {nav_title:.2f}pt;
+    font-weight: 700;
+}}
+QWidget#sentryV2Root QLabel#sentryV2TabsNavCount {{
+    color: {tokens['accent']};
+    font-family: "Segoe UI Variable Display", "Segoe UI Semibold", "Segoe UI";
+    font-size: {nav_count:.2f}pt;
+    font-weight: 700;
+}}
+QWidget#sentryV2Root QWidget#sentryV2ToggleRow {{
+    background-color: {tokens['surface_alt_rgba']};
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_medium + 2}px;
+}}
+QWidget#sentryV2Root QWidget#sentryV2PinnedBottom QGroupBox {{
+    margin-top: 8px;
+    padding: 12px 10px 10px 10px;
+}}
+QWidget#sentryV2Root QWidget#sentryV2PinnedBottom QLabel {{
+    color: {tokens['muted']};
+}}
+QWidget#sentryV2Root QTabWidget::pane {{
+    background-color: {tokens['panel_rgba']};
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_large}px;
+    top: -1px;
+}}
+QWidget#sentryV2Root QTabBar::tab {{
+    background-color: {tokens['surface_alt_rgba']};
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_medium}px;
+    padding: {tab_pad_y}px {tab_pad_x}px;
+    min-height: {tab_min_h}px;
+    min-width: 0px;
+}}
+QWidget#sentryV2Root QTabBar::tab:left {{
+    min-width: 46px;
+    max-width: 54px;
+    margin-bottom: 4px;
+}}
+QWidget#sentryV2Root QTabBar::tab:top {{
+    border-bottom: none;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    min-width: 0px;
+    min-height: 60px;
+    margin-right: 3px;
+}}
+QWidget#sentryV2Root QTabBar::tab:selected {{
+    background-color: {tokens['accent_mid']};
+    border-color: {tokens['accent']};
+    color: {tokens['hero_text']};
+}}
+QWidget#sentryV2Root QTabBar::tab:selected:left {{
+    border-left: 4px solid {tokens['accent']};
+}}
+QWidget#sentryV2Root QTabBar::tab:hover:!selected {{
+    background-color: {tokens['accent_faint']};
+    color: {tokens['hero_text']};
+}}
+QWidget#sentryV2Root QPushButton {{
+    background-color: {tokens['button_bg']};
+    color: {tokens['button_text']};
+    border: 1px solid {tokens['button_border']};
+    border-radius: {radius_medium}px;
+    padding: {button_pad_y}px {button_pad_x}px;
+    min-height: {button_min_h}px;
+}}
+QWidget#sentryV2Root QPushButton:hover {{
+    background-color: {tokens['button_hover']};
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QPushButton:pressed {{
+    background-color: {tokens['button_pressed']};
+}}
+QWidget#sentryV2Root QPushButton:checked {{
+    background-color: {tokens['button_checked']};
+    border-color: {tokens['accent']};
+    color: {tokens['hero_text']};
+}}
+QWidget#sentryV2Root QPushButton:disabled {{
+    background-color: {tokens['button_disabled']};
+    color: {tokens['disabled_text']};
+    border-color: {tokens['disabled_border']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="primary"] {{
+    background-color: {tokens['primary_button_bg']};
+    border-color: {tokens['primary_button_border']};
+    color: {tokens['hero_text']};
+    font-weight: 700;
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="primary"]:hover {{
+    background-color: {tokens['primary_button_hover']};
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="primary"]:pressed {{
+    background-color: {tokens['primary_button_pressed']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="preset"] {{
+    background-color: {tokens['surface_alt_rgba']};
+    border-color: {tokens['button_border']};
+    color: {tokens['button_text']};
+    font-weight: 600;
+    padding: {preset_pad_y}px {preset_pad_x}px;
+    min-height: {preset_min_h}px;
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="preset"]:hover {{
+    background-color: {tokens['button_hover']};
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="utility"] {{
+    background-color: {tokens['surface_alt_rgba']};
+    border-color: {tokens['button_border']};
+    color: {tokens['button_text']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="utility"]:hover {{
+    background-color: {tokens['button_hover']};
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="dpad"] {{
+    background-color: {tokens['accent_mid']};
+    border: 1px solid {tokens['accent']};
+    border-radius: {radius_medium + 2}px;
+    color: {tokens['hero_text']};
+    font-weight: 700;
+    font-size: {base_font:.2f}pt;
+    min-height: {dpad_min_h}px;
+    padding: {dpad_pad_y}px {dpad_pad_x}px;
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="dpad"]:hover {{
+    background-color: {tokens['primary_button_hover']};
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="dpad"]:pressed {{
+    background-color: {tokens['primary_button_pressed']};
+    border-color: {tokens['accent_soft']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"] {{
+    background-color: {tokens['accent_faint']};
+    border: 1px solid {tokens['accent_soft']};
+    border-radius: {radius_medium + 2}px;
+    color: {tokens['hero_text']};
+    font-weight: 700;
+    font-size: {base_font:.2f}pt;
+    min-height: {dpad_min_h}px;
+    padding: {dpad_pad_y}px {dpad_pad_x}px;
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"]:hover {{
+    background-color: {tokens['accent_mid']};
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"]:pressed {{
+    background-color: {tokens['primary_button_pressed']};
+    border-color: {tokens['accent_soft']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="mode"] {{
+    background-color: {tokens['mode_button_bg']};
+    border-color: {tokens['mode_button_border']};
+    color: {tokens['mode_button_text']};
+    font-weight: 600;
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="mode"]:hover {{
+    background-color: {tokens['mode_button_hover']};
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="danger"] {{
+    background-color: {tokens['danger_button_bg']};
+    border-color: {tokens['danger_button_border']};
+    color: {tokens['hero_text']};
+    font-weight: 700;
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="danger"]:hover {{
+    background-color: {tokens['danger_button_hover']};
+    border-color: {tokens['danger_button_border']};
+}}
+QWidget#sentryV2Root QPushButton[buttonRole="danger"]:pressed {{
+    background-color: {tokens['danger_button_pressed']};
+}}
+QWidget#sentryV2Root QLineEdit,
+QWidget#sentryV2Root QComboBox,
+QWidget#sentryV2Root QSpinBox,
+QWidget#sentryV2Root QDoubleSpinBox,
+QWidget#sentryV2Root QListWidget,
+QWidget#sentryV2Root QTextEdit {{
+    background-color: {tokens['field_rgba']};
+    color: {tokens['field_text']};
+    border: 1px solid {tokens['field_border']};
+    border-radius: {radius_small}px;
+    padding: {field_pad_y}px {field_pad_x}px;
+    selection-background-color: {tokens['accent_mid']};
+    selection-color: {tokens['hero_text']};
+}}
+QWidget#sentryV2Root QLineEdit:focus,
+QWidget#sentryV2Root QComboBox:focus,
+QWidget#sentryV2Root QSpinBox:focus,
+QWidget#sentryV2Root QDoubleSpinBox:focus,
+QWidget#sentryV2Root QListWidget:focus,
+QWidget#sentryV2Root QTextEdit:focus {{
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QComboBox::drop-down {{
+    border: none;
+    width: 22px;
+}}
+QWidget#sentryV2Root QAbstractItemView {{
+    background-color: {tokens['panel_rgba']};
+    color: {tokens['field_text']};
+    border: 1px solid {tokens['field_border']};
+    selection-background-color: {tokens['accent_mid']};
+}}
+QWidget#sentryV2Root QCheckBox {{
+    spacing: {checkbox_spacing}px;
+}}
+QWidget#sentryV2Root QCheckBox::indicator {{
+    width: {checkbox_indicator}px;
+    height: {checkbox_indicator}px;
+    border-radius: 4px;
+    border: 1px solid {tokens['field_border']};
+    background-color: {tokens['field_rgba']};
+}}
+QWidget#sentryV2Root QCheckBox::indicator:checked {{
+    background-color: {tokens['accent']};
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QSlider::groove:horizontal {{
+    height: 6px;
+    border-radius: 3px;
+    background-color: {tokens['slider_groove']};
+}}
+QWidget#sentryV2Root QSlider::handle:horizontal {{
+    width: {slider_handle}px;
+    margin: -{slider_margin}px 0;
+    border-radius: 8px;
+    background-color: {tokens['accent']};
+    border: 1px solid {tokens['accent_soft']};
+}}
+QWidget#sentryV2Root QScrollBar:vertical {{
+    background-color: transparent;
+    width: {scroll_thickness}px;
+    margin: 2px;
+}}
+QWidget#sentryV2Root QScrollBar::handle:vertical {{
+    background-color: {tokens['scroll_handle']};
+    border-radius: 6px;
+    min-height: {scroll_handle_min}px;
+}}
+QWidget#sentryV2Root QScrollBar:horizontal {{
+    background-color: transparent;
+    height: {scroll_thickness}px;
+    margin: 2px;
+}}
+QWidget#sentryV2Root QScrollBar::handle:horizontal {{
+    background-color: {tokens['scroll_handle']};
+    border-radius: 6px;
+    min-width: {scroll_handle_min}px;
+}}
+QWidget#sentryV2Root QScrollBar::add-line,
+QWidget#sentryV2Root QScrollBar::sub-line,
+QWidget#sentryV2Root QScrollBar::add-page,
+QWidget#sentryV2Root QScrollBar::sub-page {{
+    background: none;
+    border: none;
+}}
+QLabel#sentryV2Video {{
+    background-color: {tokens['video_bg_rgba']};
+    color: {tokens['video_text']};
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_large}px;
+}}
+QTextEdit#sentryV2Log {{
+    background-color: {tokens['panel_rgba']};
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_medium}px;
+    padding: 6px 8px;
+    font-family: "Consolas", "Cascadia Mono", "Courier New", monospace;
+    font-size: {max(10.0, base_font - 0.2):.2f}pt;
+    line-height: 1.35;
+}}
+QWidget#sentryV2Root QLabel[themeRole="subtle"] {{
+    color: {tokens['subtle_text']};
+    font-size: {max(status_font + 0.2, base_font - 0.1):.2f}pt;
+}}
+QWidget#sentryV2Root QLabel[themeRole="subtleBody"] {{
+    color: {tokens['subtle_text']};
+    font-size: {max(base_font + 0.1, 10.0):.2f}pt;
+}}
+QWidget#sentryV2Root QLabel[themeRole="mutedCompact"] {{
+    color: {tokens['muted']};
+    font-size: {max(status_font + 0.1, 9.8):.2f}pt;
+}}
+QWidget#sentryV2Root QLabel[themeRole="sectionPadded"] {{
+    color: {tokens['accent']};
+    font-weight: 700;
+    padding-top: 4px;
+}}
+QWidget#sentryV2Root QLabel[themeRole="summary"] {{
+    color: {tokens['text']};
+    font-size: {max(base_font + 0.2, 10.2):.2f}pt;
+}}
+QWidget#sentryV2Root QLabel[themeRole="statusMeta"] {{
+    color: {tokens['status_meta']};
+    font-size: {status_font:.2f}pt;
+}}
+QWidget#sentryV2Root QLabel[themeRole="statusStrong"] {{
+    color: {tokens['status_neutral']};
+    font-weight: bold;
+    font-size: {max(status_font + 0.3, 10.2):.2f}pt;
+}}
+QWidget#sentryV2Root QLabel[themeRole="compactValue"] {{
+    color: {tokens['text']};
+    font-weight: 700;
+    font-size: {max(status_font + 0.4, 10.2):.2f}pt;
+}}
+QWidget#sentryV2Root QLabel[themeRole="value"] {{
+    color: {tokens['text']};
+    font-weight: 700;
+    font-size: {max(base_font + 0.2, 10.2):.2f}pt;
+}}
+QWidget#sentryV2Root QLabel[themeRole="section"] {{
+    color: {tokens['accent']};
+    font-weight: 700;
+    font-size: {max(base_font + 0.5, 10.6):.2f}pt;
+}}
+QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
+    color: {tokens['text']};
+    font-weight: 700;
+    font-size: {max(base_font + 0.4, 10.6):.2f}pt;
+}}
+"""
+        self.setStyleSheet(stylesheet)
+        self._apply_status_panel_theme()
+        self._apply_settings_tab_colors()
+        self._update_responsive_layout()
+        self._sync_camera_status_style()
+        self._sync_connection_status_style()
+        self._sync_auto_trigger_checkbox_style()
+
+        window = self.window()
+        if window is not None and getattr(window, "sentry_v2_tab", None) is self:
+            try:
+                window_radius = max(6, radius - 6)
+                window.setStyleSheet(
+                    f"QMainWindow {{ background-color: transparent; color: {tokens['text']}; }}"
+                    f"QWidget#smartSentryWindowRoot {{ background-color: {tokens['root_bg_rgba']}; color: {tokens['text']}; border: 1px solid {tokens['border']}; border-radius: {radius_large}px; }}"
+                    f"QWidget#smartSentryWindowControls {{ background-color: {tokens['surface_alt_rgba']}; border-bottom: 1px solid {tokens['border']}; border-top-left-radius: {radius_large}px; border-top-right-radius: {radius_large}px; }}"
+                    f"QWidget#smartSentryWindowControls QPushButton {{ min-width: 28px; max-width: 28px; min-height: 24px; max-height: 24px; background-color: {tokens['button_bg']}; color: {tokens['button_text']}; border: 1px solid {tokens['button_border']}; border-radius: {window_radius}px; }}"
+                    f"QWidget#smartSentryWindowControls QPushButton:hover {{ background-color: {tokens['button_hover']}; border-color: {tokens['accent']}; }}"
+                    f"QWidget#smartSentryWindowControls QPushButton:pressed {{ background-color: {tokens['button_pressed']}; border-color: {tokens['accent_soft']}; }}"
+                    f"QToolTip {{ background-color: {tokens['tooltip_bg']}; color: {tokens['tooltip_text']}; border: 1px solid {tokens['accent_soft']}; padding: 4px 6px; }}"
+                )
+                window.setWindowOpacity(max(0.7, min(1.0, tokens["window_opacity"] / 100.0)))
+            except Exception:
+                pass
+        if hasattr(self, "_status_timer"):
+            try:
+                self._refresh_status()
+            except Exception:
+                pass
 
     def _apply_settings_tab_colors(self) -> None:
         if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
             return
         tab_bar = self._settings_tabs.tabBar()
-        tab_bar.setIconSize(QPixmap(10, 10).size())
-        tab_colors = [
-            "#8cc4ff",  # Connection
-            "#a9f1c0",  # Master Profiles
-            "#f5d27a",  # Detection
-            "#f7b48a",  # Prompted Targets
-            "#d7b3ff",  # Target Filter
-            "#9fd8ff",  # Threat AI
-            "#ffb7cf",  # Engage
-            "#9fe3d3",  # Guard
-            "#c6d2e3",  # Controls
-        ]
-        for idx, color in enumerate(tab_colors):
+        if hasattr(tab_bar, "_sync_icon_size"):
+            try:
+                tab_bar._sync_icon_size()
+            except Exception:
+                pass
+        else:
+            tab_bar.setIconSize(QSize(24, 24))
+        tokens = self._theme_tokens()
+        for idx, (_title, icon_key, color_value) in enumerate(SETTINGS_TAB_SPECS):
             if idx < tab_bar.count():
-                tab_bar.setTabTextColor(idx, QColor(color))
-                marker = QPixmap(10, 10)
-                marker.fill(QColor(color))
-                tab_bar.setTabIcon(idx, QIcon(marker))
+                resolved_color = tokens["accent"] if color_value == "accent" else color_value
+                tab_bar.setTabTextColor(idx, QColor(resolved_color))
+                tab_bar.setTabIcon(idx, _build_settings_tab_icon(icon_key, resolved_color, max(24, tab_bar.iconSize().width() or 24)))
+
+    def _update_settings_tab_nav_label(self, index: int) -> None:
+        if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
+            return
+        count = self._settings_tabs.count()
+        if count <= 0:
+            label_text = ""
+        else:
+            safe_index = max(0, min(int(index), count - 1))
+            tab_titles = getattr(self, "_settings_tab_titles", [])
+            tab_title = tab_titles[safe_index] if safe_index < len(tab_titles) else self._settings_tabs.tabToolTip(safe_index)
+            nav_title = SETTINGS_TAB_NAV_LABELS.get(str(tab_title), str(tab_title).upper())
+            label_text = f"{safe_index + 1}/{count} {nav_title}"
+        if hasattr(self, "_settings_nav_label") and self._settings_nav_label is not None:
+            self._settings_nav_label.setText(label_text)
+        can_navigate = count > 1
+        if hasattr(self, "_btn_prev_settings_tab") and self._btn_prev_settings_tab is not None:
+            self._btn_prev_settings_tab.setEnabled(can_navigate)
+        if hasattr(self, "_btn_next_settings_tab") and self._btn_next_settings_tab is not None:
+            self._btn_next_settings_tab.setEnabled(can_navigate)
+
+    def _select_previous_settings_tab(self) -> None:
+        if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
+            return
+        count = self._settings_tabs.count()
+        if count <= 1:
+            return
+        self._settings_tabs.setCurrentIndex((self._settings_tabs.currentIndex() - 1) % count)
+
+    def _select_next_settings_tab(self) -> None:
+        if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
+            return
+        count = self._settings_tabs.count()
+        if count <= 1:
+            return
+        self._settings_tabs.setCurrentIndex((self._settings_tabs.currentIndex() + 1) % count)
 
     def _wrap_settings_tab(self, content: QWidget) -> QScrollArea:
         content.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
@@ -2589,13 +4431,243 @@ class SentryV2TabWidget(QWidget):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        self._reflow_all_responsive_button_grids()
+        self._update_responsive_layout()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        if not self._layout_restore_complete:
+            QTimer.singleShot(0, self._apply_saved_layout_state)
 
     def _on_main_splitter_moved(self, _pos: int, _index: int) -> None:
-        self._reflow_all_responsive_button_grids()
+        self._capture_layout_state()
+        self._save_config_quietly()
+        self._update_responsive_layout()
+
+    def _on_layout_splitter_moved(self, _pos: int, _index: int) -> None:
+        self._capture_layout_state()
+        self._save_config_quietly()
+
+    def _on_bottom_info_splitter_moved(self, _pos: int, _index: int) -> None:
+        self._capture_layout_state()
+        self._save_config_quietly()
 
     def _sync_settings_panel_width(self) -> None:
         return
+
+    def _sync_settings_tab_bar_metrics(self) -> None:
+        if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
+            return
+        tab_bar = self._settings_tabs.tabBar()
+        if tab_bar is None:
+            return
+        count = max(1, self._settings_tabs.count())
+        metrics = self._responsive_panel_metrics()
+        available_width = max(260, min(int(metrics["panel_width"]) - 18, tab_bar.width() or self._settings_tabs.width() or self.width()))
+        per_tab_width = max(28.0, float(available_width) / float(count))
+        icon_px = _clamp_int_range(per_tab_width * 0.48, 20, 38)
+        bar_height = _clamp_int_range(per_tab_width * 0.80, int(metrics["tab_bar_height_min"]), int(metrics["tab_bar_height_max"]))
+        tab_bar.setIconSize(QSize(icon_px, icon_px))
+        tab_bar.setMinimumHeight(bar_height)
+        tab_bar.setMaximumHeight(bar_height)
+        tab_bar.updateGeometry()
+
+    def _settings_panel_width(self) -> int:
+        panel_width = 0
+        if self._right_panel is not None:
+            panel_width = self._right_panel.width()
+        if panel_width <= 0 and hasattr(self, "_main_splitter"):
+            sizes = self._main_splitter.sizes()
+            if len(sizes) > 1:
+                panel_width = int(sizes[1])
+        if panel_width <= 0 and hasattr(self, "_settings_tabs"):
+            panel_width = self._settings_tabs.width()
+        if panel_width <= 0:
+            panel_width = SENTRY_V2_PANEL_DEFAULT_WIDTH
+        return max(SENTRY_V2_PANEL_MIN_WIDTH, int(panel_width))
+
+    def _responsive_panel_metrics(self) -> dict[str, int | bool]:
+        panel_width = self._settings_panel_width()
+        panel_height = self.height() if self.height() > 0 else 880
+        compact = panel_width < 500
+        dense = panel_width < 620
+        nav_button = _clamp_int_range(panel_width * 0.098, 40, 62)
+        manual_button_width = _clamp_int_range((panel_width - 86) / 5.0, 58, 94)
+        manual_button_height = _clamp_int_range(manual_button_width * 0.50, 32, 44)
+        list_height = _clamp_int_range(panel_height * 0.18, 112, 220)
+        waypoint_height = _clamp_int_range(panel_height * 0.12, 88, 150)
+        mask_height = _clamp_int_range(panel_height * 0.14, 96, 176)
+        return {
+            "panel_width": panel_width,
+            "panel_height": panel_height,
+            "compact": compact,
+            "dense": dense,
+            "nav_button": nav_button,
+            "nav_spacing": 6 if compact else 10,
+            "nav_margin_x": 4 if compact else 6,
+            "tab_bar_height_min": 42 if compact else 46,
+            "tab_bar_height_max": 60 if compact else 72,
+            "manual_button_width": manual_button_width,
+            "manual_button_height": manual_button_height,
+            "class_list_height": list_height,
+            "waypoint_list_height": waypoint_height,
+            "mask_list_height": mask_height,
+        }
+
+    def _update_settings_nav_controls(self) -> None:
+        metrics = self._responsive_panel_metrics()
+        button_size = int(metrics["nav_button"])
+        if self._tabs_nav_layout is not None:
+            self._tabs_nav_layout.setContentsMargins(int(metrics["nav_margin_x"]), 2, int(metrics["nav_margin_x"]), 2)
+            self._tabs_nav_layout.setSpacing(int(metrics["nav_spacing"]))
+        if self._tabs_nav_title_label is not None:
+            self._tabs_nav_title_label.setText("")
+            self._tabs_nav_title_label.setVisible(False)
+        for button in (getattr(self, "_btn_prev_settings_tab", None), getattr(self, "_btn_next_settings_tab", None)):
+            if button is None:
+                continue
+            button.setMinimumSize(40, 40)
+            button.setMaximumSize(68, 68)
+            button.setFixedSize(button_size, button_size)
+
+    def _update_manual_control_button_sizes(self) -> None:
+        if not self._manual_control_buttons:
+            return
+        metrics = self._responsive_panel_metrics()
+        button_w = int(metrics["manual_button_width"])
+        button_h = int(metrics["manual_button_height"])
+        for button in self._manual_control_buttons:
+            button.setFixedSize(button_w, button_h)
+
+    def _update_responsive_header_metrics(self) -> None:
+        title_label = getattr(self, "_hero_title_label", None)
+        subtitle_label = getattr(self, "_hero_subtitle_label", None)
+        badge_label = getattr(self, "_hero_badge_label", None)
+        wake_button = getattr(self, "_btn_header_wake", None)
+        rest_button = getattr(self, "_btn_header_rest", None)
+        if any(widget is None for widget in (title_label, subtitle_label, badge_label, wake_button, rest_button)):
+            return
+
+        metrics = self._responsive_panel_metrics()
+        panel_width = int(metrics["panel_width"])
+        compact = bool(metrics["compact"])
+        width_ratio = max(0.0, min(1.0, (panel_width - 340.0) / 260.0))
+        tokens = self._theme_tokens()
+
+        title_scale = 0.80 + (0.24 * width_ratio)
+        subtitle_scale = 0.84 + (0.18 * width_ratio)
+        badge_scale = 0.86 + (0.14 * width_ratio)
+        button_scale = 0.80 + (0.20 * width_ratio)
+
+        title_pt = max(16.0, float(tokens["hero_title_pt"]) * title_scale)
+        subtitle_pt = max(10.4, float(tokens["hero_subtitle_pt"]) * subtitle_scale)
+        badge_pt = max(9.6, float(tokens["hero_badge_pt"]) * badge_scale)
+        button_pt = max(9.2, float(tokens["base_font_pt"]) * button_scale)
+        button_width = _clamp_int_range(panel_width * 0.28, 94, 148)
+        button_height = _clamp_int_range(button_width * 0.38, 32, 40)
+
+        title_label.setStyleSheet(f"font-size: {title_pt:.2f}pt;")
+        subtitle_label.setStyleSheet(f"font-size: {subtitle_pt:.2f}pt;")
+        badge_label.setStyleSheet(f"font-size: {badge_pt:.2f}pt;")
+        badge_label.setVisible(bool(badge_label.text().strip()))
+
+        for button in (wake_button, rest_button):
+            button.setMinimumWidth(0)
+            button.setFixedSize(button_width, button_height)
+            button.setStyleSheet(f"font-size: {button_pt:.2f}pt; font-weight: 700;")
+
+        if self._hero_layout is not None:
+            hero_margin_x = 12 if compact else 18
+            hero_margin_y = 12 if compact else 14
+            self._hero_layout.setContentsMargins(hero_margin_x, hero_margin_y, hero_margin_x, hero_margin_y)
+            self._hero_layout.setSpacing(10 if compact else 14)
+        if self._hero_actions_layout is not None:
+            self._hero_actions_layout.setSpacing(6 if compact else 8)
+        if self._hero_action_row is not None:
+            self._hero_action_row.setSpacing(6 if compact else 8)
+
+    def _register_responsive_list(self, widget: Optional[QListWidget], role: str) -> None:
+        if widget is None:
+            return
+        entry = (widget, role)
+        if entry not in self._responsive_lists:
+            self._responsive_lists.append(entry)
+
+    def _register_responsive_label(self, widget: Optional[QLabel], role: str) -> None:
+        if widget is None:
+            return
+        entry = (widget, role)
+        if entry not in self._responsive_labels:
+            self._responsive_labels.append(entry)
+
+    def _register_responsive_box_layout(self, layout: Optional[QBoxLayout], role: str) -> None:
+        if layout is None:
+            return
+        entry = (layout, role)
+        if entry not in self._responsive_box_layouts:
+            self._responsive_box_layouts.append(entry)
+
+    def _update_responsive_lists(self) -> None:
+        if not self._responsive_lists:
+            return
+        metrics = self._responsive_panel_metrics()
+        height_map = {
+            "allowed_classes": int(metrics["class_list_height"]),
+            "waypoint_list": int(metrics["waypoint_list_height"]),
+            "mask_list": int(metrics["mask_list_height"]),
+        }
+        for widget, role in self._responsive_lists:
+            max_height = height_map.get(role)
+            if max_height is not None:
+                widget.setMaximumHeight(max_height)
+
+    def _update_responsive_labels(self) -> None:
+        if not self._responsive_labels:
+            return
+        panel_width = int(self._responsive_panel_metrics()["panel_width"])
+        width_map = {
+            "weight_label": _clamp_int_range(panel_width * 0.23, 90, 132),
+            "weight_value": _clamp_int_range(panel_width * 0.08, 34, 48),
+            "zoom_value": _clamp_int_range(panel_width * 0.10, 42, 60),
+        }
+        for widget, role in self._responsive_labels:
+            width = width_map.get(role)
+            if width is None:
+                continue
+            widget.setMinimumWidth(width)
+            widget.setMaximumWidth(width)
+
+    def _update_responsive_box_layouts(self) -> None:
+        if not self._responsive_box_layouts:
+            return
+        panel_width = int(self._responsive_panel_metrics()["panel_width"])
+        threshold_map = {
+            "dense_row": 560,
+            "compact_row": 500,
+            "action_row": 460,
+        }
+        for layout, role in self._responsive_box_layouts:
+            threshold = threshold_map.get(role, 500)
+            direction = QBoxLayout.TopToBottom if panel_width < threshold else QBoxLayout.LeftToRight
+            if layout.direction() != direction:
+                layout.setDirection(direction)
+
+    def _update_responsive_layout(self) -> None:
+        self._sync_settings_tab_bar_metrics()
+        self._update_responsive_header_metrics()
+        self._update_settings_nav_controls()
+        self._update_manual_control_button_sizes()
+        self._update_responsive_lists()
+        self._update_responsive_labels()
+        self._update_responsive_box_layouts()
+        self._reflow_all_responsive_button_grids()
+
+    def _set_theme_role(self, widget: Optional[QWidget], role: str) -> None:
+        if widget is None:
+            return
+        widget.setProperty("themeRole", role)
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+        widget.update()
 
     def _set_button_role(self, button: Optional[QPushButton], role: str) -> None:
         if button is None:
@@ -2624,7 +4696,11 @@ class SentryV2TabWidget(QWidget):
             available_width = SENTRY_V2_PANEL_MIN_WIDTH
         if button_count <= 1:
             return 1
-        return 1 if available_width < 430 else 2
+        if available_width < 420:
+            return 1
+        if available_width < 680 or button_count <= 4:
+            return 2
+        return 3
 
     def _register_responsive_button_grid(self, grid: QGridLayout) -> None:
         if grid not in self._responsive_button_grids:
@@ -2742,6 +4818,18 @@ class SentryV2TabWidget(QWidget):
             self._spin_recenter_tilt: "fire_recenter_tilt",
             self._spin_target_loss_timeout: "target_loss_timeout",
             self._chk_continuous_hunt_loss: "continuous_hunt_on_loss",
+            self._chk_adaptive_loss_recovery: "adaptive_loss_recovery_enabled",
+            self._combo_loss_search_style: "loss_search_style",
+            self._spin_loss_search_rounds: "loss_search_rounds",
+            self._spin_loss_handoff_pursuit: "loss_handoff_pursuit_time_s",
+            self._spin_loss_handoff_backoff: "loss_handoff_backoff_pan_deg",
+            self._spin_loss_handoff_tilt: "loss_handoff_tilt_step_deg",
+            self._spin_loss_retry_sparse: "loss_persistent_retry_passes_sparse",
+            self._spin_loss_retry_crowded: "loss_persistent_retry_passes_crowded",
+            self._spin_loss_switch_margin: "loss_switch_score_margin",
+            self._spin_loss_crowd_threshold: "loss_scene_crowding_threshold",
+            self._spin_loss_personality: "loss_personality_intensity",
+            self._spin_loss_velocity_bias: "loss_personality_velocity_bias",
             self._combo_guard_mode: "guard_mode",
             self._spin_guard_pan: "guard_pan",
             self._spin_guard_tilt: "guard_tilt",
@@ -2772,6 +4860,21 @@ class SentryV2TabWidget(QWidget):
             self._btn_laser: "laser_toggle",
             self._btn_safety: "safety_toggle",
             self._btn_fire: "manual_fire",
+            self._chk_human_voice_enabled: "human_voice_enabled",
+            self._chk_mute_buzzer_for_human_voice: "mute_buzzer_when_human_voice_enabled",
+            self._combo_human_voice_style: "human_voice_style",
+            self._combo_human_voice: "human_voice_name",
+            self._btn_test_human_voice: "human_voice_test",
+            self._slider_human_voice_rate: "human_voice_rate",
+            self._slider_human_voice_pitch: "human_voice_pitch",
+            self._slider_human_voice_volume: "human_voice_volume",
+            self._btn_human_voice_fallback: "human_voice_fallback",
+            self._btn_human_voice_stop: "human_voice_stop",
+            self._btn_human_voice_refresh: "human_voice_refresh",
+            self._btn_human_voice_validate: "human_voice_validate",
+            self._chk_ai_auto_speak: "ai_auto_speak",
+            self._btn_ai_speak_last: "ai_speak_last",
+            self._lbl_ai_examples: "ai_request_examples",
         }
         for widget, key in widget_map.items():
             self._apply_tooltip(widget, key)
@@ -2791,6 +4894,44 @@ class SentryV2TabWidget(QWidget):
         for widget, key in getattr(self, "_extra_tooltip_widgets", []):
             self._apply_tooltip(widget, key)
 
+        self._apply_missing_button_tooltips()
+
+    def _default_button_tooltip(self, button: QPushButton) -> str:
+        text = " ".join(str(button.text() or "").split())
+        if not text:
+            return ""
+
+        symbol_tooltips = {
+            "▲": "Move tilt up by the configured manual step.",
+            "▼": "Move tilt down by the configured manual step.",
+            "◀": "Move pan left by the configured manual step.",
+            "▶": "Move pan right by the configured manual step.",
+            "↖": "Move pan left and tilt up by the configured manual step.",
+            "↗": "Move pan right and tilt up by the configured manual step.",
+            "↙": "Move pan left and tilt down by the configured manual step.",
+            "↘": "Move pan right and tilt down by the configured manual step.",
+            "HOME": "Move to the configured guard home pan and tilt position.",
+            "RUN SWEEP": "Run a slow manual sweep using the configured sweep pan range and tilt limits.",
+            "SAVE": "Save the current Smart Sentry settings to disk.",
+        }
+        mapped = symbol_tooltips.get(text.upper())
+        if mapped:
+            return mapped
+
+        action = "Toggle" if button.isCheckable() else "Activate"
+        return f"{action} {text.lower()}."
+
+    def _apply_missing_button_tooltips(self) -> None:
+        for button in self.findChildren(QPushButton):
+            try:
+                if str(button.toolTip() or "").strip():
+                    continue
+                tooltip = self._default_button_tooltip(button)
+                if tooltip:
+                    button.setToolTip(tooltip)
+            except Exception:
+                continue
+
     # ------------------------------------------------------------------ #
     #  Master Profiles Tab
     # ------------------------------------------------------------------ #
@@ -2806,7 +4947,7 @@ class SentryV2TabWidget(QWidget):
             "Each tab can still be tuned independently afterward."
         )
         intro.setWordWrap(True)
-        intro.setStyleSheet("color: #aaa; font-size: 11px;")
+        self._set_theme_role(intro, "subtleBody")
         lay.addWidget(intro)
 
         preset_grp = QGroupBox("Coordinated Profiles")
@@ -2819,7 +4960,7 @@ class SentryV2TabWidget(QWidget):
 
         self._lbl_master_profile = QLabel("")
         self._lbl_master_profile.setWordWrap(True)
-        self._lbl_master_profile.setStyleSheet("color: #999; font-size: 10px;")
+        self._set_theme_role(self._lbl_master_profile, "mutedCompact")
         preset_lay.addWidget(self._lbl_master_profile)
         lay.addWidget(preset_grp)
 
@@ -2842,6 +4983,7 @@ class SentryV2TabWidget(QWidget):
         btn_new_custom.clicked.connect(self._clear_custom_master_profile_editor)
         self._apply_tooltip(btn_new_custom, "custom_master_new")
         select_row.addWidget(btn_new_custom)
+        self._register_responsive_box_layout(select_row, "dense_row")
         save_lay.addLayout(select_row)
 
         save_row = QHBoxLayout()
@@ -2860,12 +5002,13 @@ class SentryV2TabWidget(QWidget):
         btn_save_custom.clicked.connect(self._save_new_custom_master_profile)
         self._apply_tooltip(btn_save_custom, "custom_master_save_as_new")
         save_row.addWidget(btn_save_custom)
+        self._register_responsive_box_layout(save_row, "dense_row")
         save_lay.addLayout(save_row)
         self._lbl_custom_master_info = QLabel(
             "Select a saved custom preset to edit/update it, or click New and enter a unique preset name to save the current stack as a new coordinated profile."
         )
-        self._lbl_custom_master_info.setStyleSheet("color: #999; font-size: 10px;")
         self._lbl_custom_master_info.setWordWrap(True)
+        self._set_theme_role(self._lbl_custom_master_info, "mutedCompact")
         save_lay.addWidget(self._lbl_custom_master_info)
         lay.addWidget(save_grp)
 
@@ -2874,7 +5017,7 @@ class SentryV2TabWidget(QWidget):
         summary_lay.setSpacing(3)
         self._lbl_master_stack = QLabel("")
         self._lbl_master_stack.setWordWrap(True)
-        self._lbl_master_stack.setStyleSheet("font-size: 11px;")
+        self._set_theme_role(self._lbl_master_stack, "summary")
         summary_lay.addWidget(self._lbl_master_stack)
         lay.addWidget(summary_grp)
 
@@ -2882,6 +5025,118 @@ class SentryV2TabWidget(QWidget):
         self._update_master_stack_summary()
         self._set_master_profile_label(self._match_master_profile_name())
         self._rebuild_custom_master_profile_combo()
+        return w
+
+    def _build_theme_tab(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(4, 4, 4, 4)
+        lay.setSpacing(6)
+
+        intro = QLabel(
+            "Choose a visual preset, then fine-tune opacity, contrast, accent strength, and radius. "
+            "Changes apply live and save automatically."
+        )
+        intro.setWordWrap(True)
+        self._set_theme_role(intro, "subtleBody")
+        lay.addWidget(intro)
+
+        preset_grp = QGroupBox("Theme Presets")
+        preset_lay = QVBoxLayout(preset_grp)
+        preset_lay.setSpacing(6)
+
+        preset_row = QHBoxLayout()
+        preset_row.addWidget(QLabel("Preset:"))
+        self._combo_theme_preset = QComboBox()
+        for key, data in THEME_PRESETS.items():
+            self._combo_theme_preset.addItem(data["label"], key)
+        self._combo_theme_preset.currentIndexChanged.connect(self._on_theme_preset_changed)
+        preset_row.addWidget(self._combo_theme_preset, 1)
+        btn_theme_apply = QPushButton("Apply Now")
+        self._set_button_role(btn_theme_apply, "utility")
+        btn_theme_apply.clicked.connect(self._apply_theme)
+        preset_row.addWidget(btn_theme_apply)
+        self._register_responsive_box_layout(preset_row, "compact_row")
+        preset_lay.addLayout(preset_row)
+
+        quick_presets = QGridLayout()
+        quick_presets.setHorizontalSpacing(6)
+        quick_presets.setVerticalSpacing(6)
+        for index, (key, data) in enumerate(THEME_PRESETS.items()):
+            btn = QPushButton(data["label"])
+            self._set_button_role(btn, "preset")
+            btn.clicked.connect(lambda _checked=False, preset_key=key: self._select_theme_preset(preset_key))
+            quick_presets.addWidget(btn, index // 2, index % 2)
+        self._normalize_preset_grid_button_widths(quick_presets)
+        preset_lay.addLayout(quick_presets)
+
+        self._lbl_theme_preset_desc = QLabel("")
+        self._lbl_theme_preset_desc.setWordWrap(True)
+        self._set_theme_role(self._lbl_theme_preset_desc, "mutedCompact")
+        preset_lay.addWidget(self._lbl_theme_preset_desc)
+        lay.addWidget(preset_grp)
+
+        tune_grp = QGroupBox("Fine Tuning")
+        tune_lay = QGridLayout(tune_grp)
+        tune_lay.setHorizontalSpacing(8)
+        tune_lay.setVerticalSpacing(8)
+
+        def add_slider_row(row: int, label_text: str, minimum: int, maximum: int):
+            label = QLabel(label_text)
+            slider = QSlider(Qt.Horizontal)
+            slider.setRange(minimum, maximum)
+            slider.setSingleStep(1)
+            value_label = QLabel("")
+            value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            tune_lay.addWidget(label, row, 0)
+            tune_lay.addWidget(slider, row, 1)
+            tune_lay.addWidget(value_label, row, 2)
+            return slider, value_label
+
+        self._slider_theme_accent, self._lbl_theme_accent = add_slider_row(0, "Accent Strength", 60, 140)
+        self._slider_theme_surface_opacity, self._lbl_theme_surface_opacity = add_slider_row(1, "Panel Transparency", 55, 100)
+        self._slider_theme_video_opacity, self._lbl_theme_video_opacity = add_slider_row(2, "Video Panel Opacity", 55, 100)
+        self._slider_theme_window_opacity, self._lbl_theme_window_opacity = add_slider_row(3, "Window Opacity", 70, 100)
+        self._slider_theme_contrast, self._lbl_theme_contrast = add_slider_row(4, "Contrast", 85, 125)
+        self._slider_theme_radius, self._lbl_theme_radius = add_slider_row(5, "Corner Radius", 8, 24)
+
+        for slider in (
+            self._slider_theme_accent,
+            self._slider_theme_surface_opacity,
+            self._slider_theme_video_opacity,
+            self._slider_theme_window_opacity,
+            self._slider_theme_contrast,
+            self._slider_theme_radius,
+        ):
+            slider.valueChanged.connect(self._on_theme_settings_changed)
+
+        note = QLabel(
+            "Window opacity only affects the standalone Smart Sentry window. When this tab is embedded in another host window, "
+            "the host stays opaque and only the panel surfaces become more transparent."
+        )
+        note.setWordWrap(True)
+        self._set_theme_role(note, "subtleBody")
+        tune_lay.addWidget(note, 7, 0, 1, 3)
+        lay.addWidget(tune_grp)
+
+        summary_grp = QGroupBox("Theme Summary")
+        summary_lay = QVBoxLayout(summary_grp)
+        self._lbl_theme_summary = QLabel("")
+        self._lbl_theme_summary.setWordWrap(True)
+        self._set_theme_role(self._lbl_theme_summary, "summary")
+        summary_lay.addWidget(self._lbl_theme_summary)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch(1)
+        btn_theme_reset = QPushButton("Reset Default")
+        self._set_button_role(btn_theme_reset, "utility")
+        btn_theme_reset.clicked.connect(self._reset_theme_defaults)
+        button_row.addWidget(btn_theme_reset)
+        summary_lay.addLayout(button_row)
+        lay.addWidget(summary_grp)
+
+        lay.addStretch()
+        self._sync_theme_widgets()
         return w
 
     # ------------------------------------------------------------------ #
@@ -2922,6 +5177,7 @@ class SentryV2TabWidget(QWidget):
         webcam_zoom_row.addWidget(self._slider_webcam_zoom, 1)
         self._lbl_webcam_zoom = QLabel("")
         self._lbl_webcam_zoom.setMinimumWidth(56)
+        self._register_responsive_label(self._lbl_webcam_zoom, "zoom_value")
         webcam_zoom_row.addWidget(self._lbl_webcam_zoom)
         cam_lay.addLayout(webcam_zoom_row, 2, 1)
 
@@ -2936,11 +5192,12 @@ class SentryV2TabWidget(QWidget):
         test_zoom_row.addWidget(self._slider_test_zoom, 1)
         self._lbl_test_zoom = QLabel("")
         self._lbl_test_zoom.setMinimumWidth(56)
+        self._register_responsive_label(self._lbl_test_zoom, "zoom_value")
         test_zoom_row.addWidget(self._lbl_test_zoom)
         cam_lay.addLayout(test_zoom_row, 3, 1)
 
         lbl_live_section = QLabel("Live Camera")
-        lbl_live_section.setStyleSheet("font-weight: bold; color: #cfe8ff; padding-top: 4px;")
+        self._set_theme_role(lbl_live_section, "sectionPadded")
         cam_lay.addWidget(lbl_live_section, 4, 0, 1, 2)
 
         self._btn_cam = QPushButton("Open Camera")
@@ -2959,10 +5216,11 @@ class SentryV2TabWidget(QWidget):
             "Close the current test source and reopen the last webcam"
         )
         live_action_row.addWidget(self._btn_return_to_camera)
+        self._register_responsive_box_layout(live_action_row, "action_row")
         cam_lay.addLayout(live_action_row, 5, 0, 1, 2)
 
         lbl_media_section = QLabel("Media Inputs")
-        lbl_media_section.setStyleSheet("font-weight: bold; color: #cfe8ff; padding-top: 4px;")
+        self._set_theme_role(lbl_media_section, "sectionPadded")
         cam_lay.addWidget(lbl_media_section, 6, 0, 1, 2)
 
         self._btn_test_media = QPushButton("Open Media...")
@@ -2987,7 +5245,7 @@ class SentryV2TabWidget(QWidget):
         cam_lay.addLayout(url_col, 8, 1)
 
         lbl_playback_section = QLabel("Playback")
-        lbl_playback_section.setStyleSheet("font-weight: bold; color: #cfe8ff; padding-top: 4px;")
+        self._set_theme_role(lbl_playback_section, "sectionPadded")
         cam_lay.addWidget(lbl_playback_section, 9, 0, 1, 2)
 
         resolution_action_grid = QGridLayout()
@@ -3048,13 +5306,14 @@ class SentryV2TabWidget(QWidget):
         cam_lay.addLayout(playback_col, 10, 0, 1, 2)
 
         lbl_maintenance_section = QLabel("Maintenance")
-        lbl_maintenance_section.setStyleSheet("font-weight: bold; color: #cfe8ff; padding-top: 4px;")
+        self._set_theme_role(lbl_maintenance_section, "sectionPadded")
         cam_lay.addWidget(lbl_maintenance_section, 11, 0, 1, 2)
 
         cam_lay.addLayout(resolution_action_grid, 12, 0, 1, 2)
 
         self._lbl_cam_status = QLabel("Camera closed")
-        self._lbl_cam_status.setStyleSheet("color: #888; font-size: 10px;")
+        self._camera_status_level = "neutral"
+        self._lbl_cam_status.setStyleSheet(self._camera_status_style(self._camera_status_level))
         cam_lay.addWidget(self._lbl_cam_status, 13, 0, 1, 2)
         self._on_source_zoom_changed()
         self._update_test_media_controls()
@@ -3082,9 +5341,9 @@ class SentryV2TabWidget(QWidget):
         type_lay.addWidget(self._combo_conn_type)
         self._lbl_mode_hint = QLabel("")
         self._lbl_mode_hint.setWordWrap(True)
-        self._lbl_mode_hint.setStyleSheet("color: #aaa; font-size: 10px;")
+        self._set_theme_role(self._lbl_mode_hint, "mutedCompact")
         type_lay.addWidget(self._lbl_mode_hint)
-        self._btn_wifi_pinout = QPushButton("WiFi Pinout")
+        self._btn_wifi_pinout = QPushButton("Pin Assignments")
         self._set_button_role(self._btn_wifi_pinout, "utility")
         self._btn_wifi_pinout.clicked.connect(self._show_full_wifi_pinout)
         self._apply_tooltip(self._btn_wifi_pinout, "wifi_pinout")
@@ -3191,7 +5450,7 @@ class SentryV2TabWidget(QWidget):
 
         self._lbl_servo_time_preset = QLabel("")
         self._lbl_servo_time_preset.setWordWrap(True)
-        self._lbl_servo_time_preset.setStyleSheet("color: #888; font-size: 10px;")
+        self._lbl_servo_time_preset.setStyleSheet(SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE)
         srv_lay.addWidget(self._lbl_servo_time_preset, 4, 0, 1, 2)
         self._set_servo_time_preset_label(self._match_servo_time_preset_name())
 
@@ -3250,11 +5509,12 @@ class SentryV2TabWidget(QWidget):
 
         # Status
         self._lbl_conn_status = QLabel("Disconnected")
-        self._lbl_conn_status.setStyleSheet("color: #cc3333; font-weight: bold;")
+        self._connection_status_level = "error"
+        self._lbl_conn_status.setStyleSheet(self._connection_status_style(self._connection_status_level))
         lay.addWidget(self._lbl_conn_status)
 
         self._lbl_last_cmd = QLabel("")
-        self._lbl_last_cmd.setStyleSheet("color: #888; font-size: 10px;")
+        self._lbl_last_cmd.setStyleSheet(SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE)
         self._lbl_last_cmd.setWordWrap(True)
         lay.addWidget(self._lbl_last_cmd)
 
@@ -3290,7 +5550,7 @@ class SentryV2TabWidget(QWidget):
         # Description label
         self._lbl_mode_desc = QLabel("")
         self._lbl_mode_desc.setWordWrap(True)
-        self._lbl_mode_desc.setStyleSheet("color: #aaa; font-size: 11px;")
+        self._lbl_mode_desc.setStyleSheet(SENTRY_V3_SUBTLE_TEXT_STYLE)
         mode_lay.addWidget(self._lbl_mode_desc)
         self._update_mode_description()
 
@@ -3311,11 +5571,12 @@ class SentryV2TabWidget(QWidget):
         self._set_button_role(btn_apply_size, "utility")
         btn_apply_size.clicked.connect(self._apply_selected_target_size_preset)
         preset_row.addWidget(btn_apply_size)
+        self._register_responsive_box_layout(preset_row, "compact_row")
         preset_lay.addLayout(preset_row)
 
         self._lbl_detection_preset = QLabel("")
         self._lbl_detection_preset.setWordWrap(True)
-        self._lbl_detection_preset.setStyleSheet("color: #999; font-size: 10px;")
+        self._lbl_detection_preset.setStyleSheet(SENTRY_V3_MUTED_TEXT_STYLE)
         preset_lay.addWidget(self._lbl_detection_preset)
 
         lay.addWidget(preset_grp)
@@ -3345,7 +5606,7 @@ class SentryV2TabWidget(QWidget):
         contour_lay.addWidget(self._spin_max_contour, 1, 1)
 
         self._lbl_contour_ratio = QLabel()
-        self._lbl_contour_ratio.setStyleSheet("color: #999; font-size: 10px;")
+        self._lbl_contour_ratio.setStyleSheet(SENTRY_V3_MUTED_TEXT_STYLE)
         contour_lay.addWidget(self._lbl_contour_ratio, 2, 0, 1, 2)
 
         lay.addWidget(self._grp_contour)
@@ -3354,27 +5615,41 @@ class SentryV2TabWidget(QWidget):
         self._grp_yolo = QGroupBox("YOLO Settings")
         yolo_lay = QGridLayout(self._grp_yolo)
 
-        yolo_lay.addWidget(QLabel("Model:"), 0, 0)
+        yolo_lay.addWidget(QLabel("Model Folder:"), 0, 0)
+        self._edit_yolo_model_dir = QLineEdit()
+        self._edit_yolo_model_dir.setReadOnly(True)
+        self._edit_yolo_model_dir.setPlaceholderText("Using bundled/default YOLO model folders")
+        yolo_lay.addWidget(self._edit_yolo_model_dir, 0, 1)
+        self._btn_browse_yolo_dir = QPushButton("Browse...")
+        self._set_button_role(self._btn_browse_yolo_dir, "utility")
+        self._btn_browse_yolo_dir.clicked.connect(self._browse_yolo_model_dir)
+        yolo_lay.addWidget(self._btn_browse_yolo_dir, 0, 2)
+        self._btn_refresh_yolo_models = QPushButton("Refresh")
+        self._set_button_role(self._btn_refresh_yolo_models, "utility")
+        self._btn_refresh_yolo_models.clicked.connect(self._scan_yolo_models)
+        yolo_lay.addWidget(self._btn_refresh_yolo_models, 0, 3)
+
+        yolo_lay.addWidget(QLabel("Model:"), 1, 0)
         self._combo_yolo_model = QComboBox()
         self._combo_yolo_model.setPlaceholderText("Select model...")
         self._scan_yolo_models()
         self._combo_yolo_model.currentIndexChanged.connect(self._on_yolo_model_selection_changed)
         self._apply_tooltip(self._combo_yolo_model, "yolo_model")
-        yolo_lay.addWidget(self._combo_yolo_model, 0, 1)
+        yolo_lay.addWidget(self._combo_yolo_model, 1, 1, 1, 2)
         self._btn_load_yolo = QPushButton("Load")
         self._set_button_role(self._btn_load_yolo, "utility")
         self._btn_load_yolo.clicked.connect(self._load_yolo_model)
         self._apply_tooltip(self._btn_load_yolo, "load_yolo_model")
-        yolo_lay.addWidget(self._btn_load_yolo, 0, 2)
+        yolo_lay.addWidget(self._btn_load_yolo, 1, 3)
 
-        yolo_lay.addWidget(QLabel("Classes:"), 1, 0)
+        yolo_lay.addWidget(QLabel("Classes:"), 2, 0)
         self._edit_yolo_classes = QLineEdit(", ".join(self.config.target_filter.allowed_classes))
         self._edit_yolo_classes.setPlaceholderText("person, car, dog ...")
         self._edit_yolo_classes.editingFinished.connect(self._on_yolo_classes_changed)
         self._apply_tooltip(self._edit_yolo_classes, "yolo_classes")
-        yolo_lay.addWidget(self._edit_yolo_classes, 1, 1, 1, 2)
+        yolo_lay.addWidget(self._edit_yolo_classes, 2, 1, 1, 3)
 
-        yolo_lay.addWidget(QLabel("Confidence:"), 2, 0)
+        yolo_lay.addWidget(QLabel("Confidence:"), 3, 0)
         self._spin_yolo_conf = QDoubleSpinBox()
         self._spin_yolo_conf.setRange(0.05, 1.0)
         self._spin_yolo_conf.setSingleStep(0.05)
@@ -3382,20 +5657,20 @@ class SentryV2TabWidget(QWidget):
         self._spin_yolo_conf.setValue(self.config.detection_mode.yolo_confidence)
         self._spin_yolo_conf.valueChanged.connect(self._on_detection_settings_changed)
         self._apply_tooltip(self._spin_yolo_conf, "yolo_confidence")
-        yolo_lay.addWidget(self._spin_yolo_conf, 2, 1, 1, 2)
+        yolo_lay.addWidget(self._spin_yolo_conf, 3, 1, 1, 3)
 
-        yolo_lay.addWidget(QLabel("Min Area (px):"), 3, 0)
+        yolo_lay.addWidget(QLabel("Min Area (px):"), 4, 0)
         self._spin_yolo_min_area = QSpinBox()
         self._spin_yolo_min_area.setRange(0, 10000000)
         self._spin_yolo_min_area.setSingleStep(100)
         self._spin_yolo_min_area.setValue(self.config.detection_mode.yolo_min_area)
         self._spin_yolo_min_area.valueChanged.connect(self._on_detection_settings_changed)
         self._apply_tooltip(self._spin_yolo_min_area, "yolo_min_area")
-        yolo_lay.addWidget(self._spin_yolo_min_area, 3, 1, 1, 2)
+        yolo_lay.addWidget(self._spin_yolo_min_area, 4, 1, 1, 3)
 
         self._lbl_yolo_status = QLabel("No model loaded")
-        self._lbl_yolo_status.setStyleSheet("color: #888; font-size: 10px;")
-        yolo_lay.addWidget(self._lbl_yolo_status, 4, 0, 1, 3)
+        self._lbl_yolo_status.setStyleSheet(SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE)
+        yolo_lay.addWidget(self._lbl_yolo_status, 5, 0, 1, 4)
         self._set_yolo_status("info", "Model not loaded yet")
 
         lay.addWidget(self._grp_yolo)
@@ -3433,7 +5708,7 @@ class SentryV2TabWidget(QWidget):
         color_lay.addWidget(self._spin_color_max, 2, 1)
 
         self._lbl_color_ratio = QLabel()
-        self._lbl_color_ratio.setStyleSheet("color: #999; font-size: 10px;")
+        self._lbl_color_ratio.setStyleSheet(SENTRY_V3_MUTED_TEXT_STYLE)
         color_lay.addWidget(self._lbl_color_ratio, 5, 0, 1, 2)
 
         color_lay.addWidget(QLabel("Fusion Strategy:"), 3, 0)
@@ -3465,6 +5740,7 @@ class SentryV2TabWidget(QWidget):
         self._spin_motion_thresh.valueChanged.connect(self._on_detection_settings_changed)
         self._apply_tooltip(self._spin_motion_thresh, "motion_gate_threshold")
         motion_lay.addWidget(self._spin_motion_thresh)
+        self._register_responsive_box_layout(motion_lay, "compact_row")
 
         lay.addWidget(self._grp_motion)
 
@@ -3479,6 +5755,7 @@ class SentryV2TabWidget(QWidget):
         self._spin_motion_ignore.valueChanged.connect(self._on_detection_settings_changed)
         self._apply_tooltip(self._spin_motion_ignore, "motion_ignore_after_move_s")
         motion_recovery_lay.addWidget(self._spin_motion_ignore)
+        self._register_responsive_box_layout(motion_recovery_lay, "compact_row")
         lay.addWidget(self._grp_motion_recovery)
 
         lay.addStretch()
@@ -3500,7 +5777,7 @@ class SentryV2TabWidget(QWidget):
             "The saved target library auto-loads and runs alongside the normal detector stack."
         )
         intro.setWordWrap(True)
-        intro.setStyleSheet("color: #aaa; font-size: 11px;")
+        self._set_theme_role(intro, "subtleBody")
         lay.addWidget(intro)
 
         runtime_grp = QGroupBox("Prompted Runtime")
@@ -3527,6 +5804,7 @@ class SentryV2TabWidget(QWidget):
         self._edit_prompted_name.setPlaceholderText("Example: Yellow Drill")
         self._apply_tooltip(self._edit_prompted_name, "prompted_name")
         naming_lay.addWidget(self._edit_prompted_name, 1)
+        self._register_responsive_box_layout(naming_lay, "compact_row")
         lay.addWidget(naming_grp)
 
         import_grp = QGroupBox("Create Targets")
@@ -3548,7 +5826,7 @@ class SentryV2TabWidget(QWidget):
         import_lay.addWidget(self._btn_prompted_video, 0, 2)
         self._lbl_prompted_status = QLabel("")
         self._lbl_prompted_status.setWordWrap(True)
-        self._lbl_prompted_status.setStyleSheet("color: #888; font-size: 10px;")
+        self._set_theme_role(self._lbl_prompted_status, "mutedCompact")
         import_lay.addWidget(self._lbl_prompted_status, 1, 0, 1, 3)
         lay.addWidget(import_grp)
 
@@ -3621,6 +5899,7 @@ class SentryV2TabWidget(QWidget):
         self._btn_prompted_remove.clicked.connect(self._remove_selected_prompted_target)
         self._apply_tooltip(self._btn_prompted_remove, "prompted_remove")
         button_row.addWidget(self._btn_prompted_remove)
+        self._register_responsive_box_layout(button_row, "action_row")
         library_lay.addLayout(button_row)
         lay.addWidget(library_grp, 1)
 
@@ -3657,7 +5936,7 @@ class SentryV2TabWidget(QWidget):
 
         self._lbl_filter_preset = QLabel("")
         self._lbl_filter_preset.setWordWrap(True)
-        self._lbl_filter_preset.setStyleSheet("color: #999; font-size: 10px;")
+        self._set_theme_role(self._lbl_filter_preset, "mutedCompact")
         preset_lay.addWidget(self._lbl_filter_preset)
         lay.addWidget(preset_grp)
 
@@ -3676,6 +5955,7 @@ class SentryV2TabWidget(QWidget):
             if cls_name in allowed:
                 item.setSelected(True)
         self._class_list.setMaximumHeight(160)
+        self._register_responsive_list(self._class_list, "allowed_classes")
         self._class_list.itemSelectionChanged.connect(self._on_class_selection_changed)
         self._apply_tooltip(self._class_list, "allowed_classes")
         g_lay.addWidget(self._class_list)
@@ -3765,7 +6045,7 @@ class SentryV2TabWidget(QWidget):
 
         self._lbl_threat_preset = QLabel("")
         self._lbl_threat_preset.setWordWrap(True)
-        self._lbl_threat_preset.setStyleSheet("color: #999; font-size: 10px;")
+        self._set_theme_role(self._lbl_threat_preset, "mutedCompact")
         preset_lay.addWidget(self._lbl_threat_preset)
         lay.addWidget(preset_grp)
 
@@ -3787,6 +6067,7 @@ class SentryV2TabWidget(QWidget):
             row = QHBoxLayout()
             lbl = QLabel(f"{label}:")
             lbl.setMinimumWidth(120)
+            self._register_responsive_label(lbl, "weight_label")
             row.addWidget(lbl)
             slider = QSlider(Qt.Horizontal)
             slider.setRange(0, 100)
@@ -3805,6 +6086,7 @@ class SentryV2TabWidget(QWidget):
             row.addWidget(slider)
             val_lbl = QLabel(f"{default:.2f}")
             val_lbl.setMinimumWidth(35)
+            self._register_responsive_label(val_lbl, "weight_value")
             slider.valueChanged.connect(lambda v, l=val_lbl: l.setText(f"{v / 100:.2f}"))
             row.addWidget(val_lbl)
             self._weight_sliders[key] = slider
@@ -3851,13 +6133,34 @@ class SentryV2TabWidget(QWidget):
         btn_stats.setToolTip("Show summary of logged engagement data")
         ml_btn_lay.addWidget(btn_stats)
 
+        self._btn_open_ml_folder = QPushButton("Open ML Folder")
+        self._btn_open_ml_folder.clicked.connect(self._open_ml_data_folder)
+        self._btn_open_ml_folder.setToolTip("Open the folder containing saved ML training data or the saved ML model")
+        ml_btn_lay.addWidget(self._btn_open_ml_folder)
+
         self._style_button_row([btn_train], "primary")
-        self._style_button_row([btn_save, btn_stats], "utility")
+        self._style_button_row([btn_save, btn_stats, self._btn_open_ml_folder], "utility")
         self._style_button_row([btn_clear], "danger")
 
         ml_btn_lay.addStretch()
         
         lay.addLayout(ml_btn_lay)
+
+        self._lbl_ml_status = QLabel("")
+        self._lbl_ml_status.setWordWrap(True)
+        self._set_theme_role(self._lbl_ml_status, "mutedCompact")
+        lay.addWidget(self._lbl_ml_status)
+
+        self._lbl_ml_description = QLabel(
+            "How it works: the hand-tuned threat score always runs first. Optional ML refinement only changes final ranking after "
+            "a trained model exists and ML refinement is enabled. 'Log for ML Training' currently records manual fire decisions to "
+            "config/ml_training_data.json. After enough records are collected, click Train ML, then Save ML, then enable ML scoring refinement."
+        )
+        self._lbl_ml_description.setWordWrap(True)
+        self._set_theme_role(self._lbl_ml_description, "mutedCompact")
+        lay.addWidget(self._lbl_ml_description)
+
+        self._refresh_ml_feature_status()
 
         self._set_threat_preset_label(self._match_threat_preset_name())
 
@@ -3895,17 +6198,13 @@ class SentryV2TabWidget(QWidget):
 
         self._lbl_engagement_preset = QLabel("")
         self._lbl_engagement_preset.setWordWrap(True)
-        self._lbl_engagement_preset.setStyleSheet("color: #999; font-size: 10px;")
+        self._set_theme_role(self._lbl_engagement_preset, "mutedCompact")
         preset_lay.addWidget(self._lbl_engagement_preset)
         lay.addWidget(preset_grp)
 
         # Auto-Trigger toggle (prominent)
         self._chk_auto_trigger = QCheckBox("Auto-Trigger")
-        self._chk_auto_trigger.setStyleSheet(
-            "font-weight: bold; color: #ff4d4d;"
-            if self.config.engagement.auto_trigger_enabled
-            else "font-weight: bold; color: #66dd88;"
-        )
+        self._set_theme_role(self._chk_auto_trigger, "headlineToggle")
         self._chk_auto_trigger.setChecked(self.config.engagement.auto_trigger_enabled)
         self._chk_auto_trigger.toggled.connect(self._on_auto_trigger_toggled)
         self._apply_tooltip(self._chk_auto_trigger, "auto_trigger")
@@ -3923,8 +6222,8 @@ class SentryV2TabWidget(QWidget):
         trig_row.addWidget(self._combo_trigger_mode)
         lay.addLayout(trig_row)
 
-        trigger_servo_grp = QGroupBox("Projectile Trigger Servo")
-        trigger_servo_lay = QGridLayout(trigger_servo_grp)
+        self._grp_trigger_servo = QGroupBox("Projectile Trigger Servo")
+        trigger_servo_lay = QGridLayout(self._grp_trigger_servo)
         trigger_servo_lay.setHorizontalSpacing(6)
         trigger_servo_lay.setVerticalSpacing(4)
 
@@ -3954,10 +6253,15 @@ class SentryV2TabWidget(QWidget):
         trigger_servo_lay.addWidget(self._spin_trigger_servo_speed_dps, 1, 1)
 
         self._lbl_trigger_travel = QLabel("")
-        self._lbl_trigger_travel.setStyleSheet("color: #97a8b8; font-size: 10px;")
+        self._set_theme_role(self._lbl_trigger_travel, "statusMeta")
         trigger_servo_lay.addWidget(self._lbl_trigger_travel, 1, 2, 1, 2)
 
-        lay.addWidget(trigger_servo_grp)
+        self._lbl_trigger_servo_status = QLabel("Trigger-servo path: waiting for bridge capability packet")
+        self._lbl_trigger_servo_status.setWordWrap(True)
+        self._set_theme_role(self._lbl_trigger_servo_status, "statusStrong")
+        trigger_servo_lay.addWidget(self._lbl_trigger_servo_status, 2, 0, 1, 4)
+
+        lay.addWidget(self._grp_trigger_servo)
         self._refresh_trigger_servo_summary()
 
         # Min threat to engage
@@ -4222,8 +6526,8 @@ class SentryV2TabWidget(QWidget):
         advanced_lay.addLayout(center_radius_row, 6, 1)
 
         self._lbl_center_fire_radius_hint = QLabel("")
-        self._lbl_center_fire_radius_hint.setStyleSheet("color: #999; font-size: 10px;")
         self._lbl_center_fire_radius_hint.setWordWrap(True)
+        self._set_theme_role(self._lbl_center_fire_radius_hint, "mutedCompact")
         advanced_lay.addWidget(self._lbl_center_fire_radius_hint, 7, 0, 1, 2)
 
         advanced_lay.addWidget(QLabel("Fire exit Pan / Tilt (deg):"), 8, 0)
@@ -4282,6 +6586,110 @@ class SentryV2TabWidget(QWidget):
         self._chk_continuous_hunt_loss.toggled.connect(self._on_engagement_changed)
         self._apply_tooltip(self._chk_continuous_hunt_loss, "continuous_hunt_on_loss")
         advanced_lay.addWidget(self._chk_continuous_hunt_loss, 11, 1)
+
+        after_loss_grp = QGroupBox("After Target Loss")
+        after_loss_lay = QGridLayout(after_loss_grp)
+        after_loss_lay.addWidget(QLabel("Adaptive search:"), 0, 0)
+        self._chk_adaptive_loss_recovery = QCheckBox("Enable adaptive after-loss search")
+        self._chk_adaptive_loss_recovery.setChecked(bool(getattr(self.config.engagement, "adaptive_loss_recovery_enabled", True)))
+        self._chk_adaptive_loss_recovery.toggled.connect(self._on_engagement_changed)
+        after_loss_lay.addWidget(self._chk_adaptive_loss_recovery, 0, 1, 1, 2)
+
+        after_loss_lay.addWidget(QLabel("Search style (loss + PIR):"), 1, 0)
+        self._combo_loss_search_style = QComboBox()
+        self._combo_loss_search_style.addItem("Hunting", "hunting")
+        self._combo_loss_search_style.addItem("Fast Reacquire", "fast_reacquire")
+        loss_style = str(getattr(self.config.engagement, "loss_search_style", getattr(self.config.pir_guard, "search_style", "hunting")) or "hunting")
+        loss_style_index = max(0, self._combo_loss_search_style.findData(loss_style))
+        self._combo_loss_search_style.setCurrentIndex(loss_style_index)
+        self._combo_loss_search_style.currentIndexChanged.connect(self._on_engagement_changed)
+        self._apply_tooltip(self._combo_loss_search_style, "loss_search_style")
+        after_loss_lay.addWidget(self._combo_loss_search_style, 1, 1)
+
+        after_loss_lay.addWidget(QLabel("Hunt rounds (loss + PIR):"), 1, 2)
+        self._spin_loss_search_rounds = QSpinBox()
+        self._spin_loss_search_rounds.setRange(1, 4)
+        self._spin_loss_search_rounds.setValue(int(getattr(self.config.engagement, "loss_search_rounds", getattr(self.config.pir_guard, "search_rounds", 1)) or 1))
+        self._spin_loss_search_rounds.valueChanged.connect(self._on_engagement_changed)
+        self._apply_tooltip(self._spin_loss_search_rounds, "loss_search_rounds")
+        after_loss_lay.addWidget(self._spin_loss_search_rounds, 1, 3)
+
+        after_loss_lay.addWidget(QLabel("Quick handoff pursuit (s):"), 2, 0)
+        self._spin_loss_handoff_pursuit = QDoubleSpinBox()
+        self._spin_loss_handoff_pursuit.setRange(0.05, 1.50)
+        self._spin_loss_handoff_pursuit.setSingleStep(0.01)
+        self._spin_loss_handoff_pursuit.setDecimals(2)
+        self._spin_loss_handoff_pursuit.setValue(float(getattr(self.config.engagement, "loss_handoff_pursuit_time_s", 0.14)))
+        self._spin_loss_handoff_pursuit.valueChanged.connect(self._on_engagement_changed)
+        after_loss_lay.addWidget(self._spin_loss_handoff_pursuit, 2, 1)
+
+        after_loss_lay.addWidget(QLabel("Back-off pan / tilt step (deg):"), 3, 0)
+        loss_handoff_row = QHBoxLayout()
+        self._spin_loss_handoff_backoff = QDoubleSpinBox()
+        self._spin_loss_handoff_backoff.setRange(0.20, 8.0)
+        self._spin_loss_handoff_backoff.setSingleStep(0.10)
+        self._spin_loss_handoff_backoff.setDecimals(2)
+        self._spin_loss_handoff_backoff.setValue(float(getattr(self.config.engagement, "loss_handoff_backoff_pan_deg", 1.4)))
+        self._spin_loss_handoff_backoff.valueChanged.connect(self._on_engagement_changed)
+        loss_handoff_row.addWidget(self._spin_loss_handoff_backoff)
+        self._spin_loss_handoff_tilt = QDoubleSpinBox()
+        self._spin_loss_handoff_tilt.setRange(0.10, 5.0)
+        self._spin_loss_handoff_tilt.setSingleStep(0.05)
+        self._spin_loss_handoff_tilt.setDecimals(2)
+        self._spin_loss_handoff_tilt.setValue(float(getattr(self.config.engagement, "loss_handoff_tilt_step_deg", 0.9)))
+        self._spin_loss_handoff_tilt.valueChanged.connect(self._on_engagement_changed)
+        loss_handoff_row.addWidget(self._spin_loss_handoff_tilt)
+        after_loss_lay.addLayout(loss_handoff_row, 3, 1)
+
+        after_loss_lay.addWidget(QLabel("Sparse / crowded retry passes:"), 4, 0)
+        loss_retry_row = QHBoxLayout()
+        self._spin_loss_retry_sparse = QSpinBox()
+        self._spin_loss_retry_sparse.setRange(1, 6)
+        self._spin_loss_retry_sparse.setValue(int(getattr(self.config.engagement, "loss_persistent_retry_passes_sparse", 2)))
+        self._spin_loss_retry_sparse.valueChanged.connect(self._on_engagement_changed)
+        loss_retry_row.addWidget(self._spin_loss_retry_sparse)
+        self._spin_loss_retry_crowded = QSpinBox()
+        self._spin_loss_retry_crowded.setRange(1, 6)
+        self._spin_loss_retry_crowded.setValue(int(getattr(self.config.engagement, "loss_persistent_retry_passes_crowded", 1)))
+        self._spin_loss_retry_crowded.valueChanged.connect(self._on_engagement_changed)
+        loss_retry_row.addWidget(self._spin_loss_retry_crowded)
+        after_loss_lay.addLayout(loss_retry_row, 4, 1)
+
+        after_loss_lay.addWidget(QLabel("Switch margin / crowd threshold:"), 5, 0)
+        loss_switch_row = QHBoxLayout()
+        self._spin_loss_switch_margin = QDoubleSpinBox()
+        self._spin_loss_switch_margin.setRange(0.00, 1.00)
+        self._spin_loss_switch_margin.setSingleStep(0.01)
+        self._spin_loss_switch_margin.setDecimals(2)
+        self._spin_loss_switch_margin.setValue(float(getattr(self.config.engagement, "loss_switch_score_margin", 0.12)))
+        self._spin_loss_switch_margin.valueChanged.connect(self._on_engagement_changed)
+        loss_switch_row.addWidget(self._spin_loss_switch_margin)
+        self._spin_loss_crowd_threshold = QSpinBox()
+        self._spin_loss_crowd_threshold.setRange(1, 8)
+        self._spin_loss_crowd_threshold.setValue(int(getattr(self.config.engagement, "loss_scene_crowding_threshold", 3)))
+        self._spin_loss_crowd_threshold.valueChanged.connect(self._on_engagement_changed)
+        loss_switch_row.addWidget(self._spin_loss_crowd_threshold)
+        after_loss_lay.addLayout(loss_switch_row, 5, 1)
+
+        after_loss_lay.addWidget(QLabel("Personality intensity / velocity bias:"), 6, 0)
+        loss_personality_row = QHBoxLayout()
+        self._spin_loss_personality = QDoubleSpinBox()
+        self._spin_loss_personality.setRange(0.00, 1.00)
+        self._spin_loss_personality.setSingleStep(0.05)
+        self._spin_loss_personality.setDecimals(2)
+        self._spin_loss_personality.setValue(float(getattr(self.config.engagement, "loss_personality_intensity", 0.35)))
+        self._spin_loss_personality.valueChanged.connect(self._on_engagement_changed)
+        loss_personality_row.addWidget(self._spin_loss_personality)
+        self._spin_loss_velocity_bias = QDoubleSpinBox()
+        self._spin_loss_velocity_bias.setRange(0.00, 1.00)
+        self._spin_loss_velocity_bias.setSingleStep(0.05)
+        self._spin_loss_velocity_bias.setDecimals(2)
+        self._spin_loss_velocity_bias.setValue(float(getattr(self.config.engagement, "loss_personality_velocity_bias", 0.40)))
+        self._spin_loss_velocity_bias.valueChanged.connect(self._on_engagement_changed)
+        loss_personality_row.addWidget(self._spin_loss_velocity_bias)
+        after_loss_lay.addLayout(loss_personality_row, 6, 1)
+
+        advanced_lay.addWidget(after_loss_grp, 12, 0, 1, 2)
 
         self._update_center_fire_radius_hint()
 
@@ -4366,6 +6774,96 @@ class SentryV2TabWidget(QWidget):
         row2.addWidget(self._spin_guard_tilt)
         static_lay.addLayout(row2)
 
+        row3 = QHBoxLayout()
+        row3.addWidget(QLabel("Rest Pan (deg):"))
+        self._spin_rest_pan = QDoubleSpinBox()
+        self._spin_rest_pan.setRange(SENTRY_PAN_MIN, SENTRY_PAN_MAX)
+        self._spin_rest_pan.setSingleStep(1.0)
+        self._spin_rest_pan.setValue(float(getattr(self.config.guard, "rest_pan", self.config.guard.guard_pan)))
+        self._spin_rest_pan.valueChanged.connect(self._on_guard_changed)
+        row3.addWidget(self._spin_rest_pan)
+        static_lay.addLayout(row3)
+
+        row4 = QHBoxLayout()
+        row4.addWidget(QLabel("Rest Tilt (deg):"))
+        self._spin_rest_tilt = QDoubleSpinBox()
+        self._spin_rest_tilt.setRange(SENTRY_TILT_MIN, SENTRY_TILT_MAX)
+        self._spin_rest_tilt.setSingleStep(1.0)
+        self._spin_rest_tilt.setValue(float(getattr(self.config.guard, "rest_tilt", self.config.guard.guard_tilt)))
+        self._spin_rest_tilt.valueChanged.connect(self._on_guard_changed)
+        row4.addWidget(self._spin_rest_tilt)
+        static_lay.addLayout(row4)
+
+        rest_option_row = QHBoxLayout()
+        self._chk_rest_on_startup = QCheckBox("Startup to Rest")
+        self._chk_rest_on_startup.setChecked(bool(getattr(self.config.guard, "rest_on_startup_enabled", True)))
+        self._chk_rest_on_startup.toggled.connect(self._on_guard_changed)
+        rest_option_row.addWidget(self._chk_rest_on_startup)
+        self._chk_rest_on_close = QCheckBox("Close to Rest")
+        self._chk_rest_on_close.setChecked(bool(getattr(self.config.guard, "rest_on_close_enabled", True)))
+        self._chk_rest_on_close.toggled.connect(self._on_guard_changed)
+        rest_option_row.addWidget(self._chk_rest_on_close)
+        static_lay.addLayout(rest_option_row)
+
+        motion_note = QLabel(
+            "Home and Rest use a stepped ease-out move. Wake Up from the rest position automatically uses a calmer Home profile, while Home from elsewhere stays smoother without feeling sluggish."
+        )
+        motion_note.setWordWrap(True)
+        self._set_theme_role(motion_note, "subtleBody")
+        static_lay.addWidget(motion_note)
+
+        motion_tune_grp = QGroupBox("Home / Rest Return Motion")
+        motion_tune_lay = QGridLayout(motion_tune_grp)
+        motion_tune_lay.setHorizontalSpacing(8)
+        motion_tune_lay.setVerticalSpacing(6)
+
+        motion_tune_lay.addWidget(QLabel("Home speed (deg/s):"), 0, 0)
+        self._spin_home_move_speed = QDoubleSpinBox()
+        self._spin_home_move_speed.setRange(2.0, 90.0)
+        self._spin_home_move_speed.setDecimals(1)
+        self._spin_home_move_speed.setSingleStep(0.5)
+        self._spin_home_move_speed.setValue(float(getattr(self.config.guard, "home_move_speed_dps", 24.0)))
+        self._spin_home_move_speed.valueChanged.connect(self._on_guard_changed)
+        motion_tune_lay.addWidget(self._spin_home_move_speed, 0, 1)
+
+        motion_tune_lay.addWidget(QLabel("Home final approach (deg/s):"), 0, 2)
+        self._spin_home_move_approach_speed = QDoubleSpinBox()
+        self._spin_home_move_approach_speed.setRange(1.0, 60.0)
+        self._spin_home_move_approach_speed.setDecimals(1)
+        self._spin_home_move_approach_speed.setSingleStep(0.5)
+        self._spin_home_move_approach_speed.setValue(float(getattr(self.config.guard, "home_move_approach_speed_dps", 11.0)))
+        self._spin_home_move_approach_speed.valueChanged.connect(self._on_guard_changed)
+        motion_tune_lay.addWidget(self._spin_home_move_approach_speed, 0, 3)
+
+        motion_tune_lay.addWidget(QLabel("Rest speed (deg/s):"), 1, 0)
+        self._spin_rest_move_speed = QDoubleSpinBox()
+        self._spin_rest_move_speed.setRange(2.0, 90.0)
+        self._spin_rest_move_speed.setDecimals(1)
+        self._spin_rest_move_speed.setSingleStep(0.5)
+        self._spin_rest_move_speed.setValue(float(getattr(self.config.guard, "rest_move_speed_dps", 14.0)))
+        self._spin_rest_move_speed.valueChanged.connect(self._on_guard_changed)
+        motion_tune_lay.addWidget(self._spin_rest_move_speed, 1, 1)
+
+        motion_tune_lay.addWidget(QLabel("Rest final approach (deg/s):"), 1, 2)
+        self._spin_rest_move_approach_speed = QDoubleSpinBox()
+        self._spin_rest_move_approach_speed.setRange(1.0, 60.0)
+        self._spin_rest_move_approach_speed.setDecimals(1)
+        self._spin_rest_move_approach_speed.setSingleStep(0.5)
+        self._spin_rest_move_approach_speed.setValue(float(getattr(self.config.guard, "rest_move_approach_speed_dps", 5.0)))
+        self._spin_rest_move_approach_speed.valueChanged.connect(self._on_guard_changed)
+        motion_tune_lay.addWidget(self._spin_rest_move_approach_speed, 1, 3)
+
+        motion_tune_lay.addWidget(QLabel("Slowdown window (deg):"), 2, 0)
+        self._spin_guided_move_window = QDoubleSpinBox()
+        self._spin_guided_move_window.setRange(4.0, 90.0)
+        self._spin_guided_move_window.setDecimals(1)
+        self._spin_guided_move_window.setSingleStep(1.0)
+        self._spin_guided_move_window.setValue(float(getattr(self.config.guard, "guided_move_approach_window_deg", 18.0)))
+        self._spin_guided_move_window.valueChanged.connect(self._on_guard_changed)
+        motion_tune_lay.addWidget(self._spin_guided_move_window, 2, 1)
+
+        static_lay.addWidget(motion_tune_grp)
+
         limit_row_1 = QHBoxLayout()
         limit_row_1.addWidget(QLabel("Pan Min / Max:"))
         self._spin_pan_min = QDoubleSpinBox()
@@ -4404,11 +6902,19 @@ class SentryV2TabWidget(QWidget):
         btn.clicked.connect(self._go_to_guard)
         self._apply_tooltip(btn, "go_guard")
         btn_row.addWidget(btn)
+        btn_rest = QPushButton("Go To Rest")
+        self._set_button_role(btn_rest, "utility")
+        btn_rest.clicked.connect(self._on_rest_clicked)
+        btn_row.addWidget(btn_rest)
         btn2 = QPushButton("Set As Guard")
         self._set_button_role(btn2, "utility")
         self._apply_tooltip(btn2, "set_current_guard")
         btn2.clicked.connect(self._set_current_as_guard)
         btn_row.addWidget(btn2)
+        btn_set_rest = QPushButton("Set As Rest")
+        self._set_button_role(btn_set_rest, "utility")
+        btn_set_rest.clicked.connect(self._set_current_as_rest)
+        btn_row.addWidget(btn_set_rest)
         static_lay.addLayout(btn_row)
         lay.addWidget(static_grp)
 
@@ -4460,6 +6966,7 @@ class SentryV2TabWidget(QWidget):
 
         self._wp_list = QListWidget()
         self._wp_list.setMaximumHeight(100)
+        self._register_responsive_list(self._wp_list, "waypoint_list")
         self._apply_tooltip(self._wp_list, "waypoint_list")
         for wp in self.config.guard.patrol_waypoints:
             self._wp_list.addItem(f"P{wp[0]:.0f} T{wp[1]:.0f}")
@@ -4664,6 +7171,7 @@ class SentryV2TabWidget(QWidget):
         self._mask_list = QListWidget()
         self._mask_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._mask_list.setMaximumHeight(120)
+        self._register_responsive_list(self._mask_list, "mask_list")
         mask_lay.addWidget(self._mask_list)
 
         manage_row = QHBoxLayout()
@@ -4721,7 +7229,7 @@ class SentryV2TabWidget(QWidget):
             "The lockout below suppresses near-simultaneous cross-sensor overlap in software."
         )
         pir_hint.setWordWrap(True)
-        pir_hint.setStyleSheet("color: #97a8b8; font-size: 10px;")
+        self._set_theme_role(pir_hint, "mutedCompact")
         pir_lay.addWidget(pir_hint)
 
         # PIR sensors table (3 rows: pan cue angle, tilt cue angle, enabled)
@@ -4815,6 +7323,16 @@ class SentryV2TabWidget(QWidget):
         pir_lay.addLayout(scan_row2)
 
         scan_row3 = QHBoxLayout()
+        scan_row3.addWidget(QLabel("Cue Hold (s):"))
+        self._spin_pir_cue_hold = QDoubleSpinBox()
+        self._spin_pir_cue_hold.setRange(0.05, 2.0)
+        self._spin_pir_cue_hold.setSingleStep(0.02)
+        self._spin_pir_cue_hold.setDecimals(2)
+        self._spin_pir_cue_hold.setValue(float(getattr(self.config.pir_guard, "cue_hold_time_s", 0.18)))
+        self._spin_pir_cue_hold.valueChanged.connect(self._on_pir_settings_changed)
+        self._apply_tooltip(self._spin_pir_cue_hold, "pir_cue_hold_time")
+        scan_row3.addWidget(self._spin_pir_cue_hold)
+
         scan_row3.addWidget(QLabel("Confirmation Timeout (s):"))
         self._spin_pir_confirm_timeout = QDoubleSpinBox()
         self._spin_pir_confirm_timeout.setRange(0.5, 10.0)
@@ -4892,6 +7410,271 @@ class SentryV2TabWidget(QWidget):
 
         return w
 
+    def _build_facial_recognition_tab(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(4, 4, 4, 4)
+        lay.setSpacing(6)
+
+        intro = QLabel(
+            "Identify known faces from imported images or the live camera feed. Friendly profiles can be announced and optionally excluded from engagement."
+        )
+        intro.setWordWrap(True)
+        self._set_theme_role(intro, "subtleBody")
+        lay.addWidget(intro)
+
+        runtime_grp = QGroupBox("Recognition Runtime")
+        runtime_lay = QGridLayout(runtime_grp)
+        self._chk_face_enabled = QCheckBox("Enable face recognition")
+        self._chk_face_enabled.setChecked(bool(self.config.face_recognition.enabled))
+        self._chk_face_enabled.toggled.connect(self._on_face_runtime_settings_changed)
+        runtime_lay.addWidget(self._chk_face_enabled, 0, 0, 1, 2)
+
+        runtime_lay.addWidget(QLabel("Match threshold:"), 1, 0)
+        self._spin_face_threshold = QDoubleSpinBox()
+        self._spin_face_threshold.setRange(0.50, 0.99)
+        self._spin_face_threshold.setDecimals(2)
+        self._spin_face_threshold.setSingleStep(0.01)
+        self._spin_face_threshold.setValue(float(self.config.face_recognition.recognition_threshold))
+        self._spin_face_threshold.valueChanged.connect(self._on_face_runtime_settings_changed)
+        runtime_lay.addWidget(self._spin_face_threshold, 1, 1)
+
+        runtime_lay.addWidget(QLabel("Min face size (px):"), 2, 0)
+        self._spin_face_min_size = QSpinBox()
+        self._spin_face_min_size.setRange(32, 256)
+        self._spin_face_min_size.setValue(int(self.config.face_recognition.min_face_size_px))
+        self._spin_face_min_size.valueChanged.connect(self._on_face_runtime_settings_changed)
+        runtime_lay.addWidget(self._spin_face_min_size, 2, 1)
+
+        self._chk_face_suppress = QCheckBox("Suppress friendly known faces from engagement")
+        self._chk_face_suppress.setChecked(bool(self.config.face_recognition.suppress_known_faces_from_engagement))
+        self._chk_face_suppress.toggled.connect(self._on_face_runtime_settings_changed)
+        runtime_lay.addWidget(self._chk_face_suppress, 3, 0, 1, 2)
+
+        self._chk_face_announce = QCheckBox("Speak recognized names when faces are matched")
+        self._chk_face_announce.setChecked(bool(self.config.face_recognition.announce_known_faces))
+        self._chk_face_announce.toggled.connect(self._on_face_runtime_settings_changed)
+        runtime_lay.addWidget(self._chk_face_announce, 4, 0, 1, 2)
+
+        self._chk_face_gesture = QCheckBox("Friendly reaction gesture for recognized family")
+        self._chk_face_gesture.setChecked(bool(self.config.face_recognition.cute_gesture_enabled))
+        self._chk_face_gesture.toggled.connect(self._on_face_runtime_settings_changed)
+        runtime_lay.addWidget(self._chk_face_gesture, 5, 0, 1, 2)
+
+        self._lbl_face_runtime_status = QLabel("")
+        self._lbl_face_runtime_status.setWordWrap(True)
+        self._set_theme_role(self._lbl_face_runtime_status, "mutedCompact")
+        runtime_lay.addWidget(self._lbl_face_runtime_status, 6, 0, 1, 2)
+        lay.addWidget(runtime_grp)
+
+        enroll_grp = QGroupBox("Known Faces")
+        enroll_lay = QGridLayout(enroll_grp)
+        enroll_lay.addWidget(QLabel("Profile Name:"), 0, 0)
+        self._edit_face_profile_name = QLineEdit()
+        self._edit_face_profile_name.setPlaceholderText("Example: Mom")
+        enroll_lay.addWidget(self._edit_face_profile_name, 0, 1, 1, 2)
+
+        enroll_lay.addWidget(QLabel("Notes:"), 1, 0)
+        self._edit_face_profile_notes = QLineEdit()
+        self._edit_face_profile_notes.setPlaceholderText("Optional note about this face profile")
+        enroll_lay.addWidget(self._edit_face_profile_notes, 1, 1, 1, 2)
+
+        self._chk_face_profile_friendly = QCheckBox("Friendly / family profile")
+        self._chk_face_profile_friendly.setChecked(True)
+        enroll_lay.addWidget(self._chk_face_profile_friendly, 2, 0, 1, 3)
+
+        self._chk_face_profile_announce = QCheckBox("Announce this name when recognized")
+        self._chk_face_profile_announce.setChecked(True)
+        enroll_lay.addWidget(self._chk_face_profile_announce, 3, 0, 1, 3)
+
+        self._chk_face_profile_gesture = QCheckBox("Allow friendly reaction gesture")
+        self._chk_face_profile_gesture.setChecked(True)
+        enroll_lay.addWidget(self._chk_face_profile_gesture, 4, 0, 1, 3)
+
+        self._face_profile_list = QListWidget()
+        self._face_profile_list.currentItemChanged.connect(self._on_face_profile_selected)
+        enroll_lay.addWidget(self._face_profile_list, 5, 0, 1, 3)
+
+        btn_import_faces = QPushButton("Add From Images")
+        self._set_button_role(btn_import_faces, "utility")
+        btn_import_faces.clicked.connect(self._register_face_from_images)
+        enroll_lay.addWidget(btn_import_faces, 6, 0)
+
+        btn_capture_face = QPushButton("Add From Live Frame")
+        self._set_button_role(btn_capture_face, "utility")
+        btn_capture_face.clicked.connect(self._register_face_from_live_frame)
+        enroll_lay.addWidget(btn_capture_face, 6, 1)
+
+        btn_remove_face = QPushButton("Remove Selected")
+        self._set_button_role(btn_remove_face, "utility")
+        btn_remove_face.clicked.connect(self._remove_selected_face_profile)
+        enroll_lay.addWidget(btn_remove_face, 6, 2)
+        lay.addWidget(enroll_grp)
+
+        test_row = QHBoxLayout()
+        btn_test = QPushButton("Test Current Frame")
+        self._set_button_role(btn_test, "utility")
+        btn_test.clicked.connect(self._run_face_recognition_test)
+        test_row.addWidget(btn_test)
+        test_row.addStretch(1)
+        lay.addLayout(test_row)
+
+        lay.addStretch()
+        self._rebuild_face_profile_list()
+        self._update_face_runtime_status()
+        return w
+
+    def _build_shortcut_keys_tab(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(4, 4, 4, 4)
+        lay.setSpacing(6)
+
+        intro = QLabel(
+            "Keyboard shortcuts stay active while the Smart Sentry window is focused. Use Quick Keys at the top for the same reference sheet at any time."
+        )
+        intro.setWordWrap(True)
+        self._set_theme_role(intro, "subtleBody")
+        lay.addWidget(intro)
+
+        global_grp = QGroupBox("Shortcut Runtime")
+        global_lay = QVBoxLayout(global_grp)
+        self._chk_shortcuts_enabled = QCheckBox("Enable window-focused keyboard shortcuts")
+        self._chk_shortcuts_enabled.setChecked(bool(self.config.shortcuts.enabled))
+        self._chk_shortcuts_enabled.toggled.connect(self._on_shortcuts_enabled_changed)
+        global_lay.addWidget(self._chk_shortcuts_enabled)
+
+        self._lbl_shortcut_summary = QLabel("")
+        self._lbl_shortcut_summary.setWordWrap(True)
+        self._set_theme_role(self._lbl_shortcut_summary, "mutedCompact")
+        global_lay.addWidget(self._lbl_shortcut_summary)
+
+        btn_row = QHBoxLayout()
+        btn_reload = QPushButton("Reload Shortcuts")
+        self._set_button_role(btn_reload, "utility")
+        btn_reload.clicked.connect(self._install_global_shortcuts)
+        btn_row.addWidget(btn_reload)
+
+        btn_open_doc = QPushButton("Open Quick Reference")
+        self._set_button_role(btn_open_doc, "utility")
+        btn_open_doc.clicked.connect(self._open_shortcut_quick_view)
+        btn_row.addWidget(btn_open_doc)
+        btn_row.addStretch(1)
+        global_lay.addLayout(btn_row)
+        lay.addWidget(global_grp)
+
+        behavior_grp = QGroupBox("Assigned Keys")
+        behavior_lay = QVBoxLayout(behavior_grp)
+        self._lbl_shortcut_keys = QLabel("")
+        self._lbl_shortcut_keys.setWordWrap(True)
+        self._set_theme_role(self._lbl_shortcut_keys, "subtleBody")
+        behavior_lay.addWidget(self._lbl_shortcut_keys)
+        lay.addWidget(behavior_grp)
+
+        lay.addStretch()
+        self._update_shortcut_labels()
+        return w
+
+    def _build_ai_assistant_tab(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(4, 4, 4, 4)
+        lay.setSpacing(6)
+
+        intro = QLabel(
+            "Rule-based in-app assistant for diagnostics, operator questions, and safe runtime suggestions without needing an external model service."
+        )
+        intro.setWordWrap(True)
+        self._set_theme_role(intro, "subtleBody")
+        lay.addWidget(intro)
+
+        session_grp = QGroupBox("Conversation Bridge")
+        session_lay = QGridLayout(session_grp)
+        session_lay.addWidget(QLabel("Assistant Mode:"), 0, 0)
+        self._combo_ai_mode = QComboBox()
+        self._combo_ai_mode.addItem("Read-Only Advisor", "read_only")
+        self._combo_ai_mode.addItem("Guided Tuning", "guided_tuning")
+        self._combo_ai_mode.addItem("Mode Recommendations", "mode_recommendations")
+        self._combo_ai_mode.addItem("Conversational Voice", "conversational_voice")
+        mode_index = max(0, self._combo_ai_mode.findData(str(self.config.ai_assistant.mode or "guided_tuning")))
+        self._combo_ai_mode.setCurrentIndex(mode_index)
+        self._combo_ai_mode.currentIndexChanged.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._combo_ai_mode, 0, 1, 1, 2)
+
+        self._chk_ai_enabled = QCheckBox("Enable in-app AI assistant")
+        self._chk_ai_enabled.setChecked(bool(self.config.ai_assistant.enabled))
+        self._chk_ai_enabled.toggled.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._chk_ai_enabled, 1, 0, 1, 3)
+
+        self._chk_ai_allow_modes = QCheckBox("Allow the assistant to suggest or switch detection modes")
+        self._chk_ai_allow_modes.setChecked(bool(self.config.ai_assistant.allow_mode_switch))
+        self._chk_ai_allow_modes.toggled.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._chk_ai_allow_modes, 2, 0, 1, 3)
+
+        self._chk_ai_allow_tuning = QCheckBox("Allow the assistant to draft tuning or runtime-setting changes")
+        self._chk_ai_allow_tuning.setChecked(bool(self.config.ai_assistant.allow_setting_drafts))
+        self._chk_ai_allow_tuning.toggled.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._chk_ai_allow_tuning, 3, 0, 1, 3)
+
+        self._chk_ai_allow_analysis = QCheckBox("Allow runtime-state analysis and summaries")
+        self._chk_ai_allow_analysis.setChecked(bool(self.config.ai_assistant.allow_runtime_analysis))
+        self._chk_ai_allow_analysis.toggled.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._chk_ai_allow_analysis, 4, 0, 1, 3)
+
+        self._chk_ai_auto_speak = QCheckBox("Speak assistant replies with the local human voice")
+        self._chk_ai_auto_speak.setChecked(bool(self.config.ai_assistant.auto_speak_responses))
+        self._chk_ai_auto_speak.setEnabled(self._human_voice_supported())
+        self._chk_ai_auto_speak.toggled.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._chk_ai_auto_speak, 5, 0, 1, 3)
+
+        btn_chat = QPushButton("Run Request")
+        self._set_button_role(btn_chat, "utility")
+        btn_chat.clicked.connect(self._run_ai_assistant_request)
+        session_lay.addWidget(btn_chat, 6, 0)
+
+        btn_snapshot = QPushButton("Analyze Current Behavior")
+        self._set_button_role(btn_snapshot, "utility")
+        btn_snapshot.clicked.connect(self._run_ai_assistant_analysis)
+        session_lay.addWidget(btn_snapshot, 6, 1)
+
+        btn_suggest = QPushButton("Draft Recommendations")
+        self._set_button_role(btn_suggest, "utility")
+        btn_suggest.clicked.connect(self._run_ai_assistant_recommendations)
+        session_lay.addWidget(btn_suggest, 6, 2)
+        lay.addWidget(session_grp)
+
+        coach_grp = QGroupBox("Assistant Output")
+        coach_lay = QVBoxLayout(coach_grp)
+        self._edit_ai_prompt = QLineEdit()
+        self._edit_ai_prompt.setPlaceholderText("Example: switch to people-only mode, analyze current state, or explain why nothing is engaging")
+        self._edit_ai_prompt.returnPressed.connect(self._run_ai_assistant_request)
+        coach_lay.addWidget(self._edit_ai_prompt)
+
+        self._txt_ai_output = QTextEdit()
+        self._txt_ai_output.setReadOnly(True)
+        self._txt_ai_output.setMinimumHeight(180)
+        coach_lay.addWidget(self._txt_ai_output)
+
+        self._btn_ai_speak_last = QPushButton("Speak Last Reply")
+        self._set_button_role(self._btn_ai_speak_last, "utility")
+        self._btn_ai_speak_last.setEnabled(self._human_voice_supported())
+        self._btn_ai_speak_last.clicked.connect(self._speak_last_ai_output)
+        coach_lay.addWidget(self._btn_ai_speak_last)
+
+        self._lbl_ai_examples = QLabel(
+            "Try: 'wake up', 'go rest', 'enable face recognition', 'switch to color detection', 'disable shortcuts', or 'speak a status summary'."
+        )
+        self._lbl_ai_examples.setWordWrap(True)
+        self._set_theme_role(self._lbl_ai_examples, "mutedCompact")
+        coach_lay.addWidget(self._lbl_ai_examples)
+        lay.addWidget(coach_grp)
+
+        lay.addStretch()
+        self._append_ai_output(
+            "AI assistant ready. Try requests like 'analyze current state', 'wake up', 'switch to color detection', 'enable human voice', or 'suggest safer settings'."
+        )
+        return w
+
     # ------------------------------------------------------------------ #
     #  Manual Controls Tab
     # ------------------------------------------------------------------ #
@@ -4903,8 +7686,90 @@ class SentryV2TabWidget(QWidget):
         lay.setContentsMargins(4, 4, 4, 4)
         lay.setSpacing(6)
 
+        command_intro = QLabel(
+            "This command deck keeps the most-used runtime actions close together: link control, app-triggered sweep, output toggles, source selection, guarded fire, and runtime exports."
+        )
+        command_intro.setWordWrap(True)
+        self._set_theme_role(command_intro, "subtleBody")
+        lay.addWidget(command_intro)
+
+        quick_grp = QGroupBox("Quick Actions")
+        quick_lay = QGridLayout(quick_grp)
+        quick_lay.setHorizontalSpacing(8)
+        quick_lay.setVerticalSpacing(8)
+
+        self._btn_quick_link = QPushButton("Toggle Link")
+        self._btn_quick_link.setMinimumHeight(34)
+        self._set_button_role(self._btn_quick_link, "primary")
+        self._btn_quick_link.setToolTip(
+            "Connect or disconnect the active Smart Sentry link. Use the header Wake Up and Go Rest buttons for manual position testing, Export Runtime Data for a timestamped read-only runtime capture, and Open Export Folder to jump to the saved files."
+        )
+        self._btn_quick_link.clicked.connect(self._toggle_connection)
+        quick_lay.addWidget(self._btn_quick_link, 0, 0)
+
+        btn_quick_save = QPushButton("Save Settings")
+        btn_quick_save.setMinimumHeight(34)
+        self._set_button_role(btn_quick_save, "utility")
+        btn_quick_save.clicked.connect(self._save_config)
+        quick_lay.addWidget(btn_quick_save, 0, 1)
+
+        self._btn_export_runtime_snapshot = QPushButton("Export Runtime Data")
+        self._btn_export_runtime_snapshot.setMinimumHeight(34)
+        self._set_button_role(self._btn_export_runtime_snapshot, "utility")
+        self._btn_export_runtime_snapshot.clicked.connect(self._export_runtime_snapshot)
+        self._apply_tooltip(self._btn_export_runtime_snapshot, "export_runtime_snapshot")
+        quick_lay.addWidget(self._btn_export_runtime_snapshot, 0, 2)
+
+        self._btn_open_runtime_snapshot_folder = QPushButton("Open Export Folder")
+        self._btn_open_runtime_snapshot_folder.setMinimumHeight(34)
+        self._set_button_role(self._btn_open_runtime_snapshot_folder, "utility")
+        self._btn_open_runtime_snapshot_folder.clicked.connect(self._open_runtime_snapshot_folder)
+        self._apply_tooltip(self._btn_open_runtime_snapshot_folder, "open_runtime_snapshot_folder")
+        quick_lay.addWidget(self._btn_open_runtime_snapshot_folder, 0, 3)
+
+        lay.addWidget(quick_grp)
+
+        rest_grp = QGroupBox("Rest Position")
+        rest_lay = QGridLayout(rest_grp)
+        rest_lay.setHorizontalSpacing(8)
+        rest_lay.setVerticalSpacing(8)
+
+        rest_note = QLabel(
+            "Go Rest moves from the current angle to this rest position. Wake Up returns to the Guard Pan and Guard Tilt ready position."
+        )
+        rest_note.setWordWrap(True)
+        self._set_theme_role(rest_note, "subtleBody")
+        rest_lay.addWidget(rest_note, 0, 0, 1, 4)
+
+        rest_lay.addWidget(QLabel("Rest Pan (deg):"), 1, 0)
+        self._spin_command_rest_pan = QDoubleSpinBox()
+        self._spin_command_rest_pan.setRange(SENTRY_PAN_MIN, SENTRY_PAN_MAX)
+        self._spin_command_rest_pan.setSingleStep(1.0)
+        self._spin_command_rest_pan.setValue(float(getattr(self.config.guard, "rest_pan", self.config.guard.guard_pan)))
+        self._spin_command_rest_pan.setToolTip("Rest angle used by Go Rest. Wake Up returns to Guard Pan instead.")
+        self._spin_command_rest_pan.valueChanged.connect(self._on_command_rest_position_changed)
+        rest_lay.addWidget(self._spin_command_rest_pan, 1, 1)
+
+        rest_lay.addWidget(QLabel("Rest Tilt (deg):"), 1, 2)
+        self._spin_command_rest_tilt = QDoubleSpinBox()
+        self._spin_command_rest_tilt.setRange(SENTRY_TILT_MIN, SENTRY_TILT_MAX)
+        self._spin_command_rest_tilt.setSingleStep(1.0)
+        self._spin_command_rest_tilt.setValue(float(getattr(self.config.guard, "rest_tilt", self.config.guard.guard_tilt)))
+        self._spin_command_rest_tilt.setToolTip("Rest angle used by Go Rest. Wake Up returns to Guard Tilt instead.")
+        self._spin_command_rest_tilt.valueChanged.connect(self._on_command_rest_position_changed)
+        rest_lay.addWidget(self._spin_command_rest_tilt, 1, 3)
+
+        btn_set_rest_current = QPushButton("Set Current As Rest")
+        btn_set_rest_current.setMinimumHeight(34)
+        self._set_button_role(btn_set_rest_current, "utility")
+        btn_set_rest_current.clicked.connect(self._set_current_as_rest)
+        self._apply_tooltip(btn_set_rest_current, "set_current_rest")
+        rest_lay.addWidget(btn_set_rest_current, 2, 0, 1, 2)
+
+        lay.addWidget(rest_grp)
+
         # --- D-pad manual movement ---
-        dpad_grp = QGroupBox("Manual Movement")
+        dpad_grp = QGroupBox("Manual Turret Control")
         dpad_lay = QVBoxLayout(dpad_grp)
 
         # Speed / step controls
@@ -4929,7 +7794,7 @@ class SentryV2TabWidget(QWidget):
 
         motion_note = QLabel("When disabled, Smart Sentry tracking and PIR-driven slews stop sending pan/tilt moves, but manual arrows, Home, and Move to Guard still work.")
         motion_note.setWordWrap(True)
-        motion_note.setStyleSheet("color: #97a8b8; font-size: 10px;")
+        self._set_theme_role(motion_note, "mutedCompact")
         dpad_lay.addWidget(motion_note)
 
         # Centered manual movement grid
@@ -5011,7 +7876,6 @@ class SentryV2TabWidget(QWidget):
         btn_home = QPushButton("HOME")
         btn_home.setFixedSize(manual_button_w, manual_button_h)
         self._set_button_role(btn_home, "dpad")
-        btn_home.setStyleSheet("font-size: 11px; letter-spacing: 0.5px;")
         self._apply_tooltip(btn_home, "manual_home")
         btn_home.clicked.connect(self._on_home_clicked)
         grid.addWidget(btn_home, 2, 2, alignment=Qt.AlignCenter)
@@ -5072,17 +7936,44 @@ class SentryV2TabWidget(QWidget):
         self._apply_tooltip(btn_bottom_right, "manual_bottom_right")
         grid.addWidget(btn_bottom_right, 4, 4, alignment=Qt.AlignCenter)
 
+        self._manual_control_buttons = [
+            btn_top_left,
+            btn_diag_up_left,
+            btn_max_tilt,
+            btn_diag_up_right,
+            btn_top_right,
+            btn_up,
+            btn_min_pan,
+            btn_left,
+            btn_home,
+            btn_right,
+            btn_max_pan,
+            btn_down,
+            btn_diag_down_left,
+            btn_min_tilt,
+            btn_diag_down_right,
+            btn_bottom_left,
+            btn_bottom_right,
+        ]
+
         dpad_lay.addLayout(grid)
 
         preset_note = QLabel("Corner presets use pan-and-tilt limit combinations, while arrow buttons use the configured step size. All manual controls share the same clamp path as guard/Home moves.")
         preset_note.setWordWrap(True)
-        preset_note.setStyleSheet("color: #97a8b8; font-size: 10px;")
+        self._set_theme_role(preset_note, "mutedCompact")
         dpad_lay.addWidget(preset_note)
+
+        self._btn_manual_sweep = QPushButton("RUN SWEEP")
+        self._btn_manual_sweep.setMinimumHeight(34)
+        self._set_button_role(self._btn_manual_sweep, "primary")
+        self._btn_manual_sweep.clicked.connect(self._on_manual_sweep_clicked)
+        self._btn_manual_sweep.setToolTip("Run a slow manual sweep using the configured sweep pan range and tilt limits")
+        dpad_lay.addWidget(self._btn_manual_sweep)
 
         lay.addWidget(dpad_grp)
 
-        # --- Accessories ---
-        acc_grp = QGroupBox("Accessories")
+        # --- Outputs ---
+        acc_grp = QGroupBox("Bridge Outputs")
         acc_lay = QGridLayout(acc_grp)
 
         self._btn_led = QPushButton("LED: OFF")
@@ -5113,20 +8004,44 @@ class SentryV2TabWidget(QWidget):
         self._apply_tooltip(self._btn_spare, "spare_toggle")
         acc_lay.addWidget(self._btn_spare, 1, 0)
 
-        acc_note = QLabel("Accessories stay separate from arming and fire controls.")
+        acc_note = QLabel("These toggles drive bridge-owned outputs only. Trigger arming and fire remain in the guarded section below.")
         acc_note.setWordWrap(True)
-        acc_note.setStyleSheet("color: #97a8b8; font-size: 10px;")
+        self._set_theme_role(acc_note, "mutedCompact")
         acc_lay.addWidget(acc_note, 1, 1, 1, 2)
+
+        self._lbl_optional_outputs_status = QLabel("Optional outputs: waiting for bridge capability packet")
+        self._lbl_optional_outputs_status.setWordWrap(True)
+        self._set_theme_role(self._lbl_optional_outputs_status, "statusStrong")
+        acc_lay.addWidget(self._lbl_optional_outputs_status, 2, 0, 1, 3)
 
         lay.addWidget(acc_grp)
 
+        source_grp = QGroupBox("Source And Interlocks")
+        source_lay = QVBoxLayout(source_grp)
+
+        source_note = QLabel("Use the UI button or FlySky CH6 to request APP or RC control source. Trigger output is currently gated by software safety and fault state only.")
+        source_note.setWordWrap(True)
+        self._set_theme_role(source_note, "subtle")
+        source_lay.addWidget(source_note)
+
+        self._btn_control_source = QPushButton("Control Source: APP")
+        self._btn_control_source.setCheckable(True)
+        self._set_button_role(self._btn_control_source, "mode")
+        self._btn_control_source.toggled.connect(self._on_control_source_toggled)
+        source_lay.addWidget(self._btn_control_source)
+
+        self._lbl_control_source_status = QLabel("FlySky mode: waiting for bridge runtime")
+        self._lbl_control_source_status.setWordWrap(True)
+        self._set_theme_role(self._lbl_control_source_status, "statusStrong")
+        source_lay.addWidget(self._lbl_control_source_status)
+
         # --- Safety and Manual Fire ---
-        fire_grp = QGroupBox("Safety & Fire")
+        fire_grp = QGroupBox("Fire Control And Sound")
         fire_lay = QVBoxLayout(fire_grp)
 
         fire_note = QLabel("Arm Safety before using manual fire. Safety is isolated here so it is not visually mixed with ordinary accessory toggles.")
         fire_note.setWordWrap(True)
-        fire_note.setStyleSheet("color: #c9d7e3; font-size: 10px;")
+        self._set_theme_role(fire_note, "subtle")
         fire_lay.addWidget(fire_note)
 
         self._btn_safety = QPushButton("Safety: LOCKED")
@@ -5162,36 +8077,179 @@ class SentryV2TabWidget(QWidget):
         sound_row.addWidget(self._slider_sound_volume, 1)
         self._lbl_sound_volume = QLabel("100%")
         self._lbl_sound_volume.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._lbl_sound_volume.setStyleSheet("font-weight: bold; color: #dce9f7; font-size: 10px;")
+        self._set_theme_role(self._lbl_sound_volume, "compactValue")
         sound_row.addWidget(self._lbl_sound_volume)
         fire_lay.addLayout(sound_row)
 
+        personality_row = QHBoxLayout()
+        personality_row.addWidget(QLabel("Personality:"))
+        self._combo_sound_personality = QComboBox()
+        for personality_key, personality_label in SOUND_PERSONALITY_OPTIONS:
+            self._combo_sound_personality.addItem(personality_label, personality_key)
+        self._combo_sound_personality.currentIndexChanged.connect(self._on_sound_personality_changed)
+        personality_row.addWidget(self._combo_sound_personality, 1)
+        fire_lay.addLayout(personality_row)
+
+        attitude_row = QHBoxLayout()
+        attitude_row.addWidget(QLabel("Attitude:"))
+        self._slider_sound_attitude = QSlider(Qt.Horizontal)
+        self._slider_sound_attitude.setRange(0, 100)
+        self._slider_sound_attitude.setSingleStep(5)
+        self._slider_sound_attitude.setPageStep(10)
+        self._slider_sound_attitude.valueChanged.connect(self._on_sound_attitude_changed)
+        attitude_row.addWidget(self._slider_sound_attitude, 1)
+        self._lbl_sound_attitude = QLabel("60%")
+        self._lbl_sound_attitude.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._set_theme_role(self._lbl_sound_attitude, "compactValue")
+        attitude_row.addWidget(self._lbl_sound_attitude)
+        fire_lay.addLayout(attitude_row)
+
+        self._lbl_sound_profile = QLabel("Profile: Sentinel")
+        self._lbl_sound_profile.setWordWrap(True)
+        self._set_theme_role(self._lbl_sound_profile, "statusStrong")
+        fire_lay.addWidget(self._lbl_sound_profile)
+
+        self._chk_human_voice_enabled = QCheckBox("Human voice speech")
+        self._chk_human_voice_enabled.setChecked(bool(getattr(self.config.sound, "human_voice_enabled", False)))
+        self._chk_human_voice_enabled.setEnabled(self._human_voice_supported())
+        self._chk_human_voice_enabled.toggled.connect(self._on_human_voice_enabled_changed)
+        fire_lay.addWidget(self._chk_human_voice_enabled)
+
+        self._chk_mute_buzzer_for_human_voice = QCheckBox("Mute ESP32 buzzer while human voice mode is enabled")
+        self._chk_mute_buzzer_for_human_voice.setChecked(bool(getattr(self.config.sound, "mute_buzzer_when_human_voice_enabled", True)))
+        self._chk_mute_buzzer_for_human_voice.toggled.connect(self._on_mute_buzzer_for_human_voice_changed)
+        fire_lay.addWidget(self._chk_mute_buzzer_for_human_voice)
+
+        human_style_row = QHBoxLayout()
+        human_style_row.addWidget(QLabel("Speech Style:"))
+        self._combo_human_voice_style = QComboBox()
+        for style_key, style_data in HUMAN_VOICE_STYLE_PRESETS.items():
+            self._combo_human_voice_style.addItem(str(style_data["label"]), style_key)
+        self._combo_human_voice_style.currentIndexChanged.connect(self._on_human_voice_style_changed)
+        human_style_row.addWidget(self._combo_human_voice_style, 1)
+        fire_lay.addLayout(human_style_row)
+
+        human_voice_row = QHBoxLayout()
+        human_voice_row.addWidget(QLabel("Voice:"))
+        self._combo_human_voice = QComboBox()
+        self._combo_human_voice.currentIndexChanged.connect(self._on_human_voice_name_changed)
+        human_voice_row.addWidget(self._combo_human_voice, 1)
+        self._btn_test_human_voice = QPushButton("Test Voice")
+        self._set_button_role(self._btn_test_human_voice, "utility")
+        self._btn_test_human_voice.clicked.connect(self._on_test_human_voice_clicked)
+        human_voice_row.addWidget(self._btn_test_human_voice)
+        fire_lay.addLayout(human_voice_row)
+
+        human_rate_row = QHBoxLayout()
+        human_rate_row.addWidget(QLabel("Voice Rate:"))
+        self._slider_human_voice_rate = QSlider(Qt.Horizontal)
+        self._slider_human_voice_rate.setRange(50, 150)
+        self._slider_human_voice_rate.setSingleStep(5)
+        self._slider_human_voice_rate.setValue(int(getattr(self.config.sound, "human_voice_rate_pct", 100) or 100))
+        self._slider_human_voice_rate.valueChanged.connect(self._on_human_voice_rate_changed)
+        human_rate_row.addWidget(self._slider_human_voice_rate, 1)
+        self._lbl_human_voice_rate = QLabel("100%")
+        self._set_theme_role(self._lbl_human_voice_rate, "compactValue")
+        human_rate_row.addWidget(self._lbl_human_voice_rate)
+        fire_lay.addLayout(human_rate_row)
+
+        human_pitch_row = QHBoxLayout()
+        human_pitch_row.addWidget(QLabel("Voice Pitch:"))
+        self._slider_human_voice_pitch = QSlider(Qt.Horizontal)
+        self._slider_human_voice_pitch.setRange(50, 150)
+        self._slider_human_voice_pitch.setSingleStep(5)
+        self._slider_human_voice_pitch.setValue(int(getattr(self.config.sound, "human_voice_pitch_pct", 100) or 100))
+        self._slider_human_voice_pitch.valueChanged.connect(self._on_human_voice_pitch_changed)
+        human_pitch_row.addWidget(self._slider_human_voice_pitch, 1)
+        self._lbl_human_voice_pitch = QLabel("100%")
+        self._set_theme_role(self._lbl_human_voice_pitch, "compactValue")
+        human_pitch_row.addWidget(self._lbl_human_voice_pitch)
+        fire_lay.addLayout(human_pitch_row)
+
+        human_volume_row = QHBoxLayout()
+        human_volume_row.addWidget(QLabel("Voice Volume:"))
+        self._slider_human_voice_volume = QSlider(Qt.Horizontal)
+        self._slider_human_voice_volume.setRange(0, 100)
+        self._slider_human_voice_volume.setSingleStep(5)
+        self._slider_human_voice_volume.setValue(int(getattr(self.config.sound, "human_voice_volume_pct", 85) or 85))
+        self._slider_human_voice_volume.valueChanged.connect(self._on_human_voice_volume_changed)
+        human_volume_row.addWidget(self._slider_human_voice_volume, 1)
+        self._lbl_human_voice_volume = QLabel("85%")
+        self._set_theme_role(self._lbl_human_voice_volume, "compactValue")
+        human_volume_row.addWidget(self._lbl_human_voice_volume)
+        fire_lay.addLayout(human_volume_row)
+
+        self._lbl_human_voice_status = QLabel("Human voice: waiting")
+        self._lbl_human_voice_status.setWordWrap(True)
+        self._set_theme_role(self._lbl_human_voice_status, "statusStrong")
+        fire_lay.addWidget(self._lbl_human_voice_status)
+
+        voice_diag_grp = QGroupBox("Voice Diagnostics")
+        voice_diag_lay = QVBoxLayout(voice_diag_grp)
+        self._lbl_human_voice_diag_backend = QLabel("Backend: waiting")
+        self._lbl_human_voice_diag_backend.setWordWrap(True)
+        self._set_theme_role(self._lbl_human_voice_diag_backend, "mutedCompact")
+        voice_diag_lay.addWidget(self._lbl_human_voice_diag_backend)
+
+        self._lbl_human_voice_diag_selected = QLabel("Selected voice: waiting")
+        self._lbl_human_voice_diag_selected.setWordWrap(True)
+        self._set_theme_role(self._lbl_human_voice_diag_selected, "mutedCompact")
+        voice_diag_lay.addWidget(self._lbl_human_voice_diag_selected)
+
+        self._lbl_human_voice_diag_state = QLabel("Speech state: waiting")
+        self._lbl_human_voice_diag_state.setWordWrap(True)
+        self._set_theme_role(self._lbl_human_voice_diag_state, "mutedCompact")
+        voice_diag_lay.addWidget(self._lbl_human_voice_diag_state)
+
+        self._lbl_human_voice_diag_route = QLabel("Route: Windows SAPI uses the current default playback device")
+        self._lbl_human_voice_diag_route.setWordWrap(True)
+        self._set_theme_role(self._lbl_human_voice_diag_route, "mutedCompact")
+        voice_diag_lay.addWidget(self._lbl_human_voice_diag_route)
+
+        voice_diag_btn_row = QHBoxLayout()
+        self._btn_human_voice_fallback = QPushButton("Fallback Phrase")
+        self._set_button_role(self._btn_human_voice_fallback, "utility")
+        self._btn_human_voice_fallback.clicked.connect(self._on_test_human_voice_fallback_clicked)
+        voice_diag_btn_row.addWidget(self._btn_human_voice_fallback)
+
+        self._btn_human_voice_stop = QPushButton("Stop Voice")
+        self._set_button_role(self._btn_human_voice_stop, "utility")
+        self._btn_human_voice_stop.clicked.connect(self._on_stop_human_voice_clicked)
+        voice_diag_btn_row.addWidget(self._btn_human_voice_stop)
+
+        self._btn_human_voice_refresh = QPushButton("Refresh Diagnostics")
+        self._set_button_role(self._btn_human_voice_refresh, "utility")
+        self._btn_human_voice_refresh.clicked.connect(self._on_refresh_human_voice_diagnostics_clicked)
+        voice_diag_btn_row.addWidget(self._btn_human_voice_refresh)
+
+        self._btn_human_voice_validate = QPushButton("Validate Voices")
+        self._set_button_role(self._btn_human_voice_validate, "utility")
+        self._btn_human_voice_validate.clicked.connect(self._on_validate_human_voices_clicked)
+        voice_diag_btn_row.addWidget(self._btn_human_voice_validate)
+        voice_diag_btn_row.addStretch(1)
+        voice_diag_lay.addLayout(voice_diag_btn_row)
+
+        self._lbl_human_voice_diag_validation = QLabel("Validation: not run yet")
+        self._lbl_human_voice_diag_validation.setWordWrap(True)
+        self._set_theme_role(self._lbl_human_voice_diag_validation, "mutedCompact")
+        voice_diag_lay.addWidget(self._lbl_human_voice_diag_validation)
+        fire_lay.addWidget(voice_diag_grp)
+
         self._lbl_sound_status = QLabel("Sound link: waiting")
         self._lbl_sound_status.setWordWrap(True)
-        self._lbl_sound_status.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
+        self._set_theme_role(self._lbl_sound_status, "statusStrong")
         fire_lay.addWidget(self._lbl_sound_status)
+
+        self._lbl_fire_interlock_status = QLabel("Manual fire interlock: waiting")
+        self._lbl_fire_interlock_status.setWordWrap(True)
+        self._set_theme_role(self._lbl_fire_interlock_status, "statusStrong")
+        fire_lay.addWidget(self._lbl_fire_interlock_status)
 
         self._refresh_sound_toggle_text()
         self._sync_sound_widgets()
 
+        lay.addWidget(source_grp)
         lay.addWidget(fire_grp)
-
-        snapshot_grp = QGroupBox("Runtime Snapshot")
-        snapshot_lay = QVBoxLayout(snapshot_grp)
-
-        snapshot_note = QLabel("Capture the current Smart Sentry runtime into timestamped JSON and Markdown files under the repo snapshots folder.")
-        snapshot_note.setWordWrap(True)
-        snapshot_note.setStyleSheet("color: #97a8b8; font-size: 10px;")
-        snapshot_lay.addWidget(snapshot_note)
-
-        self._btn_export_runtime_snapshot = QPushButton("Export Runtime Snapshot")
-        self._btn_export_runtime_snapshot.setMinimumHeight(34)
-        self._set_button_role(self._btn_export_runtime_snapshot, "utility")
-        self._btn_export_runtime_snapshot.clicked.connect(self._export_runtime_snapshot)
-        self._apply_tooltip(self._btn_export_runtime_snapshot, "export_runtime_snapshot")
-        snapshot_lay.addWidget(self._btn_export_runtime_snapshot)
-
-        lay.addWidget(snapshot_grp)
 
         lay.addStretch()
         return w
@@ -5201,136 +8259,164 @@ class SentryV2TabWidget(QWidget):
     # ------------------------------------------------------------------ #
 
     def _build_status_group(self) -> QGroupBox:
-        grp = QGroupBox("Status")
-        grp.setMinimumHeight(220)
-        grp.setMaximumHeight(278)
+        grp = QGroupBox("Command Status")
+        grp.setMinimumHeight(120)
+        grp.setMaximumHeight(16777215)
+        grp.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         lay = QVBoxLayout(grp)
         lay.setContentsMargins(8, 8, 8, 8)
         lay.setSpacing(6)
 
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        lay.addWidget(scroll, stretch=1)
+
+        content = QWidget()
+        scroll.setWidget(content)
+        content_lay = QVBoxLayout(content)
+        content_lay.setContentsMargins(0, 0, 2, 0)
+        content_lay.setSpacing(6)
+
         def _make_status_card(title: str, value: str, accent: str) -> tuple[QFrame, QLabel]:
             frame = QFrame()
-            frame.setStyleSheet(
-                f"QFrame {{background-color: #14263d; border: 1px solid #27476a; border-left: 3px solid {accent}; border-radius: 8px;}}"
-            )
+            frame.setObjectName("sentryV2StatusCard")
+            frame.setProperty("accentColor", accent)
             frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             card_layout = QVBoxLayout(frame)
             card_layout.setContentsMargins(8, 6, 8, 6)
             card_layout.setSpacing(2)
 
             title_lbl = QLabel(title)
-            title_lbl.setStyleSheet("color: #7fa3c7; font-size: 9px; font-weight: bold; letter-spacing: 0.6px;")
+            title_lbl.setProperty("themeRole", "statusCardTitle")
             card_layout.addWidget(title_lbl)
 
             value_lbl = QLabel(value)
             value_lbl.setWordWrap(True)
-            value_lbl.setStyleSheet("color: #e9f2ff; font-size: 18px; font-weight: bold;")
+            value_lbl.setProperty("themeRole", "statusCardValue")
             card_layout.addWidget(value_lbl)
             return frame, value_lbl
 
-        self._lbl_hw_monitor_title = QLabel("Hardware • Tracking • Servo Snapshot")
-        self._lbl_hw_monitor_title.setStyleSheet("font-weight: bold; color: #cfe7ff; font-size: 10px;")
-        lay.addWidget(self._lbl_hw_monitor_title)
+        self._lbl_hw_monitor_title = QLabel("Bridge • Tracking • Hardware Snapshot")
+        self._lbl_hw_monitor_title.setProperty("themeRole", "statusSectionTitle")
+        content_lay.addWidget(self._lbl_hw_monitor_title)
 
         card_row = QHBoxLayout()
         card_row.setSpacing(6)
 
-        state_card, self._lbl_state = _make_status_card("STATE", "PAUSED", "#7cc7ff")
-        fire_card, self._lbl_hw_safety = _make_status_card("FIRE PATH", "BLOCKED", "#ff9a7a")
-        target_card, self._lbl_stats = _make_status_card("TARGETS", "0 visible", "#8fe3c4")
+        state_card, self._lbl_state = _make_status_card("STATE", "PAUSED", "#e0a169")
+        fire_card, self._lbl_hw_safety = _make_status_card("FIRE PATH", "BLOCKED", "#d87a62")
+        target_card, self._lbl_stats = _make_status_card("TARGETS", "0 visible", "#94bf7d")
 
         card_row.addWidget(state_card, 1)
         card_row.addWidget(fire_card, 1)
         card_row.addWidget(target_card, 1)
-        lay.addLayout(card_row)
+        content_lay.addLayout(card_row)
 
         position_frame = QFrame()
-        position_frame.setStyleSheet("QFrame {background-color: #101e31; border: 1px solid #27476a; border-radius: 8px;}")
+        position_frame.setObjectName("sentryV2StatusSubframe")
         position_layout = QGridLayout(position_frame)
         position_layout.setContentsMargins(8, 7, 8, 7)
         position_layout.setHorizontalSpacing(8)
         position_layout.setVerticalSpacing(4)
 
         self._lbl_angles = QLabel("Pan 0.0°")
-        self._lbl_angles.setStyleSheet("font-weight: bold; color: #dce9f7;")
+        self._lbl_angles.setProperty("themeRole", "statusValue")
         position_layout.addWidget(self._lbl_angles, 0, 0)
 
         self._bar_pan_status = QProgressBar()
         self._bar_pan_status.setRange(0, 1000)
         self._bar_pan_status.setTextVisible(False)
         self._bar_pan_status.setFixedHeight(10)
-        self._bar_pan_status.setStyleSheet(
-            "QProgressBar {background: #0c1625; border: 1px solid #27476a; border-radius: 5px;}"
-            "QProgressBar::chunk {background: #5ab7ff; border-radius: 4px;}"
-        )
+        self._bar_pan_status.setProperty("barRole", "pan")
         position_layout.addWidget(self._bar_pan_status, 0, 1)
 
         self._lbl_angles_controls = QLabel("Tilt 0.0°")
-        self._lbl_angles_controls.setStyleSheet("font-weight: bold; color: #dce9f7;")
+        self._lbl_angles_controls.setProperty("themeRole", "statusValue")
         position_layout.addWidget(self._lbl_angles_controls, 1, 0)
 
         self._bar_tilt_status = QProgressBar()
         self._bar_tilt_status.setRange(0, 1000)
         self._bar_tilt_status.setTextVisible(False)
         self._bar_tilt_status.setFixedHeight(10)
-        self._bar_tilt_status.setStyleSheet(
-            "QProgressBar {background: #0c1625; border: 1px solid #27476a; border-radius: 5px;}"
-            "QProgressBar::chunk {background: #8fe3c4; border-radius: 4px;}"
-        )
+        self._bar_tilt_status.setProperty("barRole", "tilt")
         position_layout.addWidget(self._bar_tilt_status, 1, 1)
 
-        lay.addWidget(position_frame)
+        content_lay.addWidget(position_frame)
 
         detail_grid = QGridLayout()
         detail_grid.setHorizontalSpacing(10)
         detail_grid.setVerticalSpacing(3)
 
         self._lbl_motion_gate = QLabel("Tracking: idle")
-        self._lbl_motion_gate.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
         self._lbl_motion_gate.setWordWrap(True)
+        self._lbl_motion_gate.setProperty("themeRole", "statusDetail")
         detail_grid.addWidget(self._lbl_motion_gate, 0, 0)
 
         self._lbl_servo_feedback = QLabel("Feedback: inactive")
-        self._lbl_servo_feedback.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
         self._lbl_servo_feedback.setWordWrap(True)
+        self._lbl_servo_feedback.setProperty("themeRole", "statusDetail")
         detail_grid.addWidget(self._lbl_servo_feedback, 0, 1)
 
         self._lbl_hw_servo_health = QLabel("Servo monitor: waiting")
-        self._lbl_hw_servo_health.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
         self._lbl_hw_servo_health.setWordWrap(True)
+        self._lbl_hw_servo_health.setProperty("themeRole", "statusDetail")
         detail_grid.addWidget(self._lbl_hw_servo_health, 1, 0)
 
         self._lbl_hw_current = QLabel("Current: unavailable")
-        self._lbl_hw_current.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
         self._lbl_hw_current.setWordWrap(True)
+        self._lbl_hw_current.setProperty("themeRole", "statusDetail")
         detail_grid.addWidget(self._lbl_hw_current, 1, 1)
 
         self._lbl_no_fire_status = QLabel("No-fire: clear")
-        self._lbl_no_fire_status.setStyleSheet("font-weight: bold; color: #8fe3c4; font-size: 10px;")
         self._lbl_no_fire_status.setWordWrap(True)
+        self._lbl_no_fire_status.setProperty("themeRole", "statusDetail")
         detail_grid.addWidget(self._lbl_no_fire_status, 2, 0)
 
         self._lbl_recovery_status = QLabel("Recovery: idle")
-        self._lbl_recovery_status.setStyleSheet("font-weight: bold; color: #97a8b8; font-size: 10px;")
         self._lbl_recovery_status.setWordWrap(True)
+        self._lbl_recovery_status.setProperty("themeRole", "statusDetail")
         detail_grid.addWidget(self._lbl_recovery_status, 2, 1)
 
-        lay.addLayout(detail_grid)
+        content_lay.addLayout(detail_grid)
 
-        # Save config button
-        btn_save = QPushButton("Save")
-        self._set_button_role(btn_save, "primary")
-        btn_save.setMaximumHeight(28)
-        btn_save.clicked.connect(self._save_config)
-        self._apply_tooltip(btn_save, "save_settings")
-        lay.addWidget(btn_save)
+        bridge_frame = QFrame()
+        bridge_frame.setObjectName("sentryV2StatusSubframe")
+        bridge_layout = QVBoxLayout(bridge_frame)
+        bridge_layout.setContentsMargins(8, 7, 8, 7)
+        bridge_layout.setSpacing(3)
+
+        bridge_title = QLabel("Bridge Runtime")
+        bridge_title.setProperty("themeRole", "statusSectionTitle")
+        bridge_layout.addWidget(bridge_title)
+
+        self._lbl_bridge_runtime = QLabel("Bridge: waiting")
+        self._lbl_bridge_runtime.setWordWrap(True)
+        self._lbl_bridge_runtime.setProperty("themeRole", "statusDetail")
+        bridge_layout.addWidget(self._lbl_bridge_runtime)
+
+        self._lbl_bridge_caps = QLabel("Caps: waiting")
+        self._lbl_bridge_caps.setWordWrap(True)
+        self._lbl_bridge_caps.setProperty("themeRole", "statusDetail")
+        bridge_layout.addWidget(self._lbl_bridge_caps)
+
+        self._lbl_bridge_warning = QLabel("Bridge warning: none")
+        self._lbl_bridge_warning.setWordWrap(True)
+        self._lbl_bridge_warning.setProperty("themeRole", "statusBadge")
+        bridge_layout.addWidget(self._lbl_bridge_warning)
+
+        content_lay.addWidget(bridge_frame)
+        content_lay.addStretch(1)
 
         return grp
 
     def _build_log_group(self) -> QGroupBox:
         grp = QGroupBox("Serial Output")
-        grp.setMinimumHeight(110)
-        grp.setMaximumHeight(220)
+        grp.setMinimumHeight(120)
+        grp.setMaximumHeight(16777215)
+        grp.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
         lay = QVBoxLayout(grp)
         lay.setContentsMargins(8, 8, 8, 8)
@@ -5339,11 +8425,23 @@ class SentryV2TabWidget(QWidget):
         self._log_text = QTextEdit()
         self._log_text.setObjectName("sentryV2Log")
         self._log_text.setReadOnly(True)
-        self._log_text.setStyleSheet("font-size: 11px; font-family: Consolas, 'Courier New', monospace;")
         lay.addWidget(self._log_text, stretch=1)
 
         controls = QHBoxLayout()
         controls.addStretch(1)
+
+        btn_export = QPushButton("Export Logs")
+        self._set_button_role(btn_export, "utility")
+        btn_export.clicked.connect(self._export_serial_log)
+        self._apply_tooltip(btn_export, "export_serial_log")
+        controls.addWidget(btn_export)
+
+        btn_open_folder = QPushButton("Open Log Folder")
+        self._set_button_role(btn_open_folder, "utility")
+        btn_open_folder.clicked.connect(self._open_serial_log_folder)
+        self._apply_tooltip(btn_open_folder, "open_serial_log_folder")
+        controls.addWidget(btn_open_folder)
+
         btn_clear = QPushButton("Clear")
         self._set_button_role(btn_clear, "utility")
         btn_clear.clicked.connect(self._log_text.clear)
@@ -5356,8 +8454,115 @@ class SentryV2TabWidget(QWidget):
         if not hasattr(self, "_layout_splitter"):
             return
         total_height = max(1, self._layout_splitter.size().height())
-        log_height = max(110, min(190, int(total_height * 0.18)))
-        self._layout_splitter.setSizes([max(1, total_height - log_height), log_height])
+        lower_height = max(150, min(300, int(total_height * 0.24)))
+        self._layout_splitter.setSizes([max(1, total_height - lower_height), lower_height])
+
+    def _apply_bottom_info_panel_widths(self) -> None:
+        if not hasattr(self, "_bottom_info_splitter"):
+            return
+        total_width = max(1, self._bottom_info_splitter.size().width())
+        if total_width <= 1:
+            total_width = max(520, int(self.width() * 0.44))
+        log_width = max(220, int(total_width * 0.40))
+        status_width = max(260, total_width - log_width)
+        self._bottom_info_splitter.setSizes([log_width, status_width])
+
+    def _splitter_sizes_if_ready(self, splitter: QSplitter) -> list[int]:
+        sizes = [int(v) for v in splitter.sizes()]
+        if len(sizes) < 2:
+            return []
+        if splitter.orientation() == Qt.Horizontal:
+            axis_extent = splitter.size().width()
+        else:
+            axis_extent = splitter.size().height()
+        if axis_extent <= 32 or sum(sizes) <= 32:
+            return []
+        return sizes
+
+    def _layout_geometry_ready(self) -> bool:
+        if self.width() <= 32 or self.height() <= 32:
+            return False
+        for splitter_name in ("_main_splitter", "_layout_splitter", "_bottom_info_splitter"):
+            splitter = getattr(self, splitter_name, None)
+            if splitter is None:
+                return False
+            if not self._splitter_sizes_if_ready(splitter):
+                return False
+        return True
+
+    def _capture_layout_state(self) -> None:
+        if hasattr(self, "_main_splitter"):
+            panel_sizes = self._splitter_sizes_if_ready(self._main_splitter)
+            if panel_sizes:
+                self.config.main_splitter_sizes = panel_sizes
+                self.config.settings_panel_width = max(SENTRY_V2_PANEL_MIN_WIDTH, int(panel_sizes[1]))
+        if hasattr(self, "_layout_splitter"):
+            layout_sizes = self._splitter_sizes_if_ready(self._layout_splitter)
+            if layout_sizes:
+                self.config.layout_splitter_sizes = layout_sizes
+        if hasattr(self, "_bottom_info_splitter"):
+            bottom_sizes = self._splitter_sizes_if_ready(self._bottom_info_splitter)
+            if bottom_sizes:
+                self.config.bottom_info_splitter_sizes = bottom_sizes
+
+    def _apply_saved_layout_state(self) -> None:
+        if not self.isVisible() or self.width() <= 32 or self.height() <= 32:
+            if self._layout_restore_attempts < 6:
+                self._layout_restore_attempts += 1
+                QTimer.singleShot(0, self._apply_saved_layout_state)
+            return
+
+        main_sizes = [int(v) for v in getattr(self.config, "main_splitter_sizes", []) if int(v) > 0]
+        if len(main_sizes) >= 2:
+            self._main_splitter.setSizes(main_sizes[:2])
+        else:
+            saved_panel_width = int(getattr(self.config, "settings_panel_width", SENTRY_V2_PANEL_DEFAULT_WIDTH) or SENTRY_V2_PANEL_DEFAULT_WIDTH)
+            self._apply_panel_width(saved_panel_width)
+
+        layout_sizes = [int(v) for v in getattr(self.config, "layout_splitter_sizes", []) if int(v) > 0]
+        if len(layout_sizes) >= 2:
+            self._layout_splitter.setSizes(layout_sizes[:2])
+        else:
+            self._apply_saved_log_panel_height()
+
+        bottom_sizes = [int(v) for v in getattr(self.config, "bottom_info_splitter_sizes", []) if int(v) > 0]
+        if len(bottom_sizes) >= 2:
+            self._bottom_info_splitter.setSizes(bottom_sizes[:2])
+        else:
+            self._apply_bottom_info_panel_widths()
+
+        self._layout_restore_complete = True
+        self._layout_restore_attempts = 0
+        if self._layout_geometry_ready():
+            self._capture_layout_state()
+        self._update_responsive_layout()
+
+    def restore_window_geometry(self, window: QWidget) -> None:
+        width = max(int(window.minimumWidth() or 1), int(getattr(self.config, "window_width", 1280) or 1280))
+        height = max(int(window.minimumHeight() or 1), int(getattr(self.config, "window_height", 860) or 860))
+        window.resize(width, height)
+        pos_x = int(getattr(self.config, "window_x", -1) or -1)
+        pos_y = int(getattr(self.config, "window_y", -1) or -1)
+        if pos_x >= 0 and pos_y >= 0:
+            window.move(pos_x, pos_y)
+        if bool(getattr(self.config, "window_maximized", False)):
+            window.showMaximized()
+
+    def persist_window_geometry(self, window: QWidget, *, immediate: bool = False) -> None:
+        self._capture_layout_state()
+        normal_geometry = window.normalGeometry() if hasattr(window, "normalGeometry") else None
+        geometry = normal_geometry if window.isMaximized() and normal_geometry is not None and normal_geometry.isValid() else window.geometry()
+        if geometry is not None and geometry.isValid():
+            self.config.window_x = int(geometry.x())
+            self.config.window_y = int(geometry.y())
+            self.config.window_width = max(int(window.minimumWidth() or 1), int(geometry.width()))
+            self.config.window_height = max(int(window.minimumHeight() or 1), int(geometry.height()))
+        self.config.window_maximized = bool(window.isMaximized())
+        if immediate:
+            self._pending_quiet_save = True
+            self._flush_quiet_config_save()
+        else:
+            self._save_config_quietly()
 
     # ================================================================== #
     #  Public API (called by main app)
@@ -5405,10 +8610,13 @@ class SentryV2TabWidget(QWidget):
         self.config.guard.frame_height = h
 
         base_objects = self._raw_detections_to_objects(raw_detections, w_frame, h)
+        engine_objects, face_matches = self._apply_face_identity_to_objects(frame, base_objects, now)
+        self._last_face_matches = list(face_matches)
+        self._update_face_runtime_status()
         prompted_objects: List[DetectedObject] = []
         if bool(self.config.prompted_targets_enabled):
-            prompted_objects = self._prompted_matcher.detect(frame, base_objects, now)
-        det_objects = self._tracker.assign_tracks(base_objects + prompted_objects, now)
+            prompted_objects = self._prompted_matcher.detect(frame, engine_objects, now)
+        det_objects = self._tracker.assign_tracks(engine_objects + prompted_objects, now)
 
         # Run engine
         self._sync_engine_pose_from_feedback()
@@ -5416,20 +8624,22 @@ class SentryV2TabWidget(QWidget):
         self._update_sound_runtime_cues()
         self._last_detected_objects = list(det_objects)
 
-        # Copy frame so overlay drawing doesn't corrupt main app's buffer
-        display = frame.copy()
+        if self._show_video_feed and not self._should_present_display_frame(now):
+            self._set_preview_perf_mode("throttled")
+            return
 
-        # Draw overlay
-        display = self.overlay.draw(display, self.engine)
-        if self._scope_view_active():
-            display = self.overlay.apply_scope_view(display, self.engine)
-        self._draw_no_fire_mask_draft(display)
-        self._draw_color_gate_status(display, mode, use_internal_detector)
+        # Copy frame so overlay drawing doesn't corrupt main app's buffer
+        display = self._build_display_frame(
+            frame,
+            mode=mode,
+            use_internal_detector=use_internal_detector,
+        )
         self._last_display_frame = display
 
         # Update video label (only if show_video_feed is enabled)
         if self._show_video_feed:
             self._show_frame(display)
+            self._mark_display_present(now, mode="full")
         else:
             # Show black frame with status text
             black_frame = np.zeros_like(display)
@@ -5442,6 +8652,43 @@ class SentryV2TabWidget(QWidget):
             ty = max(th + 8, (display.shape[0] + th) // 2)
             cv2.putText(black_frame, hidden_text, (tx, ty), font, font_scale, (108, 108, 108), thickness, cv2.LINE_AA)
             self._show_frame(black_frame)
+            self._mark_display_present(now, mode="hidden")
+
+    def _should_present_display_frame(self, now: float, *, busy: bool = False) -> bool:
+        if self._force_next_display_refresh or self._last_display_present_s <= 0.0:
+            return True
+        interval = self._busy_display_frame_interval_s if busy else self._display_frame_interval_s
+        return (now - self._last_display_present_s) >= interval
+
+    def _set_preview_perf_mode(self, mode: str) -> None:
+        mode_text = str(mode or "unknown").strip() or "unknown"
+        if mode_text == self._preview_perf_mode:
+            return
+        self._preview_perf_mode = mode_text
+        self._log(f"[PREVIEW] render_mode={mode_text}")
+
+    def _mark_display_present(self, now: float, *, mode: str) -> None:
+        self._last_display_present_s = now
+        self._force_next_display_refresh = False
+        self._set_preview_perf_mode(mode)
+
+    def _build_display_frame(
+        self,
+        frame: np.ndarray,
+        *,
+        mode: int,
+        use_internal_detector: bool,
+        include_target_boxes: bool = True,
+        include_scope_view: bool = True,
+    ) -> np.ndarray:
+        display = frame.copy()
+        display = self.overlay.draw(display, self.engine, include_target_boxes=include_target_boxes)
+        self._draw_face_identity_overlays(display, list(getattr(self, "_last_face_matches", []) or []))
+        if include_scope_view and self._scope_view_active():
+            display = self.overlay.apply_scope_view(display, self.engine)
+        self._draw_no_fire_mask_draft(display)
+        self._draw_color_gate_status(display, mode, use_internal_detector)
+        return display
 
     def set_enabled(self, enabled: bool) -> None:
         self._chk_enable.setChecked(enabled)
@@ -5566,6 +8813,186 @@ class SentryV2TabWidget(QWidget):
         if style is not None and label.styleSheet() != style:
             label.setStyleSheet(style)
 
+    def eventFilter(self, obj, event):
+        if event is not None and event.type() == QEvent.Wheel:
+            try:
+                if bool(event.modifiers() & Qt.ShiftModifier) and self._event_targets_this_widget(obj):
+                    angle_delta = int(event.angleDelta().y())
+                    if angle_delta != 0:
+                        self._adjust_panel_zoom(1 if angle_delta > 0 else -1)
+                        event.accept()
+                        return True
+            except Exception:
+                pass
+        return super().eventFilter(obj, event)
+
+    def _event_targets_this_widget(self, obj: object) -> bool:
+        widget = obj if isinstance(obj, QWidget) else None
+        while widget is not None:
+            if widget is self:
+                return True
+            widget = widget.parentWidget()
+        return False
+
+    def _adjust_panel_zoom(self, direction: int) -> None:
+        theme_cfg = self._theme_config()
+        current_scale = int(getattr(theme_cfg, "font_scale_pct", 100) or 100)
+        next_scale = _clamp_int(current_scale + (int(direction) * 25), 50, 280)
+        if next_scale == current_scale:
+            return
+        theme_cfg.font_scale_pct = next_scale
+        self._apply_theme()
+        self._save_config_quietly()
+        self._log(f"Panel zoom: {next_scale}%")
+
+    def _status_two_line_markup(
+        self,
+        primary_text: str,
+        secondary_text: str,
+        *,
+        primary_color: Optional[str] = None,
+        secondary_color: Optional[str] = None,
+    ) -> str:
+        tokens = self._theme_tokens()
+        status_font = float(tokens["status_font_pt"])
+        primary = primary_color or tokens["status_neutral"]
+        secondary = secondary_color or tokens["status_meta"]
+        return (
+            f"<span style='font-size:{status_font:.2f}pt; font-weight:700; color:{primary};'>{primary_text}</span><br>"
+            f"<span style='font-size:{status_font:.2f}pt; color:{secondary};'>{secondary_text}</span>"
+        )
+
+    def _status_metric_markup(self, metrics: List[Tuple[object, str]]) -> str:
+        tokens = self._theme_tokens()
+        status_font = float(tokens["status_font_pt"])
+        parts = []
+        for value, label in metrics:
+            parts.append(
+                f"<span style='font-size:{status_font:.2f}pt; font-weight:700; color:{tokens['text']};'>{value}</span>"
+                f"<span style='font-size:{status_font:.2f}pt; color:{tokens['status_meta']};'> {label}</span>"
+            )
+        return "&nbsp;&nbsp;".join(parts)
+
+    def _compact_status_style(self, level: str = "neutral", *, bold: bool = False) -> str:
+        tokens = self._theme_tokens()
+        color_map = {
+            "neutral": tokens["status_neutral"],
+            "info": tokens["status_info"],
+            "ok": tokens["status_ok"],
+            "warn": tokens["status_warn"],
+            "error": tokens["status_error"],
+            "accent": tokens["accent"],
+            "meta": tokens["status_meta"],
+        }
+        weight = "bold" if bold else "normal"
+        return f"font-weight: {weight}; color: {color_map.get(level, tokens['status_neutral'])}; font-size: {tokens['base_font_pt']:.2f}pt;"
+
+    def _camera_status_style(self, level: str = "neutral") -> str:
+        return self._compact_status_style(level)
+
+    def _connection_status_style(self, level: str = "neutral") -> str:
+        return self._compact_status_style(level, bold=True)
+
+    def _set_camera_status(self, text: str, level: str = "neutral") -> None:
+        self._camera_status_level = str(level or "neutral")
+        if hasattr(self, "_lbl_cam_status") and self._lbl_cam_status is not None:
+            self._set_label_content(self._lbl_cam_status, text, self._camera_status_style(self._camera_status_level))
+
+    def _set_connection_status(self, text: str, level: str = "neutral") -> None:
+        self._connection_status_level = str(level or "neutral")
+        if hasattr(self, "_lbl_conn_status") and self._lbl_conn_status is not None:
+            self._set_label_content(self._lbl_conn_status, text, self._connection_status_style(self._connection_status_level))
+
+    def _sync_camera_status_style(self) -> None:
+        if hasattr(self, "_lbl_cam_status") and self._lbl_cam_status is not None:
+            level = str(getattr(self, "_camera_status_level", "neutral") or "neutral")
+            self._lbl_cam_status.setStyleSheet(self._camera_status_style(level))
+
+    def _sync_connection_status_style(self) -> None:
+        if hasattr(self, "_lbl_conn_status") and self._lbl_conn_status is not None:
+            level = str(getattr(self, "_connection_status_level", "neutral") or "neutral")
+            self._lbl_conn_status.setStyleSheet(self._connection_status_style(level))
+
+    def _sync_auto_trigger_checkbox_style(self) -> None:
+        if not hasattr(self, "_chk_auto_trigger") or self._chk_auto_trigger is None:
+            return
+        level = "error" if self._chk_auto_trigger.isChecked() else "ok"
+        style = self._compact_status_style(level, bold=True)
+        base_font = self._theme_tokens()["base_font_pt"]
+        self._chk_auto_trigger.setStyleSheet(f"{style} font-size: {base_font:.2f}pt;")
+
+    def _status_text_style(self, level: str = "neutral", *, compact: bool = True, badge: bool = False) -> str:
+        tokens = self._theme_tokens()
+        color_map = {
+            "neutral": tokens["status_neutral"],
+            "info": tokens["status_info"],
+            "ok": tokens["status_ok"],
+            "warn": tokens["status_warn"],
+            "error": tokens["status_error"],
+            "accent": tokens["accent"],
+        }
+        text_color = color_map.get(level, tokens["status_neutral"])
+        font_size = int(max(10, round(float(tokens["base_font_pt"]))))
+        if badge:
+            background = _rgba_hex(tokens["root_bg"], 30 if tokens["is_light"] else 48)
+            border = _mix_hex(text_color, tokens["border"], 0.30)
+            return (
+                f"font-weight: bold; color: {text_color}; font-size: {font_size}px; "
+                f"background-color: {background}; border: 1px solid {border}; border-radius: 6px; padding: 4px;"
+            )
+        return f"font-weight: bold; color: {text_color}; font-size: {font_size}px;"
+
+    def _status_meta_color(self) -> str:
+        return self._theme_tokens()["status_meta"]
+
+    def _apply_status_panel_theme(self) -> None:
+        if not hasattr(self, "_lbl_hw_monitor_title"):
+            return
+        tokens = self._theme_tokens()
+        for frame in self.findChildren(QFrame, "sentryV2StatusCard"):
+            accent = str(frame.property("accentColor") or tokens["accent"])
+            frame.setStyleSheet(
+                "QFrame#sentryV2StatusCard {"
+                f"background-color: {tokens['status_card_bg']}; border: 1px solid {tokens['status_card_border']}; "
+                f"border-left: 3px solid {accent}; border-radius: {tokens['status_card_radius']}px;"
+                "}"
+            )
+        for frame in self.findChildren(QFrame, "sentryV2StatusSubframe"):
+            frame.setStyleSheet(
+                "QFrame#sentryV2StatusSubframe {"
+                f"background-color: {tokens['status_subframe_bg']}; border: 1px solid {tokens['status_card_border']}; "
+                f"border-radius: {tokens['status_card_radius']}px;"
+                "}"
+            )
+        for label in self.findChildren(QLabel):
+            role = str(label.property("themeRole") or "")
+            if role == "statusCardTitle":
+                label.setStyleSheet(f"color: {tokens['status_card_title']}; font-size: {tokens['base_font_pt'] + 0.4:.2f}pt; font-weight: 700; letter-spacing: 0.2px;")
+            elif role == "statusCardValue":
+                label.setStyleSheet(f"color: {tokens['status_card_value']}; font-size: {tokens['base_font_pt'] + 0.9:.2f}pt; font-weight: 800;")
+            elif role == "statusSectionTitle":
+                label.setStyleSheet(f"font-weight: 700; color: {tokens['status_section_title']}; font-size: {tokens['base_font_pt'] + 0.5:.2f}pt;")
+            elif role == "statusValue":
+                label.setStyleSheet(f"font-weight: 800; color: {tokens['status_card_value']}; font-size: {tokens['base_font_pt'] + 0.5:.2f}pt;")
+            elif role == "statusDetail":
+                label.setStyleSheet(self._status_text_style("neutral"))
+            elif role == "statusBadge":
+                label.setStyleSheet(self._status_text_style("neutral", badge=True))
+        if hasattr(self, "_bar_pan_status"):
+            self._bar_pan_status.setStyleSheet(
+                "QProgressBar {"
+                f"background: {tokens['status_progress_bg']}; border: 1px solid {tokens['status_card_border']}; border-radius: 5px;"
+                "}"
+                f"QProgressBar::chunk {{background: {tokens['status_progress_pan']}; border-radius: 4px;}}"
+            )
+        if hasattr(self, "_bar_tilt_status"):
+            self._bar_tilt_status.setStyleSheet(
+                "QProgressBar {"
+                f"background: {tokens['status_progress_bg']}; border: 1px solid {tokens['status_card_border']}; border-radius: 5px;"
+                "}"
+                f"QProgressBar::chunk {{background: {tokens['status_progress_tilt']}; border-radius: 4px;}}"
+            )
+
     # ------------------------------------------------------------------ #
     #  Connection handlers
     # ------------------------------------------------------------------ #
@@ -5578,67 +9005,143 @@ class SentryV2TabWidget(QWidget):
         "Single USB cable — full ASCII protocol to ESP32.",
         "Two USB cables — bus servo to Debug Board + IO to ESP32.",
         "One USB cable — Debug Board stays on USB, ESP32 IO goes over WiFi.",
-        "No runtime USB — PC talks to ESP32 over WiFi, Debug Board stays on ESP32 UART2 (GPIO16/17).",
+        "No runtime USB — PC talks to the Waveshare bridge over WiFi, and the local bus-servo UART runs on GPIO18/GPIO19.",
         "No USB cables — Primary ESP32 handles IO, Secondary ESP32 (Yahboom board) handles servos.",
     ]
 
+    def _wifi_credentials_for_mode(self, mode: int) -> tuple[str, str]:
+        if int(mode) == SentryV2Comm.MODE_WIFI_FULL:
+            return SMART_SENTRY_V3_WIFI_SSID, SMART_SENTRY_V3_WIFI_PASSWORD
+        if int(mode) in {
+            SentryV2Comm.MODE_WIFI_DEBUG_USB,
+            SentryV2Comm.MODE_DUAL_ESP32_WIFI,
+        }:
+            return SMART_SENTRY_V2_WIFI_SSID, SMART_SENTRY_V2_WIFI_PASSWORD
+        return SMART_SENTRY_V2_WIFI_SSID, SMART_SENTRY_V2_WIFI_PASSWORD
+
+    def _pin_assignment_button_text(self, mode_index: int) -> str:
+        if mode_index == SentryV2Comm.MODE_WIFI_FULL:
+            return "Waveshare Pin Assignments"
+        if mode_index == SentryV2Comm.MODE_DUAL_ESP32_WIFI:
+            return "Dual ESP32 Pin Assignments"
+        if mode_index == SentryV2Comm.MODE_WIFI_DEBUG_USB:
+            return "WiFi IO Pin Assignments"
+        return "Pin Assignments"
+
     def _show_full_wifi_pinout(self) -> None:
-        text = (
-            "<div style='font-size:13px; line-height:1.35;'>"
-            "<div style='font-weight:700; color:#0f1720; margin-bottom:8px;'>ESP32 DevKit v1 full WiFi runtime</div>"
-            "<div style='margin-bottom:8px; color:#1e2936;'>"
-            "PC to ESP32: WiFi/UDP for trigger, PIR, and accessories<br>"
-            "Debug Board to PC: USB serial for pan/tilt bus-servo motion<br>"
-            "ESP32 USB: flashing and diagnostics only"
-            "</div>"
-            "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO16</td><td style='padding:3px 8px; color:#1e2936;'>UART2 RX from Debug Board TX</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO17</td><td style='padding:3px 8px; color:#1e2936;'>UART2 TX to Debug Board RX</td></tr>"
-            "</table>"
-            "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>Accessory IO</div>"
-            "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO27</td><td style='padding:3px 8px; color:#1e2936;'>Trigger MOSFET (Water)</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO13</td><td style='padding:3px 8px; color:#1e2936;'>Trigger Servo (Projectile)</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO2</td><td style='padding:3px 8px; color:#1e2936;'>Status LED / external blink mirror</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO32</td><td style='padding:3px 8px; color:#1e2936;'>LED Relay</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO33</td><td style='padding:3px 8px; color:#1e2936;'>Laser Relay</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO25</td><td style='padding:3px 8px; color:#1e2936;'>Accessory Relay (G token)</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO26</td><td style='padding:3px 8px; color:#1e2936;'>Spare Relay (A token)</td></tr>"
-            "</table>"
-            "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>PIR Sensors</div>"
-            "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO35</td><td style='padding:3px 8px; color:#1e2936;'>PIR Sensor 0 (right zone, cue ~45°)</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO34</td><td style='padding:3px 8px; color:#1e2936;'>PIR Sensor 1 (front zone, cue ~135°)</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO39</td><td style='padding:3px 8px; color:#1e2936;'>PIR Sensor 2 (left zone, cue ~225°)</td></tr>"
-            "</table>"
-            "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>Current Sensors</div>"
-            "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO36</td><td style='padding:3px 8px; color:#1e2936;'>Pan Current</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO39</td><td style='padding:3px 8px; color:#1e2936;'>Tilt Current when PIR is disabled, otherwise PIR Sensor 2</td></tr>"
-            "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO34</td><td style='padding:3px 8px; color:#1e2936;'>Total Current when PIR is disabled, otherwise PIR Sensor 1</td></tr>"
-            "</table>"
-            "<div style='color:#334155; margin-top:8px;'>"
-            "GPIO2 can drive a visible external LED mirror, and PIR-event blinking can now be disabled from Smart Sentry when you do not want idle sensor activity flashing after the app closes."
-            "</div>"
-            "</div>"
-        )
+        mode_index = self._combo_conn_type.currentIndex() if hasattr(self, "_combo_conn_type") else SentryV2Comm.MODE_ESP32_USB
+        title = "Pin Assignments"
+        if mode_index == SentryV2Comm.MODE_WIFI_FULL:
+            title = "Waveshare Pin Assignments"
+            text = (
+                "<div style='font-size:13px; line-height:1.35;'>"
+                "<div style='font-weight:700; color:#0f1720; margin-bottom:8px;'>Waveshare Servo Driver HAT single-board bridge</div>"
+                "<div style='margin-bottom:8px; color:#1e2936;'>"
+                f"PC to bridge: WiFi/UDP on {SMART_SENTRY_V3_WIFI_SSID}<br>"
+                "Pan/Tilt bus servos: local bus UART on GPIO18/GPIO19 at 1000000 baud<br>"
+                "Use the Waveshare 40-pin header numbers exactly as shown here"
+                "</div>"
+                "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>Header-backed outputs</div>"
+                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 7 / GPIO4</td><td style='padding:3px 8px; color:#1e2936;'>Buzzer output</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 13 / GPIO27</td><td style='padding:3px 8px; color:#1e2936;'>Trigger MOSFET</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 22 / GPIO25</td><td style='padding:3px 8px; color:#1e2936;'>Accessory relay</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 37 / GPIO26</td><td style='padding:3px 8px; color:#1e2936;'>Spare relay</td></tr>"
+                "</table>"
+                "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>Reserved and unassigned paths</div>"
+                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 29 / GPIO5</td><td style='padding:3px 8px; color:#1e2936;'>Speaker reserved only</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>LED relay</td><td style='padding:3px 8px; color:#1e2936;'>Unassigned on current Waveshare map</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Laser relay</td><td style='padding:3px 8px; color:#1e2936;'>Unassigned on current Waveshare map</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Trigger-servo PWM</td><td style='padding:3px 8px; color:#1e2936;'>Unassigned on current Waveshare map</td></tr>"
+                "</table>"
+                "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>Reserved transport pins</div>"
+                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO18 / GPIO19</td><td style='padding:3px 8px; color:#1e2936;'>Yahboom bus-servo UART RX/TX</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 10 / GPIO15</td><td style='padding:3px 8px; color:#1e2936;'>FlySky FS-iA6 i-Bus RX</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 8 / GPIO14</td><td style='padding:3px 8px; color:#1e2936;'>Reserved RC TX / telemetry path</td></tr>"
+                "</table>"
+                "<div style='color:#334155; margin-top:8px;'>"
+                "This is the current flashed Smart Sentry Waveshare map with only confirmed bridge-owned outputs exposed as assigned."
+                "</div>"
+                "</div>"
+            )
+        elif mode_index == SentryV2Comm.MODE_DUAL_ESP32_WIFI:
+            title = "Dual ESP32 WiFi Pin Assignments"
+            text = (
+                "<div style='font-size:13px; line-height:1.35;'>"
+                "<div style='font-weight:700; color:#0f1720; margin-bottom:8px;'>Dual ESP32 WiFi topology</div>"
+                "<div style='margin-bottom:8px; color:#1e2936;'>"
+                "Primary ESP32 handles IO and accessories over WiFi.<br>"
+                "Secondary ESP32 handles Yahboom bus-servo motion over its own WiFi bridge."
+                "</div>"
+                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Primary GPIO27</td><td style='padding:3px 8px; color:#1e2936;'>Trigger MOSFET</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Primary GPIO25</td><td style='padding:3px 8px; color:#1e2936;'>Accessory relay</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Primary GPIO26</td><td style='padding:3px 8px; color:#1e2936;'>Spare relay</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Secondary servo bridge</td><td style='padding:3px 8px; color:#1e2936;'>Pan/Tilt Yahboom motion path</td></tr>"
+                "</table>"
+                "<div style='color:#334155; margin-top:8px;'>"
+                "Use the Waveshare pin map only when you are running the single-board v3 bridge mode."
+                "</div>"
+                "</div>"
+            )
+        elif mode_index == SentryV2Comm.MODE_WIFI_DEBUG_USB:
+            title = "WiFi IO Pin Assignments"
+            text = (
+                "<div style='font-size:13px; line-height:1.35;'>"
+                "<div style='font-weight:700; color:#0f1720; margin-bottom:8px;'>ESP32 WiFi IO with Debug Board USB motion</div>"
+                "<div style='margin-bottom:8px; color:#1e2936;'>"
+                "PC to ESP32: WiFi/UDP for trigger, PIR, and accessories<br>"
+                "Debug Board to PC: USB serial for pan/tilt bus-servo motion"
+                "</div>"
+                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO27</td><td style='padding:3px 8px; color:#1e2936;'>Trigger MOSFET</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO13</td><td style='padding:3px 8px; color:#1e2936;'>Trigger Servo</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO25</td><td style='padding:3px 8px; color:#1e2936;'>Accessory relay</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO26</td><td style='padding:3px 8px; color:#1e2936;'>Spare relay</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO35 / GPIO34 / GPIO39</td><td style='padding:3px 8px; color:#1e2936;'>PIR sensor inputs</td></tr>"
+                "</table>"
+                "</div>"
+            )
+        else:
+            title = "Connection Pin Notes"
+            text = (
+                "<div style='font-size:13px; line-height:1.35;'>"
+                "<div style='font-weight:700; color:#0f1720; margin-bottom:8px;'>Current connection mode</div>"
+                "<div style='margin-bottom:8px; color:#1e2936;'>"
+                "This mode is USB-centered, so the key assignments live on the selected COM ports rather than on a WiFi bridge header map."
+                "</div>"
+                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>ESP32 USB</td><td style='padding:3px 8px; color:#1e2936;'>Primary ASCII IO link when using direct USB</td></tr>"
+                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Debug Board USB</td><td style='padding:3px 8px; color:#1e2936;'>Pan/Tilt bus-servo motion path in dual-USB layouts</td></tr>"
+                "</table>"
+                "<div style='color:#334155; margin-top:8px;'>"
+                "Switch to the Waveshare single-board WiFi mode if you want the full header-level v3 pin assignment view."
+                "</div>"
+                "</div>"
+            )
         msg = QMessageBox(self)
-        msg.setWindowTitle("ESP32 Full WiFi Pinout")
+        msg.setWindowTitle(title)
         msg.setIcon(QMessageBox.Information)
         msg.setTextFormat(Qt.RichText)
         msg.setText(text)
         msg.setStandardButtons(QMessageBox.Ok)
+        tokens = self._theme_tokens()
+        dialog_radius = max(6, int(tokens["radius"]) - 6)
         msg.setStyleSheet(
-            "QMessageBox { background-color: #f7fafc; }"
-            "QMessageBox QLabel { color: #0f1720; font-size: 13px; }"
-            "QPushButton { min-width: 84px; padding: 6px 12px; background: #1f4e79; color: #ffffff; border-radius: 6px; }"
-            "QPushButton:hover { background: #255f94; }"
+            f"QMessageBox {{ background-color: {tokens['panel_rgba']}; color: {tokens['text']}; }}"
+            f"QMessageBox QLabel {{ color: {tokens['text']}; font-size: 13px; }}"
+            f"QPushButton {{ min-width: 84px; padding: 6px 12px; background-color: {tokens['button_bg']}; color: {tokens['button_text']}; border: 1px solid {tokens['button_border']}; border-radius: {dialog_radius}px; }}"
+            f"QPushButton:hover {{ background-color: {tokens['button_hover']}; border-color: {tokens['accent']}; }}"
+            f"QPushButton:pressed {{ background-color: {tokens['button_pressed']}; border-color: {tokens['accent_soft']}; }}"
         )
         msg.exec_()
 
     def _update_conn_panel_visibility(self) -> None:
         m = self._combo_conn_type.currentIndex()
         self._lbl_mode_hint.setText(self._MODE_HINTS[m])
+        self._btn_wifi_pinout.setText(self._pin_assignment_button_text(m))
         # ESP32 serial panel: modes 0, 1
         self._grp_esp32_serial.setVisible(m in (0, 1))
         # Debug board serial panel: modes 1, 2
@@ -5754,8 +9257,7 @@ class SentryV2TabWidget(QWidget):
 
     def _toggle_connection(self) -> None:
         if self._host_controls_hardware():
-            self._lbl_conn_status.setText("Host-managed by main app")
-            self._lbl_conn_status.setStyleSheet("color: #33cc33; font-weight: bold;")
+            self._set_connection_status("Host-managed by main app", "ok")
             self._log("Connection handled by main app while embedded")
             return
         if self._connection_busy:
@@ -5846,8 +9348,7 @@ class SentryV2TabWidget(QWidget):
         is_connect = operation == "connect"
         self._btn_connect.setEnabled(False)
         self._btn_connect.setText("Connecting..." if is_connect else "Disconnecting...")
-        self._lbl_conn_status.setText("Connecting..." if is_connect else "Disconnecting...")
-        self._lbl_conn_status.setStyleSheet("color: #d0b060; font-weight: bold;")
+        self._set_connection_status("Connecting..." if is_connect else "Disconnecting...", "warn")
         self._log("Connecting..." if is_connect else "Disconnecting...")
 
         def _worker() -> None:
@@ -5927,8 +9428,7 @@ class SentryV2TabWidget(QWidget):
 
         if operation == "disconnect":
             self._btn_connect.setText("Connect")
-            self._lbl_conn_status.setText("Disconnected")
-            self._lbl_conn_status.setStyleSheet("color: #cc3333; font-weight: bold;")
+            self._set_connection_status("Disconnected", "error")
             self._log("Disconnected")
             self._startup_autoconnect_active = False
             self._startup_autoconnect_retry = 0
@@ -5936,7 +9436,7 @@ class SentryV2TabWidget(QWidget):
 
         if ok:
             self._btn_connect.setText("Disconnect")
-            self._lbl_conn_status.setText(self._format_connection_details(details, info))
+            conn_text = self._format_connection_details(details, info)
             mode2_degraded_io = (
                 int(self.config.connection.connection_type) == 2
                 and (
@@ -5944,9 +9444,7 @@ class SentryV2TabWidget(QWidget):
                     or getattr(self._comm, "_udp_target", None) is None
                 )
             )
-            self._lbl_conn_status.setStyleSheet(
-                "color: #ffae42; font-weight: bold;" if mode2_degraded_io else "color: #33cc33; font-weight: bold;"
-            )
+            self._set_connection_status(conn_text, "warn" if mode2_degraded_io else "ok")
             self._log(f"Connected: {info}")
             fire_mode = "Projectile (ESP32 GPIO13 Servo)" if self._comm.trigger_mode_bb else "Water (MOSFET)"
             safety_state = "ARMED" if self._safety_armed else "LOCKED"
@@ -5961,11 +9459,11 @@ class SentryV2TabWidget(QWidget):
             self._startup_autoconnect_active = False
             self._startup_autoconnect_retry = 0
             self._schedule_auto_yolo_load(300)
+            self._schedule_startup_rest_move()
         else:
             self._btn_connect.setText("Connect")
             failure_text = self._format_connection_details(details, f"FAILED: {err or 'unknown error'}")
-            self._lbl_conn_status.setText(failure_text)
-            self._lbl_conn_status.setStyleSheet("color: #cc3333; font-weight: bold;")
+            self._set_connection_status(failure_text, "error")
             self._log(f"Connection failed: {err or 'unknown error'}")
 
             # Startup-only retry for transient Windows COM enumeration race.
@@ -6002,8 +9500,7 @@ class SentryV2TabWidget(QWidget):
         if not src_text:
             src_text = "0"
             self._edit_cam_source.setText(src_text)
-            self._lbl_cam_status.setText("Camera source blank. Defaulting to standalone camera index 0.")
-            self._lbl_cam_status.setStyleSheet("color: #888; font-size: 10px;")
+            self._set_camera_status("Camera source blank. Defaulting to standalone camera index 0.", "neutral")
             self._log("Camera source blank; defaulting to standalone camera index 0")
         # Save to config
         selected_width, selected_height = self._selected_camera_dimensions()
@@ -6033,18 +9530,17 @@ class SentryV2TabWidget(QWidget):
                 same_source = main_text == str(src)
                 auto_zero_conflict = main_text in ("", "auto") and src == 0
                 if main_cap is not None and main_cap.isOpened() and (same_source or auto_zero_conflict):
-                    self._lbl_cam_status.setText(
-                        f"Camera index {src} is already reserved by the main app. Use another index or URL."
+                    self._set_camera_status(
+                        f"Camera index {src} is already reserved by the main app. Use another index or URL.",
+                        "error",
                     )
-                    self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
                     self._log(f"Camera open blocked: index {src} is in use by main app")
                     return
 
         try:
             self._open_video_capture_source(src, src_text, "camera", request_frame_size=True)
         except Exception as e:
-            self._lbl_cam_status.setText(f"Error: {e}")
-            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._set_camera_status(f"Error: {e}", "error")
             self._log(f"Camera error: {e}")
 
     def _browse_test_media(self) -> None:
@@ -6070,16 +9566,14 @@ class SentryV2TabWidget(QWidget):
     def _open_video_url(self) -> None:
         video_url = str(getattr(self, "_edit_video_url", None).text() if hasattr(self, "_edit_video_url") else "").strip()
         if not video_url:
-            self._lbl_cam_status.setText("Video URL is blank")
-            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._set_camera_status("Video URL is blank", "error")
             return
         # Close any existing source.  This also sets _url_stream_stop so any
         # in-flight worker for a previous URL will see it and exit.
         self._close_camera(log_close=False)
         self._video_label.set_placeholder_enabled(False)
         self._video_label.clear_frame("Opening URL\u2026")
-        self._lbl_cam_status.setText("Resolving URL\u2026")
-        self._lbl_cam_status.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        self._set_camera_status("Resolving URL\u2026", "neutral")
         self._log(f"Resolving video URL: {video_url}")
         # Bump generation so any leftover threads from a previous URL ignore their frames
         self._url_stream_gen += 1
@@ -6137,8 +9631,7 @@ class SentryV2TabWidget(QWidget):
     def _open_test_media(self, selected_path: str) -> None:
         media_path = Path(selected_path).expanduser()
         if not media_path.exists():
-            self._lbl_cam_status.setText(f"Test media not found: {selected_path}")
-            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._set_camera_status(f"Test media not found: {selected_path}", "error")
             self._log(f"Test media open failed: {selected_path}")
             return
 
@@ -6149,8 +9642,7 @@ class SentryV2TabWidget(QWidget):
             else:
                 self._open_video_capture_source(str(media_path), str(media_path), "test_video", request_frame_size=False)
         except Exception as exc:
-            self._lbl_cam_status.setText(f"Test media error: {exc}")
-            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._set_camera_status(f"Test media error: {exc}", "error")
             self._log(f"Test media error: {exc}")
 
     def _play_test_media(self) -> None:
@@ -6185,17 +9677,16 @@ class SentryV2TabWidget(QWidget):
         self._save_config()
 
         if self._local_source_kind == "camera" and self._has_local_source():
-            self._lbl_cam_status.setText(f"Reopening camera at {width} x {height}...")
-            self._lbl_cam_status.setStyleSheet("color: #d0b060; font-size: 10px;")
+            self._set_camera_status(f"Reopening camera at {width} x {height}...", "warn")
             self._close_camera(log_close=False)
             QTimer.singleShot(0, self._toggle_camera)
             self._log(f"Applying camera resolution by reopening local source: {width} x {height}")
             return
 
-        self._lbl_cam_status.setText(
-            f"Resolution saved: {width} x {height}. Use Restart App if the main/shared feed still shows the old size."
+        self._set_camera_status(
+            f"Resolution saved: {width} x {height}. Use Restart App if the main/shared feed still shows the old size.",
+            "warn",
         )
-        self._lbl_cam_status.setStyleSheet("color: #d0b060; font-size: 10px;")
         self._log(f"Camera resolution saved: {width} x {height}")
 
     def _restart_application(self) -> None:
@@ -6206,16 +9697,15 @@ class SentryV2TabWidget(QWidget):
 
         process = QProcess(self)
         env = QProcessEnvironment.systemEnvironment()
-        env.insert("DB3000_RELAUNCH_DELAY_MS", "1200")
-        env.insert("DB3000_RELAUNCH_FROM_PID", str(os.getpid()))
+        env.insert("SMART_SENTRY_V3_RELAUNCH_DELAY_MS", "1200")
+        env.insert("SMART_SENTRY_V3_RELAUNCH_FROM_PID", str(os.getpid()))
         process.setProcessEnvironment(env)
         process.setWorkingDirectory(str(repo_root))
         started = process.startDetached(sys.executable, args)
         if isinstance(started, tuple):
             started = bool(started[0])
         if not started:
-            self._lbl_cam_status.setText("Restart failed: unable to relaunch the app")
-            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._set_camera_status("Restart failed: unable to relaunch the app", "error")
             self._log("Restart failed: detached relaunch did not start")
             return
 
@@ -6316,8 +9806,7 @@ class SentryV2TabWidget(QWidget):
         try:
             self._open_video_capture_source(cam_src, src, "camera", request_frame_size=True)
         except Exception as exc:
-            self._lbl_cam_status.setText(f"Return to camera failed: {exc}")
-            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._set_camera_status(f"Return to camera failed: {exc}", "error")
             self._log(f"Return to camera failed: {exc}")
 
     def _on_test_media_loop_toggled(self, checked: bool) -> None:
@@ -6346,17 +9835,22 @@ class SentryV2TabWidget(QWidget):
         if self._local_source_kind in {"test_video", "test_image"}:
             self._test_media_last_frame = frame.copy()
         effective_frame = self._apply_source_zoom(frame)
-        if self._show_video_feed and self._detector_worker_busy:
-            if self._last_display_frame is not None and self._last_display_frame.shape[:2] == effective_frame.shape[:2]:
-                self._show_frame(self._last_display_frame)
-            else:
-                display = effective_frame.copy()
-                display = self.overlay.draw(display, self.engine)
-                if self._scope_view_active():
-                    display = self.overlay.apply_scope_view(display, self.engine)
-                self._draw_no_fire_mask_draft(display)
-                self._draw_color_gate_status(display, self.config.detection_mode.detection_mode, False)
-                self._show_frame(display)
+        now = time.time()
+        if (
+            self._show_video_feed
+            and self._detector_worker_busy
+            and self._should_present_display_frame(now, busy=True)
+        ):
+            display = self._build_display_frame(
+                effective_frame,
+                mode=self.config.detection_mode.detection_mode,
+                use_internal_detector=False,
+                include_target_boxes=not self._busy_preview_skip_target_boxes,
+                include_scope_view=not self._busy_preview_skip_scope_view,
+            )
+            self._last_display_frame = display
+            self._show_frame(display)
+            self._mark_display_present(now, mode="busy-lite")
         with self._detector_frame_lock:
             self._detector_pending_frame = effective_frame
 
@@ -6373,8 +9867,7 @@ class SentryV2TabWidget(QWidget):
         if not ret or frame is None:
             self._test_media_paused = True
             self._update_test_media_controls()
-            self._lbl_cam_status.setText("Test video paused at end of file")
-            self._lbl_cam_status.setStyleSheet("color: #d0b060; font-size: 10px;")
+            self._set_camera_status("Test video paused at end of file", "warn")
             return None
         return frame
 
@@ -6392,8 +9885,7 @@ class SentryV2TabWidget(QWidget):
         self._grab_fail_count = 0
         self._sync_source_dimensions(frame.shape[1], frame.shape[0])
         self._btn_cam.setText("Close Source")
-        self._lbl_cam_status.setText(f"Test image: {media_path.name}  ({frame.shape[1]}x{frame.shape[0]})")
-        self._lbl_cam_status.setStyleSheet("color: #33cc33; font-size: 10px;")
+        self._set_camera_status(f"Test image: {media_path.name}  ({frame.shape[1]}x{frame.shape[0]})", "ok")
         self._cam_timer.start(250)
         self._update_test_media_controls()
         self._log(f"Test image loaded: {media_path.name} ({frame.shape[1]}x{frame.shape[0]})")
@@ -6416,8 +9908,7 @@ class SentryV2TabWidget(QWidget):
         if isinstance(src, int):
             # Open integer-index cameras in a background thread so DSHOW/MSMF
             # driver init doesn't freeze the Qt event loop.
-            self._lbl_cam_status.setText("Opening camera…")
-            self._lbl_cam_status.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+            self._set_camera_status("Opening camera…", "neutral")
             self._log(f"[CAM-DEBUG] Starting background open for index {src} ({requested_w}x{requested_h})")
 
             def _open_bg(
@@ -6525,8 +10016,7 @@ class SentryV2TabWidget(QWidget):
             status_prefix, status_name = "Test video", Path(source_text).name
         else:
             status_prefix, status_name = "Open", source_text
-        self._lbl_cam_status.setText(f"{status_prefix}: {status_name}  ({status_resolution})")
-        self._lbl_cam_status.setStyleSheet("color: #33cc33; font-size: 10px;")
+        self._set_camera_status(f"{status_prefix}: {status_name}  ({status_resolution})", "ok")
         if source_kind == "test_video":
             self._log(f"Test video opened: {source_text} ({actual_w}x{actual_h})")
         else:
@@ -6688,8 +10178,7 @@ class SentryV2TabWidget(QWidget):
         self._btn_cam.setText("Close Source")
         if w > 0 and h > 0:
             self._sync_source_dimensions(w, h)
-        self._lbl_cam_status.setText(f"URL stream: {display_label}  ({w}x{h})")
-        self._lbl_cam_status.setStyleSheet("color: #33cc33; font-size: 10px;")
+        self._set_camera_status(f"URL stream: {display_label}  ({w}x{h})", "ok")
         self._log(f"URL stream opened: {display_label} ({w}x{h})")
         self._update_test_media_controls()
         self._schedule_auto_yolo_load(300)
@@ -6699,8 +10188,7 @@ class SentryV2TabWidget(QWidget):
         """Called on Qt main thread with live status text from the URL worker."""
         if self._closing:
             return
-        self._lbl_cam_status.setText(msg)
-        self._lbl_cam_status.setStyleSheet("color: #aaaaaa; font-size: 10px;")
+        self._set_camera_status(msg, "meta")
 
     def _on_camera_open_failed(self, source_text: str) -> None:
         """Called on Qt main thread when the background camera open failed."""
@@ -6712,20 +10200,17 @@ class SentryV2TabWidget(QWidget):
         if retry >= 0 and not self._has_local_source() and retry < 3:
             # Retry with increasing back-off (1.5s, 3s, 4.5s)
             delay = 1500 * (retry + 1)
-            self._lbl_cam_status.setText(f"Retrying camera ({retry+1}/3)…")
-            self._lbl_cam_status.setStyleSheet("color: #d0a030; font-size: 10px;")
+            self._set_camera_status(f"Retrying camera ({retry+1}/3)…", "warn")
             QTimer.singleShot(delay, lambda r=retry+1: self._auto_open_camera_on_startup(r))
         else:
             self._startup_retry_count = -1
-            self._lbl_cam_status.setText(f"Failed to open: {source_text}")
-            self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+            self._set_camera_status(f"Failed to open: {source_text}", "error")
 
     def _on_url_open_error(self, msg: str) -> None:
         """Called on Qt main thread when the background URL resolve/open failed."""
         if self._closing:
             return
-        self._lbl_cam_status.setText(f"Video URL error: {msg}")
-        self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+        self._set_camera_status(f"Video URL error: {msg}", "error")
         self._log(f"Video URL error: {msg}")
         self._btn_cam.setText("Open Source")
         # Show the error prominently on the video canvas, not just the status label
@@ -6756,10 +10241,10 @@ class SentryV2TabWidget(QWidget):
         self._log(
             f"{reason} Attempting camera recovery ({attempt}/{self._MAX_CAMERA_RECOVERY_ATTEMPTS})"
         )
-        self._lbl_cam_status.setText(
-            f"Camera stalled. Reopening source ({attempt}/{self._MAX_CAMERA_RECOVERY_ATTEMPTS})..."
+        self._set_camera_status(
+            f"Camera stalled. Reopening source ({attempt}/{self._MAX_CAMERA_RECOVERY_ATTEMPTS})...",
+            "warn",
         )
-        self._lbl_cam_status.setStyleSheet("color: #d0b060; font-size: 10px;")
         self._close_camera(log_close=False)
 
         def _reopen() -> None:
@@ -6775,8 +10260,7 @@ class SentryV2TabWidget(QWidget):
                 self._open_video_capture_source(cam_src, src, "camera", request_frame_size=True)
             except Exception as exc:
                 self._camera_recovery_in_progress = False
-                self._lbl_cam_status.setText(f"Camera recovery failed: {exc}")
-                self._lbl_cam_status.setStyleSheet("color: #cc3333; font-size: 10px;")
+                self._set_camera_status(f"Camera recovery failed: {exc}", "error")
                 self._log(f"Camera recovery failed ({attempt}/{self._MAX_CAMERA_RECOVERY_ATTEMPTS}): {exc}")
 
         QTimer.singleShot(250, _reopen)
@@ -6816,8 +10300,7 @@ class SentryV2TabWidget(QWidget):
             self._camera_recovery_in_progress = False
         try:
             self._btn_cam.setText("Open Camera")
-            self._lbl_cam_status.setText("Source closed")
-            self._lbl_cam_status.setStyleSheet("color: #888; font-size: 10px;")
+            self._set_camera_status("Source closed", "neutral")
             if log_close:
                 self._video_label.set_placeholder_enabled(True)
                 self._video_label.clear_frame("Camera Off\nOpen Camera to Start")
@@ -6884,10 +10367,12 @@ class SentryV2TabWidget(QWidget):
     def _detector_worker_loop(self) -> None:
         while not self._detector_worker_stop.is_set():
             frame = None
+            generation = 0
             with self._detector_frame_lock:
                 if self._detector_pending_frame is not None:
                     frame = self._detector_pending_frame
                     self._detector_pending_frame = None
+                    generation = int(self._detector_runtime_generation)
             if frame is None:
                 time.sleep(0.01)
                 continue
@@ -6896,22 +10381,38 @@ class SentryV2TabWidget(QWidget):
                 mode = self.config.detection_mode.detection_mode
                 raw_boxes = self._detector.detect(frame, mode)
                 if not self._closing:
-                    self.detection_result_ready.emit(frame, raw_boxes)
+                    self.detection_result_ready.emit(frame, raw_boxes, generation)
             except Exception as exc:
                 # Store error locally — do NOT write to self._comm from this thread.
                 self._last_detector_error = str(exc)
             finally:
                 self._detector_worker_busy = False
 
-    def _on_detection_result_ready(self, frame: object, raw_boxes: object) -> None:
+    def _on_detection_result_ready(self, frame: object, raw_boxes: object, generation: int) -> None:
         if self._closing:
             return
         try:
             if frame is None:
                 return
+            if int(generation) != int(self._detector_runtime_generation):
+                return
             self.process_frame(frame, raw_boxes or [], _from_own_camera=True)
         except Exception as exc:
             self._log(f"Detection result error: {exc}")
+
+    def _invalidate_detector_runtime(self) -> None:
+        self._detector_runtime_generation += 1
+        latest_frame: Optional[np.ndarray] = None
+        if self._last_raw_frame is not None:
+            try:
+                latest_frame = self._apply_source_zoom(self._last_raw_frame.copy())
+            except Exception:
+                latest_frame = None
+        with self._detector_frame_lock:
+            self._detector_pending_frame = latest_frame
+        self._last_detector_error = ""
+        self._force_next_display_refresh = True
+        self._last_display_present_s = 0.0
 
     # ------------------------------------------------------------------ #
     #  Detection mode handlers
@@ -6926,6 +10427,8 @@ class SentryV2TabWidget(QWidget):
         self._sync_target_size_preset_combo()
         self._detector.reset()
         self._tracker.reset()
+        self._prompted_matcher.reset()
+        self._invalidate_detector_runtime()
         self._reset_detection_runtime_if_active()
         self.detection_mode_changed.emit(index)
         if not self._applying_detection_preset:
@@ -7080,6 +10583,7 @@ class SentryV2TabWidget(QWidget):
         """Populate the YOLO model combo from known YOLO model directories."""
         self._combo_yolo_model.clear()
         self._yolo_model_entries = self._discover_yolo_models()
+        self._update_yolo_model_dir_display()
         for label, path in self._yolo_model_entries:
             self._combo_yolo_model.addItem(label, path)
 
@@ -7095,6 +10599,80 @@ class SentryV2TabWidget(QWidget):
             self.config.detection_mode.yolo_model_name = current_label
             self._set_yolo_status("info", f"Model selected: {current_label}")
 
+    def _browse_yolo_model_dir(self) -> None:
+        initial_dir = self._current_yolo_model_dir()
+        selected_dir = QFileDialog.getExistingDirectory(
+            self,
+            "Select YOLO Models Folder",
+            str(initial_dir) if initial_dir else str(self._repo_root_path()),
+        )
+        if not selected_dir:
+            return
+        chosen_path = Path(selected_dir).expanduser()
+        self.config.detection_mode.yolo_model_dir = str(chosen_path)
+        self._scan_yolo_models()
+        self._save_config_quietly()
+
+    def _update_yolo_model_dir_display(self) -> None:
+        if not hasattr(self, "_edit_yolo_model_dir"):
+            return
+        current_dir = self._current_yolo_model_dir()
+        if current_dir is None:
+            self._edit_yolo_model_dir.clear()
+            self._edit_yolo_model_dir.setPlaceholderText("Using bundled/default YOLO model folders")
+            return
+        self._edit_yolo_model_dir.setText(str(current_dir))
+        self._edit_yolo_model_dir.setCursorPosition(0)
+
+    def _configured_yolo_model_dir(self) -> Path | None:
+        configured = str(getattr(self.config.detection_mode, "yolo_model_dir", "") or "").strip()
+        if not configured:
+            return None
+        try:
+            return Path(configured).expanduser().resolve()
+        except Exception:
+            return Path(configured).expanduser()
+
+    def _release_yolo_model_dir(self) -> Path | None:
+        if not getattr(sys, "frozen", False):
+            return None
+        try:
+            return (Path(sys.executable).resolve().parent / "YOLO_MODELS").resolve()
+        except Exception:
+            return Path(sys.executable).parent / "YOLO_MODELS"
+
+    def _default_yolo_model_dirs(self) -> list[Path]:
+        defaults: list[Path] = []
+        raw_candidates: list[Path] = [self._repo_root_path() / "YOLO_MODELS"]
+        release_dir = self._release_yolo_model_dir()
+        if release_dir is not None:
+            raw_candidates.append(release_dir)
+        raw_candidates.append(Path.cwd() / "YOLO_MODELS")
+        for candidate in raw_candidates:
+            try:
+                resolved = candidate.resolve()
+            except Exception:
+                resolved = candidate
+            if resolved not in defaults:
+                defaults.append(resolved)
+        return defaults
+
+    def _is_default_yolo_model_dir(self, candidate: Path | None) -> bool:
+        if candidate is None:
+            return False
+        try:
+            resolved = candidate.resolve()
+        except Exception:
+            resolved = candidate
+        return any(resolved == default_dir for default_dir in self._default_yolo_model_dirs())
+
+    def _current_yolo_model_dir(self) -> Path | None:
+        configured_dir = self._configured_yolo_model_dir()
+        if configured_dir is not None and not self._is_default_yolo_model_dir(configured_dir):
+            return configured_dir
+        candidate_dirs = self._candidate_yolo_model_dirs()
+        return candidate_dirs[0] if candidate_dirs else configured_dir
+
     def _load_yolo_model(self) -> None:
         """Start a background-thread YOLO model load so the event loop never freezes."""
         model_name = self._combo_yolo_model.currentText().strip()
@@ -7104,6 +10682,11 @@ class SentryV2TabWidget(QWidget):
             return
         if self._yolo_loading:
             return  # already loading; ignore concurrent request
+        prepare_error = self._prepare_yolo_runtime()
+        if prepare_error:
+            self._set_yolo_status("error", f"Runtime unavailable: {model_name} ({prepare_error})")
+            self._log(f"YOLO runtime prepare failed: {prepare_error}")
+            return
         self._yolo_loading = True
         self._set_yolo_status("pending", f"Loading model: {model_name}")
         self._btn_load_yolo.setEnabled(False)
@@ -7118,6 +10701,23 @@ class SentryV2TabWidget(QWidget):
             self._yolo_load_result.emit(ok, _name, err)
 
         threading.Thread(target=_do_load, daemon=True, name="yolo-loader").start()
+
+    def _prepare_yolo_runtime(self) -> str:
+        if self._yolo_runtime_prepared:
+            return ""
+        try:
+            os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+            os.environ.setdefault("OMP_NUM_THREADS", "1")
+            os.environ.setdefault("MKL_NUM_THREADS", "1")
+            os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+            os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+            import torch  # noqa: F401
+            from ultralytics import YOLO as _YOLO  # noqa: F401
+            self._yolo_runtime_prepared = True
+            return ""
+        except Exception as exc:
+            self._yolo_runtime_prepared = False
+            return str(exc)
 
     def _on_yolo_load_result(self, ok: bool, model_name: str, err: str) -> None:
         """Called on Qt main thread when the background YOLO load completes."""
@@ -7145,9 +10745,17 @@ class SentryV2TabWidget(QWidget):
         if index < 0:
             return
         model_name = self._combo_yolo_model.itemText(index).strip()
+        model_path = str(self._combo_yolo_model.itemData(index) or "").strip()
         if not model_name:
             return
         self.config.detection_mode.yolo_model_name = model_name
+        if model_path:
+            try:
+                self.config.detection_mode.yolo_model_dir = str(Path(model_path).resolve().parent)
+            except Exception:
+                self.config.detection_mode.yolo_model_dir = str(Path(model_path).parent)
+            self._update_yolo_model_dir_display()
+            self._save_config_quietly()
         if "Runtime ready:" not in self._lbl_yolo_status.text():
             self._set_yolo_status("info", f"Model selected: {model_name}")
 
@@ -7167,25 +10775,37 @@ class SentryV2TabWidget(QWidget):
         self._lbl_yolo_status.setToolTip(message)
 
     def _repo_root_path(self) -> Path:
-        return Path(__file__).resolve().parents[2]
+        return RUNTIME_ROOT_PATH
 
     def _candidate_yolo_model_dirs(self) -> list[Path]:
         dirs: list[Path] = []
-        for candidate in (
+        configured_dir = self._configured_yolo_model_dir()
+        candidates: list[Path] = []
+        if configured_dir is not None and not self._is_default_yolo_model_dir(configured_dir):
+            candidates.append(configured_dir)
+        release_dir = self._release_yolo_model_dir()
+        if release_dir is not None:
+            candidates.append(release_dir)
+        candidates.extend([
             self._repo_root_path() / "YOLO_MODELS",
-            self._repo_root_path() / "app" / "YOLO_MODELS",
-            self._repo_root_path() / "app" / "models",
             Path.cwd() / "YOLO_MODELS",
-        ):
-            resolved = candidate.resolve()
+        ])
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+            except Exception:
+                resolved = candidate
             if resolved not in dirs and resolved.is_dir():
                 dirs.append(resolved)
         return dirs
 
     def _discover_yolo_models(self) -> list[tuple[str, str]]:
+        return self._discover_yolo_models_in_dirs(self._candidate_yolo_model_dirs())
+
+    def _discover_yolo_models_in_dirs(self, model_dirs: list[Path]) -> list[tuple[str, str]]:
         supported_suffixes = {".pt", ".onnx", ".engine", ".torchscript"}
         discovered: dict[str, str] = {}
-        for models_dir in self._candidate_yolo_model_dirs():
+        for models_dir in model_dirs:
             for model_file in sorted(models_dir.rglob("*")):
                 if not model_file.is_file() or model_file.suffix.lower() not in supported_suffixes:
                     continue
@@ -7378,6 +10998,75 @@ class SentryV2TabWidget(QWidget):
             self.engine.set_ml_training_mode(checked)
             mode = "enabled" if checked else "disabled"
             self._log(f"ML training logging {mode}")
+        self._refresh_ml_feature_status()
+
+    def _resolved_ml_training_data_path(self) -> Path:
+        default_path = Path("config/ml_training_data.json")
+        if self.engine:
+            try:
+                data_file = Path(str(self.engine.get_ml_logger().data_file))
+                if data_file.is_absolute():
+                    return data_file
+                return (self._repo_root_path() / data_file).resolve()
+            except Exception:
+                pass
+        return (self._repo_root_path() / default_path).resolve()
+
+    def _resolved_ml_model_path(self) -> Path:
+        configured = Path(str(self.config.threat_scoring.ml_model_path or "config/smart_sentry_v3_threat_model.pkl"))
+        if configured.is_absolute():
+            return configured
+        return (self._repo_root_path() / configured).resolve()
+
+    def _refresh_ml_feature_status(self) -> None:
+        if not hasattr(self, "_lbl_ml_status"):
+            return
+
+        try:
+            sklearn_available = importlib.util.find_spec("sklearn") is not None
+        except Exception:
+            sklearn_available = False
+
+        training_path = self._resolved_ml_training_data_path()
+        model_path = self._resolved_ml_model_path()
+
+        stats = self.engine.get_ml_logger_stats() if self.engine else {}
+        total_records = int(stats.get("total_records", 0))
+        by_source = dict(stats.get("by_source", {})) if stats else {}
+        manual_fire_records = int(by_source.get("manual_fire", 0))
+        model_exists = model_path.exists()
+        data_exists = total_records > 0 or training_path.exists()
+
+        self._lbl_ml_status.setText(
+            f"ML runtime: sklearn {'available' if sklearn_available else 'missing'} | "
+            f"logged records {total_records} | manual fire samples {manual_fire_records} | "
+            f"saved model {'present' if model_exists else 'missing'}"
+        )
+
+        if hasattr(self, "_btn_open_ml_folder"):
+            self._btn_open_ml_folder.setEnabled(data_exists or model_exists)
+
+    def _open_ml_data_folder(self) -> None:
+        training_path = self._resolved_ml_training_data_path()
+        model_path = self._resolved_ml_model_path()
+        folder_path: Optional[Path] = None
+
+        if training_path.exists():
+            folder_path = training_path.parent
+        elif model_path.exists():
+            folder_path = model_path.parent
+
+        if folder_path is None:
+            self._log("No saved ML training data or ML model file exists yet")
+            self._refresh_ml_feature_status()
+            return
+
+        try:
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder_path))):
+                raise RuntimeError(f"could not open folder: {folder_path}")
+            self._log(f"Opened ML data folder: {self._portable_path_string(folder_path)}")
+        except Exception as exc:
+            self._log(f"Open ML data folder failed: {exc}")
 
     def _on_precision_logging_toggled(self, checked: bool) -> None:
         """Enable or disable precision tuning logger in engine."""
@@ -7442,6 +11131,7 @@ class SentryV2TabWidget(QWidget):
             self._log(f"✓ ML model trained successfully from {total} examples")
         else:
             self._log(f"✗ ML model training failed")
+        self._refresh_ml_feature_status()
 
     def _save_ml_model(self) -> None:
         """Save the trained ML model to disk."""
@@ -7456,6 +11146,7 @@ class SentryV2TabWidget(QWidget):
             self._log(f"✓ ML model saved to: {path}")
         else:
             self._log(f"✗ Failed to save ML model to: {path}")
+        self._refresh_ml_feature_status()
 
     def _clear_ml_logs(self) -> None:
         """Clear all logged engagement data."""
@@ -7464,7 +11155,9 @@ class SentryV2TabWidget(QWidget):
             return
         
         self.engine.get_ml_logger().clear()
+        self.engine.save_ml_training_data()
         self._log("✓ Engagement logs cleared")
+        self._refresh_ml_feature_status()
 
     def _show_ml_stats(self) -> None:
         """Show summary statistics of logged engagement data."""
@@ -7486,6 +11179,10 @@ class SentryV2TabWidget(QWidget):
         classes = stats.get("class_distribution", {})
         if classes:
             self._log(f"  Classes detected: {', '.join(f'{c}({count})' for c, count in classes.items())}")
+        data_file = stats.get("data_file", "")
+        if data_file:
+            self._log(f"  Data file: {self._portable_path_string(Path(str(data_file)))}")
+        self._refresh_ml_feature_status()
 
     def _on_engagement_changed(self) -> None:
         eg = self.config.engagement
@@ -7518,6 +11215,20 @@ class SentryV2TabWidget(QWidget):
         eg.fire_recenter_tilt_tolerance = self._spin_recenter_tilt.value()
         eg.target_loss_timeout = self._spin_target_loss_timeout.value()
         eg.continuous_hunt_on_loss = self._chk_continuous_hunt_loss.isChecked()
+        eg.adaptive_loss_recovery_enabled = self._chk_adaptive_loss_recovery.isChecked()
+        eg.loss_search_style = str(self._combo_loss_search_style.currentData() or "hunting")
+        eg.loss_search_rounds = self._spin_loss_search_rounds.value()
+        eg.loss_handoff_pursuit_time_s = self._spin_loss_handoff_pursuit.value()
+        eg.loss_handoff_backoff_pan_deg = self._spin_loss_handoff_backoff.value()
+        eg.loss_handoff_tilt_step_deg = self._spin_loss_handoff_tilt.value()
+        eg.loss_persistent_retry_passes_sparse = self._spin_loss_retry_sparse.value()
+        eg.loss_persistent_retry_passes_crowded = self._spin_loss_retry_crowded.value()
+        eg.loss_switch_score_margin = self._spin_loss_switch_margin.value()
+        eg.loss_scene_crowding_threshold = self._spin_loss_crowd_threshold.value()
+        eg.loss_personality_intensity = self._spin_loss_personality.value()
+        eg.loss_personality_velocity_bias = self._spin_loss_velocity_bias.value()
+        self.config.pir_guard.search_style = eg.loss_search_style
+        self.config.pir_guard.search_rounds = eg.loss_search_rounds
         self._update_center_fire_radius_hint()
         if not self._applying_engagement_preset:
             self._set_engagement_preset_label(self._match_engagement_preset_name())
@@ -7635,6 +11346,15 @@ class SentryV2TabWidget(QWidget):
         g = self.config.guard
         g.guard_pan = self._spin_guard_pan.value()
         g.guard_tilt = self._spin_guard_tilt.value()
+        g.rest_pan = self._spin_rest_pan.value()
+        g.rest_tilt = self._spin_rest_tilt.value()
+        g.rest_on_startup_enabled = bool(self._chk_rest_on_startup.isChecked())
+        g.rest_on_close_enabled = bool(self._chk_rest_on_close.isChecked())
+        g.home_move_speed_dps = float(self._spin_home_move_speed.value())
+        g.home_move_approach_speed_dps = float(self._spin_home_move_approach_speed.value())
+        g.rest_move_speed_dps = float(self._spin_rest_move_speed.value())
+        g.rest_move_approach_speed_dps = float(self._spin_rest_move_approach_speed.value())
+        g.guided_move_approach_window_deg = float(self._spin_guided_move_window.value())
         g.pan_min = self._spin_pan_min.value()
         g.pan_max = self._spin_pan_max.value()
         g.tilt_min = self._spin_tilt_min.value()
@@ -7660,6 +11380,13 @@ class SentryV2TabWidget(QWidget):
         tilt_min, tilt_max = sorted((g.tilt_min, g.tilt_max))
         g.guard_pan = min(pan_max, max(pan_min, g.guard_pan))
         g.guard_tilt = min(tilt_max, max(tilt_min, g.guard_tilt))
+        g.rest_pan = min(pan_max, max(pan_min, g.rest_pan))
+        g.rest_tilt = min(SENTRY_TILT_MAX, max(SENTRY_TILT_MIN, g.rest_tilt))
+        g.home_move_speed_dps = max(2.0, float(g.home_move_speed_dps))
+        g.home_move_approach_speed_dps = max(1.0, min(g.home_move_speed_dps, float(g.home_move_approach_speed_dps)))
+        g.rest_move_speed_dps = max(2.0, float(g.rest_move_speed_dps))
+        g.rest_move_approach_speed_dps = max(1.0, min(g.rest_move_speed_dps, float(g.rest_move_approach_speed_dps)))
+        g.guided_move_approach_window_deg = max(4.0, float(g.guided_move_approach_window_deg))
         g.sweep_pan_min = min(pan_max, max(pan_min, g.sweep_pan_min))
         g.sweep_pan_max = min(pan_max, max(pan_min, g.sweep_pan_max))
         if g.sweep_pan_min > g.sweep_pan_max:
@@ -7679,9 +11406,52 @@ class SentryV2TabWidget(QWidget):
         self._spin_guard_tilt.blockSignals(True)
         self._spin_guard_tilt.setValue(g.guard_tilt)
         self._spin_guard_tilt.blockSignals(False)
+        self._spin_rest_pan.blockSignals(True)
+        self._spin_rest_pan.setValue(g.rest_pan)
+        self._spin_rest_pan.blockSignals(False)
+        self._spin_rest_tilt.blockSignals(True)
+        self._spin_rest_tilt.setValue(g.rest_tilt)
+        self._spin_rest_tilt.blockSignals(False)
+        self._spin_home_move_speed.blockSignals(True)
+        self._spin_home_move_speed.setValue(g.home_move_speed_dps)
+        self._spin_home_move_speed.blockSignals(False)
+        self._spin_home_move_approach_speed.blockSignals(True)
+        self._spin_home_move_approach_speed.setValue(g.home_move_approach_speed_dps)
+        self._spin_home_move_approach_speed.blockSignals(False)
+        self._spin_rest_move_speed.blockSignals(True)
+        self._spin_rest_move_speed.setValue(g.rest_move_speed_dps)
+        self._spin_rest_move_speed.blockSignals(False)
+        self._spin_rest_move_approach_speed.blockSignals(True)
+        self._spin_rest_move_approach_speed.setValue(g.rest_move_approach_speed_dps)
+        self._spin_rest_move_approach_speed.blockSignals(False)
+        self._spin_guided_move_window.blockSignals(True)
+        self._spin_guided_move_window.setValue(g.guided_move_approach_window_deg)
+        self._spin_guided_move_window.blockSignals(False)
+        if hasattr(self, "_spin_command_rest_pan"):
+            self._spin_command_rest_pan.blockSignals(True)
+            self._spin_command_rest_pan.setValue(g.rest_pan)
+            self._spin_command_rest_pan.blockSignals(False)
+        if hasattr(self, "_spin_command_rest_tilt"):
+            self._spin_command_rest_tilt.blockSignals(True)
+            self._spin_command_rest_tilt.setValue(g.rest_tilt)
+            self._spin_command_rest_tilt.blockSignals(False)
         self._push_config()
         self._refresh_status()
+        if g.rest_on_startup_enabled and not self._startup_rest_completed:
+            self._startup_rest_pending = True
+            self._schedule_startup_rest_move()
         self._note_sound_settings_changed()
+
+    def _on_command_rest_position_changed(self) -> None:
+        if not hasattr(self, "_spin_rest_pan") or not hasattr(self, "_spin_rest_tilt"):
+            return
+        self._spin_rest_pan.blockSignals(True)
+        self._spin_rest_pan.setValue(self._spin_command_rest_pan.value())
+        self._spin_rest_pan.blockSignals(False)
+        self._spin_rest_tilt.blockSignals(True)
+        self._spin_rest_tilt.setValue(self._spin_command_rest_tilt.value())
+        self._spin_rest_tilt.blockSignals(False)
+        self._on_guard_changed()
 
     def _on_guard_mode_changed(self, index: int) -> None:
         self.config.guard.guard_mode = index
@@ -7804,6 +11574,7 @@ class SentryV2TabWidget(QWidget):
         pg.scan_tilt_range = self._spin_pir_scan_tilt_range.value()
         pg.scan_grid_resolution = self._spin_pir_grid_res.value()
         pg.scan_speed = self._spin_pir_scan_speed.value()
+        pg.cue_hold_time_s = self._spin_pir_cue_hold.value()
         pg.confirmation_timeout = self._spin_pir_confirm_timeout.value()
         pg.scan_on_no_detect = self._chk_pir_scan_enabled.isChecked()
         pg.cross_sensor_lockout_ms = int(self._spin_pir_cross_lockout_ms.value())
@@ -7837,25 +11608,26 @@ class SentryV2TabWidget(QWidget):
                 chk_enabled.setChecked(True)
                 chk_enabled.blockSignals(False)
         self._spin_pir_scan_pan_range.blockSignals(True)
-        self._spin_pir_scan_pan_range.setValue(20.0)
+        self._spin_pir_scan_pan_range.setValue(45.0)
         self._spin_pir_scan_pan_range.blockSignals(False)
         self._spin_pir_scan_tilt_range.blockSignals(True)
-        self._spin_pir_scan_tilt_range.setValue(12.0)
+        self._spin_pir_scan_tilt_range.setValue(45.0)
         self._spin_pir_scan_tilt_range.blockSignals(False)
+        if hasattr(self, "_spin_loss_search_rounds"):
+            self._spin_loss_search_rounds.blockSignals(True)
+            self._spin_loss_search_rounds.setValue(1)
+            self._spin_loss_search_rounds.blockSignals(False)
         self._spin_pir_cross_lockout_ms.blockSignals(True)
         self._spin_pir_cross_lockout_ms.setValue(800)
         self._spin_pir_cross_lockout_ms.blockSignals(False)
         self._on_pir_settings_changed()
-        self._log("Applied PIR 120° layout: cues=270/150/30, scan pan=20°, tilt=12°, cross-sensor lockout=800ms")
+        self._log("Applied PIR 120° layout: cues=270/150/30, scan pan=45°, tilt=45°, hunt rounds=1, cross-sensor lockout=800ms")
 
     def _on_pan_tilt_motion_toggled(self, checked: bool) -> None:
         self._pan_tilt_motion_enabled = bool(checked)
         self.engine.set_motion_enabled(self._pan_tilt_motion_enabled)
         self._btn_motion_enable.setText(
             "Auto Motion: ON" if self._pan_tilt_motion_enabled else "Auto Motion: OFF"
-        )
-        self._btn_motion_enable.setStyleSheet(
-            "font-weight: bold; color: #66dd88;" if self._pan_tilt_motion_enabled else "font-weight: bold; color: #ffae42;"
         )
         self._log(
             "Automatic pan/tilt movement enabled" if self._pan_tilt_motion_enabled else "Automatic pan/tilt movement disabled; manual arrows/Home/Move to Guard still remain active"
@@ -8032,9 +11804,7 @@ class SentryV2TabWidget(QWidget):
 
     def _on_auto_trigger_toggled(self, checked: bool) -> None:
         self.config.engagement.auto_trigger_enabled = checked
-        self._chk_auto_trigger.setStyleSheet(
-            "font-weight: bold; color: #ff4d4d;" if checked else "font-weight: bold; color: #66dd88;"
-        )
+        self._sync_auto_trigger_checkbox_style()
         if not self._applying_master_preset:
             self._set_master_profile_label(self._match_master_profile_name())
             self._update_master_stack_summary()
@@ -8077,10 +11847,13 @@ class SentryV2TabWidget(QWidget):
 
     def _sync_comm_runtime_settings_from_config(self) -> None:
         engagement = self.config.engagement
+        guard = self.config.guard
         pir_guard = self.config.pir_guard
         self._comm.trigger_servo_rest_deg = int(getattr(engagement, "trigger_servo_rest_deg", 0))
         self._comm.trigger_servo_fire_deg = int(getattr(engagement, "trigger_servo_fire_deg", 45))
         self._comm.trigger_servo_speed_dps = int(getattr(engagement, "trigger_servo_speed_dps", 360))
+        self._comm.rest_pan = float(getattr(guard, "rest_pan", guard.guard_pan))
+        self._comm.rest_tilt = float(getattr(guard, "rest_tilt", guard.guard_tilt))
         self._comm.pir_event_blink_enabled = bool(getattr(pir_guard, "pir_event_blink_enabled", False))
 
     def _queue_runtime_trigger_config_if_connected(self) -> None:
@@ -8137,8 +11910,17 @@ class SentryV2TabWidget(QWidget):
     #  Manual control handlers
     # ------------------------------------------------------------------ #
 
-    def _move_to_absolute_position(self, pan: float, tilt: float, *, hold_guard: bool = False, log_message: str = "") -> None:
-        pan, tilt = self._clamp_manual_angles(pan, tilt)
+    def _move_to_absolute_position(
+        self,
+        pan: float,
+        tilt: float,
+        *,
+        hold_guard: bool = False,
+        log_message: str = "",
+        allow_rest_tilt: bool = False,
+    ) -> None:
+        self._finish_guided_move(cancelled=True)
+        pan, tilt = self._clamp_manual_angles(pan, tilt, allow_rest_tilt=allow_rest_tilt)
         move_time_ms = self._get_manual_move_time_ms()
         self._manual_move_priority_until = max(
             float(getattr(self, "_manual_move_priority_until", 0.0) or 0.0),
@@ -8179,6 +11961,7 @@ class SentryV2TabWidget(QWidget):
         self._move_to_absolute_position(pan, tilt, log_message=f"Manual preset: {label} corner (P{pan:.0f} T{tilt:.0f})")
 
     def _manual_move(self, pan_dir: int, tilt_dir: int) -> None:
+        self._finish_guided_move(cancelled=True)
         step = self._spin_step.value()
         new_pan = self.engine.current_pan + pan_dir * step
         new_tilt = self.engine.current_tilt + tilt_dir * step
@@ -8201,7 +11984,112 @@ class SentryV2TabWidget(QWidget):
     def _on_home_clicked(self) -> None:
         pan = self._spin_guard_pan.value()
         tilt = self._spin_guard_tilt.value()
-        self._move_to_absolute_position(pan, tilt, hold_guard=True, log_message="Go Home")
+        waking_from_rest = self._is_near_rest_position(float(self.engine.current_pan), float(self.engine.current_tilt), tolerance_deg=8.0)
+        self._play_home_cue(waking_from_rest=waking_from_rest)
+        self._start_guided_position_move(pan, tilt, maneuver="home", hold_guard=True, log_message="Go Home")
+
+    def _on_rest_clicked(self) -> None:
+        self._move_to_rest()
+
+    def _set_manual_sweep_button_state(self, active: bool) -> None:
+        self._manual_sweep_active = bool(active)
+        if hasattr(self, "_btn_manual_sweep"):
+            self._btn_manual_sweep.setEnabled(not active)
+            self._btn_manual_sweep.setText("SWEEPING..." if active else "RUN SWEEP")
+
+    def _get_manual_sweep_move_time_ms(
+        self,
+        from_pan: float,
+        from_tilt: float,
+        to_pan: float,
+        to_tilt: float,
+    ) -> int:
+        delta_deg = max(abs(float(to_pan) - float(from_pan)), abs(float(to_tilt) - float(from_tilt)), 1.0)
+        sweep_speed = max(0.5, float(getattr(self.config.guard, "sweep_speed", 6.0) or 6.0))
+        timed_move_ms = int(round((delta_deg / sweep_speed) * 1000.0))
+        return int(max(self._get_manual_move_time_ms(), min(30000, timed_move_ms)))
+
+    def _finish_manual_sweep(self, *, log_message: str = "") -> None:
+        self._manual_sweep_timer.stop()
+        self._manual_sweep_steps.clear()
+        was_active = bool(getattr(self, "_manual_sweep_active", False))
+        self._set_manual_sweep_button_state(False)
+        if log_message and was_active and not self._closing:
+            self._log(log_message)
+
+    def _advance_manual_sweep(self) -> None:
+        if self._closing:
+            self._finish_manual_sweep()
+            return
+        if not self._manual_sweep_steps:
+            self._finish_manual_sweep(log_message="Manual sweep complete")
+            return
+
+        target_pan, target_tilt, move_time_ms, label = self._manual_sweep_steps.popleft()
+        self._manual_move_priority_until = max(
+            float(getattr(self, "_manual_move_priority_until", 0.0) or 0.0),
+            time.time() + max(1.25, float(move_time_ms) / 1000.0 + 0.25),
+        )
+        self.engine.current_pan = float(target_pan)
+        self.engine.current_tilt = float(target_tilt)
+        if self._host_controls_hardware():
+            self.turret_move_requested.emit(float(target_pan), float(target_tilt))
+        else:
+            self._queue_move_command(float(target_pan), float(target_tilt), move_time_ms=int(move_time_ms), manual_override=True)
+        self._remember_commanded_position(float(target_pan), float(target_tilt), move_time_ms=int(move_time_ms))
+        self._suppress_motion_detection()
+        self._refresh_status()
+        self._log(f"Manual sweep: {label} (P{float(target_pan):.0f} T{float(target_tilt):.0f})")
+        self._manual_sweep_timer.start(max(180, int(move_time_ms) + 180))
+
+    def _on_manual_sweep_clicked(self) -> None:
+        self._finish_guided_move(cancelled=True)
+        if self._host_controls_hardware():
+            self._log("Manual sweep unavailable while hardware is managed by the host application")
+            return
+        if self._manual_sweep_active:
+            self._log("Manual sweep already in progress")
+            return
+
+        guard = self.config.guard
+        current_pan, current_tilt = self._clamp_manual_angles(float(self.engine.current_pan), float(self.engine.current_tilt))
+        pan_min, pan_max = sorted((float(guard.sweep_pan_min), float(guard.sweep_pan_max)))
+        tilt_min, tilt_max = sorted((float(guard.tilt_min), float(guard.tilt_max)))
+        sweep_tilt = min(tilt_max, max(tilt_min, float(guard.sweep_tilt)))
+
+        raw_targets = [
+            (pan_min, current_tilt, "pan min"),
+            (pan_max, current_tilt, "pan max"),
+        ]
+        if abs(sweep_tilt - current_tilt) >= 0.1:
+            raw_targets.append((pan_max, sweep_tilt, "tilt stage"))
+        raw_targets.extend([
+            (pan_max, tilt_min, "tilt min"),
+            (pan_max, tilt_max, "tilt max"),
+        ])
+
+        steps: deque[tuple[float, float, int, str]] = deque()
+        last_pan = float(current_pan)
+        last_tilt = float(current_tilt)
+        for target_pan, target_tilt, label in raw_targets:
+            target_pan, target_tilt = self._clamp_manual_angles(float(target_pan), float(target_tilt))
+            if max(abs(target_pan - last_pan), abs(target_tilt - last_tilt)) < 0.1:
+                continue
+            move_time_ms = self._get_manual_sweep_move_time_ms(last_pan, last_tilt, target_pan, target_tilt)
+            steps.append((float(target_pan), float(target_tilt), int(move_time_ms), str(label)))
+            last_pan = float(target_pan)
+            last_tilt = float(target_tilt)
+
+        if not steps:
+            self._log("Manual sweep skipped: already at configured sweep and tilt limits")
+            return
+
+        self._manual_sweep_steps = steps
+        self._set_manual_sweep_button_state(True)
+        self._log(
+            f"Manual sweep started: pan {pan_min:.0f}→{pan_max:.0f}, then tilt {tilt_min:.0f}→{tilt_max:.0f} at {float(guard.sweep_speed):.1f} deg/s"
+        )
+        QTimer.singleShot(0, self._advance_manual_sweep)
 
     def _on_led_toggled(self, checked: bool) -> None:
         self._led_on = checked
@@ -8226,6 +12114,19 @@ class SentryV2TabWidget(QWidget):
         self._btn_spare.setText(f"Spare: {'ON' if checked else 'OFF'}")
         if not self._host_controls_hardware():
             self._queue_comm_task("set_spare", checked, self.engine.current_pan, self.engine.current_tilt)
+
+    def _on_control_source_toggled(self, checked: bool) -> None:
+        mode = "rc" if checked else "app"
+        self._control_source_mode = mode
+        self._btn_control_source.setText(f"Control Source: {'FLYSKY' if checked else 'APP'}")
+        if hasattr(self, "_lbl_control_source_status"):
+            self._set_label_content(
+                self._lbl_control_source_status,
+                f"FlySky mode request: {'RC' if checked else 'APP'}",
+                f"font-weight: bold; color: {'#8fe3c4' if checked else '#97a8b8'}; font-size: 10px;",
+            )
+        if not self._host_controls_hardware():
+            self._queue_comm_task("set_control_source_mode", mode)
 
     def _on_safety_toggled(self, checked: bool) -> None:
         self._safety_armed = checked
@@ -8274,10 +12175,36 @@ class SentryV2TabWidget(QWidget):
     def _set_current_as_guard(self) -> None:
         pan = self.engine.current_pan
         tilt = self.engine.current_tilt
+        self._spin_guard_pan.blockSignals(True)
         self._spin_guard_pan.setValue(pan)
+        self._spin_guard_pan.blockSignals(False)
+        self._spin_guard_tilt.blockSignals(True)
         self._spin_guard_tilt.setValue(tilt)
+        self._spin_guard_tilt.blockSignals(False)
+        self._on_guard_changed()
         self._refresh_status()
         self._log(f"Guard set to current: P{pan:.0f} T{tilt:.0f}")
+
+    def _set_current_as_rest(self) -> None:
+        pan = self.engine.current_pan
+        tilt = self.engine.current_tilt
+        self._spin_rest_pan.blockSignals(True)
+        self._spin_rest_pan.setValue(pan)
+        self._spin_rest_pan.blockSignals(False)
+        self._spin_rest_tilt.blockSignals(True)
+        self._spin_rest_tilt.setValue(tilt)
+        self._spin_rest_tilt.blockSignals(False)
+        if hasattr(self, "_spin_command_rest_pan"):
+            self._spin_command_rest_pan.blockSignals(True)
+            self._spin_command_rest_pan.setValue(pan)
+            self._spin_command_rest_pan.blockSignals(False)
+        if hasattr(self, "_spin_command_rest_tilt"):
+            self._spin_command_rest_tilt.blockSignals(True)
+            self._spin_command_rest_tilt.setValue(tilt)
+            self._spin_command_rest_tilt.blockSignals(False)
+        self._on_guard_changed()
+        self._refresh_status()
+        self._log(f"Rest set to current: P{pan:.0f} T{tilt:.0f}")
 
     def _select_all_classes(self) -> None:
         self._class_list.selectAll()
@@ -8287,6 +12214,7 @@ class SentryV2TabWidget(QWidget):
 
     def _save_config(self) -> None:
         try:
+            self._capture_layout_state()
             # Persist connection settings from UI
             cc = self.config.connection
             cc.connection_type = self._combo_conn_type.currentIndex()
@@ -8312,10 +12240,13 @@ class SentryV2TabWidget(QWidget):
             self.config.prompted_targets_enabled = bool(getattr(self, "_chk_prompted_enabled", None) and self._chk_prompted_enabled.isChecked())
             self.config.prompted_allow_auto_fire = bool(getattr(self, "_chk_prompted_auto_fire", None) and self._chk_prompted_auto_fire.isChecked())
             self.config.prompted_library_path = self._portable_path_string(self._resolved_prompted_library_path())
-            self.config.config_path = "app/config/sentry_v2_settings.json"
-            self.config.save(str(SENTRY_V2_SETTINGS_PATH))
+            self.config.face_recognition.library_path = self._portable_path_string(self._resolved_face_library_path())
+            self.config.shortcuts.quick_view_doc_path = self._portable_path_string(SMART_SENTRY_SHORTCUT_KEYS_DOC_PATH)
+            self.config.config_path = "app/config/smart_sentry_v2_3_2_settings.json"
+            self.config.save(str(SMART_SENTRY_V2_3_2_SETTINGS_PATH))
             self._sync_legacy_settings_copy()
             self._save_prompted_target_library()
+            self._save_face_identity_library()
             self._log(f"Settings saved: {self.config.config_path}")
         except Exception as e:
             self._log(f"Save error: {e}")
@@ -8329,8 +12260,11 @@ class SentryV2TabWidget(QWidget):
             return
         self._pending_quiet_save = False
         try:
-            self.config.config_path = "app/config/sentry_v2_settings.json"
-            self.config.save(str(SENTRY_V2_SETTINGS_PATH))
+            self._capture_layout_state()
+            self.config.face_recognition.library_path = self._portable_path_string(self._resolved_face_library_path())
+            self.config.shortcuts.quick_view_doc_path = self._portable_path_string(SMART_SENTRY_SHORTCUT_KEYS_DOC_PATH)
+            self.config.config_path = "app/config/smart_sentry_v2_3_2_settings.json"
+            self.config.save(str(SMART_SENTRY_V2_3_2_SETTINGS_PATH))
             self._sync_legacy_settings_copy()
         except Exception as exc:
             self._log(f"Save error: {exc}")
@@ -8345,6 +12279,7 @@ class SentryV2TabWidget(QWidget):
                 text=True,
                 timeout=6,
                 check=False,
+                **_windows_hidden_subprocess_kwargs(),
             )
         except Exception:
             return ""
@@ -8366,6 +12301,7 @@ class SentryV2TabWidget(QWidget):
                 text=True,
                 timeout=8,
                 check=False,
+                **_windows_hidden_subprocess_kwargs(),
             )
         except Exception:
             return False
@@ -8381,6 +12317,7 @@ class SentryV2TabWidget(QWidget):
                 text=True,
                 timeout=6,
                 check=False,
+                **_windows_hidden_subprocess_kwargs(),
             )
         except Exception:
             return False
@@ -8399,6 +12336,7 @@ class SentryV2TabWidget(QWidget):
                 text=True,
                 timeout=8,
                 check=False,
+                **_windows_hidden_subprocess_kwargs(),
             )
         except Exception:
             return ""
@@ -8414,6 +12352,7 @@ class SentryV2TabWidget(QWidget):
                 text=True,
                 timeout=6,
                 check=False,
+                **_windows_hidden_subprocess_kwargs(),
             )
         except Exception:
             return ""
@@ -8435,6 +12374,7 @@ class SentryV2TabWidget(QWidget):
                 text=True,
                 timeout=8,
                 check=False,
+                **_windows_hidden_subprocess_kwargs(),
             )
         except Exception:
             pass
@@ -8491,6 +12431,7 @@ class SentryV2TabWidget(QWidget):
                 text=True,
                 timeout=8,
                 check=False,
+                **_windows_hidden_subprocess_kwargs(),
             )
             return result.returncode == 0 and self._windows_wifi_profile_is_compatible(ssid, password)
         except Exception:
@@ -8511,8 +12452,7 @@ class SentryV2TabWidget(QWidget):
         now = time.time()
         if now - self._last_wifi_autojoin_attempt_s < 8.0:
             return
-        ssid = ESP32_DEFAULT_WIFI_SSID
-        password = ESP32_DEFAULT_WIFI_PASSWORD
+        ssid, password = self._wifi_credentials_for_mode(mode)
         self._last_wifi_autojoin_attempt_s = now
         self._wifi_autojoin_inflight = True
 
@@ -8540,6 +12480,7 @@ class SentryV2TabWidget(QWidget):
                             text=True,
                             timeout=10,
                             check=False,
+                            **_windows_hidden_subprocess_kwargs(),
                         )
                         time.sleep(2.5)
                         ok = self._windows_wifi_current_ssid() == ssid
@@ -8574,7 +12515,8 @@ class SentryV2TabWidget(QWidget):
         self._start_windows_wifi_autojoin()
         now = time.time()
         current_ssid = self._windows_wifi_current_ssid() if os.name == "nt" else ""
-        on_esp32_wifi = current_ssid == ESP32_DEFAULT_WIFI_SSID
+        expected_ssid, _expected_password = self._wifi_credentials_for_mode(mode)
+        on_esp32_wifi = current_ssid == expected_ssid
 
         if mode == 3 and not self._comm.is_connected():
             if not on_esp32_wifi:
@@ -8677,6 +12619,7 @@ class SentryV2TabWidget(QWidget):
         active_detection = getattr(active_target, "det", None)
         servo_feedback = self._comm.get_servo_feedback_snapshot()
         io_runtime = self._comm.get_io_runtime_snapshot()
+        bridge_caps = self._comm.get_bridge_caps_snapshot()
 
         payload = {
             "generated_at_local": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -8710,6 +12653,7 @@ class SentryV2TabWidget(QWidget):
                 "is_connected": bool(self._comm.is_connected()),
                 "connection_status_label": str(self._lbl_conn_status.text()) if hasattr(self, "_lbl_conn_status") else "",
                 "host_hardware_managed": bool(self._host_controls_hardware()),
+                "bridge_caps": bridge_caps,
                 "configured_mode_index": int(self.config.connection.connection_type),
                 "configured_mode_label": SentryV2Comm.MODE_LABELS[int(self.config.connection.connection_type)] if 0 <= int(self.config.connection.connection_type) < len(SentryV2Comm.MODE_LABELS) else "Unknown",
                 "mode_index": int(getattr(self._comm, "_mode", 0) or 0),
@@ -8754,9 +12698,9 @@ class SentryV2TabWidget(QWidget):
                 "min_area": int(self.config.detection_mode.yolo_min_area),
             },
             "external_file_references": {
-                "settings_json": _path_entry(SENTRY_V2_SETTINGS_PATH),
-                "legacy_settings_json": _path_entry(LEGACY_SENTRY_V2_SETTINGS_PATH),
-                "custom_master_presets": _path_entry(CUSTOM_MASTER_PRESET_PATH),
+                "settings_json": _path_entry(SMART_SENTRY_V2_3_2_SETTINGS_PATH),
+                "legacy_settings_json": _path_entry(LEGACY_SMART_SENTRY_V3_SETTINGS_PATH if LEGACY_SMART_SENTRY_V3_SETTINGS_PATH.exists() else LEGACY_SENTRY_V2_SETTINGS_PATH),
+                "custom_master_presets": _path_entry(self._custom_master_preset_path()),
                 "prompted_target_library": _path_entry(self._resolved_prompted_library_path()),
                 "snapshot_dir": _path_entry(SENTRY_V2_SNAPSHOT_DIR),
                 "selected_yolo_model": _path_entry(Path(selected_model_path)) if selected_model_path else None,
@@ -8778,7 +12722,7 @@ class SentryV2TabWidget(QWidget):
         recent_logs = payload.get("recent_log_lines", [])
 
         lines = [
-            "# Smart Sentry v2 Runtime Snapshot",
+            "# SMART SENTRY V2.3.2 Runtime Snapshot",
             "",
             f"- Generated: {payload.get('generated_at_local', '')}",
             f"- Engine state: {engine_state.get('state', '')}",
@@ -8915,16 +12859,88 @@ class SentryV2TabWidget(QWidget):
             markdown = self._render_runtime_snapshot_markdown(payload)
             json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             md_path.write_text(markdown, encoding="utf-8")
-            self._log(f"Runtime snapshot exported: {self._portable_path_string(json_path)}")
-            self._log(f"Runtime snapshot summary: {self._portable_path_string(md_path)}")
+            self._last_runtime_snapshot_json_path = json_path
+            self._last_runtime_snapshot_markdown_path = md_path
+            self._log(f"Runtime data exported: {self._portable_path_string(json_path)}")
+            self._log(f"Runtime data summary: {self._portable_path_string(md_path)}")
         except Exception as exc:
-            self._log(f"Runtime snapshot export failed: {exc}")
+            self._log(f"Runtime data export failed: {exc}")
+
+    def _open_runtime_snapshot_folder(self) -> None:
+        try:
+            SENTRY_V2_SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+            latest_path = self._last_runtime_snapshot_json_path
+            folder_path = SENTRY_V2_SNAPSHOT_DIR
+            if latest_path is not None and latest_path.exists():
+                folder_path = latest_path.parent
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder_path))):
+                raise RuntimeError(f"could not open folder: {folder_path}")
+            if latest_path is not None and latest_path.exists():
+                self._log(f"Opened runtime export folder: {self._portable_path_string(folder_path)} (latest: {self._portable_path_string(latest_path)})")
+            else:
+                self._log(f"Opened runtime export folder: {self._portable_path_string(folder_path)}")
+        except Exception as exc:
+            self._log(f"Open export folder failed: {exc}")
+
+    def _export_serial_log(self) -> None:
+        try:
+            if not hasattr(self, "_log_text") or self._log_text is None:
+                self._log("Serial log export failed: log panel is unavailable")
+                return
+            log_text = self._log_text.toPlainText()
+            if not log_text.strip():
+                self._log("Serial log export skipped: log panel is empty")
+                return
+            SENTRY_V2_LOG_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            export_path = SENTRY_V2_LOG_EXPORT_DIR / f"sentry_v2_serial_log_{timestamp}.txt"
+            header = [
+                f"# SMART SENTRY V2.3.2 Serial Log Export",
+                f"# Exported: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+                "",
+            ]
+            export_path.write_text("\n".join(header) + log_text.rstrip() + "\n", encoding="utf-8")
+            self._last_log_export_path = export_path
+            self._log(f"Serial log exported: {self._portable_path_string(export_path)}")
+        except Exception as exc:
+            self._log(f"Serial log export failed: {exc}")
+
+    def _open_serial_log_folder(self) -> None:
+        try:
+            SENTRY_V2_LOG_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+            latest_path = self._last_log_export_path
+            folder_path = SENTRY_V2_LOG_EXPORT_DIR
+            if latest_path is not None and latest_path.exists():
+                folder_path = latest_path.parent
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder_path))):
+                raise RuntimeError(f"could not open folder: {folder_path}")
+            if latest_path is not None and latest_path.exists():
+                self._log(
+                    f"Opened serial log export folder: {self._portable_path_string(folder_path)} (latest: {self._portable_path_string(latest_path)})"
+                )
+            else:
+                self._log(f"Opened serial log export folder: {self._portable_path_string(folder_path)}")
+        except Exception as exc:
+            self._log(f"Open serial log folder failed: {exc}")
 
     def _resolved_prompted_library_path(self) -> Path:
-        configured = Path(str(self.config.prompted_library_path or "app/config/sentry_v2_prompted_targets.json"))
+        configured = Path(str(self.config.prompted_library_path or "app/config/smart_sentry_v2_3_2_prompted_targets.json"))
+        if configured == Path("app/config/smart_sentry_v2_3_2_prompted_targets.json"):
+            if SMART_SENTRY_V2_3_2_PROMPTED_TARGETS_PATH.exists():
+                return SMART_SENTRY_V2_3_2_PROMPTED_TARGETS_PATH.resolve()
+        if configured == Path("app/config/smart_sentry_v3_prompted_targets.json"):
+            if SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH.exists():
+                return SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH.resolve()
+            if LEGACY_SMART_SENTRY_V3_PROMPTED_TARGETS_PATH.exists():
+                return LEGACY_SMART_SENTRY_V3_PROMPTED_TARGETS_PATH.resolve()
+        if configured == Path("app/config/sentry_v2_prompted_targets.json"):
+            if SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH.exists():
+                return SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH.resolve()
+            if LEGACY_SENTRY_V2_PROMPTED_TARGETS_PATH.exists():
+                return LEGACY_SENTRY_V2_PROMPTED_TARGETS_PATH.resolve()
         if configured.is_absolute():
             return configured
-        return (Path(__file__).resolve().parents[2] / configured).resolve()
+        return (self._repo_root_path() / configured).resolve()
 
     def _load_prompted_target_library(self) -> PromptedTargetLibrary:
         return PromptedTargetLibrary.load(str(self._resolved_prompted_library_path()))
@@ -8934,6 +12950,617 @@ class SentryV2TabWidget(QWidget):
             self._prompted_target_library.save(str(self._resolved_prompted_library_path()))
         except Exception as exc:
             self._log(f"Prompted target save failed: {exc}")
+
+    def _resolved_face_library_path(self) -> Path:
+        configured = Path(str(self.config.face_recognition.library_path or "app/config/smart_sentry_v2_3_2_faces.json"))
+        if configured == Path("app/config/smart_sentry_v2_3_2_faces.json") and SMART_SENTRY_V2_3_2_FACE_LIBRARY_PATH.exists():
+            return SMART_SENTRY_V2_3_2_FACE_LIBRARY_PATH.resolve()
+        if configured.is_absolute():
+            return configured
+        return (self._repo_root_path() / configured).resolve()
+
+    def _load_face_identity_library(self) -> FaceIdentityLibrary:
+        return FaceIdentityLibrary.load(str(self._resolved_face_library_path()))
+
+    def _save_face_identity_library(self) -> None:
+        try:
+            self._face_library.save(str(self._resolved_face_library_path()))
+        except Exception as exc:
+            self._log(f"Face library save failed: {exc}")
+
+    def _selected_face_profile_id(self) -> Optional[str]:
+        if not hasattr(self, "_face_profile_list"):
+            return None
+        item = self._face_profile_list.currentItem()
+        if item is None:
+            return None
+        profile_id = str(item.data(Qt.UserRole) or "")
+        return profile_id or None
+
+    def _selected_face_profile(self):
+        profile_id = self._selected_face_profile_id()
+        if not profile_id:
+            return None
+        for profile in self._face_library.profiles:
+            if str(profile.profile_id) == profile_id:
+                return profile
+        return None
+
+    def _rebuild_face_profile_list(self) -> None:
+        if not hasattr(self, "_face_profile_list"):
+            return
+        selected_id = self._selected_face_profile_id()
+        self._face_profile_list.blockSignals(True)
+        self._face_profile_list.clear()
+        for profile in self._face_library.profiles:
+            suffix = "friendly" if bool(profile.friendly) else "watch"
+            item = QListWidgetItem(f"{profile.name} ({len(profile.embeddings)} samples, {suffix})")
+            item.setData(Qt.UserRole, str(profile.profile_id))
+            self._face_profile_list.addItem(item)
+            if selected_id and str(profile.profile_id) == selected_id:
+                item.setSelected(True)
+                self._face_profile_list.setCurrentItem(item)
+        self._face_profile_list.blockSignals(False)
+        self._on_face_profile_selected()
+        self._update_face_runtime_status()
+
+    def _on_face_profile_selected(self) -> None:
+        profile = self._selected_face_profile()
+        if not hasattr(self, "_edit_face_profile_name"):
+            return
+        if profile is None:
+            self._edit_face_profile_name.clear()
+            self._edit_face_profile_notes.clear()
+            self._chk_face_profile_friendly.setChecked(True)
+            self._chk_face_profile_announce.setChecked(True)
+            self._chk_face_profile_gesture.setChecked(True)
+            return
+        self._edit_face_profile_name.setText(str(profile.name))
+        self._edit_face_profile_notes.setText(str(profile.notes or ""))
+        self._chk_face_profile_friendly.setChecked(bool(profile.friendly))
+        self._chk_face_profile_announce.setChecked(bool(profile.announce_name))
+        self._chk_face_profile_gesture.setChecked(bool(profile.cute_gesture))
+
+    def _update_face_runtime_status(self) -> None:
+        if not hasattr(self, "_lbl_face_runtime_status"):
+            return
+        match_text = "none"
+        if self._last_face_matches:
+            top = max(self._last_face_matches, key=lambda item: float(item.confidence))
+            match_text = f"{top.name} ({top.confidence:.2f})"
+        self._lbl_face_runtime_status.setText(
+            f"Known profiles: {len(self._face_library.profiles)} | last recognized: {match_text} | file: {self._portable_path_string(self._resolved_face_library_path())}"
+        )
+
+    def _on_face_runtime_settings_changed(self) -> None:
+        cfg = self.config.face_recognition
+        cfg.enabled = bool(self._chk_face_enabled.isChecked())
+        cfg.recognition_threshold = float(self._spin_face_threshold.value())
+        cfg.min_face_size_px = int(self._spin_face_min_size.value())
+        cfg.suppress_known_faces_from_engagement = bool(self._chk_face_suppress.isChecked())
+        cfg.announce_known_faces = bool(self._chk_face_announce.isChecked())
+        cfg.cute_gesture_enabled = bool(self._chk_face_gesture.isChecked())
+        cfg.library_path = self._portable_path_string(self._resolved_face_library_path())
+        self._save_config_quietly()
+        self._update_face_runtime_status()
+
+    def _register_face_from_images(self) -> None:
+        name = str(getattr(self, "_edit_face_profile_name", QLineEdit()).text()).strip()
+        if not name:
+            self._log("Face registration aborted: enter a profile name first")
+            return
+        paths, _selected_filter = QFileDialog.getOpenFileNames(
+            self,
+            "Select Face Images",
+            str(self._repo_root_path()),
+            "Images (*.png *.jpg *.jpeg *.bmp *.webp)",
+        )
+        if not paths:
+            return
+        vectors = self._face_runtime.build_embeddings_from_images(paths, min_face_size_px=int(self.config.face_recognition.min_face_size_px))
+        if not vectors:
+            self._log(f"Face registration failed for {name}: no usable face found in selected images")
+            return
+        profile = self._face_library.upsert_profile(
+            name,
+            vectors,
+            friendly=bool(self._chk_face_profile_friendly.isChecked()),
+            announce_name=bool(self._chk_face_profile_announce.isChecked()),
+            cute_gesture=bool(self._chk_face_profile_gesture.isChecked()),
+            notes=str(self._edit_face_profile_notes.text().strip()),
+        )
+        if profile is None:
+            self._log(f"Face registration failed for {name}")
+            return
+        self._face_runtime.refresh_library(self._face_library)
+        self._save_face_identity_library()
+        self._save_config_quietly()
+        self._rebuild_face_profile_list()
+        self._log(f"Face profile updated: {profile.name} (+{len(vectors)} image sample(s))")
+
+    def _register_face_from_live_frame(self) -> None:
+        name = str(getattr(self, "_edit_face_profile_name", QLineEdit()).text()).strip()
+        if not name:
+            self._log("Live face registration aborted: enter a profile name first")
+            return
+        frame = getattr(self, "_last_raw_frame", None)
+        if frame is None or getattr(frame, "size", 0) == 0:
+            self._log("Live face registration unavailable: no camera frame captured yet")
+            return
+        vector = self._face_runtime.extract_primary_embedding(frame, min_face_size_px=int(self.config.face_recognition.min_face_size_px))
+        if vector is None:
+            self._log(f"Live face registration failed for {name}: no clear face found in the current frame")
+            return
+        profile = self._face_library.upsert_profile(
+            name,
+            [vector],
+            friendly=bool(self._chk_face_profile_friendly.isChecked()),
+            announce_name=bool(self._chk_face_profile_announce.isChecked()),
+            cute_gesture=bool(self._chk_face_profile_gesture.isChecked()),
+            notes=str(self._edit_face_profile_notes.text().strip()),
+        )
+        if profile is None:
+            self._log(f"Live face registration failed for {name}")
+            return
+        self._face_runtime.refresh_library(self._face_library)
+        self._save_face_identity_library()
+        self._save_config_quietly()
+        self._rebuild_face_profile_list()
+        self._log(f"Live face registered: {profile.name}")
+
+    def _remove_selected_face_profile(self) -> None:
+        profile = self._selected_face_profile()
+        if profile is None:
+            self._log("Face removal skipped: no profile selected")
+            return
+        removed = self._face_library.remove_profile(str(profile.profile_id))
+        if not removed:
+            self._log(f"Face removal failed: {profile.name}")
+            return
+        self._face_runtime.refresh_library(self._face_library)
+        self._save_face_identity_library()
+        self._rebuild_face_profile_list()
+        self._save_config_quietly()
+        self._log(f"Face profile removed: {profile.name}")
+
+    def _run_face_recognition_test(self) -> None:
+        frame = getattr(self, "_last_raw_frame", None)
+        if frame is None or getattr(frame, "size", 0) == 0:
+            self._log("Face test unavailable: no frame available")
+            return
+        matches = self._face_runtime.match_known_faces(
+            frame,
+            min_face_size_px=int(self.config.face_recognition.min_face_size_px),
+            threshold=float(self.config.face_recognition.recognition_threshold),
+        )
+        self._last_face_matches = list(matches)
+        self._update_face_runtime_status()
+        if not matches:
+            self._log("Face test complete: no known face matched the current frame")
+            return
+        summary = ", ".join(f"{match.name} {match.confidence:.2f}" for match in matches[:4])
+        self._log(f"Face test matched: {summary}")
+
+    def _face_person_boxes(self, objects: List[DetectedObject]) -> Optional[List[Tuple[int, int, int, int]]]:
+        person_boxes = [tuple(det.bbox) for det in objects if str(det.class_name or "").strip().lower() == "person"]
+        return person_boxes or None
+
+    @staticmethod
+    def _bbox_iou(a: Tuple[int, int, int, int], b: Tuple[int, int, int, int]) -> float:
+        ax, ay, aw, ah = a
+        bx, by, bw, bh = b
+        ax2, ay2 = ax + aw, ay + ah
+        bx2, by2 = bx + bw, by + bh
+        ix1 = max(ax, bx)
+        iy1 = max(ay, by)
+        ix2 = min(ax2, bx2)
+        iy2 = min(ay2, by2)
+        iw = max(0, ix2 - ix1)
+        ih = max(0, iy2 - iy1)
+        inter = iw * ih
+        if inter <= 0:
+            return 0.0
+        union = max(1, (aw * ah) + (bw * bh) - inter)
+        return inter / union
+
+    def _apply_face_identity_to_objects(self, frame: np.ndarray, objects: List[DetectedObject], now: float) -> Tuple[List[DetectedObject], List[FaceMatchResult]]:
+        if not bool(self.config.face_recognition.enabled) or not self._face_library.profiles:
+            return list(objects), []
+        matches = self._face_runtime.match_known_faces(
+            frame,
+            min_face_size_px=int(self.config.face_recognition.min_face_size_px),
+            person_boxes=self._face_person_boxes(objects),
+            threshold=float(self.config.face_recognition.recognition_threshold),
+        )
+        annotated = list(objects)
+        for match in matches:
+            best_det = None
+            best_score = 0.0
+            for det in annotated:
+                score = self._bbox_iou(tuple(det.bbox), tuple(match.bbox))
+                if score > best_score:
+                    best_det = det
+                    best_score = score
+            if best_det is None or best_score < 0.05:
+                continue
+            best_det.identity_label = str(match.name)
+            best_det.identity_confidence = float(match.confidence)
+            best_det.identity_profile_id = str(match.profile_id)
+            best_det.friendly_identity = bool(match.friendly)
+        filtered: List[DetectedObject] = []
+        for det in annotated:
+            is_suppressed = bool(
+                det.identity_label
+                and det.friendly_identity
+                and self.config.face_recognition.suppress_known_faces_from_engagement
+            )
+            if not is_suppressed:
+                filtered.append(det)
+        best_match = max(matches, key=lambda item: float(item.confidence), default=None)
+        if best_match is not None:
+            self._maybe_announce_face_match(best_match, now)
+            self._maybe_run_friendly_identity_gesture(best_match, now)
+        return filtered, matches
+
+    def _maybe_announce_face_match(self, match: FaceMatchResult, now: float) -> None:
+        if not bool(self.config.face_recognition.announce_known_faces) or not bool(match.announce_name):
+            return
+        key = str(match.profile_id or match.name).strip().lower()
+        if not key:
+            return
+        last_at = float(self._last_announced_identity_at.get(key, 0.0) or 0.0)
+        cooldown_s = float(getattr(self.config.sound, "name_announce_cooldown_s", 18.0) or 18.0)
+        if now - last_at < cooldown_s:
+            return
+        self._last_announced_identity_at[key] = now
+        if bool(getattr(self.config.sound, "human_voice_enabled", False)):
+            phrase = f"Hello {match.name}." if bool(match.friendly) else f"Recognized {match.name}."
+            self._speak_human_phrase(phrase)
+        if bool(getattr(self.config.sound, "robot_voice_enabled", False)) and not self._buzzer_suppressed_for_human_voice():
+            self._sound_engine.note_identity_recognized(match.name, friendly=bool(match.friendly))
+        self._log(f"Recognized face: {match.name} ({match.confidence:.2f})")
+
+    def _maybe_run_friendly_identity_gesture(self, match: FaceMatchResult, now: float) -> None:
+        if not bool(match.friendly and match.cute_gesture):
+            return
+        if not bool(self.config.face_recognition.cute_gesture_enabled):
+            return
+        if self.engine.state == SentryV2State.ENGAGING:
+            return
+        key = str(match.profile_id or match.name).strip().lower()
+        last_at = float(self._last_gesture_identity_at.get(key, 0.0) or 0.0)
+        cooldown_s = float(getattr(self.config.face_recognition, "gesture_cooldown_s", 30.0) or 30.0)
+        if now - last_at < cooldown_s:
+            return
+        self._last_gesture_identity_at[key] = now
+        pan = float(self.engine.current_pan)
+        tilt = float(self.engine.current_tilt)
+        greet_tilt = min(float(self.config.guard.tilt_max), max(float(self.config.guard.tilt_min), tilt + 3.0))
+        self._manual_move_priority_until = max(float(getattr(self, "_manual_move_priority_until", 0.0) or 0.0), now + 1.4)
+        if not self._host_controls_hardware():
+            self._queue_move_command(pan, greet_tilt, move_time_ms=220, manual_override=True)
+            QTimer.singleShot(320, lambda p=pan, t=tilt: self._queue_move_command(p, t, move_time_ms=260, manual_override=True))
+        self._log(f"Friendly greeting: {match.name}")
+
+    def _draw_face_identity_overlays(self, frame: np.ndarray, matches: List[FaceMatchResult]) -> None:
+        for match in matches:
+            x, y, w, h = [int(v) for v in match.bbox]
+            color = (90, 230, 120) if bool(match.friendly) else (255, 210, 80)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2, cv2.LINE_AA)
+            label = f"{match.name} {match.confidence:.2f}"
+            ty = max(18, y - 8)
+            cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.48, (0, 0, 0), 2, cv2.LINE_AA)
+            cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.48, color, 1, cv2.LINE_AA)
+
+    def _shortcut_definitions(self) -> List[Tuple[str, str, Callable[[], None], str]]:
+        return [
+            ("Quick keys", "Ctrl+Alt+Q", self._open_shortcut_quick_view, "Open the shortcut reference"),
+            ("Enable / disable sentry", "Ctrl+Alt+E", lambda: self._chk_enable.toggle(), "Toggle Smart Sentry runtime"),
+            ("Toggle connection", "Ctrl+Alt+C", self._toggle_connection, "Connect or disconnect the controller link"),
+            ("Open / close camera", "Ctrl+Alt+O", self._toggle_camera, "Open or close the active camera source"),
+            ("Show / hide video", "Ctrl+Alt+V", lambda: self._chk_show_video.toggle(), "Toggle the preview feed"),
+            ("Go home", "Ctrl+Alt+W", self._on_home_clicked, "Move to the configured home position"),
+            ("Go rest", "Ctrl+Alt+R", self._on_rest_clicked, "Move to the configured rest position"),
+            ("Save settings", "Ctrl+Alt+S", self._save_config, "Write current settings to disk"),
+            ("Previous tab", "Ctrl+Alt+Left", self._select_previous_settings_tab, "Move to the previous settings tab"),
+            ("Next tab", "Ctrl+Alt+Right", self._select_next_settings_tab, "Move to the next settings tab"),
+            ("Manual pan left", "Ctrl+Shift+Left", lambda: self._manual_move(-1, 0), "Nudge the turret left"),
+            ("Manual pan right", "Ctrl+Shift+Right", lambda: self._manual_move(1, 0), "Nudge the turret right"),
+            ("Manual tilt up", "Ctrl+Shift+Up", lambda: self._manual_move(0, -1), "Nudge the turret up"),
+            ("Manual tilt down", "Ctrl+Shift+Down", lambda: self._manual_move(0, 1), "Nudge the turret down"),
+            ("Toggle safety", "Ctrl+Alt+1", lambda: self._btn_safety.toggle(), "Arm or lock safety"),
+            ("Toggle LED", "Ctrl+Alt+2", lambda: self._btn_led.toggle(), "Toggle LED output"),
+            ("Toggle laser", "Ctrl+Alt+3", lambda: self._btn_laser.toggle(), "Toggle laser output"),
+            ("Toggle ACC", "Ctrl+Alt+4", lambda: self._btn_acc.toggle(), "Toggle ACC output"),
+            ("Zoom UI in", "Ctrl+Alt+Plus", lambda: self._adjust_panel_zoom(1), "Increase panel zoom"),
+            ("Zoom UI out", "Ctrl+Alt+Minus", lambda: self._adjust_panel_zoom(-1), "Decrease panel zoom"),
+        ]
+
+    def _clear_shortcuts(self) -> None:
+        for shortcut in list(getattr(self, "_shortcut_bindings", [])):
+            try:
+                shortcut.setEnabled(False)
+                shortcut.disconnect()
+                shortcut.deleteLater()
+            except Exception:
+                pass
+        self._shortcut_bindings = []
+
+    def _install_global_shortcuts(self) -> None:
+        self._clear_shortcuts()
+        if not bool(self.config.shortcuts.enabled):
+            self._update_shortcut_labels()
+            return
+        bindings: List[QShortcut] = []
+        for _label, sequence, handler, _description in self._shortcut_definitions():
+            shortcut = QShortcut(QKeySequence(sequence), self)
+            shortcut.setContext(Qt.WindowShortcut)
+            shortcut.activated.connect(handler)
+            bindings.append(shortcut)
+        self._shortcut_bindings = bindings
+        self._update_shortcut_labels()
+
+    def _update_shortcut_labels(self) -> None:
+        lines = [f"{sequence} - {label}" for label, sequence, _handler, _description in self._shortcut_definitions()]
+        summary = f"Shortcuts: {len(lines)} active commands | status: {'enabled' if self.config.shortcuts.enabled else 'disabled'}"
+        if hasattr(self, "_lbl_shortcut_summary"):
+            self._lbl_shortcut_summary.setText(summary)
+        if hasattr(self, "_lbl_shortcut_keys"):
+            self._lbl_shortcut_keys.setText("\n".join(lines))
+
+    def _on_shortcuts_enabled_changed(self) -> None:
+        self.config.shortcuts.enabled = bool(self._chk_shortcuts_enabled.isChecked())
+        self.config.shortcuts.quick_view_doc_path = self._portable_path_string(SMART_SENTRY_SHORTCUT_KEYS_DOC_PATH)
+        self._install_global_shortcuts()
+        self._save_config_quietly()
+
+    def _open_shortcut_quick_view(self) -> None:
+        path = SMART_SENTRY_SHORTCUT_KEYS_DOC_PATH
+        if not path.exists():
+            self._log(f"Shortcut reference missing: {self._portable_path_string(path)}")
+            return
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path))):
+            self._log(f"Shortcut reference open failed: {self._portable_path_string(path)}")
+            return
+        self._log(f"Shortcut reference opened: {self._portable_path_string(path)}")
+
+    def _on_ai_assistant_settings_changed(self) -> None:
+        cfg = self.config.ai_assistant
+        cfg.enabled = bool(self._chk_ai_enabled.isChecked())
+        cfg.mode = str(self._combo_ai_mode.currentData() or "guided_tuning")
+        cfg.allow_mode_switch = bool(self._chk_ai_allow_modes.isChecked())
+        cfg.allow_setting_drafts = bool(self._chk_ai_allow_tuning.isChecked())
+        cfg.allow_runtime_analysis = bool(self._chk_ai_allow_analysis.isChecked())
+        cfg.auto_speak_responses = bool(getattr(self, "_chk_ai_auto_speak", None) and self._chk_ai_auto_speak.isChecked())
+        self._save_config_quietly()
+
+    def _append_ai_output(self, text: str, *, speak: bool = False) -> None:
+        if hasattr(self, "_txt_ai_output"):
+            self._txt_ai_output.append(text)
+        self._last_spoken_ai_response = str(text)
+        if speak:
+            self._maybe_speak_ai_output(text)
+
+    def _maybe_speak_ai_output(self, text: str) -> None:
+        if not bool(getattr(self.config.ai_assistant, "auto_speak_responses", False)):
+            return
+        self._speak_human_phrase(text)
+
+    def _speak_last_ai_output(self) -> None:
+        if not self._last_spoken_ai_response:
+            self._append_ai_output("No assistant reply is available to speak yet.")
+            return
+        if not self._speak_human_phrase(self._last_spoken_ai_response):
+            self._append_ai_output("Human voice speech is unavailable or disabled. Enable Human voice speech in Controls first.")
+
+    def _assistant_detection_mode_name(self) -> str:
+        mode_index = int(self._combo_detection_mode.currentIndex()) if hasattr(self, "_combo_detection_mode") else 0
+        if 0 <= mode_index < len(DETECTION_MODES):
+            return str(DETECTION_MODES[mode_index])
+        return f"Mode {mode_index}"
+
+    def _assistant_human_voice_style_key(self) -> str:
+        style = str(getattr(self.config.sound, "human_voice_style", "neutral") or "neutral").strip().lower()
+        return style if style in HUMAN_VOICE_STYLE_PRESETS else "neutral"
+
+    def _assistant_format_response(self, text: str, *, conversational: bool) -> str:
+        cleaned = " ".join(str(text or "").split()).strip()
+        if not conversational or not cleaned:
+            return cleaned
+        prefix = {
+            "neutral": "Assistant update.",
+            "operator": "Operator update.",
+            "alert": "Attention.",
+            "warm": "Certainly.",
+        }.get(self._assistant_human_voice_style_key(), "Assistant update.")
+        if cleaned.lower().startswith(prefix.lower()):
+            return cleaned
+        return f"{prefix} {cleaned}"
+
+    def _assistant_apply_detection_mode(self, mode_index: int, label: str) -> str:
+        if not bool(self.config.ai_assistant.allow_mode_switch):
+            return "Assistant mode switching is disabled in the current settings."
+        if not hasattr(self, "_combo_detection_mode"):
+            return "Detection mode controls are unavailable in this runtime."
+        mode_index = int(max(0, min(len(DETECTION_MODES) - 1, int(mode_index))))
+        self._combo_detection_mode.setCurrentIndex(mode_index)
+        self._log(f"AI assistant changed detection mode to {label}")
+        return f"I switched Smart Sentry to {label}."
+
+    def _assistant_runtime_snapshot(self) -> str:
+        visible_targets = len(getattr(self, "_last_detected_objects", []) or [])
+        known_faces = ", ".join(f"{match.name} {match.confidence:.2f}" for match in self._last_face_matches[:3]) or "none"
+        return (
+            f"State: {self.engine.state.name} | sentry: {'enabled' if self._chk_enable.isChecked() else 'disabled'} | "
+            f"mode: {self._assistant_detection_mode_name()} ({self._combo_detection_mode.currentIndex()}) | targets: {visible_targets} | "
+            f"faces: {known_faces} | face recognition: {'on' if self.config.face_recognition.enabled else 'off'} | "
+            f"shortcuts: {'on' if self.config.shortcuts.enabled else 'off'} | connection: {self._connection_status_level} | "
+            f"camera: {'open' if self._has_local_source() else 'closed'} | human voice: {'on' if self.config.sound.human_voice_enabled else 'off'} ({self._assistant_human_voice_style_key()})"
+        )
+
+    def _run_ai_assistant_analysis(self) -> None:
+        if not bool(self.config.ai_assistant.enabled and self.config.ai_assistant.allow_runtime_analysis):
+            self._append_ai_output("Assistant analysis is disabled in the current settings.")
+            return
+        snapshot = self._assistant_runtime_snapshot()
+        self._append_ai_output(f"Analysis: {snapshot}", speak=bool(self.config.ai_assistant.mode == "conversational_voice"))
+        self._log(f"AI assistant analysis: {snapshot}")
+
+    def _run_ai_assistant_recommendations(self) -> None:
+        if not bool(self.config.ai_assistant.enabled and self.config.ai_assistant.allow_setting_drafts):
+            self._append_ai_output("Assistant recommendation drafts are disabled.")
+            return
+        suggestions: List[str] = []
+        if not bool(self.config.face_recognition.enabled) and self._face_library.profiles:
+            suggestions.append("Enable face recognition because known profiles already exist in the library.")
+        if not bool(self.config.shortcuts.enabled):
+            suggestions.append("Re-enable shortcuts so Quick Keys and operator hotkeys are available during testing.")
+        if bool(self.config.ai_assistant.mode == "conversational_voice") and not bool(getattr(self.config.sound, "human_voice_enabled", False)):
+            suggestions.append("Enable Human voice speech so Conversational Voice mode can respond audibly instead of text only.")
+        if bool(getattr(self.config.sound, "human_voice_enabled", False)) and bool(self.config.ai_assistant.mode == "conversational_voice") and not bool(self.config.ai_assistant.auto_speak_responses):
+            suggestions.append("Turn on assistant auto-speak so conversational replies are spoken without pressing Speak Last Reply.")
+        if self.engine.state == SentryV2State.GUARDING and not bool(getattr(self, "_show_video_feed", True)):
+            suggestions.append("Video is hidden while idle; show the feed if you need visual verification during setup.")
+        if not suggestions:
+            suggestions.append("Current runtime looks balanced. No immediate assistant changes are recommended.")
+        for item in suggestions:
+            self._append_ai_output(f"Suggestion: {item}", speak=bool(self.config.ai_assistant.mode == "conversational_voice"))
+
+    def _run_ai_assistant_request(self) -> None:
+        prompt = str(getattr(self, "_edit_ai_prompt", QLineEdit()).text()).strip()
+        if not prompt:
+            self._append_ai_output("Enter a request first.")
+            return
+        if not bool(self.config.ai_assistant.enabled):
+            self._append_ai_output("Assistant is disabled.")
+            return
+        lower_prompt = prompt.lower()
+        conversational = bool(self.config.ai_assistant.mode == "conversational_voice")
+        response = ""
+        if "analy" in lower_prompt or "status" in lower_prompt:
+            self._run_ai_assistant_analysis()
+            self._edit_ai_prompt.clear()
+            return
+        elif "suggest" in lower_prompt or "recommend" in lower_prompt:
+            self._run_ai_assistant_recommendations()
+            self._edit_ai_prompt.clear()
+            return
+        elif ("speak" in lower_prompt or "say" in lower_prompt) and ("summary" in lower_prompt or "status" in lower_prompt):
+            summary = self._assistant_runtime_snapshot()
+            spoken = self._speak_human_phrase(summary)
+            response = f"Status summary: {summary}"
+            if not spoken:
+                response += " Human voice speech is currently disabled or unavailable, so I returned the summary as text only."
+        elif ("wake up" in lower_prompt or "go home" in lower_prompt or "return home" in lower_prompt):
+            self._on_home_clicked()
+            response = "Smart Sentry is moving to the guard home position."
+        elif "go rest" in lower_prompt or "rest position" in lower_prompt:
+            self._on_rest_clicked()
+            response = "Smart Sentry is moving to the configured rest position."
+        elif ("enable" in lower_prompt or "turn on" in lower_prompt) and ("sentry" in lower_prompt or "smart sentry" in lower_prompt):
+            self._chk_enable.setChecked(True)
+            response = "Smart Sentry is enabled."
+        elif ("disable" in lower_prompt or "turn off" in lower_prompt) and ("sentry" in lower_prompt or "smart sentry" in lower_prompt):
+            self._chk_enable.setChecked(False)
+            response = "Smart Sentry is disabled."
+        elif ("connect" in lower_prompt or "open link" in lower_prompt) and "disconnect" not in lower_prompt:
+            if self._comm.is_connected():
+                response = "The controller link is already connected."
+            else:
+                self._toggle_connection()
+                response = "Controller link connection requested."
+        elif "disconnect" in lower_prompt:
+            if not self._comm.is_connected():
+                response = "The controller link is already disconnected."
+            else:
+                self._toggle_connection()
+                response = "Controller link disconnect requested."
+        elif ("open" in lower_prompt or "start" in lower_prompt) and "camera" in lower_prompt:
+            if self._has_local_source():
+                response = "The camera feed is already open."
+            else:
+                self._toggle_camera()
+                response = "Camera open requested."
+        elif ("close" in lower_prompt or "stop" in lower_prompt) and "camera" in lower_prompt:
+            if not self._has_local_source():
+                response = "The camera feed is already closed."
+            else:
+                self._toggle_camera()
+                response = "Camera close requested."
+        elif ("motion" in lower_prompt or "frame difference" in lower_prompt) and ("mode" in lower_prompt or "detection" in lower_prompt or "switch" in lower_prompt):
+            response = self._assistant_apply_detection_mode(0, "Motion mode")
+        elif ("background" in lower_prompt or "backsub" in lower_prompt) and ("mode" in lower_prompt or "detection" in lower_prompt or "switch" in lower_prompt):
+            response = self._assistant_apply_detection_mode(1, "Background Subtraction mode")
+        elif "yolo" in lower_prompt and ("mode" in lower_prompt or "detection" in lower_prompt or "switch" in lower_prompt):
+            response = self._assistant_apply_detection_mode(2, "YOLO Object Detection mode")
+        elif "color" in lower_prompt and ("mode" in lower_prompt or "detection" in lower_prompt or "switch" in lower_prompt):
+            response = self._assistant_apply_detection_mode(6, "Color Detection mode")
+        elif ("filtered" in lower_prompt or "target mode" in lower_prompt or "motion-locked" in lower_prompt) and ("mode" in lower_prompt or "detection" in lower_prompt or "switch" in lower_prompt):
+            response = self._assistant_apply_detection_mode(10, "Motion-Locked Filtered Target mode")
+        elif ("human voice" in lower_prompt or "normal voice" in lower_prompt or "speak" in lower_prompt) and ("enable" in lower_prompt or "turn on" in lower_prompt):
+            self.config.sound.human_voice_enabled = True
+            if hasattr(self, "_chk_human_voice_enabled"):
+                self._chk_human_voice_enabled.setChecked(True)
+            if hasattr(self, "_chk_ai_auto_speak"):
+                self._chk_ai_auto_speak.setChecked(True)
+            if conversational:
+                response = "Human voice mode is enabled. I can now speak replies like a normal local assistant."
+            else:
+                response = "Human voice mode is enabled. Switch the assistant to Conversational Voice if you want spoken replies by default."
+        elif ("human voice" in lower_prompt or "normal voice" in lower_prompt) and ("disable" in lower_prompt or "turn off" in lower_prompt):
+            self.config.sound.human_voice_enabled = False
+            if hasattr(self, "_chk_human_voice_enabled"):
+                self._chk_human_voice_enabled.setChecked(False)
+            response = "Human voice mode is disabled."
+        elif ("auto speak" in lower_prompt or "speak replies" in lower_prompt) and ("enable" in lower_prompt or "turn on" in lower_prompt):
+            if hasattr(self, "_chk_ai_auto_speak"):
+                self._chk_ai_auto_speak.setChecked(True)
+            response = "Assistant auto-speak is enabled for future replies."
+        elif ("auto speak" in lower_prompt or "speak replies" in lower_prompt) and ("disable" in lower_prompt or "turn off" in lower_prompt):
+            if hasattr(self, "_chk_ai_auto_speak"):
+                self._chk_ai_auto_speak.setChecked(False)
+            response = "Assistant auto-speak is disabled."
+        elif ("shortcut" in lower_prompt or "quick key" in lower_prompt) and ("enable" in lower_prompt or "turn on" in lower_prompt):
+            if hasattr(self, "_chk_shortcuts_enabled"):
+                self._chk_shortcuts_enabled.setChecked(True)
+            response = "Window-focused operator shortcuts are enabled."
+        elif ("shortcut" in lower_prompt or "quick key" in lower_prompt) and ("disable" in lower_prompt or "turn off" in lower_prompt):
+            if hasattr(self, "_chk_shortcuts_enabled"):
+                self._chk_shortcuts_enabled.setChecked(False)
+            response = "Window-focused operator shortcuts are disabled."
+        elif "hello" in lower_prompt or "hi" in lower_prompt or "hey" in lower_prompt:
+            response = "Hello. I am Smart Sentry's local assistant. I can analyze the current runtime, adjust supported modes, and speak with a human voice when that option is enabled."
+        elif "who are you" in lower_prompt:
+            response = "I am the local Smart Sentry assistant built into this control panel. I handle diagnostics, safe mode changes, and conversational voice replies without requiring an external AI service."
+        elif "what can you do" in lower_prompt or "help" in lower_prompt:
+            response = "I can analyze the current runtime, draft recommendations, switch supported detection modes, move to home or rest, control face recognition and shortcuts, and speak replies with the local human voice engine if you enable it."
+        elif "person" in lower_prompt or "people" in lower_prompt:
+            response = "Use the Target Filter tab to keep only person detections. That pairs best with face recognition and family-safe identity labeling."
+        elif "face" in lower_prompt and "enable" in lower_prompt:
+            self._chk_face_enabled.setChecked(True)
+            response = "Face recognition is now enabled. You can register identities from images or from the current live frame in the Facial Recognition tab."
+        elif "face" in lower_prompt and ("disable" in lower_prompt or "turn off" in lower_prompt):
+            self._chk_face_enabled.setChecked(False)
+            response = "Face recognition is disabled."
+        elif ("voice style" in lower_prompt or "speech style" in lower_prompt) and "quiet" in lower_prompt:
+            self._apply_human_voice_style("operator")
+            response = "Human voice style is now set to Quiet Operator."
+        elif ("voice style" in lower_prompt or "speech style" in lower_prompt) and ("alert" in lower_prompt or "guard" in lower_prompt):
+            self._apply_human_voice_style("alert")
+            response = "Human voice style is now set to Alert Guard."
+        elif ("voice style" in lower_prompt or "speech style" in lower_prompt) and ("warm" in lower_prompt or "friendly" in lower_prompt):
+            self._apply_human_voice_style("warm")
+            response = "Human voice style is now set to Warm Greeter."
+        elif ("voice style" in lower_prompt or "speech style" in lower_prompt) and ("neutral" in lower_prompt or "default" in lower_prompt):
+            self._apply_human_voice_style("neutral")
+            response = "Human voice style is now set to Neutral Assistant."
+        else:
+            response = (
+                "I can help with runtime analysis, recommendations, home or rest moves, link or camera control, detection mode changes, shortcuts, face recognition, and human voice setup. "
+                "Try requests like 'wake up', 'go rest', 'switch to color detection', 'disable shortcuts', or 'enable human voice'."
+            )
+        self._append_ai_output(self._assistant_format_response(response, conversational=conversational), speak=conversational)
+        self._edit_ai_prompt.clear()
 
     def _reset_prompted_runtime(self) -> None:
         self._prompted_matcher.refresh_library_cache()
@@ -9113,7 +13740,12 @@ class SentryV2TabWidget(QWidget):
         if image is None:
             self._log(f"Could not load image: {path}")
             return
-        dialog = PromptedMediaSelectionDialog(title="Select Prompted Targets From Image", image=image, parent=self)
+        dialog = PromptedMediaSelectionDialog(
+            title="Select Prompted Targets From Image",
+            image=image,
+            theme_tokens=self._theme_tokens(),
+            parent=self,
+        )
         if dialog.exec_() != dialog.Accepted:
             return
         selections = dialog.selections()
@@ -9130,7 +13762,12 @@ class SentryV2TabWidget(QWidget):
         )
         if not path:
             return
-        dialog = PromptedMediaSelectionDialog(title="Select Prompted Targets From Video", video_path=path, parent=self)
+        dialog = PromptedMediaSelectionDialog(
+            title="Select Prompted Targets From Video",
+            video_path=path,
+            theme_tokens=self._theme_tokens(),
+            parent=self,
+        )
         if dialog.exec_() != dialog.Accepted:
             return
         selections = dialog.selections()
@@ -9203,9 +13840,238 @@ class SentryV2TabWidget(QWidget):
     def set_host_main_window(self, main_window: Optional[QWidget]) -> None:
         self._main_window_ref = main_window
         self._host_hardware_managed = main_window is not None
+        self._apply_theme()
 
     def _host_controls_hardware(self) -> bool:
         return bool(self._host_hardware_managed and self._main_window_ref is not None)
+
+    def _theme_config(self) -> ThemeConfig:
+        theme_cfg = getattr(self.config, "theme", None)
+        if theme_cfg is None:
+            self.config.theme = ThemeConfig()
+            theme_cfg = self.config.theme
+        return theme_cfg
+
+    def _theme_tokens(self) -> dict:
+        theme_cfg = self._theme_config()
+        preset = THEME_PRESETS.get(str(theme_cfg.preset or "ember"), THEME_PRESETS["ember"])
+        is_light = bool(preset.get("is_light", False))
+        accent_strength = _clamp_int(getattr(theme_cfg, "accent_strength_pct", 100), 60, 140)
+        contrast_pct = _clamp_int(getattr(theme_cfg, "contrast_pct", 100), 85, 125)
+        surface_opacity = _clamp_int(getattr(theme_cfg, "surface_opacity_pct", 94), 55, 100)
+        video_opacity = _clamp_int(getattr(theme_cfg, "video_panel_opacity_pct", 100), 55, 100)
+        window_opacity = _clamp_int(getattr(theme_cfg, "window_opacity_pct", 100), 70, 100)
+        radius = _clamp_int(getattr(theme_cfg, "corner_radius_px", 14), 8, 24)
+        font_scale_pct = _clamp_int(getattr(theme_cfg, "font_scale_pct", 100), 50, 280)
+
+        accent_boost = (accent_strength - 100) / 40.0
+        contrast_boost = (contrast_pct - 100) / 25.0
+        accent_target = "#ffffff" if not is_light else "#1b130d"
+        text_target = "#ffffff" if not is_light else "#120e0c"
+        subtle_target = "#f5ede4" if not is_light else "#2f2318"
+        dark_sink = preset["root_bg"] if not is_light else "#efe4d5"
+
+        if accent_boost >= 0:
+            accent = _mix_hex(preset["accent"], accent_target, accent_boost * 0.32)
+            accent_soft = _mix_hex(preset["accent_soft"], accent_target, accent_boost * 0.22)
+        else:
+            accent = _mix_hex(preset["accent"], dark_sink, abs(accent_boost) * 0.34)
+            accent_soft = _mix_hex(preset["accent_soft"], dark_sink, abs(accent_boost) * 0.28)
+
+        if contrast_boost >= 0:
+            text = _mix_hex(preset["text"], text_target, contrast_boost * 0.25)
+            muted = _mix_hex(preset["muted"], subtle_target, contrast_boost * 0.20)
+            border = _mix_hex(preset["border"], accent if not is_light else text_target, contrast_boost * 0.16)
+        else:
+            text = _mix_hex(preset["text"], preset["muted"], abs(contrast_boost) * 0.22)
+            muted = _mix_hex(preset["muted"], preset["surface"], abs(contrast_boost) * 0.18)
+            border = _mix_hex(preset["border"], preset["surface"], abs(contrast_boost) * 0.20)
+
+        ui_scale = max(0.50, min(2.80, float(font_scale_pct) / 100.0))
+        base_font_pt = 9.8 * ui_scale
+        shell_opacity = max(28, min(surface_opacity, window_opacity) - 12)
+        hero_text = text if is_light else _mix_hex(text, "#ffffff", 0.10)
+        button_alpha = surface_opacity
+        button_hover_alpha = min(100, surface_opacity)
+        button_pressed_alpha = max(40, surface_opacity - 10)
+        button_disabled_alpha = max(26, surface_opacity - 34)
+        accent_alpha = min(100, surface_opacity)
+        accent_faint_alpha = max(22, min(70, surface_opacity - 18))
+        accent_mid_hex = _mix_hex(accent, preset["surface"], 0.38 if not is_light else 0.18)
+        button_hover_hex = _mix_hex(preset["surface_alt"], accent, 0.16 if not is_light else 0.12)
+        button_pressed_hex = _mix_hex(preset["surface_alt"], preset["root_bg"], 0.30 if not is_light else 0.10)
+        button_checked_hex = _mix_hex(preset["surface"], accent, 0.34 if not is_light else 0.22)
+        button_disabled_hex = _mix_hex(preset["surface"], preset["root_bg"], 0.45 if not is_light else 0.18)
+        primary_button_hex = _mix_hex(accent, preset["hero_mid"], 0.22 if not is_light else 0.10)
+        primary_button_hover_hex = _mix_hex(accent, text_target, 0.18 if not is_light else 0.06)
+        primary_button_pressed_hex = _mix_hex(accent_soft, preset["root_bg"], 0.22 if not is_light else 0.05)
+        mode_button_hex = _mix_hex(preset["surface_alt"], accent, 0.12)
+        mode_button_hover_hex = _mix_hex(preset["surface_alt"], accent, 0.20)
+        danger_button_hex = _mix_hex("#c45c54", preset["surface_alt"], 0.34 if not is_light else 0.18)
+        danger_button_hover_hex = _mix_hex("#d97166", preset["surface_alt"], 0.22 if not is_light else 0.12)
+        danger_button_pressed_hex = _mix_hex("#9d4941", preset["surface_alt"], 0.24 if not is_light else 0.10)
+        hero_badge_bg_hex = _mix_hex(preset["surface_alt"], preset["root_bg"], 0.35)
+
+        return {
+            "preset_label": preset["label"],
+            "preset_description": preset["description"],
+            "is_light": is_light,
+            "root_bg": preset["root_bg"],
+            "root_bg_rgba": _rgba_hex(preset["root_bg"], shell_opacity),
+            "surface_rgba": _rgba_hex(preset["surface"], surface_opacity),
+            "surface_alt_rgba": _rgba_hex(preset["surface_alt"], min(100, surface_opacity)),
+            "panel_rgba": _rgba_hex(preset["panel"], max(55, surface_opacity - 4)),
+            "field_rgba": _rgba_hex(preset["field"], min(100, surface_opacity + 2)),
+            "field_text": text,
+            "field_border": border,
+            "border": border,
+            "text": text,
+            "muted": muted,
+            "subtle_text": muted,
+            "accent": accent,
+            "accent_soft": accent_soft,
+            "accent_mid": _rgba_hex(accent_mid_hex, accent_alpha),
+            "accent_faint": _rgba_hex(accent, accent_faint_alpha),
+            "button_bg": _rgba_hex(preset["surface_alt"], button_alpha),
+            "button_text": text,
+            "button_border": border,
+            "button_hover": _rgba_hex(button_hover_hex, button_hover_alpha),
+            "button_pressed": _rgba_hex(button_pressed_hex, button_pressed_alpha),
+            "button_checked": _rgba_hex(button_checked_hex, button_alpha),
+            "button_disabled": _rgba_hex(button_disabled_hex, button_disabled_alpha),
+            "disabled_text": _mix_hex(muted, preset["surface"], 0.35),
+            "disabled_border": _mix_hex(border, preset["surface"], 0.26),
+            "primary_button_bg": _rgba_hex(primary_button_hex, button_alpha),
+            "primary_button_border": accent_soft,
+            "primary_button_hover": _rgba_hex(primary_button_hover_hex, button_hover_alpha),
+            "primary_button_pressed": _rgba_hex(primary_button_pressed_hex, button_pressed_alpha),
+            "mode_button_bg": _rgba_hex(mode_button_hex, button_alpha),
+            "mode_button_border": _mix_hex(border, accent, 0.28),
+            "mode_button_text": hero_text,
+            "mode_button_hover": _rgba_hex(mode_button_hover_hex, button_hover_alpha),
+            "danger_button_bg": _rgba_hex(danger_button_hex, button_alpha),
+            "danger_button_border": _mix_hex("#e88074", accent_soft, 0.30),
+            "danger_button_hover": _rgba_hex(danger_button_hover_hex, button_hover_alpha),
+            "danger_button_pressed": _rgba_hex(danger_button_pressed_hex, button_pressed_alpha),
+            "slider_groove": _mix_hex(preset["surface_alt"], border, 0.35),
+            "scroll_handle": _mix_hex(border, accent, 0.16),
+            "hero_start": _rgba_hex(preset["hero_start"], min(100, surface_opacity + 4)),
+            "hero_mid": _rgba_hex(preset["hero_mid"], min(100, surface_opacity + 2)),
+            "hero_end": _rgba_hex(preset["hero_end"], min(100, surface_opacity + 6)),
+            "hero_text": hero_text,
+            "hero_subtle": _mix_hex(hero_text, muted, 0.35),
+            "hero_badge_bg": _rgba_hex(hero_badge_bg_hex, max(38, min(100, surface_opacity - 12))),
+            "hero_badge_text": hero_text,
+            "tooltip_bg": preset["tooltip_bg"],
+            "tooltip_text": preset["tooltip_text"],
+            "video_bg_rgba": _rgba_hex(preset["video_bg"], video_opacity),
+            "video_text": preset["video_text"],
+            "window_opacity": window_opacity,
+            "radius": radius,
+            "status_neutral": _mix_hex(muted, text, 0.15),
+            "status_info": _mix_hex(accent, text, 0.10 if not is_light else 0.18),
+            "status_ok": _mix_hex("#4dbb74", text, 0.18 if not is_light else 0.08),
+            "status_warn": _mix_hex("#d9a63e", text, 0.18 if not is_light else 0.06),
+            "status_error": _mix_hex("#d8645f", text, 0.14 if not is_light else 0.05),
+            "status_meta": _mix_hex(muted, preset["field"], 0.05 if not is_light else 0.20),
+            "status_card_bg": _rgba_hex(_mix_hex(preset["surface"], preset["panel"], 0.35), min(100, surface_opacity + 2)),
+            "status_subframe_bg": _rgba_hex(_mix_hex(preset["surface_alt"], preset["panel"], 0.30), min(100, surface_opacity)),
+            "status_card_border": _mix_hex(border, accent, 0.12),
+            "status_card_title": _mix_hex(accent, text, 0.22 if not is_light else 0.14),
+            "status_card_value": _mix_hex(text, accent, 0.05 if not is_light else 0.02),
+            "status_section_title": _mix_hex(accent, text, 0.20 if not is_light else 0.12),
+            "status_progress_bg": _rgba_hex(_mix_hex(preset["field"], preset["panel"], 0.25), 100),
+            "status_progress_pan": _mix_hex(accent, preset["hero_mid"], 0.22 if not is_light else 0.12),
+            "status_progress_tilt": _mix_hex("#63b572", accent, 0.28 if not is_light else 0.12),
+            "status_card_radius": max(6, radius - 6),
+            "ui_scale": ui_scale,
+            "base_font_pt": base_font_pt,
+            "hero_title_pt": max(20.0, 20.8 + ((ui_scale - 1.0) * 3.8)),
+            "hero_subtitle_pt": max(12.8, 13.4 + ((ui_scale - 1.0) * 2.2)),
+            "hero_badge_pt": max(11.2, 11.8 + ((ui_scale - 1.0) * 1.7)),
+            "nav_title_pt": max(11.6, base_font_pt + 1.4),
+            "nav_count_pt": max(12.6, base_font_pt + 2.2),
+            "status_font_pt": base_font_pt,
+        }
+
+    def _select_theme_preset(self, preset_key: str) -> None:
+        if not hasattr(self, "_combo_theme_preset"):
+            return
+        index = self._combo_theme_preset.findData(preset_key)
+        if index >= 0:
+            self._combo_theme_preset.setCurrentIndex(index)
+
+    def _sync_theme_widgets(self) -> None:
+        if not hasattr(self, "_combo_theme_preset"):
+            return
+        theme_cfg = self._theme_config()
+        widgets = [
+            self._combo_theme_preset,
+            self._slider_theme_accent,
+            self._slider_theme_surface_opacity,
+            self._slider_theme_video_opacity,
+            self._slider_theme_window_opacity,
+            self._slider_theme_contrast,
+            self._slider_theme_radius,
+        ]
+        for widget in widgets:
+            widget.blockSignals(True)
+        try:
+            preset_index = self._combo_theme_preset.findData(str(theme_cfg.preset or "ember"))
+            if preset_index < 0:
+                preset_index = self._combo_theme_preset.findData("ember")
+            if preset_index >= 0:
+                self._combo_theme_preset.setCurrentIndex(preset_index)
+            self._slider_theme_accent.setValue(_clamp_int(theme_cfg.accent_strength_pct, 60, 140))
+            self._slider_theme_surface_opacity.setValue(_clamp_int(theme_cfg.surface_opacity_pct, 55, 100))
+            self._slider_theme_video_opacity.setValue(_clamp_int(theme_cfg.video_panel_opacity_pct, 55, 100))
+            self._slider_theme_window_opacity.setValue(_clamp_int(theme_cfg.window_opacity_pct, 70, 100))
+            self._slider_theme_contrast.setValue(_clamp_int(theme_cfg.contrast_pct, 85, 125))
+            self._slider_theme_radius.setValue(_clamp_int(theme_cfg.corner_radius_px, 8, 24))
+        finally:
+            for widget in widgets:
+                widget.blockSignals(False)
+
+        tokens = self._theme_tokens()
+        self._lbl_theme_preset_desc.setText(tokens["preset_description"])
+        self._lbl_theme_accent.setText(f"{self._slider_theme_accent.value()}%")
+        self._lbl_theme_surface_opacity.setText(f"{self._slider_theme_surface_opacity.value()}%")
+        self._lbl_theme_video_opacity.setText(f"{self._slider_theme_video_opacity.value()}%")
+        self._lbl_theme_window_opacity.setText(f"{self._slider_theme_window_opacity.value()}%")
+        self._lbl_theme_contrast.setText(f"{self._slider_theme_contrast.value()}%")
+        self._lbl_theme_radius.setText(f"{self._slider_theme_radius.value()} px")
+        self._lbl_theme_summary.setText(
+            f"Preset: {tokens['preset_label']}\n"
+            f"Accent {self._slider_theme_accent.value()}% | Panels {self._slider_theme_surface_opacity.value()}% | "
+            f"Video {self._slider_theme_video_opacity.value()}% | Window {self._slider_theme_window_opacity.value()}%\n"
+            f"Contrast {self._slider_theme_contrast.value()}% | Radius {self._slider_theme_radius.value()} px"
+        )
+
+    def _on_theme_preset_changed(self, _index: int) -> None:
+        if not hasattr(self, "_combo_theme_preset"):
+            return
+        self._theme_config().preset = str(self._combo_theme_preset.currentData() or "ember")
+        self._sync_theme_widgets()
+        self._apply_theme()
+        self._save_config_quietly()
+
+    def _on_theme_settings_changed(self, _value: int) -> None:
+        theme_cfg = self._theme_config()
+        theme_cfg.accent_strength_pct = int(self._slider_theme_accent.value())
+        theme_cfg.surface_opacity_pct = int(self._slider_theme_surface_opacity.value())
+        theme_cfg.video_panel_opacity_pct = int(self._slider_theme_video_opacity.value())
+        theme_cfg.window_opacity_pct = int(self._slider_theme_window_opacity.value())
+        theme_cfg.contrast_pct = int(self._slider_theme_contrast.value())
+        theme_cfg.corner_radius_px = int(self._slider_theme_radius.value())
+        self._sync_theme_widgets()
+        self._apply_theme()
+        self._save_config_quietly()
+
+    def _reset_theme_defaults(self) -> None:
+        self.config.theme = ThemeConfig()
+        self._sync_theme_widgets()
+        self._apply_theme()
+        self._save_config_quietly()
 
     def _get_main_window(self):
         return self._main_window_ref
@@ -9220,7 +14086,7 @@ class SentryV2TabWidget(QWidget):
             total_width = max(self.width(), width + SENTRY_V2_VIDEO_MIN_WIDTH)
         left_width = max(SENTRY_V2_VIDEO_MIN_WIDTH, total_width - width)
         self._main_splitter.setSizes([left_width, width])
-        self._reflow_all_responsive_button_grids()
+        self._update_responsive_layout()
 
     def _on_servo_time_changed(self, value: int) -> None:
         move_time = int(value)
@@ -9469,7 +14335,9 @@ class SentryV2TabWidget(QWidget):
 
     def _resolved_engagement_preset_settings(self, preset: dict) -> dict:
         settings = dict(vars(EngagementConfig()))
-        settings.update(dict(preset.get("settings", {})))
+        raw_settings = dict(preset.get("settings", {}))
+        settings.update(raw_settings)
+        settings = _normalize_engagement_precision_limits(settings, raw_settings)
         max_queue_length = max(1, int(settings.get("max_queue_length", 1) or 1))
         settings["max_queue_length"] = max_queue_length
         # The visible queue control is the source of truth. Preserve explicit
@@ -9590,6 +14458,8 @@ class SentryV2TabWidget(QWidget):
             self._sync_target_size_preset_combo()
             self._detector.reset()
             self._tracker.reset()
+            self._prompted_matcher.reset()
+            self._invalidate_detector_runtime()
             self._reset_detection_runtime_if_active()
             self.detection_mode_changed.emit(int(settings["detection_mode"]))
             self._push_config()
@@ -9975,7 +14845,7 @@ class SentryV2TabWidget(QWidget):
 
     def _load_custom_master_profiles(self) -> None:
         self._custom_master_profiles = {}
-        path = CUSTOM_MASTER_PRESET_PATH
+        path = self._custom_master_preset_path()
         try:
             if not path.exists():
                 return
@@ -10008,7 +14878,7 @@ class SentryV2TabWidget(QWidget):
             print(f"[SENTRY_V2_TAB] Failed to load custom master presets: {exc}")
 
     def _save_custom_master_profiles_to_disk(self) -> bool:
-        path = CUSTOM_MASTER_PRESET_PATH
+        path = SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH
         profiles_out: dict[str, dict] = {}
         for master_key, preset in self._custom_master_profiles.items():
             slug = master_key.replace("custom_master__", "", 1)
@@ -10267,6 +15137,7 @@ class SentryV2TabWidget(QWidget):
         fire: int = 0,
         move_time_ms: Optional[int] = None,
         manual_override: bool = False,
+        allow_rest_tilt: bool = False,
     ) -> None:
         if self._closing:
             return
@@ -10274,7 +15145,7 @@ class SentryV2TabWidget(QWidget):
         if not self._pan_tilt_motion_enabled and not manual_override:
             return
         move_time = int(self._get_manual_move_time_ms() if move_time_ms is None else move_time_ms)
-        queued_move = (float(pan), float(tilt), int(fire), move_time, bool(manual_override))
+        queued_move = (float(pan), float(tilt), int(fire), move_time, bool(manual_override), bool(allow_rest_tilt))
         now = time.time()
         with self._pending_move_lock:
             if manual_override:
@@ -10336,13 +15207,17 @@ class SentryV2TabWidget(QWidget):
                     move_command = self._pending_move_commands.popleft()
             if move_command is not None and not self._closing:
                 try:
-                    pan, tilt, fire, move_time, _manual_override = move_command
+                    pan, tilt, fire, move_time, _manual_override, _allow_rest_tilt = move_command
                     if int(fire) != 0:
-                        ok = self._comm.send_command(pan, tilt, fire=fire, move_time_ms=move_time)
-                        detail = getattr(self._comm, "_last_error", "") or getattr(self._comm, "_last_cmd", "") or ""
+                        ok = self._comm.send_command(pan, tilt, fire=fire, move_time_ms=move_time, allow_rest_tilt=_allow_rest_tilt)
+                        detail = getattr(self._comm, "_last_error", "") or ""
+                        if ok and _manual_override:
+                            detail = getattr(self._comm, "_last_cmd", "") or ""
                     else:
-                        ok = self._comm.send_movement(pan, tilt, move_time_ms=move_time)
-                        detail = getattr(self._comm, "_last_cmd", "") or ""
+                        ok = self._comm.send_movement(pan, tilt, move_time_ms=move_time, allow_rest_tilt=_allow_rest_tilt)
+                        detail = ""
+                        if _manual_override:
+                            detail = getattr(self._comm, "_last_cmd", "") or ""
                         if not ok:
                             detail = getattr(self._comm, "_last_error", "") or "movement command failed"
                     self.command_result_ready.emit(
@@ -10382,9 +15257,17 @@ class SentryV2TabWidget(QWidget):
             ok = self._comm.set_safety(*args, **kwargs)
             self.command_result_ready.emit("set_safety", bool(ok), getattr(self._comm, "_last_error", "") or "")
             return
+        if task_name == "set_control_source_mode":
+            ok = self._comm.set_control_source_mode(*args, **kwargs)
+            self.command_result_ready.emit("set_control_source_mode", bool(ok), getattr(self._comm, "_last_error", "") or getattr(self._comm, "_last_cmd", "") or "")
+            return
         if task_name == "send_pir_enabled":
             ok = self._comm.send_pir_enabled(*args, **kwargs)
             self.command_result_ready.emit("send_pir_enabled", bool(ok), getattr(self._comm, "_last_error", "") or getattr(self._comm, "_last_cmd", "") or "")
+            return
+        if task_name == "send_sweep":
+            ok = self._comm.send_sweep(*args, **kwargs)
+            self.command_result_ready.emit("send_sweep", bool(ok), getattr(self._comm, "_last_error", "") or getattr(self._comm, "_last_cmd", "") or "")
             return
         if task_name == "send_sound":
             ok = self._comm.send_sound(*args, **kwargs)
@@ -10407,14 +15290,22 @@ class SentryV2TabWidget(QWidget):
             self.command_result_ready.emit("refresh_wifi_runtime_link", bool(ok), detail)
             return
 
+    def _update_last_command_label(self, cmd_text: str) -> None:
+        text = str(cmd_text or "").strip()
+        if not text:
+            return
+        self._last_visible_command_text = text
+        if hasattr(self, "_lbl_last_cmd") and self._lbl_last_cmd is not None:
+            self._set_label_content(self._lbl_last_cmd, f"Last: {text}", SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE)
+
     def _on_command_result_ready(self, command_name: str, ok: bool, detail: str) -> None:
         if self._closing:
             return
-        if hasattr(self, "_lbl_last_cmd") and getattr(self._comm, "_last_cmd", ""):
-            self._lbl_last_cmd.setText(f"Last: {self._comm._last_cmd}")
         if command_name == "refresh_wifi_runtime_link":
             self._wifi_runtime_refresh_inflight = False
         if ok:
+            if detail:
+                self._update_last_command_label(detail)
             if command_name == "refresh_wifi_runtime_link":
                 self._log(str(detail or "WiFi runtime link refreshed"))
             return
@@ -10450,10 +15341,13 @@ class SentryV2TabWidget(QWidget):
         d.custom_hsv_upper = (dm.custom_h_max, dm.custom_s_max, dm.custom_v_max)
         d.set_yolo_classes(",".join(self.config.target_filter.allowed_classes))
 
-    def _clamp_manual_angles(self, pan: float, tilt: float) -> Tuple[float, float]:
+    def _clamp_manual_angles(self, pan: float, tilt: float, *, allow_rest_tilt: bool = False) -> Tuple[float, float]:
         g = self.config.guard
         pan_min, pan_max = sorted((g.pan_min, g.pan_max))
-        tilt_min, tilt_max = sorted((g.tilt_min, g.tilt_max))
+        if allow_rest_tilt:
+            tilt_min, tilt_max = SENTRY_TILT_MIN, SENTRY_TILT_MAX
+        else:
+            tilt_min, tilt_max = sorted((g.tilt_min, g.tilt_max))
         return (
             max(pan_min, min(pan_max, pan)),
             max(tilt_min, min(tilt_max, tilt)),
@@ -10552,6 +15446,8 @@ class SentryV2TabWidget(QWidget):
             return
         if not bool(getattr(self.config.sound, "enabled", True)):
             return
+        if self._buzzer_suppressed_for_human_voice():
+            return
         volume_pct = self._sound_volume_pct()
         if volume_pct <= 0:
             return
@@ -10562,6 +15458,169 @@ class SentryV2TabWidget(QWidget):
                 self._log(self._comm.sound_transport_info())
             return
         self._queue_comm_task("send_sound", int(freq_hz), int(duration_ms), volume_pct)
+
+    def _human_voice_supported(self) -> bool:
+        return bool(QTextToSpeech is not None and getattr(self, "_speech_available", False))
+
+    def _mute_buzzer_for_human_voice_enabled(self) -> bool:
+        return bool(getattr(self.config.sound, "mute_buzzer_when_human_voice_enabled", True))
+
+    def _buzzer_suppressed_for_human_voice(self) -> bool:
+        return bool(self._mute_buzzer_for_human_voice_enabled() and getattr(self.config.sound, "human_voice_enabled", False))
+
+    def _human_voice_name(self) -> str:
+        return str(getattr(self.config.sound, "human_voice_name", "") or "").strip()
+
+    def _human_voice_backend_summary(self) -> str:
+        engine = getattr(self, "_speech_engine", None)
+        if engine is None or QTextToSpeech is None:
+            return "unavailable"
+        try:
+            engines = list(engine.availableEngines() or [])
+        except Exception:
+            engines = []
+        return ", ".join(str(item) for item in engines if str(item).strip()) or "no backend reported"
+
+    def _human_voice_style_key(self) -> str:
+        style = str(getattr(self.config.sound, "human_voice_style", "neutral") or "neutral").strip().lower()
+        return style if style in HUMAN_VOICE_STYLE_PRESETS else "neutral"
+
+    def _human_voice_rate_pct(self) -> int:
+        return int(max(50, min(150, int(getattr(self.config.sound, "human_voice_rate_pct", 100) or 100))))
+
+    def _human_voice_pitch_pct(self) -> int:
+        return int(max(50, min(150, int(getattr(self.config.sound, "human_voice_pitch_pct", 100) or 100))))
+
+    def _human_voice_volume_pct(self) -> int:
+        return int(max(0, min(100, int(getattr(self.config.sound, "human_voice_volume_pct", 85) or 85))))
+
+    def _apply_human_voice_style(self, style_key: str, *, save: bool = True) -> None:
+        normalized = str(style_key or "neutral").strip().lower()
+        preset = HUMAN_VOICE_STYLE_PRESETS.get(normalized, HUMAN_VOICE_STYLE_PRESETS["neutral"])
+        self.config.sound.human_voice_style = normalized if normalized in HUMAN_VOICE_STYLE_PRESETS else "neutral"
+        self.config.sound.human_voice_rate_pct = int(preset["rate"])
+        self.config.sound.human_voice_pitch_pct = int(preset["pitch"])
+        self.config.sound.human_voice_volume_pct = int(preset["volume"])
+        self._sync_sound_widgets()
+        if save:
+            self._save_config_quietly()
+
+    def _set_human_voice_runtime_state(self, label: str) -> None:
+        self._speech_state_label = str(label or "waiting").strip() or "waiting"
+        if hasattr(self, "_lbl_human_voice_status"):
+            self._sync_sound_widgets()
+
+    def _refresh_human_voice_diagnostics(self) -> None:
+        if hasattr(self, "_lbl_human_voice_diag_backend"):
+            self._lbl_human_voice_diag_backend.setText(f"Backend: {self._human_voice_backend_summary()}")
+        engine = getattr(self, "_speech_engine", None)
+        actual_voice = ""
+        if engine is not None and hasattr(engine, "voice"):
+            try:
+                actual_voice = str(engine.voice().name() or "").strip()
+            except Exception:
+                actual_voice = ""
+        selected_voice = self._human_voice_name() or (self._speech_voice_names[0] if self._speech_voice_names else "default voice")
+        if hasattr(self, "_lbl_human_voice_diag_selected"):
+            if actual_voice and actual_voice != selected_voice:
+                self._lbl_human_voice_diag_selected.setText(f"Selected voice: {selected_voice} | engine voice: {actual_voice}")
+            else:
+                self._lbl_human_voice_diag_selected.setText(f"Selected voice: {actual_voice or selected_voice}")
+        if hasattr(self, "_lbl_human_voice_diag_state"):
+            route_mode = "buzzer muted" if self._buzzer_suppressed_for_human_voice() else "buzzer allowed"
+            self._lbl_human_voice_diag_state.setText(
+                f"Speech state: {getattr(self, '_speech_state_label', 'waiting')} | Human voice {'ON' if getattr(self.config.sound, 'human_voice_enabled', False) else 'OFF'} | {route_mode}"
+            )
+        if hasattr(self, "_lbl_human_voice_diag_route"):
+            route_note = "Windows SAPI uses the current default playback device"
+            if self._buzzer_suppressed_for_human_voice():
+                route_note += " | ESP32 buzzer is intentionally muted while human voice mode is enabled"
+            self._lbl_human_voice_diag_route.setText(f"Route: {route_note}")
+
+    def _on_human_speech_state_changed(self, state: object) -> None:
+        if QTextToSpeech is None:
+            return
+        ready_state = getattr(QTextToSpeech, "Ready", None)
+        speaking_state = getattr(QTextToSpeech, "Speaking", None)
+        paused_state = getattr(QTextToSpeech, "Paused", None)
+        backend_error_state = getattr(QTextToSpeech, "BackendError", None)
+        if state == speaking_state:
+            self._set_human_voice_runtime_state("speaking")
+        elif state == paused_state:
+            self._set_human_voice_runtime_state("paused")
+        elif state == backend_error_state:
+            self._set_human_voice_runtime_state("error")
+            self._log("Human voice backend reported an error while trying to speak")
+        elif state == ready_state:
+            self._set_human_voice_runtime_state("ready")
+
+    def _init_human_speech_engine(self) -> None:
+        self._speech_available = False
+        self._speech_voice_names = []
+        if QTextToSpeech is None:
+            self._speech_state_label = "unavailable"
+            return
+        try:
+            self._speech_engine = QTextToSpeech(self)
+            self._speech_available = bool(self._speech_engine.availableEngines())
+            self._speech_voice_names = [str(voice.name()) for voice in list(self._speech_engine.availableVoices() or []) if str(voice.name()).strip()]
+            if hasattr(self._speech_engine, "stateChanged"):
+                self._speech_engine.stateChanged.connect(self._on_human_speech_state_changed)
+            self._speech_state_label = "ready" if self._speech_available else "unavailable"
+            self._sync_human_speech_engine()
+        except Exception:
+            self._speech_engine = None
+            self._speech_available = False
+            self._speech_voice_names = []
+            self._speech_state_label = "unavailable"
+
+    def _sync_human_speech_engine(self) -> None:
+        engine = getattr(self, "_speech_engine", None)
+        if engine is None:
+            return
+        try:
+            voices = list(engine.availableVoices() or [])
+            if voices and self._human_voice_name():
+                target = self._human_voice_name().lower()
+                for voice in voices:
+                    if str(voice.name()).strip().lower() == target:
+                        engine.setVoice(voice)
+                        break
+            engine.setRate((float(self._human_voice_rate_pct()) - 100.0) / 50.0)
+            engine.setPitch((float(self._human_voice_pitch_pct()) - 100.0) / 50.0)
+            engine.setVolume(float(self._human_voice_volume_pct()) / 100.0)
+        except Exception:
+            pass
+
+    def _stop_human_speech(self) -> None:
+        engine = getattr(self, "_speech_engine", None)
+        if engine is None:
+            return
+        try:
+            engine.stop()
+            self._speech_state_label = "ready"
+        except Exception:
+            pass
+
+    def _speak_human_phrase(self, text: str, *, interrupt: bool = True) -> bool:
+        cleaned = " ".join(str(text or "").split()).strip()
+        if not cleaned or not bool(getattr(self.config.sound, "human_voice_enabled", False)):
+            return False
+        engine = getattr(self, "_speech_engine", None)
+        if engine is None or not self._human_voice_supported():
+            self._set_human_voice_runtime_state("unavailable")
+            return False
+        try:
+            self._sync_human_speech_engine()
+            if interrupt:
+                engine.stop()
+            engine.say(cleaned)
+            self._set_human_voice_runtime_state("speaking")
+            return True
+        except Exception as exc:
+            self._set_human_voice_runtime_state("error")
+            self._report_runtime_warning("Human speech unavailable", exc)
+            return False
 
     def _current_sound_area_ratio(self) -> Optional[float]:
         active_order = getattr(self.engine, "active_order", None)
@@ -10612,15 +15671,31 @@ class SentryV2TabWidget(QWidget):
         self._sound_lock_active = lock_active
 
     def _note_sound_settings_changed(self) -> None:
+        self._sound_engine.set_profile(self._sound_personality_key(), self._sound_attitude_pct())
         if bool(getattr(self.config.sound, "enabled", True)):
             self._sound_engine.note_settings_changed()
 
     def _sound_volume_pct(self) -> int:
         return int(max(0, min(100, int(getattr(self.config.sound, "volume_pct", 100) or 100))))
 
+    def _sound_personality_key(self) -> str:
+        personality = str(getattr(self.config.sound, "personality", "sentinel") or "sentinel").strip().lower()
+        return personality if personality in SOUND_PERSONALITY_LABELS else "sentinel"
+
+    def _sound_attitude_pct(self) -> int:
+        return int(max(0, min(100, int(getattr(self.config.sound, "attitude_pct", 60) or 60))))
+
     def _sync_sound_widgets(self) -> None:
         enabled = bool(getattr(self.config.sound, "enabled", True))
         volume_pct = self._sound_volume_pct()
+        personality = self._sound_personality_key()
+        attitude_pct = self._sound_attitude_pct()
+        human_voice_enabled = bool(getattr(self.config.sound, "human_voice_enabled", False))
+        human_voice_style = self._human_voice_style_key()
+        human_voice_rate = self._human_voice_rate_pct()
+        human_voice_pitch = self._human_voice_pitch_pct()
+        human_voice_volume = self._human_voice_volume_pct()
+        voice_names = list(getattr(self, "_speech_voice_names", []) or [])
         for attr_name in ("_chk_sound_enabled",):
             if hasattr(self, attr_name):
                 widget = getattr(self, attr_name)
@@ -10632,8 +15707,177 @@ class SentryV2TabWidget(QWidget):
             self._slider_sound_volume.setValue(volume_pct)
             self._slider_sound_volume.setEnabled(enabled)
             self._slider_sound_volume.blockSignals(False)
+        if hasattr(self, "_combo_sound_personality"):
+            combo_index = max(0, self._combo_sound_personality.findData(personality))
+            self._combo_sound_personality.blockSignals(True)
+            self._combo_sound_personality.setCurrentIndex(combo_index)
+            self._combo_sound_personality.setEnabled(enabled)
+            self._combo_sound_personality.blockSignals(False)
+        if hasattr(self, "_slider_sound_attitude"):
+            self._slider_sound_attitude.blockSignals(True)
+            self._slider_sound_attitude.setValue(attitude_pct)
+            self._slider_sound_attitude.setEnabled(enabled)
+            self._slider_sound_attitude.blockSignals(False)
         if hasattr(self, "_lbl_sound_volume"):
             self._lbl_sound_volume.setText("Muted" if volume_pct <= 0 else f"{volume_pct}%")
+        if hasattr(self, "_lbl_sound_attitude"):
+            self._lbl_sound_attitude.setText(f"{attitude_pct}%")
+        if hasattr(self, "_lbl_sound_profile"):
+            self._lbl_sound_profile.setText(
+                f"Profile: {SOUND_PERSONALITY_LABELS.get(personality, 'Sentinel')} • attitude {attitude_pct}%"
+            )
+        if hasattr(self, "_chk_human_voice_enabled"):
+            self._chk_human_voice_enabled.blockSignals(True)
+            self._chk_human_voice_enabled.setChecked(human_voice_enabled)
+            self._chk_human_voice_enabled.setEnabled(self._human_voice_supported())
+            self._chk_human_voice_enabled.blockSignals(False)
+        if hasattr(self, "_combo_human_voice_style"):
+            style_index = max(0, self._combo_human_voice_style.findData(human_voice_style))
+            self._combo_human_voice_style.blockSignals(True)
+            self._combo_human_voice_style.setCurrentIndex(style_index)
+            self._combo_human_voice_style.setEnabled(self._human_voice_supported())
+            self._combo_human_voice_style.blockSignals(False)
+        if hasattr(self, "_combo_human_voice"):
+            self._combo_human_voice.blockSignals(True)
+            self._combo_human_voice.clear()
+            for voice_name in voice_names:
+                self._combo_human_voice.addItem(voice_name, voice_name)
+            if voice_names:
+                voice_name = self._human_voice_name()
+                voice_index = max(0, self._combo_human_voice.findData(voice_name)) if voice_name else 0
+                self._combo_human_voice.setCurrentIndex(voice_index)
+            self._combo_human_voice.setEnabled(bool(voice_names) and self._human_voice_supported())
+            self._combo_human_voice.blockSignals(False)
+        if hasattr(self, "_slider_human_voice_rate"):
+            self._slider_human_voice_rate.blockSignals(True)
+            self._slider_human_voice_rate.setValue(human_voice_rate)
+            self._slider_human_voice_rate.setEnabled(self._human_voice_supported())
+            self._slider_human_voice_rate.blockSignals(False)
+        if hasattr(self, "_slider_human_voice_pitch"):
+            self._slider_human_voice_pitch.blockSignals(True)
+            self._slider_human_voice_pitch.setValue(human_voice_pitch)
+            self._slider_human_voice_pitch.setEnabled(self._human_voice_supported())
+            self._slider_human_voice_pitch.blockSignals(False)
+        if hasattr(self, "_slider_human_voice_volume"):
+            self._slider_human_voice_volume.blockSignals(True)
+            self._slider_human_voice_volume.setValue(human_voice_volume)
+            self._slider_human_voice_volume.setEnabled(self._human_voice_supported())
+            self._slider_human_voice_volume.blockSignals(False)
+        if hasattr(self, "_lbl_human_voice_rate"):
+            self._lbl_human_voice_rate.setText(f"{human_voice_rate}%")
+        if hasattr(self, "_lbl_human_voice_pitch"):
+            self._lbl_human_voice_pitch.setText(f"{human_voice_pitch}%")
+        if hasattr(self, "_lbl_human_voice_volume"):
+            self._lbl_human_voice_volume.setText("Muted" if human_voice_volume <= 0 else f"{human_voice_volume}%")
+        if hasattr(self, "_lbl_human_voice_status"):
+            if not self._human_voice_supported():
+                self._lbl_human_voice_status.setText("Human voice: unavailable in the current runtime")
+            else:
+                state_label = str(getattr(self, "_speech_state_label", "ready") or "ready")
+                status = f"enabled / {state_label}" if human_voice_enabled else state_label
+                voice_name = self._human_voice_name() or (voice_names[0] if voice_names else "default voice")
+                style_label = str(HUMAN_VOICE_STYLE_PRESETS.get(human_voice_style, HUMAN_VOICE_STYLE_PRESETS["neutral"])["label"])
+                self._lbl_human_voice_status.setText(f"Human voice: {status} • {voice_name} • {style_label}")
+        if hasattr(self, "_btn_test_human_voice"):
+            self._btn_test_human_voice.setEnabled(self._human_voice_supported())
+        if hasattr(self, "_chk_mute_buzzer_for_human_voice"):
+            self._chk_mute_buzzer_for_human_voice.blockSignals(True)
+            self._chk_mute_buzzer_for_human_voice.setChecked(self._mute_buzzer_for_human_voice_enabled())
+            self._chk_mute_buzzer_for_human_voice.setEnabled(self._human_voice_supported())
+            self._chk_mute_buzzer_for_human_voice.blockSignals(False)
+        if hasattr(self, "_btn_human_voice_fallback"):
+            self._btn_human_voice_fallback.setEnabled(self._human_voice_supported())
+        if hasattr(self, "_btn_human_voice_stop"):
+            self._btn_human_voice_stop.setEnabled(self._human_voice_supported())
+        if hasattr(self, "_btn_human_voice_refresh"):
+            self._btn_human_voice_refresh.setEnabled(True)
+        if hasattr(self, "_btn_human_voice_validate"):
+            self._btn_human_voice_validate.setEnabled(self._human_voice_supported())
+        self._refresh_human_voice_diagnostics()
+        if hasattr(self, "_lbl_sound_status") and self._buzzer_suppressed_for_human_voice() and bool(getattr(self.config.sound, "enabled", True)):
+            self._set_label_content(
+                self._lbl_sound_status,
+                f"ESP32 buzzer muted while human voice mode is enabled | {SOUND_PERSONALITY_LABELS.get(personality, 'Sentinel')} {attitude_pct}% | Volume {volume_pct}%",
+                self._status_text_style("neutral"),
+            )
+        self._sound_engine.set_profile(personality, attitude_pct)
+        self._sync_human_speech_engine()
+
+    def _set_optional_toggle_availability(self, button: QPushButton, *, available: bool, on_label: str, off_label: str, unavailable_label: str) -> None:
+        if not available:
+            button.blockSignals(True)
+            button.setChecked(False)
+            button.blockSignals(False)
+            button.setEnabled(False)
+            button.setText(unavailable_label)
+            return
+        button.setEnabled(True)
+        button.setText(on_label if button.isChecked() else off_label)
+
+    def _apply_bridge_capability_controls(self, bridge_caps: dict) -> None:
+        caps_age = bridge_caps.get("age_s") if isinstance(bridge_caps, dict) else None
+        caps_source = str((bridge_caps or {}).get("source") or "inactive") if isinstance(bridge_caps, dict) else "inactive"
+
+        led_available = True
+        laser_available = True
+        trigger_servo_available = True
+        if caps_age is not None:
+            led_available = bridge_caps.get("led_relay_assigned") is not False
+            laser_available = bridge_caps.get("laser_relay_assigned") is not False
+            trigger_servo_available = bridge_caps.get("trigger_servo_assigned") is not False
+
+        if hasattr(self, "_btn_led"):
+            self._set_optional_toggle_availability(
+                self._btn_led,
+                available=led_available,
+                on_label="LED: ON",
+                off_label="LED: OFF",
+                unavailable_label="LED: N/A",
+            )
+            if not led_available:
+                self._led_on = False
+        if hasattr(self, "_btn_laser"):
+            self._set_optional_toggle_availability(
+                self._btn_laser,
+                available=laser_available,
+                on_label="Laser: ON",
+                off_label="Laser: OFF",
+                unavailable_label="Laser: N/A",
+            )
+            if not laser_available:
+                self._laser_on = False
+
+        if hasattr(self, "_lbl_optional_outputs_status"):
+            if caps_age is None and caps_source == "waiting":
+                text = "Optional outputs: waiting for bridge capability packet"
+                style = "font-weight: bold; color: #97a8b8; font-size: 10px;"
+            elif caps_age is None:
+                text = "Optional outputs: capability-driven availability is only shown in bridge mode"
+                style = "font-weight: bold; color: #97a8b8; font-size: 10px;"
+            else:
+                parts = []
+                parts.append("LED assigned" if led_available else "LED unassigned")
+                parts.append("Laser assigned" if laser_available else "Laser unassigned")
+                text = "Optional outputs: " + " • ".join(parts)
+                style = "font-weight: bold; color: #8fe3c4; font-size: 10px;" if (led_available or laser_available) else "font-weight: bold; color: #97a8b8; font-size: 10px;"
+            self._set_label_content(self._lbl_optional_outputs_status, text, style)
+
+        if hasattr(self, "_grp_trigger_servo"):
+            self._grp_trigger_servo.setEnabled(trigger_servo_available)
+        if hasattr(self, "_lbl_trigger_servo_status"):
+            if caps_age is None and caps_source == "waiting":
+                text = "Trigger-servo path: waiting for bridge capability packet"
+                style = "font-weight: bold; color: #97a8b8; font-size: 10px;"
+            elif caps_age is None:
+                text = "Trigger-servo path: capability-driven availability is only shown in bridge mode"
+                style = "font-weight: bold; color: #97a8b8; font-size: 10px;"
+            elif trigger_servo_available:
+                text = "Trigger-servo path: assigned and configurable"
+                style = "font-weight: bold; color: #8fe3c4; font-size: 10px;"
+            else:
+                text = "Trigger-servo path: unassigned on current Waveshare map; water or MOSFET fire path still works"
+                style = "font-weight: bold; color: #97a8b8; font-size: 10px;"
+            self._set_label_content(self._lbl_trigger_servo_status, text, style)
 
     def _refresh_sound_toggle_text(self) -> None:
         if hasattr(self, "_chk_sound_enabled"):
@@ -10654,6 +15898,161 @@ class SentryV2TabWidget(QWidget):
         self._save_config_quietly()
         if bool(getattr(self.config.sound, "enabled", True)) and self._sound_volume_pct() > 0:
             self._sound_engine.note_settings_changed()
+
+    def _on_sound_personality_changed(self, index: int) -> None:
+        if not hasattr(self, "_combo_sound_personality"):
+            return
+        personality = str(self._combo_sound_personality.itemData(index) or "sentinel").strip().lower()
+        if personality not in SOUND_PERSONALITY_LABELS:
+            personality = "sentinel"
+        self.config.sound.personality = personality
+        self._sync_sound_widgets()
+        self._save_config_quietly()
+        self._note_sound_settings_changed()
+
+    def _on_sound_attitude_changed(self, value: int) -> None:
+        self.config.sound.attitude_pct = int(max(0, min(100, int(value))))
+        self._sync_sound_widgets()
+        self._save_config_quietly()
+        self._note_sound_settings_changed()
+
+    def _on_human_voice_enabled_changed(self, checked: bool) -> None:
+        self.config.sound.human_voice_enabled = bool(checked)
+        self._set_human_voice_runtime_state("ready" if checked else "disabled")
+        self._sync_sound_widgets()
+        self._save_config_quietly()
+        if checked:
+            self._speak_human_phrase("Human voice speech is now enabled.")
+
+    def _on_human_voice_style_changed(self, index: int) -> None:
+        if not hasattr(self, "_combo_human_voice_style"):
+            return
+        style_key = str(self._combo_human_voice_style.itemData(index) or "neutral").strip().lower()
+        self._apply_human_voice_style(style_key)
+
+    def _on_mute_buzzer_for_human_voice_changed(self, checked: bool) -> None:
+        self.config.sound.mute_buzzer_when_human_voice_enabled = bool(checked)
+        self._sync_sound_widgets()
+        self._save_config_quietly()
+
+    def _on_human_voice_name_changed(self, index: int) -> None:
+        if not hasattr(self, "_combo_human_voice"):
+            return
+        voice_name = str(self._combo_human_voice.itemData(index) or "").strip()
+        self.config.sound.human_voice_name = voice_name
+        self._sync_sound_widgets()
+        self._save_config_quietly()
+
+    def _on_human_voice_rate_changed(self, value: int) -> None:
+        self.config.sound.human_voice_rate_pct = int(max(50, min(150, int(value))))
+        self._sync_sound_widgets()
+        self._save_config_quietly()
+
+    def _on_human_voice_pitch_changed(self, value: int) -> None:
+        self.config.sound.human_voice_pitch_pct = int(max(50, min(150, int(value))))
+        self._sync_sound_widgets()
+        self._save_config_quietly()
+
+    def _on_human_voice_volume_changed(self, value: int) -> None:
+        self.config.sound.human_voice_volume_pct = int(max(0, min(100, int(value))))
+        self._sync_sound_widgets()
+        self._save_config_quietly()
+
+    def _on_test_human_voice_clicked(self) -> None:
+        if not self._human_voice_supported():
+            self._set_human_voice_runtime_state("unavailable")
+            self._log("Human voice test unavailable: Qt text-to-speech is not ready")
+            return
+        if not bool(getattr(self.config.sound, "human_voice_enabled", False)):
+            self.config.sound.human_voice_enabled = True
+            self._sync_sound_widgets()
+            self._save_config_quietly()
+        test_voice = self._human_voice_name() or (self._speech_voice_names[0] if self._speech_voice_names else "default voice")
+        style_label = str(HUMAN_VOICE_STYLE_PRESETS.get(self._human_voice_style_key(), HUMAN_VOICE_STYLE_PRESETS["neutral"])["label"])
+        if self._speak_human_phrase(f"Hello. Smart Sentry human voice mode is online. Voice {test_voice}. Style {style_label}."):
+            self._log(f"Human voice test started using {test_voice} ({style_label})")
+        else:
+            self._log("Human voice test failed to start")
+
+    def _on_test_human_voice_fallback_clicked(self) -> None:
+        if not self._human_voice_supported():
+            self._set_human_voice_runtime_state("unavailable")
+            self._log("Fallback voice test unavailable: Qt text-to-speech is not ready")
+            return
+        if not bool(getattr(self.config.sound, "human_voice_enabled", False)):
+            self.config.sound.human_voice_enabled = True
+            self._set_human_voice_runtime_state("ready")
+            self._sync_sound_widgets()
+            self._save_config_quietly()
+        phrase = "This is the Smart Sentry fallback voice check. If you hear this, Windows SAPI playback is working."
+        if self._speak_human_phrase(phrase):
+            self._log("Fallback voice phrase started")
+        else:
+            self._log("Fallback voice phrase failed to start")
+
+    def _on_stop_human_voice_clicked(self) -> None:
+        self._stop_human_speech()
+        self._refresh_human_voice_diagnostics()
+        self._log("Human voice playback stopped")
+
+    def _on_refresh_human_voice_diagnostics_clicked(self) -> None:
+        self._refresh_human_voice_diagnostics()
+        self._log(
+            f"Voice diagnostics: backend={self._human_voice_backend_summary()} voice={self._human_voice_name() or 'default voice'} state={getattr(self, '_speech_state_label', 'waiting')} buzzer_muted={self._buzzer_suppressed_for_human_voice()}"
+        )
+
+    def _on_validate_human_voices_clicked(self) -> None:
+        if not self._human_voice_supported():
+            self._set_human_voice_runtime_state("unavailable")
+            if hasattr(self, "_lbl_human_voice_diag_validation"):
+                self._lbl_human_voice_diag_validation.setText("Validation: Qt text-to-speech is unavailable in the current runtime")
+            self._log("Voice validation unavailable: Qt text-to-speech is not ready")
+            return
+        if not bool(getattr(self.config.sound, "human_voice_enabled", False)):
+            self.config.sound.human_voice_enabled = True
+            self._set_human_voice_runtime_state("ready")
+            self._sync_sound_widgets()
+            self._save_config_quietly()
+        app = QApplication.instance()
+        engine = getattr(self, "_speech_engine", None)
+        original_voice = self._human_voice_name()
+        results: List[str] = []
+        for voice_name in list(getattr(self, "_speech_voice_names", []) or []):
+            index = self._combo_human_voice.findData(voice_name) if hasattr(self, "_combo_human_voice") else -1
+            if index >= 0:
+                self._combo_human_voice.setCurrentIndex(index)
+                self._on_human_voice_name_changed(index)
+            else:
+                self.config.sound.human_voice_name = str(voice_name)
+                self._sync_human_speech_engine()
+            started = self._speak_human_phrase(f"Voice validation. {voice_name}.")
+            deadline = time.time() + 0.18
+            while app is not None and time.time() < deadline:
+                app.processEvents()
+            engine_voice = ""
+            if engine is not None and hasattr(engine, "voice"):
+                try:
+                    engine_voice = str(engine.voice().name() or "").strip()
+                except Exception:
+                    engine_voice = ""
+            state_label = str(getattr(self, "_speech_state_label", "waiting") or "waiting")
+            accepted = bool(started and engine_voice.lower() == str(voice_name).strip().lower() and state_label in {"speaking", "ready", "paused"})
+            status_text = "accepted by Qt" if accepted else f"check state={state_label} engine={engine_voice or 'none'}"
+            results.append(f"{voice_name}: {status_text}")
+            self._stop_human_speech()
+        if original_voice:
+            restore_index = self._combo_human_voice.findData(original_voice) if hasattr(self, "_combo_human_voice") else -1
+            if restore_index >= 0:
+                self._combo_human_voice.setCurrentIndex(restore_index)
+                self._on_human_voice_name_changed(restore_index)
+            else:
+                self.config.sound.human_voice_name = original_voice
+                self._sync_human_speech_engine()
+        self._refresh_human_voice_diagnostics()
+        summary = "Validation: " + " | ".join(results) if results else "Validation: no voices were available to test"
+        if hasattr(self, "_lbl_human_voice_diag_validation"):
+            self._lbl_human_voice_diag_validation.setText(summary + " | This confirms Qt voice selection and speech-state transitions, not physical speaker audibility.")
+        self._log(summary)
 
     def _suppress_motion_detection(self, seconds: Optional[float] = None) -> None:
         suppress_for = self.config.detection_mode.motion_ignore_after_move_s if seconds is None else seconds
@@ -10832,6 +16231,9 @@ class SentryV2TabWidget(QWidget):
     def _refresh_status(self) -> None:
         """Periodic status label update."""
         stats = self.engine.get_engagement_stats()
+        feedback = self._comm.get_servo_feedback_snapshot()
+        io_runtime = self._comm.get_io_runtime_snapshot()
+        bridge_caps = self._comm.get_bridge_caps_snapshot()
 
         detector_error = str(getattr(self, "_last_detector_error", "") or "").strip()
         if detector_error and detector_error != getattr(self, "_last_detector_error_seen", ""):
@@ -10850,22 +16252,26 @@ class SentryV2TabWidget(QWidget):
 
         state_name = str(stats['state'] or 'PAUSED').strip().upper()
         motion_enabled = bool(stats.get('motion_enabled', True))
-        state_color = {
-            'PAUSED': '#97a8b8',
-            'GUARDING': '#7cc7ff',
-            'ENGAGING': '#8fe3c4',
-            'RETURNING': '#ffd27a',
-        }.get(state_name, '#dce9f7')
+        state_level = {
+            'PAUSED': 'neutral',
+            'GUARDING': 'info',
+            'ENGAGING': 'ok',
+            'RETURNING': 'warn',
+        }.get(state_name, 'info')
         self._set_label_content(
             self._lbl_state,
-            f"<span style='font-size:18px; font-weight:700;'>{state_name}</span><br>"
-            f"<span style='font-size:10px; color:#9fb4c9;'>Pan/Tilt {'ON' if motion_enabled else 'OFF'}</span>",
-            f"color: {state_color};",
+            self._status_two_line_markup(
+                state_name,
+                f"Pan/Tilt {'ON' if motion_enabled else 'OFF'}",
+                primary_color=self._theme_tokens()["status_neutral"],
+                secondary_color=self._status_meta_color(),
+            ),
+            self._status_text_style(state_level, compact=False),
         )
 
         visible_targets = int(stats.get('targets_visible', 0) or 0)
         qualified_targets = int(stats.get('targets_qualified', 0) or 0)
-        engaged_targets = int(stats.get('engagements_total', 0) or 0)
+        active_engagements = int(stats.get('active_engagements', 0) or 0)
         if state_name in {"GUARDING", "RETURNING"} and visible_targets <= 0:
             self._sound_engine.note_guard_tick(
                 scanning=bool(
@@ -10877,11 +16283,12 @@ class SentryV2TabWidget(QWidget):
             )
         self._set_label_content(
             self._lbl_stats,
-            "<span style='font-size:16px; font-weight:700;'>"
-            f"{visible_targets}</span><span style='font-size:10px; color:#9fb4c9;'> vis</span>  "
-            f"<span style='font-size:16px; font-weight:700;'>{qualified_targets}</span><span style='font-size:10px; color:#9fb4c9;'> ready</span>  "
-            f"<span style='font-size:16px; font-weight:700;'>{engaged_targets}</span><span style='font-size:10px; color:#9fb4c9;'> eng</span>",
-            "color: #8fe3c4;",
+            self._status_metric_markup([
+                (visible_targets, "vis"),
+                (qualified_targets, "ready"),
+                (active_engagements, "active"),
+            ]),
+            self._status_text_style('ok', compact=False),
         )
         if hasattr(self, "_lbl_motion_gate"):
             if not motion_enabled:
@@ -10901,32 +16308,58 @@ class SentryV2TabWidget(QWidget):
                 f"{gate_text} | Lock {int(stats.get('aim_lock_frames', 0) or 0)} | "
                 f"Move {int(getattr(self, '_last_tracking_move_time_ms', 0))}ms | "
                 f"Suppress {float(getattr(self, '_last_tracking_suppression_s', 0.0)):.2f}s",
-                f"font-weight: bold; color: {gate_color}; font-size: 10px;",
+                f"font-weight: bold; color: {gate_color}; font-size: {self._theme_tokens()['status_font_pt']:.2f}pt;",
             )
         current_pan = float(self.engine.current_pan)
         current_tilt = float(self.engine.current_tilt)
+        feedback_age = feedback.get("age_s")
+        feedback_pan = feedback.get("pan_deg")
+        feedback_tilt = feedback.get("tilt_deg")
+        feedback_live = (
+            feedback_pan is not None
+            and feedback_tilt is not None
+            and feedback_age is not None
+            and float(feedback_age) <= 1.5
+        )
+        display_pan = float(feedback_pan) if feedback_live else current_pan
+        display_tilt = float(feedback_tilt) if feedback_live else current_tilt
         guard = self.config.guard
         pan_span = max(0.1, float(guard.pan_max) - float(guard.pan_min))
         tilt_span = max(0.1, float(guard.tilt_max) - float(guard.tilt_min))
-        pan_progress = int(max(0, min(1000, round(((current_pan - float(guard.pan_min)) / pan_span) * 1000.0))))
-        tilt_progress = int(max(0, min(1000, round(((current_tilt - float(guard.tilt_min)) / tilt_span) * 1000.0))))
-        self._set_label_content(self._lbl_angles, f"Pan {current_pan:.1f}°  [{guard.pan_min:.0f}..{guard.pan_max:.0f}]")
+        pan_progress = int(max(0, min(1000, round(((display_pan - float(guard.pan_min)) / pan_span) * 1000.0))))
+        tilt_progress = int(max(0, min(1000, round(((display_tilt - float(guard.tilt_min)) / tilt_span) * 1000.0))))
+        pan_source_text = "meas" if feedback_live else "est"
+        tilt_source_text = "meas" if feedback_live else "est"
+        self._set_label_content(self._lbl_angles, f"Pan {display_pan:.1f}° ({pan_source_text})  [{guard.pan_min:.0f}..{guard.pan_max:.0f}]")
         self._bar_pan_status.setValue(pan_progress)
         if hasattr(self, "_lbl_angles_controls"):
             commanded_pan = float(getattr(self, "_last_commanded_pan", current_pan))
             commanded_tilt = float(getattr(self, "_last_commanded_tilt", current_tilt))
             self._set_label_content(
                 self._lbl_angles_controls,
-                f"Tilt {current_tilt:.1f}°  [{guard.tilt_min:.0f}..{guard.tilt_max:.0f}]   Cmd {commanded_pan:.1f}/{commanded_tilt:.1f}°",
+                f"Tilt {display_tilt:.1f}° ({tilt_source_text})  [{guard.tilt_min:.0f}..{guard.tilt_max:.0f}]   Cmd {commanded_pan:.1f}/{commanded_tilt:.1f}°",
             )
             self._bar_tilt_status.setValue(tilt_progress)
-        feedback = self._comm.get_servo_feedback_snapshot()
-        io_runtime = self._comm.get_io_runtime_snapshot()
+        caps_age = bridge_caps.get("age_s")
+        switch_supported = None
+        if caps_age is not None:
+            switch_supported = bridge_caps.get("switch_supported")
+        safety_text = "LOCKED"
+        trigger_text = "Water"
+        switch_text = None
+        hw_arm_text = None
+        fire_blocked = True
+        current_fault = None
+        hw_arm_enabled_value = None
+        switch_in_value = None
+
         if hasattr(self, "_lbl_hw_safety"):
             io_age = io_runtime.get("age_s")
             io_is_live = io_age is not None and float(io_age) <= 2.0
             safety_value = io_runtime.get("safety") if io_is_live else None
             mode_value = io_runtime.get("mode") if io_is_live else None
+            switch_in_value = io_runtime.get("switch_in") if io_is_live else None
+            hw_arm_enabled_value = io_runtime.get("hw_arm_enabled") if io_is_live else None
             current_fault = io_runtime.get("current_fault") if io_is_live else None
             if safety_value is None:
                 safety_text = "ARMED" if self._safety_armed else "LOCKED"
@@ -10936,12 +16369,20 @@ class SentryV2TabWidget(QWidget):
                 trigger_text = "Projectile" if self.config.engagement.trigger_mode_bb else "Water"
             else:
                 trigger_text = "Projectile" if int(mode_value) == 1 else "Water"
+            switch_text = None if switch_in_value is None else ("CLOSED" if int(switch_in_value) != 0 else "OPEN")
+            hw_arm_text = None if hw_arm_enabled_value is None else ("ENABLED" if int(hw_arm_enabled_value) != 0 else "BLOCKED")
             fire_blocked = (safety_text != "ARMED") or bool(current_fault)
+            if switch_supported is True and hw_arm_enabled_value is not None and int(hw_arm_enabled_value) == 0:
+                fire_blocked = True
 
         if hasattr(self, "_lbl_sound_status"):
             sound_enabled = bool(getattr(self.config.sound, "enabled", True))
+            sound_personality = SOUND_PERSONALITY_LABELS.get(self._sound_personality_key(), "Sentinel")
             if not sound_enabled:
                 sound_text = "Sound disabled"
+                sound_color = "#97a8b8"
+            elif self._buzzer_suppressed_for_human_voice():
+                sound_text = "ESP32 buzzer muted while human voice mode is enabled"
                 sound_color = "#97a8b8"
             else:
                 sound_text = self._comm.sound_transport_info()
@@ -10953,22 +16394,45 @@ class SentryV2TabWidget(QWidget):
                     sound_color = "#ffae42"
             self._set_label_content(
                 self._lbl_sound_status,
-                f"{sound_text} | Volume {self._sound_volume_pct()}%",
-                f"font-weight: bold; color: {sound_color}; font-size: 10px;",
+                f"{sound_text} | {sound_personality} {self._sound_attitude_pct()}% | Volume {self._sound_volume_pct()}%",
+                self._status_text_style("ok" if sound_color == "#8fe3c4" else "warn" if sound_color == "#ffd27a" else "error" if sound_color == "#ffae42" else "neutral"),
             )
-            fire_path_text = "BLOCKED" if fire_blocked else "CLEAR"
+            if current_fault is not None and bool(current_fault):
+                fire_path_text = "FAULT TRIPPED"
+            elif switch_supported is True and hw_arm_enabled_value is not None and int(hw_arm_enabled_value) == 0:
+                fire_path_text = "SWITCH OPEN"
+            elif safety_text != "ARMED":
+                fire_path_text = "SAFETY LOCKED"
+            elif switch_supported is False:
+                fire_path_text = "SOFTWARE ARMED"
+            elif hw_arm_enabled_value is not None and int(hw_arm_enabled_value) != 0:
+                fire_path_text = "PHYSICALLY ARMED"
+            else:
+                fire_path_text = "READY UNKNOWN"
             if current_fault is None:
                 current_fault_text = "unknown"
-                color = "#ffd27a" if safety_text == "ARMED" else "#ff8a7a"
+                safety_color = "#ffd27a" if safety_text == "ARMED" and not fire_blocked else "#ff8a7a"
             else:
                 current_fault_text = "TRIPPED" if bool(current_fault) else "clear"
-                color = "#ff8a7a" if bool(current_fault) or safety_text != "ARMED" else "#8fe3c4"
+                safety_color = "#ff8a7a" if fire_blocked else "#8fe3c4"
+            status_parts = [f"Safety {safety_text}", trigger_text, f"Fault {current_fault_text}"]
+            if switch_supported is True and switch_text is not None:
+                status_parts.append(f"Switch {switch_text}")
+            if switch_supported is True and hw_arm_text is not None:
+                status_parts.append(f"HW arm {hw_arm_text}")
+            elif switch_supported is False:
+                status_parts.append("No HW switch")
             self._set_label_content(
                 self._lbl_hw_safety,
-                f"<span style='font-size:18px; font-weight:700;'>{fire_path_text}</span><br>"
-                f"<span style='font-size:10px; color:#9fb4c9;'>Safety {safety_text} • {trigger_text} • Fault {current_fault_text}</span>",
-                f"color: {color};",
+                self._status_two_line_markup(
+                    fire_path_text,
+                    " • ".join(status_parts),
+                    primary_color=safety_color,
+                    secondary_color=self._status_meta_color(),
+                ),
+                f"color: {safety_color};",
             )
+
         if hasattr(self, "_lbl_hw_servo_health"):
             feedback_age = feedback.get("age_s")
             diag_age = feedback.get("diag_age_s")
@@ -11003,18 +16467,48 @@ class SentryV2TabWidget(QWidget):
             self._set_label_content(
                 self._lbl_hw_servo_health,
                 f"Servo {status_word} • {voltage_text} • {load_text} • {age_text}",
-                f"font-weight: bold; color: {color}; font-size: 10px;",
+                self._status_text_style("ok" if color == "#8fe3c4" else "warn" if color == "#ffd27a" else "neutral"),
             )
+
         if hasattr(self, "_lbl_hw_current"):
             io_age = io_runtime.get("age_s")
             io_is_live = io_age is not None and float(io_age) <= 2.0
             pan_m_a = io_runtime.get("pan_mA") if io_is_live else None
+            pan_m_a_valid = io_runtime.get("pan_mA_valid") if io_is_live else None
             tilt_m_a = io_runtime.get("tilt_mA") if io_is_live else None
+            tilt_m_a_valid = io_runtime.get("tilt_mA_valid") if io_is_live else None
             total_m_a = io_runtime.get("total_mA") if io_is_live else None
+            total_m_a_valid = io_runtime.get("total_mA_valid") if io_is_live else None
             current_fault = io_runtime.get("current_fault") if io_is_live else None
-            if pan_m_a is None and tilt_m_a is None and total_m_a is None:
+            pan_supported = bridge_caps.get("current_pan_supported") if caps_age is not None else None
+            tilt_supported = bridge_caps.get("current_tilt_supported") if caps_age is not None else None
+            total_supported = bridge_caps.get("current_total_supported") if caps_age is not None else None
+
+            def _current_field_text(label: str, value: object, valid: object, supported: object) -> str:
+                if valid is False or supported is False:
+                    return f"{label} n/a"
+                if value is not None:
+                    return f"{label} {int(value)}mA"
+                return f"{label} waiting"
+
+            has_any_current_state = any(
+                item is not None
+                for item in (
+                    pan_m_a,
+                    tilt_m_a,
+                    total_m_a,
+                    pan_m_a_valid,
+                    tilt_m_a_valid,
+                    total_m_a_valid,
+                    pan_supported,
+                    tilt_supported,
+                    total_supported,
+                )
+            )
+
+            if not has_any_current_state:
                 if io_runtime.get("source") in ("esp32-state", "esp32-ack"):
-                    text = "Current: firmware state has no live mA yet"
+                    text = "Current: runtime is live but this firmware has not exposed current telemetry metadata yet"
                     color = "#ffd27a"
                 elif io_runtime.get("source") == "waiting":
                     text = "Current: waiting for ESP32 state"
@@ -11023,12 +16517,206 @@ class SentryV2TabWidget(QWidget):
                     text = "Current: unavailable in this connection mode"
                     color = "#97a8b8"
             else:
-                pan_text = f"Pan {int(pan_m_a)}mA" if pan_m_a is not None else "Pan n/a"
-                tilt_text = f"Tilt {int(tilt_m_a)}mA" if tilt_m_a is not None else "Tilt n/a"
-                total_text = f"Total {int(total_m_a)}mA" if total_m_a is not None else "Total n/a"
+                pan_text = _current_field_text("Pan", pan_m_a, pan_m_a_valid, pan_supported)
+                tilt_text = _current_field_text("Tilt", tilt_m_a, tilt_m_a_valid, tilt_supported)
+                total_text = _current_field_text("Total", total_m_a, total_m_a_valid, total_supported)
                 text = f"Current: {pan_text} | {tilt_text} | {total_text}"
-                color = "#ff8a7a" if bool(current_fault) else "#8fe3c4"
-            self._set_label_content(self._lbl_hw_current, text, f"font-weight: bold; color: {color}; font-size: 10px;")
+                if bool(current_fault):
+                    color = "#ff8a7a"
+                elif False in (pan_m_a_valid, tilt_m_a_valid, total_m_a_valid, pan_supported, tilt_supported, total_supported):
+                    color = "#ffd27a"
+                else:
+                    color = "#8fe3c4"
+            self._set_label_content(self._lbl_hw_current, text, self._status_text_style("error" if color == "#ff8a7a" else "ok" if color == "#8fe3c4" else "warn" if color == "#ffd27a" else "neutral"))
+
+        if hasattr(self, "_lbl_bridge_runtime"):
+            io_age = io_runtime.get("age_s")
+            io_is_live = io_age is not None and float(io_age) <= 2.0
+            switch_in = io_runtime.get("switch_in") if io_is_live else None
+            hw_arm_enabled = io_runtime.get("hw_arm_enabled") if io_is_live else None
+            control_source_mode = str(io_runtime.get("control_source_mode") or "") if io_is_live else ""
+            control_source_active = str(io_runtime.get("control_source_active") or "") if io_is_live else ""
+            if switch_supported is False and caps_age is not None:
+                age_text = f"age {float(io_age):.1f}s" if io_age is not None else "age --"
+                source_text = f" • src {control_source_active or control_source_mode}" if (control_source_active or control_source_mode) else ""
+                text = f"Bridge: NO HARDWARE SWITCH • software safety only{source_text} • {age_text}"
+                color = "#8fe3c4" if not fire_blocked else "#ffd27a"
+            elif switch_in is None and hw_arm_enabled is None:
+                source = str(io_runtime.get("source") or "inactive")
+                if source in ("esp32-state", "esp32-ack"):
+                    text = "Bridge: runtime live but this firmware has not reported switch/interlock fields"
+                    color = "#ffd27a"
+                elif source == "waiting":
+                    text = "Bridge: waiting for switch runtime"
+                    color = "#97a8b8"
+                else:
+                    text = "Bridge: inactive in this connection mode"
+                    color = "#97a8b8"
+            else:
+                switch_text = "closed" if int(switch_in or 0) != 0 else "open"
+                age_text = f"age {float(io_age):.1f}s" if io_age is not None else "age --"
+                headline = "PHYSICALLY ARMED" if int(hw_arm_enabled or 0) != 0 else "TRIGGER BLOCKED BY HARDWARE"
+                source_text = f" • src {control_source_active or control_source_mode}" if (control_source_active or control_source_mode) else ""
+                text = f"Bridge: {headline} • switch {switch_text}{source_text} • {age_text}"
+                color = "#8fe3c4" if int(hw_arm_enabled or 0) != 0 else "#ff8a7a"
+            self._set_label_content(self._lbl_bridge_runtime, text, self._status_text_style("error" if color == "#ff8a7a" else "ok" if color == "#8fe3c4" else "warn" if color == "#ffd27a" else "neutral"))
+
+        if hasattr(self, "_lbl_bridge_warning"):
+            io_age = io_runtime.get("age_s")
+            io_is_live = io_age is not None and float(io_age) <= 2.0
+            hw_arm_enabled = io_runtime.get("hw_arm_enabled") if io_is_live else None
+            switch_in = io_runtime.get("switch_in") if io_is_live else None
+            if caps_age is not None and switch_supported is False:
+                text = "Bridge warning: none, hardware interlock is disabled in current firmware"
+                level = "ok"
+            elif caps_age is not None and hw_arm_enabled is not None and int(hw_arm_enabled) == 0:
+                switch_state = "OPEN" if int(switch_in or 0) == 0 else "UNKNOWN"
+                text = f"Bridge warning: trigger path blocked by hardware interlock ({switch_state})"
+                level = "error"
+            elif caps_age is not None and hw_arm_enabled is not None and int(hw_arm_enabled) != 0:
+                text = "Bridge warning: none, physical arm path is enabled"
+                level = "ok"
+            elif caps_age is not None:
+                text = "Bridge warning: waiting for live switch/interlock state"
+                level = "warn"
+            elif io_runtime.get("source") in ("esp32-state", "esp32-ack"):
+                text = "Bridge warning: firmware runtime is live but no capability packet has been seen yet"
+                level = "warn"
+            else:
+                text = "Bridge warning: unavailable in this connection mode"
+                level = "neutral"
+            self._set_label_content(self._lbl_bridge_warning, text, self._status_text_style(level, badge=True))
+
+        if hasattr(self, "_lbl_bridge_caps"):
+            caps_source = str(bridge_caps.get("source") or "inactive")
+            pins = bridge_caps.get("pins") or {}
+            switch_role = str(bridge_caps.get("switch_role") or "")
+            if caps_age is not None:
+                role = str(bridge_caps.get("role") or "bridge")
+                sound_text = "sound on" if bool(bridge_caps.get("sound_supported")) else "sound off"
+                header_text = "header locked" if bool(bridge_caps.get("header_reference_locked")) else "header open"
+                rc_supported = bridge_caps.get("rc_input_supported")
+                rc_planned = str(bridge_caps.get("rc_input_planned") or "")
+                rc_rx_pin = pins.get("header_rc_uart_rx_planned")
+                rc_switch_channel = bridge_caps.get("rc_source_switch_channel")
+                if rc_supported is True:
+                    rc_text = "rc on"
+                elif rc_planned:
+                    if rc_rx_pin is not None and rc_switch_channel is not None:
+                        rc_text = f"fs-ia6 plan H{rc_rx_pin}/CH{rc_switch_channel}"
+                    elif rc_rx_pin is not None:
+                        rc_text = f"rc plan H{rc_rx_pin}"
+                    else:
+                        rc_text = "rc planned"
+                else:
+                    rc_text = "rc off"
+                trigger_pin = pins.get("header_trigger_mosfet")
+                switch_pin = pins.get("header_switch_in")
+                if trigger_pin is not None and switch_supported is True and switch_pin is not None:
+                    pin_text = f"trig H{trigger_pin} • switch H{switch_pin}"
+                elif trigger_pin is not None and switch_supported is False:
+                    pin_text = f"trig H{trigger_pin} • no hw switch"
+                elif pins:
+                    pin_text = "gpio map published"
+                else:
+                    pin_text = "header pins partial"
+                if switch_supported is True and switch_role:
+                    text = f"Caps: {role} • {sound_text} • {rc_text} • {header_text} • {switch_role} • {pin_text}"
+                else:
+                    text = f"Caps: {role} • {sound_text} • {rc_text} • {header_text} • {pin_text}"
+                color = "#8fe3c4"
+            elif caps_source == "waiting":
+                text = "Caps: waiting for bridge capability packet"
+                color = "#97a8b8"
+            elif io_runtime.get("source") in ("esp32-state", "esp32-ack"):
+                text = "Caps: runtime is live but this firmware has not sent a capability packet"
+                color = "#ffd27a"
+            else:
+                text = "Caps: unavailable in this connection mode"
+                color = "#97a8b8"
+            self._set_label_content(self._lbl_bridge_caps, text, self._status_text_style("ok" if color == "#8fe3c4" else "neutral"))
+        self._apply_bridge_capability_controls(bridge_caps)
+        if hasattr(self, "_btn_control_source"):
+            io_age = io_runtime.get("age_s")
+            io_is_live = io_age is not None and float(io_age) <= 2.0
+            runtime_mode = str(io_runtime.get("control_source_mode") or "") if io_is_live else ""
+            runtime_active = str(io_runtime.get("control_source_active") or "") if io_is_live else ""
+            if runtime_mode in ("app", "rc"):
+                checked = runtime_mode == "rc"
+                if self._btn_control_source.isChecked() != checked:
+                    self._btn_control_source.blockSignals(True)
+                    self._btn_control_source.setChecked(checked)
+                    self._btn_control_source.blockSignals(False)
+                self._control_source_mode = runtime_mode
+                self._btn_control_source.setText(f"Control Source: {'FLYSKY' if checked else 'APP'}")
+            if hasattr(self, "_lbl_control_source_status"):
+                rc_link_active = io_runtime.get("rc_link_active") if io_is_live else None
+                rc_override_active = io_runtime.get("rc_override_active") if io_is_live else None
+                rc_failsafe_active = io_runtime.get("rc_failsafe_active") if io_is_live else None
+                rc_frame_age_ms = io_runtime.get("rc_frame_age_ms") if io_is_live else None
+                rc_channels = io_runtime.get("rc_channels") if io_is_live else {}
+                if runtime_mode:
+                    detail = f"Mode {runtime_mode.upper()}"
+                    if runtime_active:
+                        detail += f" • active {runtime_active.upper()}"
+                    if rc_link_active is not None:
+                        detail += f" • rc link {'ON' if bool(rc_link_active) else 'OFF'}"
+                    if rc_override_active is not None:
+                        detail += f" • override {'ON' if bool(rc_override_active) else 'OFF'}"
+                    if rc_failsafe_active is not None:
+                        detail += f" • failsafe {'ON' if bool(rc_failsafe_active) else 'OFF'}"
+                    if rc_frame_age_ms is not None:
+                        detail += f" • {int(rc_frame_age_ms)}ms"
+                    if isinstance(rc_channels, dict) and rc_channels:
+                        ch4 = rc_channels.get("ch4_us")
+                        ch5 = rc_channels.get("ch5_us")
+                        ch6 = rc_channels.get("ch6_us")
+                        channel_parts = []
+                        if ch4 is not None:
+                            channel_parts.append(f"CH4 {int(ch4)}")
+                        if ch5 is not None:
+                            channel_parts.append(f"CH5 {int(ch5)}")
+                        if ch6 is not None:
+                            channel_parts.append(f"CH6 {int(ch6)}")
+                        if channel_parts:
+                            detail += " • " + " / ".join(channel_parts)
+                    style = "font-weight: bold; color: #8fe3c4; font-size: 10px;" if runtime_mode == "rc" else "font-weight: bold; color: #97a8b8; font-size: 10px;"
+                    self._set_label_content(self._lbl_control_source_status, f"FlySky mode: {detail}", style)
+                else:
+                    self._set_label_content(self._lbl_control_source_status, "FlySky mode: waiting for bridge runtime", "font-weight: bold; color: #97a8b8; font-size: 10px;")
+            if hasattr(self, "_lbl_fire_interlock_status"):
+                io_age = io_runtime.get("age_s")
+                io_is_live = io_age is not None and float(io_age) <= 2.0
+                hw_arm_enabled = io_runtime.get("hw_arm_enabled") if io_is_live else None
+                switch_in = io_runtime.get("switch_in") if io_is_live else None
+                current_fault = io_runtime.get("current_fault") if io_is_live else None
+                if switch_supported is False:
+                    if current_fault is not None and bool(current_fault):
+                        text = "Manual fire interlock: blocked by fault"
+                        style = self._status_text_style("error")
+                    elif safety_text != "ARMED":
+                        text = "Manual fire interlock: software safety still locked"
+                        style = self._status_text_style("warn")
+                    else:
+                        text = "Manual fire interlock: ready, no hardware switch configured"
+                        style = self._status_text_style("ok")
+                elif hw_arm_enabled is None:
+                    text = "Manual fire interlock: waiting for bridge hardware state"
+                    style = self._status_text_style("neutral")
+                elif current_fault is not None and bool(current_fault):
+                    text = "Manual fire interlock: blocked by fault"
+                    style = self._status_text_style("error")
+                elif int(hw_arm_enabled) == 0:
+                    switch_state = "open" if int(switch_in or 0) == 0 else "not enabled"
+                    text = f"Manual fire interlock: blocked, switch {switch_state}"
+                    style = self._status_text_style("error")
+                elif safety_text != "ARMED":
+                    text = "Manual fire interlock: hardware ready, software safety still locked"
+                    style = self._status_text_style("warn")
+                else:
+                    text = "Manual fire interlock: ready, press FIRE to command trigger path"
+                    style = self._status_text_style("ok")
+                self._set_label_content(self._lbl_fire_interlock_status, text, style)
         if hasattr(self, "_lbl_servo_feedback"):
             feedback_age = feedback.get("age_s")
             feedback_pan = feedback.get("pan_deg")
@@ -11042,38 +16730,49 @@ class SentryV2TabWidget(QWidget):
                     self._lbl_servo_feedback,
                     f"Feedback {status_word} • Meas {float(feedback_pan):.1f}/{float(feedback_tilt):.1f}° • "
                     f"Err {pan_err:+.1f}/{tilt_err:+.1f}° • age {float(feedback_age):.2f}s",
-                    "font-weight: bold; color: #ffd27a; font-size: 10px;" if is_stale else "font-weight: bold; color: #8fe3c4; font-size: 10px;",
+                    self._status_text_style("warn" if is_stale else "ok"),
                 )
             else:
                 source = str(feedback.get("source") or "inactive")
                 last_error = str(feedback.get("last_error") or "").strip()
+                commanded_pose_time = float(getattr(self, "_last_commanded_pose_time_s", 0.0) or 0.0)
+                commanded_pan = float(getattr(self, "_last_commanded_pan", current_pan))
+                commanded_tilt = float(getattr(self, "_last_commanded_tilt", current_tilt))
+                command_age_s = max(0.0, time.time() - commanded_pose_time) if commanded_pose_time > 0.0 else None
                 if source == "waiting":
                     message = last_error or "Waiting for first servo feedback reply"
-                    color = "#ffd27a"
+                    style = self._status_text_style("warn")
                 elif source == "disconnected":
                     message = "Disconnected"
-                    color = "#97a8b8"
+                    style = self._status_text_style("neutral")
                 else:
                     message = "Inactive in this connection mode"
-                    color = "#97a8b8"
-                self._set_label_content(self._lbl_servo_feedback, f"Feedback: {message}", f"font-weight: bold; color: {color}; font-size: 10px;")
+                    style = self._status_text_style("neutral")
+                if command_age_s is not None:
+                    self._set_label_content(
+                        self._lbl_servo_feedback,
+                        f"Feedback pending • Cmd {commanded_pan:.1f}/{commanded_tilt:.1f}° • UI {current_pan:.1f}/{current_tilt:.1f}° • {message} • age {command_age_s:.2f}s",
+                        style,
+                    )
+                else:
+                    self._set_label_content(self._lbl_servo_feedback, f"Feedback: {message}", style)
         blocked_mask = str(stats.get('no_fire_mask') or '')
         if hasattr(self, "_lbl_no_fire_status"):
             if blocked_mask:
-                self._set_label_content(self._lbl_no_fire_status, f"No-fire: blocked by {blocked_mask}", "font-weight: bold; color: #ff8a7a; font-size: 10px;")
+                self._set_label_content(self._lbl_no_fire_status, f"No-fire: blocked by {blocked_mask}", self._status_text_style("error"))
             else:
-                self._set_label_content(self._lbl_no_fire_status, "No-fire: clear", "font-weight: bold; color: #8fe3c4; font-size: 10px;")
+                self._set_label_content(self._lbl_no_fire_status, "No-fire: clear", self._status_text_style("ok"))
         if hasattr(self, "_lbl_recovery_status"):
             loss_phase = str(stats.get('loss_recovery_phase') or '').strip()
             if loss_phase:
                 phase_text = loss_phase.replace('_', ' ').title()
                 reacquire_note = str(stats.get('reacquire_note') or '').strip()
                 if reacquire_note:
-                    self._set_label_content(self._lbl_recovery_status, f"Recovery: {phase_text} • {reacquire_note}", "font-weight: bold; color: #ffd27a; font-size: 10px;")
+                    self._set_label_content(self._lbl_recovery_status, f"Recovery: {phase_text} • {reacquire_note}", self._status_text_style("warn"))
                 else:
-                    self._set_label_content(self._lbl_recovery_status, f"Recovery: {phase_text}", "font-weight: bold; color: #ffd27a; font-size: 10px;")
+                    self._set_label_content(self._lbl_recovery_status, f"Recovery: {phase_text}", self._status_text_style("warn"))
             else:
-                self._set_label_content(self._lbl_recovery_status, "Recovery: idle", "font-weight: bold; color: #97a8b8; font-size: 10px;")
+                self._set_label_content(self._lbl_recovery_status, "Recovery: idle", self._status_text_style("neutral"))
         if blocked_mask != self._last_blocked_mask_seen:
             if blocked_mask:
                 self._log(f"No-fire mask active: {blocked_mask}")
@@ -11089,10 +16788,8 @@ class SentryV2TabWidget(QWidget):
             self._last_reacquire_note_seen = reacquire_note
             self._log(f"Tracking {reacquire_note}")
         # Update last-command diagnostic in connection tab
-        if hasattr(self, "_lbl_last_cmd"):
-            cmd = self._comm._last_cmd
-            if cmd:
-                self._set_label_content(self._lbl_last_cmd, f"Last: {cmd}")
+        if hasattr(self, "_lbl_last_cmd") and self._last_visible_command_text:
+            self._set_label_content(self._lbl_last_cmd, f"Last: {self._last_visible_command_text}", SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE)
         
         # Update PIR status display in Guard tab
         if hasattr(self, "_lbl_pir_status"):

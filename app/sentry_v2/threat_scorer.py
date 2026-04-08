@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — Threat Scorer
+SMART SENTRY V3 — Threat Scorer
 
 Assigns a 0-1 threat score to each qualified detection using a weighted
 formula.  Optionally refines scores with a small ML model (sklearn MLP)
@@ -18,6 +18,7 @@ Scoring factors:
 from __future__ import annotations
 
 import math
+import importlib
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -26,15 +27,11 @@ from typing import Dict, List, Optional, Set, Tuple
 from .sentry_v2_config import ThreatScoringConfig, TargetFilterConfig
 from .target_filter import DetectedObject
 
-# Optional ML import — graceful fallback to pure weighted scoring
-_HAS_SKLEARN = False
-try:
-    from sklearn.neural_network import MLPRegressor  # type: ignore
-    import pickle
-
-    _HAS_SKLEARN = True
-except ImportError:
-    pass
+def _sklearn_available() -> bool:
+    try:
+        return importlib.util.find_spec("sklearn") is not None
+    except Exception:
+        return False
 
 
 @dataclass
@@ -86,9 +83,9 @@ class ThreatScorer:
 
         # Optional ML model
         self._ml_model: object = None
-        if scoring_cfg.use_ml_model and _HAS_SKLEARN:
+        if scoring_cfg.use_ml_model and _sklearn_available():
             self._load_ml_model(scoring_cfg.ml_model_path)
-        elif scoring_cfg.use_ml_model and not _HAS_SKLEARN:
+        elif scoring_cfg.use_ml_model and not _sklearn_available():
             self._log_ml_warning(
                 "ML scoring requested but scikit-learn is not installed; using weighted scoring only",
                 once_key="missing_sklearn",
@@ -128,9 +125,9 @@ class ThreatScorer:
         self.filter_cfg = filter_cfg
         
         # Hot-reload ML model if enabled and path changed or toggled on
-        if scoring_cfg.use_ml_model and _HAS_SKLEARN:
+        if scoring_cfg.use_ml_model and _sklearn_available():
             self._load_ml_model(scoring_cfg.ml_model_path)
-        elif scoring_cfg.use_ml_model and not _HAS_SKLEARN:
+        elif scoring_cfg.use_ml_model and not _sklearn_available():
             self._log_ml_warning(
                 "ML scoring requested but scikit-learn is not installed; using weighted scoring only",
                 once_key="missing_sklearn",
@@ -255,9 +252,10 @@ class ThreatScorer:
     # ------------------------------------------------------------------ #
 
     def _load_ml_model(self, path: str) -> None:
-        if not _HAS_SKLEARN:
+        if not _sklearn_available():
             return
         try:
+            import pickle
             from pathlib import Path as _P
 
             p = _P(path)
@@ -269,8 +267,9 @@ class ThreatScorer:
             self._log_ml_warning(f"Failed to load ML model from {path}", exc, once_key=f"load:{path}")
 
     def save_ml_model(self, path: str) -> None:
-        if self._ml_model is None or not _HAS_SKLEARN:
+        if self._ml_model is None or not _sklearn_available():
             return
+        import pickle
         from pathlib import Path as _P
 
         p = _P(path)
@@ -287,9 +286,11 @@ class ThreatScorer:
         labels: 0-1 threat score (1 = should engage, 0 = ignore)
         Returns True on success.
         """
-        if not _HAS_SKLEARN or len(features_list) < 10:
+        if not _sklearn_available() or len(features_list) < 10:
             return False
         try:
+            from sklearn.neural_network import MLPRegressor  # type: ignore
+
             model = MLPRegressor(
                 hidden_layer_sizes=(16, 8),
                 max_iter=500,

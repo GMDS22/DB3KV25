@@ -1,9 +1,9 @@
 # SMART SENTRY V2 — COMPLETE REFERENCE MANUAL
 
-> **Version:** 2.1.0  
+> **Version:** 2.3.2  
 > **Module Path:** `app/sentry_v2/`  
-> **Last Updated:** 2026-04-04  
-> **Status:** Verified against current implementation; Smart Sentry v2 runs as a standalone app, keeps its canonical runtime settings in `app/config/sentry_v2_settings.json`, mirrors a legacy nested settings copy for compatibility, supports quick-start startup deferral, includes procedural sound controls with transport-aware status, and exposes runtime snapshot export in the live UI.
+> **Last Updated:** 2026-04-08  
+> **Status:** Verified against the current standalone Smart Sentry v2.3.2 implementation. The canonical runtime settings file is `app/config/smart_sentry_v2_3_2_settings.json`; older settings paths remain compatibility fallbacks only. The live UI now includes the rest-position workflow, visible `Wake Up` / `Go Rest` controls, smooth guided home/rest motion tuning, procedural sound with transport-aware status, read-only runtime/log export actions, adaptive after-target-loss recovery, hidden Shift+wheel panel zoom, and PIR cue confirmation that immediately advances into an offset search when no target is found at the cue point.
 
 ---
 
@@ -34,17 +34,20 @@
 Smart Sentry v2 is a standalone turret control application launched from the DB3000 launcher. Its **detection logic**, **serial/UDP communication**, **camera ownership**, and **state machine** are self-contained inside `app/sentry_v2/`.
 
 - **Standalone camera ownership:** Smart Sentry opens and owns its own camera or stream source
-- **Separate runtime settings:** Smart Sentry persists to `app/config/sentry_v2_settings.json`
+- **Separate runtime settings:** Smart Sentry persists to `app/config/smart_sentry_v2_3_2_settings.json` and mirrors older files only for compatibility
 - **One-app-at-a-time workflow:** Smart Sentry and the main app may use the same COM values, but never at the same time
 
 On single-camera systems, Smart Sentry should normally use camera index `0` unless the operator explicitly selects another camera or stream source.
 
 ### Recent Verified Standalone Upgrades
 
-- **Quick startup policy:** launch can defer auto camera open, auto-connect, and YOLO load until the operator requests them
+- **Quick startup policy:** launch defers auto camera open and auto-connect, then performs a later lazy YOLO auto-load so startup stays responsive without leaving YOLO permanently unloaded
 - **Sound system:** procedural non-blocking buzzer cues now route through `sound_engine.py` and `SentryV2Comm` with transport-aware status and persisted volume
+- **Voice output modes:** Smart Sentry now supports both robot buzzer cues and optional human-like local speech through Qt text-to-speech, so identity alerts and assistant replies can use either path or both together
 - **Runtime diagnostics:** the status area now includes pinned hardware-monitor cards plus a live sound-link readout
-- **Snapshot export:** the Controls page can write timestamped JSON and Markdown runtime snapshots under the repo snapshot folder
+- **Runtime data export:** the Controls page can write timestamped JSON and Markdown runtime captures under the repo snapshot folder and expose a direct open-folder action for the saved files
+- **Operator expansion:** the live settings surface now includes Facial Recognition, Shortcut Keys, and AI Assistant tabs plus a pinned top-row `Quick Keys` action
+- **Known-face support:** Smart Sentry can now load and persist a lightweight face library, register new identities from images or the current live frame, label recognized faces in the preview, and optionally keep friendly known faces out of the engagement path
 - **Settings compatibility:** the canonical runtime settings file remains authoritative while the legacy nested settings file is kept synchronized for compatibility
 
 ### Verified Current Integration Notes
@@ -58,7 +61,7 @@ On single-camera systems, Smart Sentry should normally use camera index `0` unle
 - **Independent sentry logic:** No reliance on main app detection or serial ports
 - **Single owned video source:** Smart Sentry owns one configured camera/stream source at a time
 - **Self-contained pipeline:** Camera → Detection → Filter → Score → Plan → Engage → Fire
-- **Pluggable connection modes:** 4 hardware topologies supported
+- **Pluggable connection modes:** 5 hardware topologies supported
 - **11 detection modes:** From simple motion to YOLO + color hybrids
 - **4 guard patrol modes:** Static, sweep, waypoint, random scan
 - **Precision PID aiming:** Closed-loop refinement before firing
@@ -70,6 +73,7 @@ SentryV2TabWidget (UI host)
 ├── SentryV2Config        (all settings, persistence)
 ├── SentryV2Comm          (serial/UDP/bus-servo I/O)
 ├── SentryV2Detector      (frame analysis, 11 modes)
+├── FaceIdentityRuntime   (Haar-based face detection + lightweight embeddings)
 ├── SentryV2Engine        (state machine, engagement logic)
 │   ├── TargetFilter      (class/size/zone filtering)
 │   ├── ThreatScorer      (multi-factor threat ranking)
@@ -91,8 +95,9 @@ _grab_frame()
     │
     ▼
 process_frame(frame, raw_boxes)
-    │  _convert_detections() → [DetectedObject, ...]
-    │  engine.update(det_objects, timestamp)
+   │  _raw_detections_to_objects() → [DetectedObject, ...]
+   │  _apply_face_identity_to_objects() → friendly labels + optional engagement suppression
+   │  engine.update(det_objects, timestamp)
     │      │  TargetFilter.filter() → qualified
     │      │  ThreatScorer.score() → sorted TrackedTargets
     │      │  State-specific logic (guard/engage/return)
@@ -127,12 +132,16 @@ All configuration in `@dataclass` structures with JSON save/load.
 | `DetectionModeConfig` | Detection algorithm settings | `detection_mode`, contour area, YOLO area, color preset, custom HSV, motion gate |
 | `TargetFilterConfig` | Class/size/zone filtering | `allowed_classes`, `class_priority`, `min_confidence`, `engagement_zone` |
 | `ThreatScoringConfig` | Threat score weights | 7 weights (proximity, size, confidence, class, speed, persistence, approach) |
-| `EngagementConfig` | Fire/trigger/timing | `min_threat_score`, burst settings, cooldowns, PID gains, auto-trigger |
-| `GuardConfig` | Guard position + patrol | `guard_pan/tilt`, FOV, 4 guard modes, sweep/waypoint/random params |
+| `EngagementConfig` | Fire/trigger/timing | `min_threat_score`, burst settings, cooldowns, PID gains, auto-trigger, adaptive after-loss recovery tuning |
+| `GuardConfig` | Guard, rest, patrol, and guided move behavior | `guard_pan/tilt`, `rest_pan/tilt`, startup/close rest timing, home/rest move speeds, FOV, 4 guard modes, sweep/waypoint/random params |
+| `SoundConfig` | Procedural and spoken audio behavior | buzzer enable, human voice enable, voice selection, voice rate/pitch/volume, rest cues, identity announce cooldown |
+| `FaceRecognitionConfig` | Known-face runtime rules | enable, library path, threshold, min size, friendly suppression, announce, gesture |
+| `AIAssistantConfig` | In-app assistant controls | enable, mode, mode switching, runtime analysis, setting drafts |
+| `ShortcutConfig` | Operator hotkey runtime | enabled flag and quick-reference document path |
 | `ConnectionConfig` | Hardware topology | `connection_type`, ports/bauds, UDP host/port, servo IDs, camera, inversions |
 | `SentryV2Config` | Top-level container | All sub-configs + overlay flags + `save()`/`load()` |
 
-**Persistence:** `app/config/sentry_v2_settings.json` (canonical runtime file, auto-created). A synchronized legacy mirror may also be written to `app/app/config/sentry_v2_settings.json` for compatibility with older paths.
+**Persistence:** `app/config/smart_sentry_v2_3_2_settings.json` (canonical runtime file, auto-created). Compatibility fallbacks and mirrors may also exist at `app/config/smart_sentry_v2_3_1_settings.json`, `app/config/smart_sentry_v3_settings.json`, and `app/config/sentry_v2_settings.json`, but those are not the authoritative live file.
 
 ---
 
@@ -164,13 +173,31 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 4. **Prompted Targets** — prompted-target library and guided target matching tools
 5. **Target Filter** — Class whitelist, confidence threshold, size filter, engagement zone
 6. **Threat AI** — threat-weight tuning and optional ML refinement controls
-7. **Engage** — Burst/cooldown/PID settings, auto-trigger, trigger mode, aim-lock presets
-8. **Guard** — Guard position, patrol mode, sweep/waypoint/random parameters
-9. **Controls** — Manual pan/tilt matrix, sound controls, runtime snapshot export, LED/laser/safety toggles
+7. **Engage** — Burst/cooldown/PID settings, auto-trigger, trigger mode, aim-lock presets, After Target Loss recovery tuning
+8. **Guard** — Guard position, rest position, startup/close rest behavior, PIR guard controls, patrol mode, sweep/waypoint/random parameters, guided home/rest motion tuning
+9. **Theme** — visual preset selection plus live accent, transparency, contrast, radius, and contrast tuning; panel font zoom remains supported through the hidden Shift+wheel shortcut rather than a visible slider
+10. **Controls** — Manual pan/tilt matrix, visible `Wake Up` / `Go Rest` actions, sound controls, runtime data export and open-folder actions, LED/laser/safety toggles
+11. **Facial Recognition** — known-face library controls, image and live-frame registration, friendly-face behavior, runtime thresholding, and recognition testing
+12. **Shortcut Keys** — live shortcut status, assigned key summary, and quick-reference access
+13. **AI Assistant** — rule-based diagnostics, request input, runtime analysis, and safe recommendation tools
 
-**Verified current layout note:** the live UI currently renders 9 settings tabs inside a right-side scroll panel, with a pinned header above the tabs and compact Status/Log areas below rather than as separate tabs.
+**Verified current layout note:** the live UI currently renders 13 icon-forward settings tabs inside a full-height right-side panel, with a pinned header and top-row `Quick Keys` button above the tabs and compact Status/Log areas below the video rather than as separate tabs.
 
-**Verified current runtime note:** the Controls page now includes persisted Sound ON/OFF and volume controls, while the Status area surfaces live sound-link transport state alongside the hardware monitor.
+**Verified current runtime note:** the Controls page now includes persisted Sound ON/OFF and volume controls, visible `Wake Up` / `Go Rest` buttons, read-only runtime data export controls, and an open-folder shortcut for saved exports, while the Status area surfaces live sound-link transport state alongside the hardware monitor. The Serial Output panel now also supports timestamped log export plus a direct open-folder action for AI analysis and troubleshooting.
+
+**Verified current identity note:** the Facial Recognition page persists its face library separately at `app/config/smart_sentry_v2_3_2_faces.json`, uses Haar-cascade face detection plus lightweight DCT and histogram embeddings, and can either label friendly known faces only or keep them out of the engagement stream entirely when that protection is enabled. Recognized names can be announced through the buzzer, the local human voice engine, or both, but the current Controls contract now also supports muting the ESP32 buzzer automatically while human voice mode is enabled so those outputs do not overlap.
+
+**Verified current shortcut note:** the top-row `Quick Keys` button and the Shortcut Keys tab both point operators to `SMART_SENTRY_SHORTCUT_KEYS.md`, and the live shortcut runtime stays window-focused so hotkeys only fire while the Smart Sentry window is active.
+
+**Verified current AI assistant note:** the AI Assistant tab is now a local rule-based assistant surface, not a cloud LLM client. It can summarize runtime state, draft simple recommendations, and apply a small set of safe operator actions from text requests, including home or rest moves, shortcut toggling, face-recognition toggling, and detection-mode changes. In `Conversational Voice` mode it can also speak replies through the local human voice engine, and the color-detection request path now maps to the real Color Detection mode instead of the older hybrid index.
+
+**Verified current Threat AI note:** the Threat AI page now shows saved-data and model status text, exposes an `Open ML Folder` action only when real saved data or model artifacts exist, and includes an operator-facing description of how logged training examples and optional ML refinement interact with the weighted threat scorer.
+
+**Verified current command-status note:** the Connection page still shows the latest manual or operator-scale command result, but automatic tracking moves no longer overwrite that label every frame, so status remains readable during active tracking.
+
+**Verified current loss-recovery note:** when a tracked target drops out, Smart Sentry now captures loss context and chooses between two bounded recovery protocols. `rapid_handoff_search` favors quick transfer toward a stronger visible candidate in crowded scenes, while `persistent_reacquire_search` spends more effort searching around the last known position in sparse scenes. In fixed guard mode, recovery still remains bounded and ends in a return to the configured guard position instead of lingering off-home.
+
+**Runtime export note:** the runtime data export path is intentionally observational only. It records the active runtime state for diagnostics and future AI analysis, but it must not alter the live detector, engine, transport, or firing logic. See `SMART_SENTRY_RUNTIME_DATA_EXPORT.md` for the export contract and guardrails.
 
 ---
 
@@ -232,7 +259,25 @@ Non-blocking procedural sound scheduler used by the standalone UI.
 **Responsibilities:**
 - Queue short tone phrases without blocking the UI or comm worker
 - Apply per-event cooldowns for settings, detection, lock, fire, guard, and PIR cues
+- Encode short robotic identity phrases for recognized names on the same buzzer transport
 - Keep transport details out of the UI by emitting abstract tone requests only
+
+---
+
+### `face_identity.py` (~250 lines)
+Standalone known-face helper for the Smart Sentry runtime.
+
+**Classes:**
+- `FaceIdentityProfile` — persisted identity profile with embeddings and friendly-behavior flags
+- `FaceMatchResult` — one recognition result for the current frame
+- `FaceIdentityLibrary` — JSON-backed face-profile storage
+- `FaceIdentityRuntime` — Haar-cascade face finder and embedding matcher
+
+**Responsibilities:**
+- Persist the face library independently of the main settings JSON
+- Register known faces from imported images or a live frame snapshot
+- Match faces without requiring the unavailable `cv2.face` contrib package
+- Keep the recognition runtime light enough for the current portable environment
 
 ---
 
@@ -284,6 +329,10 @@ Filters raw detections by class, confidence, size, and engagement zone.
 | `center_y` | `float` | Pixel center Y |
 | `frame_width` | `int` | Frame width for normalization |
 | `frame_height` | `int` | Frame height for normalization |
+| `identity_label` | `str` | Recognized person name, if known |
+| `identity_confidence` | `float` | Recognition confidence for the matched identity |
+| `identity_profile_id` | `str` | Back-reference to the saved face profile |
+| `friendly_identity` | `bool` | Whether this identity is marked friendly/family-safe |
 
 **Computed Properties:** `area_ratio`, `norm_cx`, `norm_cy`
 
@@ -508,7 +557,9 @@ Named presets are hue-anchored but shade-tolerant. Moderate darkening or desatur
 
 ### YOLO Model Management
 
-- Models stored in `YOLO_MODELS/` directory (workspace root)
+- Source-side models are stored in `YOLO_MODELS/` at the workspace root
+- Packaged-release operator model drop folder is `F:\SMART SENTRY V2.3.2\YOLO_MODELS`
+- Packaged default fallback weights may also exist under `F:\SMART SENTRY V2.3.2\SMART_SENTRY_V2_3_2_FILES\YOLO_MODELS`
 - Model selector combo box scans for `*.pt` files
 - Load button calls `detector.load_yolo(path)`
 - Class filter text input controls which YOLO classes are detected
@@ -531,8 +582,11 @@ Named presets are hue-anchored but shade-tolerant. Moderate darkening or desatur
 detector.detect(frame, mode)
     → [(x,y,w,h,score,class_id), ...]   6-tuples from detector
     
-_convert_detections(raw, frame_w, frame_h)
+_raw_detections_to_objects(raw, frame_w, frame_h)
     → [DetectedObject, ...]               Structured objects with center/norm
+
+_apply_face_identity_to_objects(frame, detections)
+   → recognized labels + optional friendly suppression
 
 TargetFilter.filter(detections)
     → qualified [DetectedObject, ...]      Class/confidence/size/zone filtered
@@ -622,6 +676,73 @@ The current Smart Sentry v2 aiming controller is now the protected baseline for 
 - “Better” means at minimum: equal or better centering, equal or lower overshoot, no regression in reacquisition continuity, and no regression in fire gating behavior.
 - Cosmetic HUD changes are allowed without changing controller behavior.
 - Tuning or logic changes to the controller should be documented in this manual and logged in `SMART_SENTRY_ISSUE_LOG.md`.
+
+### Adaptive After-Target-Loss Contract
+
+The current target-loss behavior is no longer a single generic recovery sweep. It is an adaptive protocol with explicit context capture and two distinct operator-tunable behaviors. Treat this as a protected behavior contract, not incidental implementation detail.
+
+When an active target is lost, the engine now captures all of the following before it begins recovery:
+
+- the last tracked target id and threat score
+- the last known pan and tilt solution for that target
+- the recent motion direction implied by the target history
+- whether other visible candidates are present at the loss moment
+- whether the scene is sparse or crowded based on the configured crowding threshold
+
+The engine then selects one of two named recovery protocols:
+
+1. `rapid_handoff_search`
+2. `persistent_reacquire_search`
+
+`rapid_handoff_search` is intended for scenes where the original target was lost but another credible target is already visible or appears quickly after loss. Its contract is:
+
+- keep the turret moving in the same general direction for a short pursuit window instead of stopping immediately
+- bias the search just behind and around the loss vector using backoff pan and tilt steps so the turret feels purposeful instead of random
+- allow an immediate handoff if a visible target is stronger than the lost target by at least the configured switch margin
+- finish quickly; it is a handoff-oriented protocol, not a wide-area search
+
+`persistent_reacquire_search` is intended for sparse scenes where nothing equally credible is visible after loss. Its contract is:
+
+- preserve continuity with the lost target instead of immediately abandoning the area
+- keep moving in the last credible motion direction first, then hunt tightly around the last known aim before widening further
+- retry the local search for more passes in sparse scenes than in crowded scenes
+- expand the search pattern outward gradually from the loss anchor rather than jumping to unrelated positions
+- remain bounded; once retry limits are exhausted, the engine must fall through to the normal return behavior
+
+The distinction between these protocols is deliberate and must not be collapsed back into one generic “scan around last target” routine unless the full behavioral contract is revalidated and the manual is updated in the same change.
+
+### Visible-Target Handoff Rule
+
+If a new visible target appears during loss recovery, the engine does not automatically switch every time. The switch contract is:
+
+- the alternative target must be currently visible
+- the alternative target must exceed the lost target context by the configured `loss_switch_score_margin`
+- the persistence bias still matters; recovery should not thrash between short-lived weak detections
+- when a switch is accepted, the recovery state is cleared and the new target becomes the active engagement target immediately
+
+This means the engine now behaves differently in two operator-visible cases:
+
+1. A new target appears and is materially stronger: hand off quickly.
+2. No target appears or only weak candidates appear: keep searching around the last loss anchor for a bounded time.
+
+### Personality Rule
+
+The new recovery behavior includes “personality” controls. These are not cosmetic labels; they intentionally shape how recovery feels:
+
+- `loss_personality_intensity` increases how assertively the search points deviate from a plain symmetric pattern
+- `loss_personality_velocity_bias` biases recovery in the direction the target was already moving
+- `loss_personality_order_variation` allows less rigid point ordering so recovery feels less robotic in a repetitive sense while still remaining deterministic enough for tuning
+
+These controls may alter the path shape and movement feel, but they must not change the safety envelope, firing rules, or the requirement that recovery remains bounded.
+
+### Search Style Rule
+
+The `Search Style (loss + PIR)` control is now a shared runtime preference for both after-target-loss hunting and PIR no-detect behavior.
+
+- `Hunting` keeps the turret near the loss or PIR cue area first, uses a denser near-field pattern, and feels more deliberate.
+- `Fast Reacquire` reduces dwell and broadens early coverage sooner so the system can catch up faster when raw reacquisition speed matters more than movement feel.
+
+This setting is intentionally shared so blind-spot PIR hunting and visual target-loss hunting do not feel like two unrelated movement personalities.
 
 ### Turret Movement
 
@@ -726,6 +847,22 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 | `precision_ki` | `float` | 0.001 | PID integral gain |
 | `precision_kd` | `float` | 0.005 | PID derivative gain |
 | `precision_max_step` | `float` | 1.0 | Max PID correction per tick (degrees) |
+| `adaptive_loss_recovery_enabled` | `bool` | True | Master gate for context-aware after-target-loss behavior |
+| `loss_recovery_protocol_new_target` | `str` | `rapid_handoff_search` | Protocol used when a stronger candidate is visible during loss recovery |
+| `loss_recovery_protocol_no_detection` | `str` | `persistent_reacquire_search` | Protocol used when no strong visible replacement is present |
+| `loss_handoff_pursuit_time_s` | `float` | 0.55 | How long rapid handoff continues along the last target direction before local stepping |
+| `loss_handoff_backoff_pan_deg` | `float` | 3.5 | Pan offset used to search just behind and around the loss vector |
+| `loss_handoff_tilt_step_deg` | `float` | 2.0 | Tilt stepping used during rapid handoff search |
+| `loss_handoff_max_duration_s` | `float` | 1.4 | Maximum total time rapid handoff recovery may spend before resolving |
+| `loss_persistent_retry_passes_sparse` | `int` | 3 | Number of bounded retry passes when the scene is sparse |
+| `loss_persistent_retry_passes_crowded` | `int` | 1 | Number of bounded retry passes when the scene is already crowded |
+| `loss_persistent_expand_scale` | `float` | 1.3 | Multiplier that grows the local search radius on each persistent retry pass |
+| `loss_switch_score_margin` | `float` | 0.08 | Minimum score advantage required before switching to a visible alternative target |
+| `loss_switch_persistence_bias` | `float` | 0.15 | Extra continuity bias that reduces thrash toward brief weak alternatives |
+| `loss_scene_crowding_threshold` | `int` | 3 | Number of credible visible targets considered “crowded” for recovery selection |
+| `loss_personality_intensity` | `float` | 0.35 | Strength of path-shape variation during recovery |
+| `loss_personality_velocity_bias` | `float` | 0.45 | Weight placed on the lost target's recent motion direction |
+| `loss_personality_order_variation` | `float` | 0.2 | Allowed variation in the order recovery points are visited |
 
 ### GuardConfig
 
@@ -733,10 +870,27 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 |---|---|---|---|
 | `guard_pan` | `float` | 90.0 | Home pan position |
 | `guard_tilt` | `float` | 50.0 | Home tilt position |
-| `camera_hfov` | `float` | 60.0 | Horizontal FOV (degrees) |
-| `camera_vfov` | `float` | 45.0 | Vertical FOV (degrees) |
-| `frame_width` | `int` | 640 | Frame width (updated at runtime) |
-| `frame_height` | `int` | 480 | Frame height (updated at runtime) |
+| `rest_pan` | `float` | 90.0 | Rest-position pan; defaults to the home pan when first created |
+| `rest_tilt` | `float` | 50.0 | Rest-position tilt; may be saved below `guard_tilt`/`tilt_min` as long as it remains inside absolute sentry tilt limits |
+| `rest_on_startup_enabled` | `bool` | True | Start in rest after launch once the configured startup delay expires |
+| `rest_on_close_enabled` | `bool` | True | Send the turret to rest before final shutdown/close |
+| `rest_startup_delay_ms` | `int` | 900 | Delay before startup rest begins |
+| `rest_close_timeout_ms` | `int` | 1600 | Grace period allowed for close-time rest movement |
+| `home_move_speed_dps` | `float` | 24.0 | Primary speed used for guided moves back to home or guard |
+| `home_move_approach_speed_dps` | `float` | 11.0 | Slower final-approach speed used near the home target |
+| `rest_move_speed_dps` | `float` | 14.0 | Primary speed used for guided moves into rest |
+| `rest_move_approach_speed_dps` | `float` | 5.0 | Slower final-approach speed used near the rest target |
+| `guided_move_approach_window_deg` | `float` | 18.0 | Distance from the destination where the guided move switches to its approach speed |
+| `pan_min` | `float` | 0.0 | Absolute minimum allowed pan angle |
+| `pan_max` | `float` | 270.0 | Absolute maximum allowed pan angle |
+| `tilt_min` | `float` | 0.0 | Minimum allowed guard/manual tilt bound; rest moves may still use any tilt inside absolute sentry limits |
+| `tilt_max` | `float` | 110.0 | Maximum allowed guard/manual tilt bound |
+| `camera_hfov` | `float` | 78.0 | Horizontal FOV (degrees) |
+| `camera_vfov` | `float` | 44.0 | Vertical FOV (degrees) |
+| `pan_center_bias_deg` | `float` | 0.0 | Horizontal calibration offset applied to pixel-to-pan conversion |
+| `tilt_center_bias_deg` | `float` | 0.0 | Vertical calibration offset applied to pixel-to-tilt conversion |
+| `frame_width` | `int` | 1280 | Frame width (updated at runtime) |
+| `frame_height` | `int` | 720 | Frame height (updated at runtime) |
 | `guard_mode` | `int` | 0 | 0=Static, 1=Sweep, 2=Waypoint, 3=Random |
 | `sweep_pan_min` | `float` | 45.0 | Sweep left limit |
 | `sweep_pan_max` | `float` | 135.0 | Sweep right limit |
@@ -774,6 +928,8 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 | `camera_width` | `int` | 1280 | Requested camera width |
 | `camera_height` | `int` | 720 | Requested camera height |
 | `settings_panel_width` | `int` | 420 | Preferred width of the right-side settings panel |
+| `webcam_zoom_pct` | `int` | 100 | Source zoom applied to live webcam frames before display and detection |
+| `test_source_zoom_pct` | `int` | 100 | Source zoom applied to video-file or test-source frames |
 
 ---
 
@@ -803,8 +959,8 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 │ [Connect]                                               │
 │ ESP32 Serial: ✅  Debug Board: ✅  UDP: —  Servo UDP: —  │
 ├─ Camera ───────────────────────────────────────────────┤
-│ Source: [blank = shared feed]   Width: [1280] Height: [720] │
-│ [Open Camera]   Status: Shared main-app feed or owned camera │
+│ Source: [0 / URL / file path]   Width: [1280] Height: [720] │
+│ [Open Camera]   Status: Owned Smart Sentry source             │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -812,8 +968,104 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 
 - The settings side is currently a scroll area on the right side of the video feed.
 - The settings side is now hosted in a horizontal splitter so operators can resize it against the video feed.
-- A bottom `Panel Width` slider is now available in the settings panel and updates the preferred panel width live.
-- The current implementation also lacks quick-jump navigation between settings sections.
+- The current implementation uses icon-first tabs, large previous/next navigation arrows, a stacked `Wake Up` / `Go Rest` header control, and a pinned `Quick Keys` utility action in the top strip.
+- The earlier bottom `Panel Width` slider is no longer part of the current operator workflow; width is managed by the splitter and persisted settings.
+
+### Guard Tab
+
+The Guard tab now covers four linked operator responsibilities instead of only the original patrol setup:
+
+- home or guard position definition
+- rest-position storage and lifecycle behavior
+- PIR blind-spot cueing and no-detect scanning
+- patrol and random/sweep motion limits
+
+The current live contract is:
+
+- `guard_pan` / `guard_tilt` remain the primary guarded home position.
+- `rest_pan` / `rest_tilt` define a separate parked pose used for startup rest, close-time rest, and manual `Go Rest`.
+- `rest_tilt` is allowed to sit below the normal guard minimum tilt as long as it stays inside the absolute sentry tilt range; the live `Go Rest` path now honors that exception instead of clamping back up to `guard.tilt_min`.
+- startup rest and close rest are optional and timed by `rest_startup_delay_ms` and `rest_close_timeout_ms`.
+- home and rest moves use guided two-stage motion profiles rather than one abrupt speed, with a configurable approach window and separate cruise/approach speeds.
+
+### PIR Guard Behavior
+
+Current PIR guard behavior is cue-first and scan-second:
+
+1. A valid PIR event queues or starts a cue for that sensor's configured pan/tilt.
+2. Smart Sentry slews to the cue point and holds there only for the configured `Cue Hold` time while vision checks the exact cue center.
+3. If no target is confirmed and `scan_on_no_detect` is enabled, the scan begins immediately from a nearby offset point and starts with a localized hunt around the triggered PIR zone.
+4. The duplicated center scan point is intentionally removed when multiple scan points exist because the cue phase already visited the center.
+5. Early PIR hunt points are biased toward the triggered sensor's zone before the wider scan mirrors across the rest of the configured search area.
+6. If a target appears during confirmation or scan, normal engagement resumes. If not, the cue completes and current builds explicitly command the configured guard/home position instead of leaving the turret parked at the last hunt point.
+
+This behavior matters operationally because the turret should no longer appear to sit at one PIR cue for too long, and it should not remain frozen after the PIR hunt finishes. `Cue Hold` is the only intentional pre-hunt dwell. A stationary pause after the hunt itself is not part of the intended contract.
+
+### Theme and Panel Zoom
+
+The Theme page still persists `font_scale_pct`, but the current UI does not expose it as a normal slider. Operators can adjust panel zoom with `Shift` + mouse wheel while the settings panel has focus, or with the dedicated shortcut keys documented in `SMART_SENTRY_SHORTCUT_KEYS.md`. The zoom is clamped to the live supported range and saved back into theme config.
+
+### Controls and Header Actions
+
+The pinned header and Controls page now share the operator workflow for explicit positioning commands:
+
+- `Wake Up` moves from rest toward the configured home position and uses the waking-home sound cue when enabled.
+- `Go Rest` moves to the configured rest position and uses the rest cue when enabled.
+- both actions follow the guided move profile instead of the generic manual jump behavior.
+- manual movement arrows and absolute-position helpers still operate independently of automatic tracking, subject to the live motion-enable gate and transport availability.
+- `Quick Keys` stays visible in the top strip and opens the dedicated shortcut-reference document without changing the header sizing contract.
+- The Controls page now also exposes local human voice controls for Smart Sentry speech output, including enable or disable, speech-style presets, voice choice, rate, pitch, volume, a direct test button, an option to mute the ESP32 buzzer while human voice mode is enabled, and a dedicated Voice Diagnostics group.
+- The Voice Diagnostics group shows the active speech backend, selected voice, current speech state, route note, a one-click fallback phrase, a stop-voice action, a refresh action for logging the current human-voice diagnostic state, and a `Validate Voices` action that confirms each detected Qt voice can be selected and driven into a valid speech state.
+
+### Facial Recognition Tab
+
+The Facial Recognition tab is now a live runtime surface rather than a placeholder.
+
+- It can register identities from imported still images or from the current live frame.
+- The face library is stored separately from the main settings file in `app/config/smart_sentry_v2_3_2_faces.json`.
+- Recognition uses a lightweight Haar-cascade and embedding approach so it works in the current environment where `cv2.face` is not available.
+- Friendly known faces can be announced, greeted with a small friendly gesture, and optionally suppressed from the engagement pipeline.
+- Recognized names are drawn directly on the preview, even when a friendly face is excluded from engagement.
+
+### Shortcut Keys Tab
+
+The Shortcut Keys tab is now the runtime status page for operator hotkeys.
+
+- It exposes one master enable toggle for window-focused shortcuts.
+- It shows the assigned key list inside the app.
+- It mirrors the same quick-reference document opened by the top-row `Quick Keys` button.
+
+### AI Assistant Tab
+
+The AI Assistant tab is now a live local assistant surface.
+
+- It accepts short operator text requests.
+- It can summarize the current runtime state.
+- It can draft safe recommendations.
+- It can apply a small set of rule-based actions such as switching detection mode, moving to home or rest, toggling shortcuts, controlling face recognition, and speaking a live status summary when allowed by the assistant settings.
+- It now includes a `Conversational Voice` mode plus an option to speak replies through the local Qt text-to-speech engine, giving the operator a normal human-style spoken response path without requiring a cloud service.
+- The human voice path now supports speech-style presets such as quiet operator, alert guard, warm greeter, and neutral assistant. Each preset updates the local voice rate, pitch, and volume together so operators can shift the spoken character quickly without hand-tuning every slider.
+- When human voice mode is enabled, the Controls tab can now mute the ESP32 buzzer path so AI speech does not collide with firmware-driven buzzer cues on the integrated board.
+- The newer human-voice and assistant speech controls now carry explicit in-app tooltips so operators can see what each setting validates, changes, or suppresses without leaving the tab.
+
+### Engage Tab
+
+The Engage tab now includes an `After Target Loss` group in the advanced engagement area.
+
+That group is the operator-facing contract for the adaptive recovery system. It currently exposes:
+
+- adaptive loss recovery enable or disable
+- rapid handoff pursuit time
+- handoff backoff pan amount
+- handoff tilt step amount
+- sparse-scene retry count
+- crowded-scene retry count
+- visible-target switch margin
+- scene crowding threshold
+- recovery personality intensity
+- recovery velocity bias
+
+This section is intended to let operators tune how quickly Smart Sentry hands off in dense scenes versus how stubbornly it searches in sparse scenes. Any future UI simplification must preserve the scene-dependent behavior distinction rather than flattening it into one generic timeout control.
 
 ### Detection Tab
 
@@ -842,7 +1094,13 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 - Custom HSV fields exist in config and detector sync, but the current UI does not currently expose manual HSV controls.
 - Precision PID gains and lock thresholds exist in config and engine logic, but the current UI exposes only settle time and max step.
 - YOLO confidence and YOLO class text are live controls, but they are not currently persisted in `SentryV2Config`.
-- The current Motion Gate Threshold slider is present in the UI, but the threshold helper is not currently used by the active hybrid detection paths.
+- The current Motion Gate Threshold slider is live for the active motion-gated hybrid paths. Performance shortcuts are intentionally limited so hybrid and motion-locked modes keep full-resolution gating while pure motion-only modes may use a lighter preprocessing path.
+
+### Scope View
+
+- The toggleable scope overlay is display-only; it does not change detector geometry or fire logic.
+- The current reticle intentionally avoids a filled center marker so the aim point stays unobstructed during live tracking.
+- Normal scope styling is monochrome for visibility: white outer ring, black inner ring, black crosshair arms, and black short tick marks. A temporary fire-flash accent may still appear during active firing feedback.
 
 ---
 
@@ -1012,6 +1270,7 @@ Use this section to assess which files are affected by common modifications.
 |---|---|
 | Modify engagement phases | `sentry_v2_engine.py` — `_update_engaging()` |
 | Change PID gains | `sentry_v2_config.py` — `EngagementConfig` |
+| Change after-target-loss behavior | `sentry_v2_engine.py` — `_capture_loss_recovery_context()`, `_select_loss_recovery_protocol()`, `_update_rapid_handoff_recovery()`, `_update_persistent_recovery()` |
 | Add trigger type | `sentry_v2_comm.py` — `send_fire_burst()` |
 | Update burst UI | `sentry_v2_tab.py` — `_build_engagement_tab()` |
 
@@ -1147,7 +1406,7 @@ boxes = d.detect(frame, 0)  # This should return boxes if there's motion
 
 These are current implementation risks verified during documentation review and runtime probing.
 
-1. **Dead control gap:** the Motion Gate Threshold control is present in the UI but is not currently honored by the live gated hybrid detection methods.
+1. **Tuning gap:** the Motion Gate Threshold control is now live in the active motion-gated hybrid methods, but the best threshold still depends on scene noise, camera gain, and the selected detection stack.
 2. **Hidden config gap:** `engagement_zone`, `show_guard_crosshair`, custom HSV, and several precision-aim settings exist in config and logic, but are still not fully surfaced in the operator UI.
 3. **Persistence gap:** YOLO class text is still a live control rather than a persisted Smart Sentry config field.
 
@@ -1161,7 +1420,7 @@ These are current implementation risks verified during documentation review and 
 |---|---|---|
 | No boxes drawn | Detector returns empty list | Check mode matches algorithm, verify camera is open |
 | Boxes appear but no engagement | Filter rejects all detections | Check `allowed_classes`, `min_confidence`, `engagement_zone` |
-| YOLO mode shows nothing | Model not loaded | Click "Load Model" button, check YOLO_MODELS/ directory |
+| YOLO mode shows nothing | Model not loaded or wrong release folder used | Confirm the model appears in the selector, wait for the lazy startup load or click "Load Model", and check the release-root `YOLO_MODELS/` folder first |
 | Frame diff always empty | No motion in scene | Need actual movement between frames |
 | Color mode misses objects | Wrong preset or poor lighting | Try "custom" preset with manual HSV tuning |
 | BackSub warmup delay | Normal — MOG2 needs 30 frames | Wait ~1 second for background model to stabilize |
@@ -1186,7 +1445,25 @@ These are current implementation risks verified during documentation review and 
 | Doesn't fire at all | Auto-trigger disabled | Enable auto-trigger in Engagement tab |
 | Aims wrong spot | Camera FOV mismatch | Adjust `camera_hfov` / `camera_vfov` in Guard tab |
 | PID oscillation | Gains too high | Lower `precision_kp`, increase `precision_kd` |
+| `Go Rest` stops above the saved rest tilt | Rest tilt is below the normal guard minimum and the saved value or limits are inconsistent | Verify `rest_tilt` is inside the absolute sentry tilt range. The current app allows rest moves below `tilt_min`/guard minimum when executing a rest command. |
+| `Wake Up` / `Go Rest` feels abrupt | Guided move speeds or approach window are too aggressive | Tune `home_move_speed_dps`, `home_move_approach_speed_dps`, `rest_move_speed_dps`, `rest_move_approach_speed_dps`, and `guided_move_approach_window_deg` in Guard settings. |
 | Fire timing looks uneven under heavy load | UI timer jitter can still affect timer-driven burst cadence | Move burst sequencing to a worker or hardware-timed path if stricter cadence is required |
+
+### PIR Guard Issues
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| PIR cue happens but the scan looks like it instantly returned to patrol | The first scan point used to duplicate the already-visited cue center, so no visible offset move occurred | Current builds remove the duplicated center point. If you still see this, confirm you are running the updated build and that `scan_on_no_detect` is enabled. |
+| PIR search starts too late or seems to sit on one cue | `Cue Hold` is too high for the behavior you want | Reduce `Cue Hold` first. Use `Fast Reacquire` if you want the turret to leave the cue earlier and widen sooner. |
+| PIR hunt finishes but the turret stays parked at the last hunt point | Older builds could clear PIR state without issuing an explicit return-home command | Current builds command the configured guard/home position when a no-target PIR hunt completes. If you still see a post-hunt stall, update the build rather than trying to tune around it. |
+| PIR events feel merged across two zones | Cross-sensor lockout is suppressing near-simultaneous overlaps | Reduce `cross_sensor_lockout_ms` only if your sensors are mounted far enough apart to avoid duplicate-trigger churn. |
+
+### UI and Sound Issues
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| Theme page has no visible font-size control | Panel zoom is intentionally hidden in the current UI | Use `Shift` + mouse wheel over the settings panel to change the saved panel zoom. |
+| Sound toggle is on but no cue plays | Active transport does not currently expose the ESP32 buzzer sound path | Check the pinned sound-link status in the Status panel and verify the active WiFi firmware still supports the normal `sound` action path. |
 
 ---
 
@@ -1194,7 +1471,7 @@ These are current implementation risks verified during documentation review and 
 
 ### Highest-Priority Code Fixes
 
-1. Either wire the Motion Gate Threshold into the active hybrid paths or remove the control until it is live.
+1. Bench-tune Motion Gate Threshold defaults per mode so low-light motion scenes do not force operators into repeated manual retuning.
 2. Persist YOLO confidence and YOLO class text in `SentryV2Config`.
 3. Expose engagement-zone editing and guard-crosshair toggles in the operator UI.
 4. Expose custom HSV and precision lock/PID tuning controls in the operator UI.

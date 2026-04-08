@@ -29,10 +29,10 @@ def main() -> int:
 
     from PyQt5.QtCore import QTimer, QSize
     from PyQt5.QtWidgets import QApplication
-    from run_sentry_v2 import SentryV2StandaloneWindow
+    from run_smart_sentry_v2_3_2 import SmartSentryV2_3_2StandaloneWindow
 
     app = QApplication(sys.argv)
-    window = SentryV2StandaloneWindow()
+    window = SmartSentryV2_3_2StandaloneWindow()
     window.show()
 
     def log(message: str) -> None:

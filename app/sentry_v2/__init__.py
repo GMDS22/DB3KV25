@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — Package init
+SMART SENTRY V3 — Package init
 
 Drop-in replacement / companion for the original sentry_mode.
 Import SentryV2TabWidget and add it as a tab in the main app.

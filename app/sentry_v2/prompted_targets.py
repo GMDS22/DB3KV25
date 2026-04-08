@@ -28,6 +28,152 @@ from .sentry_v2_video_canvas import SentryV2VideoCanvas
 from .target_filter import DetectedObject
 
 
+def _fallback_dialog_theme_tokens() -> dict:
+    return {
+        'panel_rgba': 'rgba(27, 21, 18, 0.96)',
+        'surface_rgba': 'rgba(41, 31, 26, 0.94)',
+        'surface_alt_rgba': 'rgba(56, 43, 36, 0.94)',
+        'field_rgba': 'rgba(32, 25, 21, 0.98)',
+        'text': '#f5ede4',
+        'muted': '#cbb8a8',
+        'border': '#8f6c55',
+        'accent': '#e09a5a',
+        'accent_soft': '#c37a45',
+        'accent_mid': 'rgba(224, 154, 90, 0.82)',
+        'button_bg': 'rgba(56, 43, 36, 0.94)',
+        'button_text': '#f5ede4',
+        'button_border': '#8f6c55',
+        'button_hover': 'rgba(88, 63, 47, 0.98)',
+        'button_pressed': 'rgba(43, 33, 28, 0.98)',
+        'primary_button_bg': 'rgba(163, 93, 47, 0.96)',
+        'primary_button_border': '#e09a5a',
+        'primary_button_hover': 'rgba(191, 112, 55, 0.98)',
+        'primary_button_pressed': 'rgba(128, 70, 37, 0.98)',
+        'danger_button_bg': 'rgba(140, 72, 64, 0.96)',
+        'danger_button_border': '#d68376',
+        'danger_button_hover': 'rgba(165, 83, 74, 0.98)',
+        'danger_button_pressed': 'rgba(116, 58, 51, 0.98)',
+        'slider_groove': '#6d5a4c',
+        'scroll_handle': '#b88f73',
+        'radius': 14,
+    }
+
+
+def _resolve_dialog_theme_tokens(parent: Optional[QWidget], theme_tokens: Optional[dict]) -> dict:
+    if isinstance(theme_tokens, dict) and theme_tokens:
+        return dict(theme_tokens)
+    if parent is not None:
+        getter = getattr(parent, '_theme_tokens', None)
+        if callable(getter):
+            try:
+                tokens = getter()
+            except Exception:
+                tokens = None
+            if isinstance(tokens, dict) and tokens:
+                return dict(tokens)
+    return _fallback_dialog_theme_tokens()
+
+
+def _prompted_dialog_stylesheet(tokens: dict) -> str:
+    radius = max(8, int(tokens.get('radius', 14) or 14))
+    radius_small = max(6, radius - 6)
+    radius_medium = max(8, radius - 4)
+    return f"""
+QDialog#promptedMediaSelectionDialog {{
+    background-color: {tokens['panel_rgba']};
+    color: {tokens['text']};
+}}
+QDialog#promptedMediaSelectionDialog QLabel {{
+    color: {tokens['muted']};
+}}
+QDialog#promptedMediaSelectionDialog QLabel#promptedHintLabel,
+QDialog#promptedMediaSelectionDialog QLabel#promptedFrameLabel {{
+    color: {tokens['text']};
+}}
+QDialog#promptedMediaSelectionDialog QWidget#promptedVideoControls {{
+    background-color: {tokens['surface_rgba']};
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_medium}px;
+}}
+QDialog#promptedMediaSelectionDialog QListWidget#promptedSelectionList {{
+    background-color: {tokens['field_rgba']};
+    color: {tokens['text']};
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_small}px;
+    padding: 5px;
+}}
+QDialog#promptedMediaSelectionDialog QListWidget#promptedSelectionList::item:selected {{
+    background-color: {tokens['accent_mid']};
+    color: {tokens['button_text']};
+}}
+QDialog#promptedMediaSelectionDialog QPushButton {{
+    min-height: 30px;
+    padding: 6px 12px;
+    background-color: {tokens['button_bg']};
+    color: {tokens['button_text']};
+    border: 1px solid {tokens['button_border']};
+    border-radius: {radius_medium}px;
+}}
+QDialog#promptedMediaSelectionDialog QPushButton:hover {{
+    background-color: {tokens['button_hover']};
+    border-color: {tokens['accent']};
+}}
+QDialog#promptedMediaSelectionDialog QPushButton:pressed {{
+    background-color: {tokens['button_pressed']};
+    border-color: {tokens['accent_soft']};
+}}
+QDialog#promptedMediaSelectionDialog QPushButton[buttonRole="primary"] {{
+    background-color: {tokens['primary_button_bg']};
+    color: {tokens['button_text']};
+    border-color: {tokens['primary_button_border']};
+    font-weight: 700;
+}}
+QDialog#promptedMediaSelectionDialog QPushButton[buttonRole="primary"]:hover {{
+    background-color: {tokens['primary_button_hover']};
+}}
+QDialog#promptedMediaSelectionDialog QPushButton[buttonRole="primary"]:pressed {{
+    background-color: {tokens['primary_button_pressed']};
+}}
+QDialog#promptedMediaSelectionDialog QPushButton[buttonRole="utility"] {{
+    background-color: {tokens['surface_alt_rgba']};
+}}
+QDialog#promptedMediaSelectionDialog QPushButton[buttonRole="danger"] {{
+    background-color: {tokens['danger_button_bg']};
+    border-color: {tokens['danger_button_border']};
+    color: {tokens['button_text']};
+    font-weight: 700;
+}}
+QDialog#promptedMediaSelectionDialog QPushButton[buttonRole="danger"]:hover {{
+    background-color: {tokens['danger_button_hover']};
+    border-color: {tokens['danger_button_border']};
+}}
+QDialog#promptedMediaSelectionDialog QPushButton[buttonRole="danger"]:pressed {{
+    background-color: {tokens['danger_button_pressed']};
+}}
+QDialog#promptedMediaSelectionDialog QSlider::groove:horizontal {{
+    height: 6px;
+    background: {tokens['slider_groove']};
+    border-radius: 3px;
+}}
+QDialog#promptedMediaSelectionDialog QSlider::handle:horizontal {{
+    width: 16px;
+    margin: -5px 0;
+    background: {tokens['accent']};
+    border: 1px solid {tokens['accent_soft']};
+    border-radius: 8px;
+}}
+QDialog#promptedMediaSelectionDialog QScrollBar:vertical {{
+    width: 12px;
+    background: transparent;
+}}
+QDialog#promptedMediaSelectionDialog QScrollBar::handle:vertical {{
+    background: {tokens['scroll_handle']};
+    min-height: 28px;
+    border-radius: 6px;
+}}
+"""
+
+
 def _clamp_bbox(bbox: Tuple[int, int, int, int], frame_width: int, frame_height: int) -> Tuple[int, int, int, int]:
     x, y, w, h = [int(v) for v in bbox]
     x = max(0, min(int(frame_width) - 1, x))
@@ -198,7 +344,7 @@ class PromptedTargetLibrary:
         if not target_path.exists():
             return cls()
         try:
-            data = json.loads(target_path.read_text(encoding='utf-8'))
+            data = json.loads(target_path.read_text(encoding='utf-8-sig'))
         except Exception:
             return cls()
         profiles = [PromptedTargetProfile.from_dict(item) for item in list(data.get('targets', []))]
@@ -527,11 +673,13 @@ class PromptedMediaSelectionDialog(QDialog):
         title: str,
         image: Optional[np.ndarray] = None,
         video_path: str = '',
+        theme_tokens: Optional[dict] = None,
         parent: Optional[QWidget] = None,
     ):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.resize(980, 720)
+        self.setObjectName('promptedMediaSelectionDialog')
         self._video_path = str(video_path or '')
         self._video_cap: Optional[cv2.VideoCapture] = None
         self._frame_count = 1
@@ -539,52 +687,66 @@ class PromptedMediaSelectionDialog(QDialog):
         self._current_frame: Optional[np.ndarray] = None
         self._base_image = image.copy() if image is not None else None
         self._selections: List[PromptedSelection] = []
+        self._theme_tokens = _resolve_dialog_theme_tokens(parent, theme_tokens)
 
         root = QVBoxLayout(self)
         self._canvas = SentryV2VideoCanvas('Load media to select targets')
+        self._canvas.setObjectName('promptedCanvas')
         self._canvas.setMinimumSize(640, 420)
         self._canvas.set_roi_selection_enabled(True)
         self._canvas.roiSelected.connect(self._on_roi_selected)
         root.addWidget(self._canvas, 1)
 
         self._video_controls = QWidget()
+        self._video_controls.setObjectName('promptedVideoControls')
         video_lay = QGridLayout(self._video_controls)
         self._btn_prev = QPushButton('Prev')
+        self._btn_prev.setProperty('buttonRole', 'utility')
         self._btn_prev.clicked.connect(lambda: self._step_video(-1))
         video_lay.addWidget(self._btn_prev, 0, 0)
         self._btn_next = QPushButton('Next')
+        self._btn_next.setProperty('buttonRole', 'utility')
         self._btn_next.clicked.connect(lambda: self._step_video(1))
         video_lay.addWidget(self._btn_next, 0, 1)
         self._slider = QSlider(Qt.Horizontal)
         self._slider.valueChanged.connect(self._on_slider_changed)
         video_lay.addWidget(self._slider, 0, 2)
         self._lbl_frame = QLabel('Frame 0 / 0')
+        self._lbl_frame.setObjectName('promptedFrameLabel')
         video_lay.addWidget(self._lbl_frame, 0, 3)
         root.addWidget(self._video_controls)
 
         bottom = QHBoxLayout()
         self._selection_list = QListWidget()
+        self._selection_list.setObjectName('promptedSelectionList')
         bottom.addWidget(self._selection_list, 1)
 
         right = QVBoxLayout()
         self._lbl_hint = QLabel('Drag a box on the preview to capture a target example.')
+        self._lbl_hint.setObjectName('promptedHintLabel')
         self._lbl_hint.setWordWrap(True)
         right.addWidget(self._lbl_hint)
-        btn_remove = QPushButton('Remove Last')
-        btn_remove.clicked.connect(self._remove_last_selection)
-        right.addWidget(btn_remove)
-        btn_clear = QPushButton('Clear')
-        btn_clear.clicked.connect(self._clear_selections)
-        right.addWidget(btn_clear)
-        btn_ok = QPushButton('Use Selections')
-        btn_ok.clicked.connect(self.accept)
-        right.addWidget(btn_ok)
-        btn_cancel = QPushButton('Cancel')
-        btn_cancel.clicked.connect(self.reject)
-        right.addWidget(btn_cancel)
+        self._btn_remove = QPushButton('Remove Last')
+        self._btn_remove.setProperty('buttonRole', 'danger')
+        self._btn_remove.clicked.connect(self._remove_last_selection)
+        right.addWidget(self._btn_remove)
+        self._btn_clear = QPushButton('Clear')
+        self._btn_clear.setProperty('buttonRole', 'danger')
+        self._btn_clear.clicked.connect(self._clear_selections)
+        right.addWidget(self._btn_clear)
+        self._btn_ok = QPushButton('Use Selections')
+        self._btn_ok.setProperty('buttonRole', 'primary')
+        self._btn_ok.clicked.connect(self.accept)
+        right.addWidget(self._btn_ok)
+        self._btn_cancel = QPushButton('Cancel')
+        self._btn_cancel.setProperty('buttonRole', 'utility')
+        self._btn_cancel.clicked.connect(self.reject)
+        right.addWidget(self._btn_cancel)
         right.addStretch()
         bottom.addLayout(right)
         root.addLayout(bottom, 1)
+
+        self.setStyleSheet(_prompted_dialog_stylesheet(self._theme_tokens))
 
         if self._video_path:
             self._open_video(self._video_path)

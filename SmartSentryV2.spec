@@ -5,10 +5,7 @@ from PyInstaller.utils.hooks import collect_all
 datas = [
     ('app/sentry_v2', 'app/sentry_v2'),
     ('app/config', 'app/config'),
-    ('app/app/config', 'app/app/config'),
     ('YOLO_MODELS', 'YOLO_MODELS'),
-    ('app/models', 'app/models'),
-    ('app/YOLO_MODELS', 'app/YOLO_MODELS'),
     ('app/LOGO.png', 'app/LOGO.png'),
     ('requirements-sentry-v2-portable.txt', 'requirements-sentry-v2-portable.txt'),
     ('SENTRY_V2_PORTABLE_INCLUDE_LIST.md', 'SENTRY_V2_PORTABLE_INCLUDE_LIST.md'),
@@ -23,7 +20,7 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['app\\run_sentry_v2.py'],
+    ['run.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,
@@ -42,7 +39,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='SMART_SENTRY_V2_0',
+    name='SMART_SENTRY',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -61,5 +58,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='SMART_SENTRY_V2_0',
+    name='SMART_SENTRY',
 )

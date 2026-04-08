@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — Engagement Planner
+SMART SENTRY V3 — Engagement Planner
 
 Given a list of scored targets, decides:
   1. Which targets to engage (above threshold)

@@ -5,23 +5,35 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-DEFAULT_VERSION = "2.0.0"
-DEFAULT_TITLE_PREFIX = "Smart Sentry"
+try:
+    from runtime_paths import runtime_root_path
+except ImportError:
+    from app.runtime_paths import runtime_root_path
+
+DEFAULT_VERSION = "2.3.2"
+DEFAULT_TITLE_PREFIX = "SMART SENTRY"
+
+
+def _read_text_utf8(path: Path) -> str:
+    return path.read_text(encoding="utf-8-sig")
 
 
 def _repo_root() -> Path:
-    # app/db3k_meta.py -> repo root is one level up from /app
-    return Path(__file__).resolve().parent.parent
+    return runtime_root_path()
 
 
 def get_version(default: str = DEFAULT_VERSION) -> str:
     version_files = [
+        _repo_root() / "SMART_SENTRY_V2_3_2_VERSION.txt",
+        _repo_root() / "SMART_SENTRY_V2_3_1_VERSION.txt",
+        _repo_root() / "SMART_SENTRY_V2_3_VERSION.txt",
+        _repo_root() / "SMART_SENTRY_V3_0_VERSION.txt",
         _repo_root() / "SMART_SENTRY_V2_0_VERSION.txt",
         _repo_root() / "DB3K_VERSION.txt",
     ]
     for version_path in version_files:
         try:
-            raw = version_path.read_text(encoding="utf-8").strip()
+            raw = _read_text_utf8(version_path).strip()
             raw = raw.lstrip("vV").strip()
             if raw:
                 return raw
@@ -60,7 +72,7 @@ def _normalize_items(items: Iterable[dict[str, Any]], max_items: int) -> list[Re
 def load_recent_updates(max_items: int = 10) -> list[RecentUpdate]:
     path = _repo_root() / "RECENT_UPDATES.json"
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(_read_text_utf8(path))
         items = data.get("items", [])
         file_max = int(data.get("max_items", max_items) or max_items)
         return _normalize_items(items, min(max_items, file_max))
@@ -72,7 +84,7 @@ def append_recent_update(date: str, title: str, max_items: int = 10) -> None:
     """Optional helper for maintainers/scripts: appends an update and trims to max_items."""
     path = _repo_root() / "RECENT_UPDATES.json"
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(_read_text_utf8(path))
     except Exception:
         data = {"schema": 1, "max_items": max_items, "items": []}
 

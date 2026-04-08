@@ -22,10 +22,10 @@ No major logic changes were introduced.
 - Fix: added repo-relative portable path normalization in save/load path handling.
 - File: app/sentry_v2/sentry_v2_tab.py
 
-4. YOLO discovery did not include tracked model locations used by repository
-- Issue: model scan only checked repo-root YOLO_MODELS and cwd YOLO_MODELS.
-- Fix: added app/YOLO_MODELS and app/models discovery candidates.
-- File: app/sentry_v2/sentry_v2_tab.py
+4. YOLO discovery and release-folder contract drifted from the portable packaging protocol
+- Issue: packaged builds exposed bundled default models only under the versioned support folder, while release docs told operators to use the release-root YOLO_MODELS folder.
+- Fix: restored release-root `YOLO_MODELS` as the public drop folder, kept support-folder defaults as bundled fallbacks, and updated frozen model discovery to prefer the release-root folder while still seeing bundled defaults.
+- File: app/sentry_v2/sentry_v2_tab.py, build_smart_sentry_v2_3_1_portable.ps1
 
 5. Default model name not present in tracked model files
 - Issue: default yolo_model_name was ratdogcat.pt (missing tracked file).
@@ -36,6 +36,16 @@ No major logic changes were introduced.
 - Issue: root requirements referenced missing optional requirements files and did not provide a dedicated Smart Sentry v2 portable manifest.
 - Fix: created dedicated manifest with explicit runtime dependencies.
 - File: requirements-sentry-v2-portable.txt
+
+7. Portable build still depended on manual model copying and could inherit a machine-local YOLO path into the packaged release
+- Issue: the standard build path did not bundle local models by default, the tracked config pointed at a temporary user-folder model path, and packaged settings could land on a dead machine-specific directory.
+- Fix: changed the portable build helper so the default build is the full release, validates local package availability for offline-safe packaging, bundles the local YOLO model tree automatically, mirrors bundled models into the support-folder fallback location, and rewrites packaged configs to the bundled release model directory.
+- File: build_smart_sentry_v2_3_1_portable.ps1, app/config/smart_sentry_v3_settings.json, app/config/sentry_v2_settings.json
+
+8. Python 3.12 plus PyQt5 local runtime drift made source-run stability weaker than the packaged 3.11 path
+- Issue: local PyQt5 installs could reintroduce stale VC runtime DLLs into `PyQt5\Qt5\bin`, and the workspace default editor/build path could drift back to Python 3.12.
+- Fix: standardized the release workflow on Python 3.11 in `.venv311`, added interpreter override support plus 3.11 preference to the portable build helper, pinned VS Code to `.venv311`, and documented removal of the local Qt-bundled VC runtime override DLLs after PyQt reinstall.
+- File: build_smart_sentry_v2_3_1_portable.ps1, .vscode/settings.json, SMART_SENTRY_V2_3_1_COMPILATION_PROTOCOL.md
 
 ## Portable Build Asset Tracking Docs Added
 

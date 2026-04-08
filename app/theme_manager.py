@@ -5,22 +5,21 @@ from PyQt5.QtWidgets import QApplication, QCheckBox
 def get_dark_palette():
     """Creates and returns a dark theme palette for a Qt application."""
     dark_palette = QPalette()
-    dark_palette.setColor(QPalette.Window, QColor(53, 53, 53))
-    dark_palette.setColor(QPalette.WindowText, QColor(255, 255, 255))
-    dark_palette.setColor(QPalette.Base, QColor(42, 42, 42))
-    dark_palette.setColor(QPalette.AlternateBase, QColor(66, 66, 66))
-    # Tooltip colors - light yellow background with black text for readability
-    dark_palette.setColor(QPalette.ToolTipBase, QColor(255, 250, 205))  # Light yellow
-    dark_palette.setColor(QPalette.ToolTipText, QColor(0, 0, 0))  # Black text
-    dark_palette.setColor(QPalette.Text, QColor(255, 255, 255))
-    dark_palette.setColor(QPalette.Button, QColor(53, 53, 53))
-    dark_palette.setColor(QPalette.ButtonText, QColor(255, 255, 255))
-    dark_palette.setColor(QPalette.BrightText, QColor(255, 0, 0))
-    dark_palette.setColor(QPalette.Link, QColor(42, 130, 218))
-    dark_palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-    dark_palette.setColor(QPalette.HighlightedText, QColor(0, 0, 0))
-    dark_palette.setColor(QPalette.Disabled, QPalette.Text, QColor(127, 127, 127))
-    dark_palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(127, 127, 127))
+    dark_palette.setColor(QPalette.Window, QColor(18, 14, 12))
+    dark_palette.setColor(QPalette.WindowText, QColor(243, 236, 228))
+    dark_palette.setColor(QPalette.Base, QColor(23, 18, 15))
+    dark_palette.setColor(QPalette.AlternateBase, QColor(34, 26, 22))
+    dark_palette.setColor(QPalette.ToolTipBase, QColor(253, 226, 176))
+    dark_palette.setColor(QPalette.ToolTipText, QColor(34, 22, 16))
+    dark_palette.setColor(QPalette.Text, QColor(237, 228, 218))
+    dark_palette.setColor(QPalette.Button, QColor(45, 32, 26))
+    dark_palette.setColor(QPalette.ButtonText, QColor(245, 238, 231))
+    dark_palette.setColor(QPalette.BrightText, QColor(216, 109, 95))
+    dark_palette.setColor(QPalette.Link, QColor(242, 166, 90))
+    dark_palette.setColor(QPalette.Highlight, QColor(140, 63, 36))
+    dark_palette.setColor(QPalette.HighlightedText, QColor(255, 245, 238))
+    dark_palette.setColor(QPalette.Disabled, QPalette.Text, QColor(134, 118, 106))
+    dark_palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(134, 118, 106))
     return dark_palette
 
 

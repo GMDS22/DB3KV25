@@ -195,11 +195,11 @@ class SentryV2VideoCanvas(QLabel):
         if target.width() <= 0 or target.height() <= 0:
             return
         pixmap = self._placeholder_pixmap
-        if pixmap.width() > target.width() or pixmap.height() > max(1, target.height() - 48):
-            scaled = pixmap.scaled(target.width(), max(1, target.height() - 48), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        else:
-            scaled = pixmap
+        max_width = max(1, int(target.width() * 0.56))
+        max_height = max(1, int((target.height() - 48) * 0.56))
+        desired = pixmap.scaled(max_width, max_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        scaled = desired if not desired.isNull() else pixmap
         x = (target.width() - scaled.width()) // 2
-        y = max(0, ((target.height() - scaled.height()) // 2) - 12)
+        y = max(0, ((target.height() - scaled.height()) // 2) - 8)
         self._display_rect = QRect(x, y, scaled.width(), scaled.height())
         super().setPixmap(scaled)

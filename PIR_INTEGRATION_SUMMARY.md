@@ -1,8 +1,23 @@
 # PIR Sensor Integration - Complete Implementation Summary
 
-**Date**: December 2024  
-**Status**: ✅ COMPLETE (UI + Firmware + Documentation)  
+**Date**: December 2024, updated for Smart Sentry v2.3.2 on 2026-04-08  
+**Status**: ✅ COMPLETE (UI + Firmware + Documentation) with current runtime deltas documented below  
 **Scope**: 3 PIR motion sensors with toggleable integration across Smart Sentry v2 PC app and ESP32 firmware
+
+---
+
+## Current Runtime Delta For v2.3.2
+
+The original PIR integration remains valid, but the live runtime contract now includes these documented updates:
+
+- Smart Sentry v2 is operated as a standalone app workflow.
+- The canonical current settings file is `app/config/smart_sentry_v2_3_2_settings.json`.
+- The current default three-zone layout is 45°, 135°, and 225° pan with 35° tilt.
+- Current per-sensor debounce default is 500 ms.
+- Current `confirmation_timeout` default is 1.2 s.
+- The cue point is now the confirmation center, and multi-point no-detect scans intentionally begin from the first offset point instead of re-visiting the center again.
+
+When documenting or validating PIR behavior, describe the live cue-confirm-offset-search sequence rather than the older center-revisit interpretation.
 
 ---
 
@@ -73,11 +88,11 @@
 │                                                              │
 │  NEW PIR Monitoring (Optional):                             │
 │  ├─ updatePIRSensors() - Motion edge detection             │
-│  │  ├─ GPIO 35 (PIN_PIR_SENSOR_0) - Left-rear             │
-│  │  ├─ GPIO 34 (PIN_PIR_SENSOR_1) - Front-left            │
-│  │  └─ GPIO 39 (PIN_PIR_SENSOR_2) - Front-right           │
+│  │  ├─ GPIO 35 (PIN_PIR_SENSOR_0) - Zone 0                │
+│  │  ├─ GPIO 34 (PIN_PIR_SENSOR_1) - Zone 1                │
+│  │  └─ GPIO 39 (PIN_PIR_SENSOR_2) - Zone 2                │
 │  ├─ reportPIREvent() - Send telemetry to host              │
-│  └─ Debounce: 200ms per sensor (configurable)              │
+│  └─ Debounce: runtime-configurable per sensor              │
 │                                                              │
 │  Command Parsing:                                           │
 │  ├─ Original: S, M, F, L, R, G (unchanged)                 │
@@ -95,7 +110,7 @@
 Physical Motion at Sensor
         ↓
 ESP32 PIR Input (rising edge)
-        ↓ (debounce 200ms)
+        ↓ (debounce window per sensor)
 reportPIREvent(sensor_id=0, timestamp=...)
         ↓ (serial/UDP to PC)
 sentry_v2_comm receives PIR_EVENT
@@ -105,13 +120,21 @@ engine.on_pir_sensor_fired(sensor_id, timestamp)
 Smart Sentry switches to PIR cue mode
         ↓
 Slew to sensor's configured (Pan, Tilt) cue angle
-        ↓ (wait settle 350ms)
+        ↓ (short cue hold)
 Check camera for targets at cue point
         ↓
 BRANCH 1: Target found → Engage normally (no change)
-BRANCH 2: No target + scan enabled → Run adaptive scan grid
-BRANCH 3: Scan timeout / no target + scan disabled → Return to patrol
+BRANCH 2: No target + scan enabled → Run localized hunt starting from the first offset point, then widen scan coverage, then command guard/home if still no target
+BRANCH 3: Scan timeout / no target + scan disabled → Return to configured guard/home position
 ```
+
+Live scan-start nuance:
+
+- The cue phase already visits the center of the PIR search area.
+- In current builds, `start_scan()` removes that duplicated center point whenever multiple scan points exist.
+- The first several hunt points now stay close to the triggered PIR zone before the wider scan mirrors across the rest of the search area.
+- This makes the first visible search move happen immediately after a no-detect instead of looking like a false return-to-guard or a long pause.
+- After the bounded no-target hunt completes, the engine now explicitly commands the configured guard/home position so a static guard setup cannot remain parked at the last hunt point.
 
 ### Toggle Points
 

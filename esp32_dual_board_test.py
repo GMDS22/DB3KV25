@@ -212,7 +212,7 @@ def main():
         print("=" * 40)
         if all_pass:
             print("🎉 ALL TESTS PASSED - Dual ESP32 setup is working!")
-            print("You can now use Smart Sentry v2 in Dual ESP32 WiFi mode.")
+            print("You can now use SMART SENTRY V3 in Dual ESP32 WiFi mode.")
         else:
             print("❌ SOME TESTS FAILED")
             print("Check that both ESP32 boards are:")

@@ -1,0 +1,106 @@
+SMART SENTRY V2.3.1
+Minimum and Recommended PC Specifications
+
+This guide is for the Windows desktop application build of Smart Sentry v2.3.1.
+It reflects the actual runtime stack used by the app: PyQt5, OpenCV, PyTorch, Ultralytics YOLO, NumPy, scikit-learn, and serial / WiFi device communication.
+
+Important:
+- The app can run without a dedicated GPU, but YOLO detection speed will be lower on CPU-only systems.
+- Performance depends heavily on camera resolution, selected YOLO model, and whether live detection is enabled.
+- Smaller YOLO models such as yolo11n.pt or yolov8n.pt require less hardware than larger models such as yolo11m.pt or yolov8l.pt.
+
+MINIMUM PC SPECIFICATION
+
+Use case:
+- App launches reliably
+- Manual controls, camera preview, serial / WiFi communication, and lighter YOLO models at modest settings
+- Best suited for 720p camera input and smaller YOLO models
+
+Operating System:
+- Windows 10 64-bit or Windows 11 64-bit
+
+Processor:
+- 4 physical cores minimum
+- Intel Core i5 8th Gen or newer
+- AMD Ryzen 5 2000 series or newer
+
+Memory:
+- 8 GB RAM minimum
+
+Graphics:
+- Integrated graphics is acceptable for basic use
+- Dedicated GPU is not required to start or use the app
+
+Storage:
+- SSD strongly preferred
+- At least 20 GB free disk space recommended for the app, model files, logs, and temporary runtime files
+
+USB / Connectivity:
+- At least 2 available USB ports if using camera plus ESP32 / serial hardware
+- WiFi adapter capable of connecting to the Smart Sentry WiFi network
+
+Expected behavior on minimum spec:
+- App should launch and operate
+- Smaller YOLO models can work, but inference may be slow
+- Lower camera resolutions and lighter models are recommended
+
+RECOMMENDED PC SPECIFICATION
+
+Use case:
+- Stable day-to-day Smart Sentry operation
+- Better live YOLO responsiveness
+- Better multitasking with camera feed, UI, logs, and device communication active together
+
+Operating System:
+- Windows 11 64-bit preferred
+- Windows 10 64-bit also supported
+
+Processor:
+- 6 or more physical cores recommended
+- Intel Core i5 10th Gen / Core i7 10th Gen or newer
+- AMD Ryzen 5 5000 series / Ryzen 7 5000 series or newer
+
+Memory:
+- 16 GB RAM recommended
+- 32 GB RAM preferred if running larger YOLO models, high-resolution cameras, or other heavy background software
+
+Graphics:
+- NVIDIA GPU recommended for better YOLO performance
+- GTX 1650 4 GB VRAM or better is a practical baseline
+- RTX 2060 / RTX 3060 class or better is recommended for smoother detection workloads
+- If no dedicated GPU is available, the app can still run, but YOLO detection performance will depend on CPU speed and selected model size
+
+Storage:
+- SSD required in practice for best responsiveness
+- 40 GB free disk space recommended to allow room for logs, snapshots, models, and packaging/runtime support files
+
+USB / Connectivity:
+- USB 3.0 preferred for camera and accessory stability
+- Two WiFi adapters recommended if you want one adapter dedicated to your normal desktop / internet connection and a second adapter dedicated to SMART SENTRY V2.3 WiFi
+
+NETWORKING RECOMMENDATION FOR TWO WIFI DONGLES
+
+If your desktop has two separate WiFi adapters:
+- Use one adapter for your normal home / office / internet network
+- Use the second adapter only for the SMART SENTRY V2.3 WiFi network
+
+Why this is recommended:
+- It avoids forcing the PC to switch between internet access and the Smart Sentry device network
+- It reduces connection conflicts when the Smart Sentry ESP32 WiFi uses its own local AP / device subnet
+- It is the preferred setup if you want the desktop to remain online while also staying connected to Smart Sentry over WiFi
+
+PRACTICAL RECOMMENDATION
+
+For the best balance of cost and reliability, use:
+- Windows 10/11 64-bit
+- 6-core CPU
+- 16 GB RAM
+- SSD
+- NVIDIA GTX 1650 or better if you plan to use YOLO regularly
+- Two separate WiFi adapters if one is dedicated to SMART SENTRY V2.3 WiFi and the other is used for normal desktop networking
+
+NOTES
+
+- If you only need control, camera preview, and lighter testing, the minimum spec is usually enough.
+- If you want more responsive YOLO-based detection, use the recommended spec.
+- If you use larger YOLO models or high-resolution video, the recommended spec should be treated as the baseline.

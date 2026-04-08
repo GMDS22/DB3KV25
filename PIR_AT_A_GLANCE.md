@@ -1,7 +1,25 @@
 # PIR Sensor Integration - At a Glance
 
 **Status**: ✅ COMPLETE  
-**Date**: December 2024
+**Date**: December 2024, updated for Smart Sentry v2.3.2 on 2026-04-09
+
+---
+
+## Current Runtime Notes
+
+For the live Smart Sentry v2.3.2 runtime, keep these updates in mind:
+
+✅ Canonical settings file is now `app/config/smart_sentry_v2_3_2_settings.json`  
+✅ Current default cue layout is 45° / 135° / 225° at 35° tilt  
+✅ Current debounce default is 500 ms per sensor  
+✅ Current confirmation timeout default is 1.2 s  
+✅ Current cue hold default is 0.18 s before local PIR hunting begins  
+✅ Current shared search style default is `Hunting`  
+✅ Current shared hunt-round default is `1`  
+✅ No-detect scans now start from the first offset point after the cue center is checked  
+✅ Completed no-target PIR hunts now command the configured guard/home position instead of parking at the last hunt point  
+
+This means the cue point itself acts as the center confirmation step, but it should not remain there for long. If no target is confirmed there, the search should visibly move away from center immediately and hunt the triggered PIR zone first. After that hunt completes with no target, the turret should head back to guard/home rather than sitting still at the final hunt point.
 
 ---
 
@@ -12,7 +30,7 @@
 ✅ Guard Tab Extended
    ├─ PIR Master Enable/Disable
    ├─ 3 Sensor Configuration (pan/tilt cues)
-   ├─ Scan Behavior Settings (7 parameters)
+   ├─ Scan Behavior Settings (8 parameters)
    └─ Live Status Display
 
 ✅ Python Modules
@@ -56,22 +74,22 @@
 Motion at Sensor 0
         ↓
 ESP32 Detects Rising Edge (GPIO 35)
-        ↓
-Debounce Check (200ms passed?)
+      ↓
+   Debounce Check (sensor debounce passed?)
         ↓
 YES → Send: PIR_EVENT sensor_id=0 timestamp=123456789
         ↓
 PC App Receives Event
         ↓
-Smart Sentry Slews to Configured Angle (270°, 15°)
+   Smart Sentry Slews to Configured Cue Angle
         ↓
-Wait Settle Time (350ms)
+      Brief Cue Hold At PIR Center
         ↓
 Check Camera for Target
         ↓
 ┌─ YES: Engage Normally
-├─ NO + Scan Enabled: Run Adaptive Scan Grid
-└─ NO + Scan Disabled: Return to Guard Patrol
+      ├─ NO + Scan Enabled: Run Local PIR Hunt from first offset point, then widen
+└─ NO + Scan Disabled: Return to configured Guard/Home position
 ```
 
 ---
@@ -123,7 +141,7 @@ S1           → Safety ON (disables everything - unchanged)
 
 ### Saved Locations
 ```
-PC App: app/config/sentry_v2_settings.json
+PC App: app/config/smart_sentry_v2_3_2_settings.json
    └─ Contains: pir_guard { enabled, sensors[], scan settings }
    └─ Auto-saved from Guard tab UI
    └─ Restored on app restart

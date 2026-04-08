@@ -1,5 +1,5 @@
 """
-Smart Sentry v2 — Configuration
+SMART SENTRY V3 — Configuration
 
 All tuneable parameters for the smart sentry system.
 Designed as a dataclass for easy serialization / UI binding.
@@ -60,6 +60,7 @@ class DetectionModeConfig:
     max_contour_area: float = 250000.0
     # --- YOLO-specific (modes 2,4,5,9,10) ---
     yolo_model_name: str = "ratdogcat_last.pt"
+    yolo_model_dir: str = ""
     yolo_min_area: int = 0
     yolo_confidence: float = 0.45
     # --- Color detection (modes 6,7,8,9) ---
@@ -135,7 +136,7 @@ class ThreatScoringConfig:
     # Enable ML-based scoring refinement (requires sklearn)
     use_ml_model: bool = False
     # Path to saved ML model (pickle)
-    ml_model_path: str = "config/sentry_v2_threat_model.pkl"
+    ml_model_path: str = "config/smart_sentry_v3_threat_model.pkl"
 
 
 @dataclass
@@ -224,13 +225,36 @@ class EngagementConfig:
     loss_direction_pursuit_enabled: bool = True
     loss_direction_pursuit_s: float = 0.28
     loss_local_search_enabled: bool = True
-    loss_local_search_pan_deg: float = 3.5
-    loss_local_search_tilt_deg: float = 2.0
+    loss_local_search_pan_deg: float = 45.0
+    loss_local_search_tilt_deg: float = 45.0
     loss_expanding_search_enabled: bool = True
     loss_expanding_search_rings: int = 2
     loss_expanding_search_pan_step_deg: float = 3.0
     loss_expanding_search_tilt_step_deg: float = 1.5
     loss_search_step_interval_s: float = 0.18
+    # Adaptive after-loss search protocols.
+    adaptive_loss_recovery_enabled: bool = True
+    loss_recovery_protocol_new_target: str = "rapid_handoff_search"
+    loss_recovery_protocol_no_detection: str = "persistent_reacquire_search"
+    loss_handoff_pursuit_time_s: float = 0.14
+    loss_handoff_backoff_pan_deg: float = 1.4
+    loss_handoff_tilt_step_deg: float = 0.9
+    loss_handoff_max_duration_s: float = 0.38
+    loss_persistent_retry_passes_sparse: int = 2
+    loss_persistent_retry_passes_crowded: int = 1
+    loss_persistent_expand_scale: float = 1.18
+    loss_switch_score_margin: float = 0.12
+    loss_switch_persistence_bias: float = 0.05
+    loss_scene_crowding_threshold: int = 3
+    loss_personality_intensity: float = 0.35
+    loss_personality_velocity_bias: float = 0.40
+    loss_personality_order_variation: float = 0.30
+    # Shared hunting style for both target-loss and PIR no-detect behavior.
+    # "hunting" favors a careful local-area search, while
+    # "fast_reacquire" trims dwell and broadens early coverage.
+    loss_search_style: str = "hunting"
+    # Shared hunt pass count for target-loss and PIR no-detect searches.
+    loss_search_rounds: int = 1
 
 
 @dataclass
@@ -239,6 +263,17 @@ class GuardConfig:
     # Guard position — where turret rests (degrees)
     guard_pan: float = SENTRY_HOME_PAN
     guard_tilt: float = SENTRY_HOME_TILT
+    rest_pan: float = SENTRY_HOME_PAN
+    rest_tilt: float = SENTRY_HOME_TILT
+    rest_on_startup_enabled: bool = True
+    rest_on_close_enabled: bool = True
+    rest_startup_delay_ms: int = 900
+    rest_close_timeout_ms: int = 1600
+    home_move_speed_dps: float = 24.0
+    home_move_approach_speed_dps: float = 11.0
+    rest_move_speed_dps: float = 14.0
+    rest_move_approach_speed_dps: float = 5.0
+    guided_move_approach_window_deg: float = 18.0
     pan_min: float = SENTRY_PAN_MIN
     pan_max: float = SENTRY_PAN_MAX
     tilt_min: float = SENTRY_TILT_MIN
@@ -331,11 +366,13 @@ class PIRGuardConfig:
     ])
     # Enable adaptive scan when PIR fires but camera doesn't detect
     scan_on_no_detect: bool = True
+    # Short cue-center dwell before the local hunt begins.
+    cue_hold_time_s: float = 0.18
     # Pan sweep range (degrees left/right from cue point)
     # 45° covers the full 90° zone for each sensor (±45° from center)
     scan_pan_range: float = 45.0
     # Tilt sweep range (degrees up/down from cue point)
-    scan_tilt_range: float = 15.0
+    scan_tilt_range: float = 45.0
     # Scan movement speed (degrees per second)
     scan_speed: float = 12.0
     # Time to wait for camera detection after initial slew (seconds)
@@ -347,6 +384,10 @@ class PIRGuardConfig:
     # Ignore near-simultaneous events from different PIR sensors so one target
     # crossing overlapping sensor cones is treated as a single zone hit.
     cross_sensor_lockout_ms: int = 800
+    # Shared hunting style for PIR no-detect search.
+    search_style: str = "hunting"
+    # Shared hunt pass count for target-loss and PIR no-detect searches.
+    search_rounds: int = 1
 
 
 @dataclass
@@ -354,11 +395,68 @@ class SoundConfig:
     """Runtime sound cue settings."""
     enabled: bool = True
     volume_pct: int = 100
+    personality: str = "sentinel"
+    attitude_pct: int = 60
+    rest_cue_enabled: bool = True
+    robot_voice_enabled: bool = True
+    human_voice_enabled: bool = False
+    mute_buzzer_when_human_voice_enabled: bool = True
+    human_voice_name: str = ""
+    human_voice_style: str = "neutral"
+    human_voice_rate_pct: int = 100
+    human_voice_pitch_pct: int = 100
+    human_voice_volume_pct: int = 85
+    name_announce_cooldown_s: float = 18.0
+
+
+@dataclass
+class FaceRecognitionConfig:
+    """Known-face identification and friendly-recognition behavior."""
+    enabled: bool = False
+    library_path: str = "app/config/smart_sentry_v2_3_2_faces.json"
+    recognition_threshold: float = 0.82
+    min_face_size_px: int = 56
+    suppress_known_faces_from_engagement: bool = True
+    announce_known_faces: bool = True
+    cute_gesture_enabled: bool = True
+    gesture_cooldown_s: float = 30.0
+    registration_samples_required: int = 1
+
+
+@dataclass
+class AIAssistantConfig:
+    """Rule-based assistant controls for Smart Sentry diagnostics and guided tuning."""
+    enabled: bool = True
+    mode: str = "guided_tuning"
+    allow_mode_switch: bool = True
+    allow_setting_drafts: bool = True
+    allow_runtime_analysis: bool = True
+    auto_speak_responses: bool = False
+
+
+@dataclass
+class ShortcutConfig:
+    """Global keyboard shortcut preferences."""
+    enabled: bool = True
+    quick_view_doc_path: str = "SMART_SENTRY_SHORTCUT_KEYS.md"
+
+
+@dataclass
+class ThemeConfig:
+    """Runtime theme settings for the SMART SENTRY V3 UI."""
+    preset: str = "ember"
+    accent_strength_pct: int = 100
+    surface_opacity_pct: int = 94
+    video_panel_opacity_pct: int = 100
+    window_opacity_pct: int = 100
+    corner_radius_px: int = 14
+    font_scale_pct: int = 100
+    contrast_pct: int = 100
 
 
 @dataclass
 class ConnectionConfig:
-    """Connection settings for Smart Sentry v2.
+    """Connection settings for SMART SENTRY V3.
 
     Modes:
         0  ESP32 USB only               (single COM)
@@ -397,7 +495,7 @@ class ConnectionConfig:
 
 @dataclass
 class SentryV2Config:
-    """Top-level configuration for Smart Sentry v2."""
+    """Top-level configuration for SMART SENTRY V3."""
     connection: ConnectionConfig = field(default_factory=ConnectionConfig)
     detection_mode: DetectionModeConfig = field(default_factory=DetectionModeConfig)
     target_filter: TargetFilterConfig = field(default_factory=TargetFilterConfig)
@@ -407,6 +505,10 @@ class SentryV2Config:
     no_fire_masks: List[NoFireMaskConfig] = field(default_factory=list)
     pir_guard: PIRGuardConfig = field(default_factory=PIRGuardConfig)
     sound: SoundConfig = field(default_factory=SoundConfig)
+    face_recognition: FaceRecognitionConfig = field(default_factory=FaceRecognitionConfig)
+    ai_assistant: AIAssistantConfig = field(default_factory=AIAssistantConfig)
+    shortcuts: ShortcutConfig = field(default_factory=ShortcutConfig)
+    theme: ThemeConfig = field(default_factory=ThemeConfig)
 
     # --- Overlay / HUD ---
     show_overlay: bool = True
@@ -418,13 +520,21 @@ class SentryV2Config:
     scope_radius_pct: int = 35
     scope_vignette_opacity: int = 60
     settings_panel_width: int = 420
+    main_splitter_sizes: List[int] = field(default_factory=list)
+    layout_splitter_sizes: List[int] = field(default_factory=list)
+    bottom_info_splitter_sizes: List[int] = field(default_factory=list)
+    window_x: int = -1
+    window_y: int = -1
+    window_width: int = 1280
+    window_height: int = 860
+    window_maximized: bool = False
     prompted_targets_enabled: bool = False
     prompted_allow_auto_fire: bool = False
-    prompted_library_path: str = "app/config/sentry_v2_prompted_targets.json"
+    prompted_library_path: str = "app/config/smart_sentry_v2_3_2_prompted_targets.json"
     quick_startup_enabled: bool = True
 
     # --- Persistence ---
-    config_path: str = "app/config/sentry_v2_settings.json"
+    config_path: str = "app/config/smart_sentry_v2_3_2_settings.json"
 
     # ------------------------------------------------------------------ #
     # Serialization helpers
@@ -453,6 +563,13 @@ class SentryV2Config:
         guard.tilt_max = tilt_max
         guard.guard_pan = float(min(pan_max, max(pan_min, guard.guard_pan)))
         guard.guard_tilt = float(min(tilt_max, max(tilt_min, guard.guard_tilt)))
+        guard.rest_pan = float(min(pan_max, max(pan_min, guard.rest_pan)))
+        guard.rest_tilt = float(min(SENTRY_TILT_MAX, max(SENTRY_TILT_MIN, guard.rest_tilt)))
+        guard.home_move_speed_dps = float(max(2.0, guard.home_move_speed_dps))
+        guard.home_move_approach_speed_dps = float(max(1.0, min(guard.home_move_speed_dps, guard.home_move_approach_speed_dps)))
+        guard.rest_move_speed_dps = float(max(2.0, guard.rest_move_speed_dps))
+        guard.rest_move_approach_speed_dps = float(max(1.0, min(guard.rest_move_speed_dps, guard.rest_move_approach_speed_dps)))
+        guard.guided_move_approach_window_deg = float(max(4.0, guard.guided_move_approach_window_deg))
         guard.sweep_pan_min = float(min(pan_max, max(pan_min, guard.sweep_pan_min)))
         guard.sweep_pan_max = float(min(pan_max, max(pan_min, guard.sweep_pan_max)))
         if guard.sweep_pan_min > guard.sweep_pan_max:
@@ -478,6 +595,10 @@ class SentryV2Config:
         ts = ThreatScoringConfig(**d.get("threat_scoring", {}))
         eg = EngagementConfig(**d.get("engagement", {}))
         gd_raw = dict(d.get("guard", {}))
+        if "rest_pan" not in gd_raw:
+            gd_raw["rest_pan"] = gd_raw.get("guard_pan", SENTRY_HOME_PAN)
+        if "rest_tilt" not in gd_raw:
+            gd_raw["rest_tilt"] = gd_raw.get("guard_tilt", SENTRY_HOME_TILT)
         # JSON stores tuples as lists — convert patrol_waypoints back
         if "patrol_waypoints" in gd_raw:
             gd_raw["patrol_waypoints"] = [
@@ -509,6 +630,10 @@ class SentryV2Config:
                 sensors.append(PIRSensorConfig(**sensor_data))
         pir_cfg = PIRGuardConfig(sensors=sensors, **pir_raw)
         sound_cfg = SoundConfig(**dict(d.get("sound", {})))
+        face_cfg = FaceRecognitionConfig(**dict(d.get("face_recognition", {})))
+        ai_cfg = AIAssistantConfig(**dict(d.get("ai_assistant", {})))
+        shortcut_cfg = ShortcutConfig(**dict(d.get("shortcuts", {})))
+        theme_cfg = ThemeConfig(**dict(d.get("theme", {})))
         
         return cls(
             connection=cn,
@@ -520,6 +645,10 @@ class SentryV2Config:
             no_fire_masks=masks,
             pir_guard=pir_cfg,
             sound=sound_cfg,
+            face_recognition=face_cfg,
+            ai_assistant=ai_cfg,
+            shortcuts=shortcut_cfg,
+            theme=theme_cfg,
             show_overlay=d.get("show_overlay", True),
             show_threat_scores=d.get("show_threat_scores", False),
             show_engagement_zone=d.get("show_engagement_zone", False),
@@ -529,11 +658,19 @@ class SentryV2Config:
             scope_radius_pct=d.get("scope_radius_pct", 35),
             scope_vignette_opacity=d.get("scope_vignette_opacity", 60),
             settings_panel_width=d.get("settings_panel_width", 420),
+            main_splitter_sizes=[int(v) for v in d.get("main_splitter_sizes", []) if isinstance(v, (int, float))],
+            layout_splitter_sizes=[int(v) for v in d.get("layout_splitter_sizes", []) if isinstance(v, (int, float))],
+            bottom_info_splitter_sizes=[int(v) for v in d.get("bottom_info_splitter_sizes", []) if isinstance(v, (int, float))],
+            window_x=int(d.get("window_x", -1)),
+            window_y=int(d.get("window_y", -1)),
+            window_width=int(d.get("window_width", 1280)),
+            window_height=int(d.get("window_height", 860)),
+            window_maximized=bool(d.get("window_maximized", False)),
             prompted_targets_enabled=d.get("prompted_targets_enabled", False),
             prompted_allow_auto_fire=d.get("prompted_allow_auto_fire", False),
-            prompted_library_path=d.get("prompted_library_path", "app/config/sentry_v2_prompted_targets.json"),
+            prompted_library_path=d.get("prompted_library_path", "app/config/smart_sentry_v2_3_2_prompted_targets.json"),
             quick_startup_enabled=d.get("quick_startup_enabled", True),
-            config_path=d.get("config_path", "app/config/sentry_v2_settings.json"),
+            config_path=d.get("config_path", "app/config/smart_sentry_v2_3_2_settings.json"),
         )
 
     def save(self, path: Optional[str] = None) -> None:
@@ -545,5 +682,5 @@ class SentryV2Config:
     def load(cls, path: str) -> "SentryV2Config":
         p = Path(path)
         if p.exists():
-            return cls.from_dict(json.loads(p.read_text(encoding="utf-8")))
+            return cls.from_dict(json.loads(p.read_text(encoding="utf-8-sig")))
         return cls()

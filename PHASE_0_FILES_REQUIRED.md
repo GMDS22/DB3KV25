@@ -2,25 +2,27 @@
 
 **Objective**: Test Waveshare ESP32 + Pan/Tilt Servos with wireless control from PC application
 
+> Status note (2026-04-05): this checklist predates the current Waveshare V3 bridge contract and is not the canonical reference anymore. For the current single-board Waveshare path, use `arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino`, `ESP32_CURRENT_SKETCH.md`, `ESP32_UDP_FLASH.md`, and `SMART_SENTRY_V3_0_WAVESHARE_PREP_REPORT_2026-04-05.md`.
+
 ---
 
 ## Essential Files - Already Exist ✅
 
 ### 1. ESP32 Firmware
-**File**: [arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino](arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino)
-- **Purpose**: Main firmware for Waveshare ESP32 board
-- **Status**: Production-ready (tested with Debug Board communication)
+**File**: [arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino](arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino)
+- **Purpose**: Current Waveshare V3 single-board bridge firmware
+- **Status**: Current bench-prep target
 - **Key Features**:
-  - WiFi AP mode (192.168.4.1 SSID: "DB3000-ESP32")
+  - WiFi AP mode (192.168.4.1 SSID: "SMART-SENTRY-V3")
   - UDP server on port 9000
   - JSON+CRC32 packet parsing
   - Pan/Tilt servo control (ID1/ID2)
-  - UART2 GPIO16/17 support (already present for Debug Board)
-  - GPIO2 status LED / external blink mirror
-  - Runtime trigger-servo tuning and PIR-event blink control
-  - Periodic pan/tilt/total current telemetry in `state` packets
+  - Bus UART on GPIO18/GPIO19 at 1000000 baud
+  - Hardware arm switch reporting on GPIO21 / header 40
+  - Direct trigger MOSFET, accessory relay, spare relay, and buzzer support
+  - Optional outputs left explicitly unassigned
   - Boot diagnostics printed to serial (115,200 baud)
-- **Phase 0 Role**: Flash this to Waveshare board; verify boot messages
+- **Phase 0 Role**: Flash this to Waveshare board; verify boot messages and bridge replies
 
 ---
 
@@ -69,8 +71,9 @@
   - Capture any error messages during servo control
 - **Output To Capture**:
   - `[BOOT] DB3000_ESP32_UDP_PIR  v1`
-  - `[BOOT] WiFi AP 'DB3000-ESP32': OK  IP=192.168.4.1`
-  - `[BOOT] UART2 baud=1000000 RX=GPIO16 TX=GPIO17`
+  - `[BOOT] ap=OK ip=192.168.4.1`
+  - `[BOOT] bus uart baud=1000000 rx=18 tx=19`
+  - `[BOOT] switch input gpio=21 active_low=1 state=...`
   - `[BOOT] UDP port 9000 ready`
 
 ---
@@ -95,8 +98,8 @@
   - **Fire Button**: For GPIO25 relay test (optional)
   - **Diagnostics Panel**: Connection status indicator
 - **Key Line References**:
-  - Line 4852: GPIO16/GPIO17 UART2 documentation (visible in UI)
-  - Lines 4865-4866: Shows pin mappings in help text
+    - Full WiFi mode now shows the Waveshare bridge bus path on GPIO18/GPIO19
+    - The Waveshare pin assignment help now reflects the active hardware switch and unassigned optional outputs
 - **Phase 0 Role**: Primary interface for sending pan/tilt commands
 
 ---
@@ -162,10 +165,10 @@
   3. Copy all output to `PHASE_0_BOOT_LOG.txt`
 - **Expected Content**:
   ```
-  [BOOT] DB3000_ESP32_UDP_PIR  v1
-  [BOOT] WiFi AP 'DB3000-ESP32': OK  IP=192.168.4.1
-  [BOOT] UART2 baud=1000000 RX=GPIO16 TX=GPIO17
-  [BOOT] UDP port 9000 ready
+  [BOOT] ap=OK ip=192.168.4.1
+  [BOOT] bus uart baud=1000000 rx=18 tx=19
+  [BOOT] switch input gpio=21 active_low=1 state=...
+  [BOOT] udp port=9000
   ```
 
 ---
@@ -282,7 +285,7 @@
 ## Next Actions (After Phase 0)
 
 **If Phase 0 Passes → Proceed to Phase 1** (Hardware Verification)
-- Verify GPIO16/GPIO17 physical accessibility
+- Verify the local bus-servo path on GPIO18/GPIO19
 - Plan Nano wiring
 
 **If Phase 0 Fails → Debug Before Proceeding**

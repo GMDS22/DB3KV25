@@ -1,14 +1,14 @@
 """
-Smart Sentry v2 — Engine (Core State Machine)
+SMART SENTRY V3 — Engine (Core State Machine)
 
 The engine ties together all components:
-  TargetFilter  →  ThreatScorer  →  EngagementPlanner  →  fire / move
+    TargetFilter  →  ThreatScorer  →  EngagementPlanner  →  fire / move
 
 State machine:
-  GUARDING  — stationary, watching all detections
-  ENGAGING  — executing engagement queue (snap-aim-fire per target)
-  RETURNING — moving back to guard position after engagement
-  PAUSED    — user paused / disabled
+    GUARDING  — stationary, watching all detections
+    ENGAGING  — executing engagement queue (snap-aim-fire per target)
+    RETURNING — moving back to guard position after engagement
+    PAUSED    — user paused / disabled
 
 The engine is *frame-driven*: the tab calls ``engine.update(detections, frame)``
 on every camera frame and the engine emits callbacks for turret/fire actions.
@@ -124,6 +124,9 @@ class SentryV2Engine:
         self._last_reacquire_time: float = 0.0
         self._last_no_fire_mask_name: str = ""
         self._loss_recovery_phase: str = ""
+        self._loss_recovery_protocol: str = ""
+        self._loss_recovery_context: Dict[str, object] = {}
+        self._loss_recovery_retry_count: int = 0
         self._loss_recovery_anchor_pan: float = self.current_pan
         self._loss_recovery_anchor_tilt: float = self.current_tilt
         self._loss_recovery_last_move_time: float = 0.0
@@ -164,6 +167,7 @@ class SentryV2Engine:
 
         # PIR state (guard mode PIR cueing)
         self._pir_cue_mode: bool = False          # In PIR cue pursuit?
+        self._pir_cue_sensor_id: int = -1
         self._pir_cue_pan: float = 0.0
         self._pir_cue_tilt: float = 0.0
         self._pir_cue_slew_start: float = 0.0
@@ -255,6 +259,7 @@ class SentryV2Engine:
         self._return_start = 0.0
         self._reset_loss_recovery_state()
         self._pir_cue_mode = False
+        self._pir_cue_sensor_id = -1
         self._pir_scan_mode = False
         self._pir_scan_awaiting_settle = False
         self._pir_settle_start = 0.0
@@ -363,6 +368,7 @@ class SentryV2Engine:
             self._change_state(SentryV2State.GUARDING)
 
         self._pir_cue_mode = True
+        self._pir_cue_sensor_id = int(cue.sensor_id)
         self._pir_cue_pan = cue.cue_pan
         self._pir_cue_tilt = cue.cue_tilt
         self._pir_cue_slew_start = now
@@ -408,10 +414,13 @@ class SentryV2Engine:
             if cue is not None:
                 # Start PIR cue pursuit
                 self._pir_cue_mode = True
+                self._pir_cue_sensor_id = int(cue.sensor_id)
                 self._pir_cue_pan = cue.cue_pan
                 self._pir_cue_tilt = cue.cue_tilt
                 self._pir_cue_slew_start = now
                 self._pir_scan_mode = False
+                self._pir_scan_awaiting_settle = False
+                self._pir_settle_start = 0.0
                 self._move_turret(self._pir_cue_pan, self._pir_cue_tilt)
                 return
         
@@ -430,8 +439,9 @@ class SentryV2Engine:
 
     def _update_pir_confirmation(self, targets: List[TrackedTarget], now: float) -> None:
         """Wait for camera to confirm a target at the PIR cue point."""
-        # Check if servo has settled
-        settle_time = 0.35
+        # Hold very briefly at the cue center, then move immediately into a
+        # local hunt around that PIR zone if vision still sees nothing.
+        settle_time = self._pir_cue_hold_time()
         slew_elapsed = now - self._pir_cue_slew_start
         
         if slew_elapsed < settle_time:
@@ -441,6 +451,7 @@ class SentryV2Engine:
         if targets:
             # Found a target — complete cue (preserve queue) and engage.
             self._pir_cue_mode = False
+            self._pir_cue_sensor_id = -1
             self._pir_manager.complete_active_cue()
             # Trigger engagement
             if now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown:
@@ -460,22 +471,31 @@ class SentryV2Engine:
         
         # No target confirmed at cue point
         if self.cfg.pir_guard.scan_on_no_detect:
-            # Start adaptive scan
+            # Start a localized hunt around the PIR cue point first, then widen.
             self._pir_scan_mode = True
-            self._pir_manager.start_scan(self._pir_cue_pan, self._pir_cue_tilt)
-            self._pir_scan_awaiting_settle = False
-            self._pir_settle_start = 0.0
+            self._pir_manager.start_scan(
+                self._pir_cue_pan,
+                self._pir_cue_tilt,
+                sensor_id=self._pir_cue_sensor_id,
+                search_style=getattr(self.cfg.pir_guard, "search_style", "hunting"),
+            )
+            next_point = self._pir_manager.get_next_scan_point()
+            if next_point is not None:
+                self._move_turret(next_point[0], next_point[1])
+                self._pir_scan_awaiting_settle = True
+                self._pir_settle_start = now
+            else:
+                self._finish_pir_no_target()
         else:
-            # No scan enabled, just cancel and return to patrol
-            self._pir_cue_mode = False
-            self._pir_manager.cancel_active_cue()
-            self._patrol_initialized = False
+            # No search enabled, finish this cue and fall back to guard/patrol.
+            self._finish_pir_no_target()
 
     def _update_pir_scan(self, targets: List[TrackedTarget], now: float) -> None:
         """Run adaptive scan grid at PIR cue location."""
         # If we found targets during scan, engage them
         if targets:
             self._pir_cue_mode = False
+            self._pir_cue_sensor_id = -1
             self._pir_scan_mode = False
             self._pir_manager.complete_active_cue()
             if now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown:
@@ -507,20 +527,15 @@ class SentryV2Engine:
             self._pir_scan_awaiting_settle = True
             self._pir_settle_start = now
         else:
-            # Scan complete, no target found
-            self._pir_cue_mode = False
-            self._pir_scan_mode = False
-            self._pir_manager.cancel_active_cue()
-            self._patrol_initialized = False
+            # Search complete with no target. Explicitly return home so a static
+            # guard configuration cannot remain parked at the final hunt point.
+            self._finish_pir_no_target()
 
     def _pir_scan_settle_time(self) -> float:
-        reference = self._pir_manager.get_scan_reference_point()
-        if reference is None:
-            reference = (float(self.current_pan), float(self.current_tilt))
-        distance = float(max(abs(float(self.current_pan) - float(reference[0])), abs(float(self.current_tilt) - float(reference[1]))))
+        style = self._normalized_search_style(getattr(self.cfg.pir_guard, "search_style", "hunting"))
         speed = float(max(1.0, self.cfg.pir_guard.scan_speed))
-        travel_time = distance / speed
-        return float(min(1.20, max(0.12, travel_time + 0.08)))
+        base = 0.10 if style == "fast_reacquire" else 0.12
+        return float(min(0.70, max(base, (2.2 / speed) + base)))
 
     # ------------------------------------------------------------------ #
     # ENGAGING state
@@ -536,9 +551,7 @@ class SentryV2Engine:
             if self._log_precision_tuning and self._current_precision_engagement_id:
                 self._precision_logger.end_engagement()
                 self._current_precision_engagement_id = None
-            self._last_engage_time = now
-            self._return_start = now
-            self._change_state(SentryV2State.RETURNING)
+            self._start_return_to_guard(now)
             return
 
         order = self._queue[self._queue_index]
@@ -562,17 +575,14 @@ class SentryV2Engine:
             if target_det is None:
                 if self._target_lost_since <= 0.0:
                     self._target_lost_since = now
+                    self._loss_recovery_retry_count = 0
                     if self._loss_recovery_enabled():
                         self._start_loss_recovery(now)
                 if self._loss_recovery_enabled():
                     self._update_loss_recovery(now)
                 if (now - self._target_lost_since) >= self.cfg.engagement.target_loss_timeout:
-                    if bool(getattr(self.cfg.engagement, "continuous_hunt_on_loss", False)):
-                        # Stay in precision/hunt mode and keep trying to reacquire
-                        # instead of returning to guard.
-                        self._aim_lock_frames = 0
-                        self._last_err_pan_deg = 0.0
-                        self._last_err_tilt_deg = 0.0
+                    if self._should_retry_loss_recovery():
+                        self._restart_loss_recovery(now)
                         return
                     self._advance_queue(now)
                 return
@@ -737,10 +747,7 @@ class SentryV2Engine:
                     if self._log_precision_tuning and self._current_precision_engagement_id:
                         self._precision_logger.end_engagement()
                         self._current_precision_engagement_id = None
-                    self._last_engage_time = now
-                    self._return_start = now
-                    self.active_order = None
-                    self._change_state(SentryV2State.RETURNING)
+                    self._start_return_to_guard(now)
 
     def _find_active_target(self, order: EngagementOrder) -> Optional[TrackedTarget]:
         for target in self.last_targets:
@@ -783,6 +790,14 @@ class SentryV2Engine:
         anchor_area = self._bbox_area(anchor_bbox)
         reacquire_radius_px = max(72.0, min(frame_w, frame_h) * 0.16, anchor_diag * 0.60)
         reacquire_radius_px *= min(1.9, 1.0 + (loss_age * 1.35))
+        if self._adaptive_loss_recovery_enabled():
+            visible_count = int(self._loss_recovery_context.get("visible_target_count", len(self.last_targets)) or len(self.last_targets))
+            crowd_threshold = max(1, int(getattr(self.cfg.engagement, "loss_scene_crowding_threshold", 3) or 3))
+            expand_scale = max(1.0, float(getattr(self.cfg.engagement, "loss_persistent_expand_scale", 1.18) or 1.18))
+            if visible_count <= 0:
+                reacquire_radius_px *= expand_scale
+            elif visible_count >= crowd_threshold:
+                reacquire_radius_px *= 0.82
 
         best_target: Optional[TrackedTarget] = None
         best_cost = float("inf")
@@ -813,6 +828,11 @@ class SentryV2Engine:
                 - (area_similarity * 0.35)
                 - (target.threat_score * 0.20)
             )
+            if self._adaptive_loss_recovery_enabled():
+                visible_count = int(self._loss_recovery_context.get("visible_target_count", len(self.last_targets)) or len(self.last_targets))
+                crowd_threshold = max(1, int(getattr(self.cfg.engagement, "loss_scene_crowding_threshold", 3) or 3))
+                if visible_count >= crowd_threshold:
+                    cost += 0.08
             if cost < best_cost:
                 best_cost = cost
                 best_target = target
@@ -924,7 +944,23 @@ class SentryV2Engine:
             self._active_target_last_seen_time = 0.0
             self._active_target_last_class = ""
             self._active_target_last_source = ""
-            self._change_state(SentryV2State.RETURNING)
+            self._start_return_to_guard(now, immediate_move=True)
+
+    def _start_return_to_guard(self, now: float, *, immediate_move: bool = False) -> None:
+        self._last_engage_time = now
+        self._return_start = now
+        self.active_order = None
+        self._active_target_last_center = None
+        self._active_target_last_bbox = None
+        self._active_target_last_heading_norm = (0.0, 0.0)
+        self._active_target_last_seen_time = 0.0
+        self._active_target_last_class = ""
+        self._active_target_last_source = ""
+        self._reset_precision_state()
+        if immediate_move or self.cfg.guard.guard_mode == 0:
+            gp, gt = self._planner.get_return_position()
+            self._move_turret(gp, gt)
+        self._change_state(SentryV2State.RETURNING)
 
     def _start_order_engagement(self, order: EngagementOrder, now: float) -> None:
         """Start engagement for a queued order with a stable first step."""
@@ -992,6 +1028,7 @@ class SentryV2Engine:
                 persistence=target.persistence,
                 approach_rate=target.approach_rate,
             )
+            self._ml_logger.save()
 
         # Only actually fire if auto-trigger is enabled
         if self.cfg.engagement.auto_trigger_enabled and blocked_mask is None:
@@ -1151,33 +1188,295 @@ class SentryV2Engine:
             or getattr(eng, "loss_expanding_search_enabled", True)
         )
 
+    def _adaptive_loss_recovery_enabled(self) -> bool:
+        return bool(getattr(self.cfg.engagement, "adaptive_loss_recovery_enabled", True))
+
+    def _normalized_search_style(self, style: object) -> str:
+        text = str(style or "hunting").strip().lower()
+        if text in {"fast", "fast_reacquire", "fast-reacquire", "reacquire"}:
+            return "fast_reacquire"
+        return "hunting"
+
+    def _loss_search_style(self) -> str:
+        return self._normalized_search_style(getattr(self.cfg.engagement, "loss_search_style", "hunting"))
+
+    def _loss_search_rounds(self) -> int:
+        return max(1, int(getattr(self.cfg.engagement, "loss_search_rounds", 1) or 1))
+
+    def _pir_cue_hold_time(self) -> float:
+        configured = float(getattr(self.cfg.pir_guard, "cue_hold_time_s", 0.18) or 0.18)
+        configured = max(0.05, min(configured, float(getattr(self.cfg.pir_guard, "confirmation_timeout", 1.2) or 1.2)))
+        if self._normalized_search_style(getattr(self.cfg.pir_guard, "search_style", "hunting")) == "fast_reacquire":
+            return min(configured, 0.14)
+        return configured
+
+    def _finish_pir_no_target(self) -> None:
+        """Clear the active PIR cue and explicitly command a return home."""
+        self._pir_cue_mode = False
+        self._pir_cue_sensor_id = -1
+        self._pir_scan_mode = False
+        self._pir_scan_awaiting_settle = False
+        self._pir_settle_start = 0.0
+        self._pir_manager.complete_active_cue()
+        gp, gt = self._planner.get_return_position()
+        self._move_turret(gp, gt)
+        self._patrol_initialized = False
+        self._patrol_last_update = 0.0
+
+    def _loss_search_step_interval(self, phase: str) -> float:
+        base = max(0.08, float(getattr(self.cfg.engagement, "loss_search_step_interval_s", 0.18) or 0.18))
+        style = self._loss_search_style()
+        phase_key = str(phase or "local_search")
+        if "expand" in phase_key:
+            scale = 0.60 if style == "fast_reacquire" else 0.70
+        elif "handoff" in phase_key:
+            scale = 0.52 if style == "fast_reacquire" else 0.60
+        else:
+            scale = 0.55 if style == "fast_reacquire" else 0.64
+        return float(max(0.08, min(base, base * scale)))
+
+    def _search_point_distance(
+        self,
+        source: Tuple[float, float],
+        target: Tuple[float, float],
+    ) -> float:
+        pan_delta = abs(float(target[0]) - float(source[0]))
+        tilt_delta = abs(float(target[1]) - float(source[1]))
+        return pan_delta + (tilt_delta * 1.15)
+
+    def _smooth_search_path(
+        self,
+        points: List[Tuple[float, float]],
+        start_pan: float,
+        start_tilt: float,
+    ) -> List[Tuple[float, float]]:
+        remaining = list(points)
+        ordered: List[Tuple[float, float]] = []
+        current = (float(start_pan), float(start_tilt))
+        while remaining:
+            next_index = min(
+                range(len(remaining)),
+                key=lambda idx: self._search_point_distance(current, remaining[idx]),
+            )
+            point = remaining.pop(next_index)
+            ordered.append(point)
+            current = point
+        return ordered
+
+    def _apply_loss_search_rounds(
+        self,
+        points: List[Tuple[float, float]],
+        center_pan: float,
+        center_tilt: float,
+    ) -> List[Tuple[float, float]]:
+        rounds = self._loss_search_rounds()
+        if not points:
+            return []
+
+        style = self._loss_search_style()
+        scale_step = 0.18 if style == "fast_reacquire" else 0.12
+        ordered_points: List[Tuple[float, float]] = []
+        seen: set[Tuple[float, float]] = set()
+        start_pan = float(center_pan)
+        start_tilt = float(center_tilt)
+
+        for round_index in range(rounds):
+            scale = 1.0 + (scale_step * round_index)
+            round_points: List[Tuple[float, float]] = []
+            round_seen: set[Tuple[float, float]] = set()
+            for point_pan, point_tilt in points:
+                scaled_point = (
+                    self._clamp_pan(center_pan + ((point_pan - center_pan) * scale)),
+                    self._clamp_tilt(center_tilt + ((point_tilt - center_tilt) * scale)),
+                )
+                if scaled_point in round_seen:
+                    continue
+                round_seen.add(scaled_point)
+                round_points.append(scaled_point)
+            for point in self._smooth_search_path(round_points, start_pan, start_tilt):
+                if point in seen:
+                    continue
+                seen.add(point)
+                ordered_points.append(point)
+            if ordered_points:
+                start_pan, start_tilt = ordered_points[-1]
+
+        return ordered_points
+
+    def _active_recovery_order(self) -> Optional[EngagementOrder]:
+        if 0 <= self._queue_index < len(self._queue):
+            return self._queue[self._queue_index]
+        return self.active_order
+
+    def _best_loss_recovery_alternative_target(self) -> Optional[TrackedTarget]:
+        order = self._active_recovery_order()
+        exclude_track_id = int(order.target.det.track_id) if order is not None else -1
+        best_target: Optional[TrackedTarget] = None
+        best_score = float("-inf")
+        for target in self.last_targets:
+            if int(target.det.track_id) == exclude_track_id:
+                continue
+            if target.threat_score < (self.cfg.engagement.min_threat_score * 0.70):
+                continue
+            if best_target is None or target.threat_score > best_score:
+                best_target = target
+                best_score = float(target.threat_score)
+        return best_target
+
+    def _capture_loss_recovery_context(self, now: float) -> None:
+        order = self._active_recovery_order()
+        best_alternative = self._best_loss_recovery_alternative_target()
+        visible_count = len(self.last_targets)
+        crowd_threshold = max(1, int(getattr(self.cfg.engagement, "loss_scene_crowding_threshold", 3) or 3))
+        lost_track_id = int(order.target.det.track_id) if order is not None else -1
+        lost_threat = float(order.target.threat_score) if order is not None else 0.0
+        lost_persistence = float(getattr(order.target, "persistence", 0.0) or 0.0) if order is not None else 0.0
+        self._loss_recovery_context = {
+            "lost_track_id": lost_track_id,
+            "lost_target_threat": lost_threat,
+            "lost_target_persistence": lost_persistence,
+            "visible_target_count": visible_count,
+            "scene_sparse": visible_count < crowd_threshold,
+            "scene_crowded": visible_count >= crowd_threshold,
+            "best_alternative_score": float(best_alternative.threat_score) if best_alternative is not None else 0.0,
+            "started_at": now,
+        }
+
+    def _select_loss_recovery_protocol(self) -> str:
+        eng = self.cfg.engagement
+        visible_count = len(self.last_targets)
+        self._loss_recovery_context["visible_target_count"] = visible_count
+        crowd_threshold = max(1, int(getattr(eng, "loss_scene_crowding_threshold", 3) or 3))
+        self._loss_recovery_context["scene_sparse"] = visible_count < crowd_threshold
+        self._loss_recovery_context["scene_crowded"] = visible_count >= crowd_threshold
+        if visible_count > 0:
+            return str(getattr(eng, "loss_recovery_protocol_new_target", "rapid_handoff_search") or "rapid_handoff_search")
+        return str(getattr(eng, "loss_recovery_protocol_no_detection", "persistent_reacquire_search") or "persistent_reacquire_search")
+
+    def _should_switch_to_visible_target(self, target: TrackedTarget) -> bool:
+        lost_score = float(self._loss_recovery_context.get("lost_target_threat", 0.0) or 0.0)
+        lost_persistence = float(self._loss_recovery_context.get("lost_target_persistence", 0.0) or 0.0)
+        margin = max(0.0, float(getattr(self.cfg.engagement, "loss_switch_score_margin", 0.12) or 0.12))
+        persistence_bias = max(0.0, float(getattr(self.cfg.engagement, "loss_switch_persistence_bias", 0.05) or 0.05))
+        required_score = lost_score + margin + (lost_persistence * persistence_bias)
+        if bool(self._loss_recovery_context.get("scene_crowded", False)):
+            required_score -= margin * 0.45
+        return float(target.threat_score) >= required_score
+
+    def _handoff_to_visible_target(self, target: TrackedTarget, now: float) -> None:
+        order = self._active_recovery_order()
+        if order is None:
+            return
+        pan, tilt = self._planner._pixel_to_pantilt(target, self.current_pan, self.current_tilt)
+        order.target = target
+        order.pan = pan
+        order.tilt = tilt
+        self.active_order = order
+        self._target_lost_since = 0.0
+        self._reset_loss_recovery_state()
+        self._remember_active_target(target.det, target=target, timestamp=now)
+        self._last_reacquire_note = f"loss handoff -> {int(target.det.track_id)}"
+        self._last_reacquire_time = now
+        self._start_order_engagement(order, now)
+
+    def _loss_recovery_personality_profile(self) -> Dict[str, float]:
+        eng = self.cfg.engagement
+        intensity = max(0.0, float(getattr(eng, "loss_personality_intensity", 0.35) or 0.35))
+        velocity_bias = max(0.0, float(getattr(eng, "loss_personality_velocity_bias", 0.40) or 0.40))
+        order_variation = max(0.0, float(getattr(eng, "loss_personality_order_variation", 0.30) or 0.30))
+        seed = int(self._loss_recovery_context.get("lost_track_id", 0) or 0) * 131
+        seed += (self._loss_recovery_retry_count + 1) * 17
+        rng = random.Random(seed)
+        heading_pan, heading_tilt = self._active_target_heading_norm(0.12)
+        pan_bias = (heading_pan * velocity_bias) + (rng.uniform(-0.45, 0.45) * order_variation)
+        tilt_bias = (heading_tilt * velocity_bias) + (rng.uniform(-0.35, 0.35) * order_variation)
+        return {
+            "pan_bias": pan_bias * intensity,
+            "tilt_bias": tilt_bias * intensity,
+            "intensity": intensity,
+        }
+
     def _start_loss_recovery(self, now: float) -> None:
         if not self._loss_recovery_enabled():
             self._reset_loss_recovery_state()
             return
+        self._capture_loss_recovery_context(now)
         self._loss_recovery_anchor_pan = float(self._active_target_last_aim_pan)
         self._loss_recovery_anchor_tilt = float(self._active_target_last_aim_tilt)
         self._loss_recovery_last_move_time = 0.0
         self._loss_recovery_search_index = 0
-        self._loss_recovery_phase = "pursuit"
+        self._loss_recovery_protocol = self._select_loss_recovery_protocol()
+        self._loss_recovery_phase = self._loss_recovery_protocol
         self._last_reacquire_note = "loss pursuit"
         self._last_reacquire_time = now
 
     def _reset_loss_recovery_state(self) -> None:
         self._loss_recovery_phase = ""
+        self._loss_recovery_protocol = ""
+        self._loss_recovery_context = {}
+        self._loss_recovery_retry_count = 0
         self._loss_recovery_anchor_pan = float(self.current_pan)
         self._loss_recovery_anchor_tilt = float(self.current_tilt)
         self._loss_recovery_last_move_time = 0.0
         self._loss_recovery_search_index = 0
 
+    def _should_retry_loss_recovery(self) -> bool:
+        if not bool(getattr(self.cfg.engagement, "continuous_hunt_on_loss", False)):
+            return False
+        if int(getattr(self.cfg.guard, "guard_mode", 0) or 0) == 0:
+            return False
+        if self._adaptive_loss_recovery_enabled():
+            visible_count = int(self._loss_recovery_context.get("visible_target_count", 0) or 0)
+            crowd_threshold = max(1, int(getattr(self.cfg.engagement, "loss_scene_crowding_threshold", 3) or 3))
+            max_retries = int(getattr(self.cfg.engagement, "loss_persistent_retry_passes_sparse", 2) or 2)
+            if visible_count >= crowd_threshold:
+                max_retries = int(getattr(self.cfg.engagement, "loss_persistent_retry_passes_crowded", 1) or 1)
+            return self._loss_recovery_retry_count < max(0, max_retries - 1)
+        return self._loss_recovery_retry_count < 1
+
+    def _restart_loss_recovery(self, now: float) -> None:
+        self._loss_recovery_retry_count += 1
+        self._target_lost_since = now
+        self._capture_loss_recovery_context(now)
+        self._loss_recovery_anchor_pan = float(self.current_pan)
+        self._loss_recovery_anchor_tilt = float(self.current_tilt)
+        self._loss_recovery_last_move_time = 0.0
+        self._loss_recovery_search_index = 0
+        self._loss_recovery_protocol = self._select_loss_recovery_protocol()
+        self._loss_recovery_phase = self._loss_recovery_protocol
+        self._last_reacquire_note = "loss retry"
+        self._last_reacquire_time = now
+        self._aim_lock_frames = 0
+        self._last_err_pan_deg = 0.0
+        self._last_err_tilt_deg = 0.0
+
     def _update_loss_recovery(self, now: float) -> None:
         if self._target_lost_since <= 0.0 or not self._loss_recovery_enabled():
             return
+
+        if self._adaptive_loss_recovery_enabled():
+            best_alternative = self._best_loss_recovery_alternative_target()
+            if best_alternative is not None:
+                self._loss_recovery_context["best_alternative_score"] = float(best_alternative.threat_score)
+                if self._should_switch_to_visible_target(best_alternative):
+                    self._handoff_to_visible_target(best_alternative, now)
+                    return
+            protocol = self._select_loss_recovery_protocol()
+            if protocol != self._loss_recovery_protocol:
+                self._loss_recovery_protocol = protocol
+                self._loss_recovery_search_index = 0
 
         eng = self.cfg.engagement
         loss_elapsed = max(0.0, now - self._target_lost_since)
         timeout = max(0.1, float(eng.target_loss_timeout))
         if loss_elapsed >= timeout:
+            return
+
+        if self._adaptive_loss_recovery_enabled() and self._loss_recovery_protocol == "rapid_handoff_search":
+            self._update_rapid_handoff_recovery(now, loss_elapsed, timeout)
+            return
+        if self._adaptive_loss_recovery_enabled() and self._loss_recovery_protocol == "persistent_reacquire_search":
+            self._update_persistent_recovery(now, loss_elapsed, timeout)
             return
         pursuit_window = min(
             max(0.0, float(getattr(eng, "loss_direction_pursuit_s", 0.0) or 0.0)),
@@ -1201,10 +1500,6 @@ class SentryV2Engine:
                 self._move_loss_recovery_target(pursuit_pan, pursuit_tilt, now)
             return
 
-        step_interval = max(0.08, float(getattr(eng, "loss_search_step_interval_s", 0.18) or 0.18))
-        if (now - self._loss_recovery_last_move_time) < step_interval:
-            return
-
         local_points = self._loss_recovery_local_search_points(pursuit_window)
         expanding_points = self._loss_recovery_expanding_search_points(pursuit_window)
         search_points: List[Tuple[float, float]] = []
@@ -1215,6 +1510,9 @@ class SentryV2Engine:
         local_count = len(local_points)
         point_index = min(self._loss_recovery_search_index, len(search_points) - 1)
         next_phase = "local_search" if point_index < local_count else "expanding_search"
+        step_interval = self._loss_search_step_interval(next_phase)
+        if (now - self._loss_recovery_last_move_time) < step_interval:
+            return
         if self._loss_recovery_phase != next_phase:
             self._loss_recovery_phase = next_phase
             self._last_reacquire_note = "loss local scan" if next_phase == "local_search" else "loss expanding scan"
@@ -1224,10 +1522,88 @@ class SentryV2Engine:
             self._loss_recovery_search_index += 1
         self._move_loss_recovery_target(point[0], point[1], now)
 
+    def _update_rapid_handoff_recovery(self, now: float, loss_elapsed: float, timeout: float) -> None:
+        eng = self.cfg.engagement
+        handoff_timeout = min(timeout, max(0.12, float(getattr(eng, "loss_handoff_max_duration_s", 0.38) or 0.38)))
+        if loss_elapsed >= handoff_timeout:
+            return
+        pursuit_window = min(handoff_timeout * 0.45, max(0.0, float(getattr(eng, "loss_handoff_pursuit_time_s", 0.14) or 0.14)))
+        if pursuit_window > 0.0 and loss_elapsed <= pursuit_window:
+            if self._loss_recovery_phase != "rapid_handoff_search:pursuit":
+                self._loss_recovery_phase = "rapid_handoff_search:pursuit"
+                self._last_reacquire_note = "rapid handoff pursuit"
+                self._last_reacquire_time = now
+            if (now - self._loss_recovery_last_move_time) >= 0.06:
+                heading_pan_deg_s, heading_tilt_deg_s = self._active_target_heading_deg_s(loss_elapsed + 0.06)
+                lookahead = min(pursuit_window, loss_elapsed + float(getattr(eng, "predictive_lead_time_s", 0.0) or 0.0))
+                pursuit_pan = self._loss_recovery_anchor_pan + (heading_pan_deg_s * lookahead)
+                pursuit_tilt = self._loss_recovery_anchor_tilt + (heading_tilt_deg_s * lookahead)
+                self._move_loss_recovery_target(pursuit_pan, pursuit_tilt, now)
+            return
+        step_interval = self._loss_search_step_interval("rapid_handoff_search:scan")
+        if (now - self._loss_recovery_last_move_time) < step_interval:
+            return
+        points = self._rapid_handoff_search_points(pursuit_window)
+        if not points:
+            return
+        point_index = min(self._loss_recovery_search_index, len(points) - 1)
+        self._loss_recovery_phase = "rapid_handoff_search:scan"
+        self._last_reacquire_note = "rapid handoff scan"
+        self._last_reacquire_time = now
+        point = points[point_index]
+        if self._loss_recovery_search_index < (len(points) - 1):
+            self._loss_recovery_search_index += 1
+        self._move_loss_recovery_target(point[0], point[1], now)
+
+    def _update_persistent_recovery(self, now: float, loss_elapsed: float, timeout: float) -> None:
+        eng = self.cfg.engagement
+        pursuit_window = min(
+            max(0.0, float(getattr(eng, "loss_direction_pursuit_s", 0.0) or 0.0)),
+            timeout * 0.45,
+        )
+        if pursuit_window > 0.0 and loss_elapsed <= pursuit_window:
+            if self._loss_recovery_phase != "persistent_reacquire_search:pursuit":
+                self._loss_recovery_phase = "persistent_reacquire_search:pursuit"
+                self._last_reacquire_note = "persistent pursuit"
+                self._last_reacquire_time = now
+            if (now - self._loss_recovery_last_move_time) >= 0.08:
+                heading_pan_deg_s, heading_tilt_deg_s = self._active_target_heading_deg_s(loss_elapsed + 0.08)
+                lookahead = min(pursuit_window, loss_elapsed + float(getattr(eng, "predictive_lead_time_s", 0.0) or 0.0))
+                pursuit_pan = self._loss_recovery_anchor_pan + (heading_pan_deg_s * lookahead)
+                pursuit_tilt = self._loss_recovery_anchor_tilt + (heading_tilt_deg_s * lookahead)
+                self._move_loss_recovery_target(pursuit_pan, pursuit_tilt, now)
+            return
+        points = self._persistent_loss_recovery_points(pursuit_window)
+        if not points:
+            return
+        point_index = min(self._loss_recovery_search_index, len(points) - 1)
+        local_count = min(len(points), len(self._loss_recovery_local_search_points(pursuit_window)))
+        next_phase = (
+            "persistent_reacquire_search:local"
+            if point_index < local_count else
+            "persistent_reacquire_search:expand"
+        )
+        step_interval = self._loss_search_step_interval(next_phase)
+        if (now - self._loss_recovery_last_move_time) < step_interval:
+            return
+        self._loss_recovery_phase = next_phase
+        self._last_reacquire_note = "persistent reacquire"
+        self._last_reacquire_time = now
+        point = points[point_index]
+        if self._loss_recovery_search_index < (len(points) - 1):
+            self._loss_recovery_search_index += 1
+        self._move_loss_recovery_target(point[0], point[1], now)
+
     def _loss_recovery_search_origin(self, pursuit_window: float) -> Tuple[float, float]:
         heading_pan_deg_s, heading_tilt_deg_s = self._active_target_heading_deg_s(max(0.08, pursuit_window))
         center_pan = self._loss_recovery_anchor_pan + (heading_pan_deg_s * max(0.0, pursuit_window))
         center_tilt = self._loss_recovery_anchor_tilt + (heading_tilt_deg_s * max(0.0, pursuit_window))
+        if self._adaptive_loss_recovery_enabled():
+            profile = self._loss_recovery_personality_profile()
+            pan_span = max(0.6, float(getattr(self.cfg.engagement, "loss_local_search_pan_deg", 3.5) or 3.5))
+            tilt_span = max(0.4, float(getattr(self.cfg.engagement, "loss_local_search_tilt_deg", 2.0) or 2.0))
+            center_pan += pan_span * 0.18 * float(profile.get("pan_bias", 0.0) or 0.0)
+            center_tilt += tilt_span * 0.14 * float(profile.get("tilt_bias", 0.0) or 0.0)
         return center_pan, center_tilt
 
     def _loss_recovery_local_search_points(self, pursuit_window: float) -> List[Tuple[float, float]]:
@@ -1236,17 +1612,74 @@ class SentryV2Engine:
         center_pan, center_tilt = self._loss_recovery_search_origin(pursuit_window)
         pan_span = max(0.6, float(getattr(self.cfg.engagement, "loss_local_search_pan_deg", 3.5) or 3.5))
         tilt_span = max(0.4, float(getattr(self.cfg.engagement, "loss_local_search_tilt_deg", 2.0) or 2.0))
-        return [
-            (center_pan, center_tilt),
-            (center_pan + pan_span, center_tilt),
-            (center_pan - pan_span, center_tilt),
-            (center_pan, center_tilt + tilt_span),
-            (center_pan, center_tilt - tilt_span),
-            (center_pan + (pan_span * 0.65), center_tilt + (tilt_span * 0.65)),
-            (center_pan - (pan_span * 0.65), center_tilt + (tilt_span * 0.65)),
-            (center_pan + (pan_span * 0.65), center_tilt - (tilt_span * 0.65)),
-            (center_pan - (pan_span * 0.65), center_tilt - (tilt_span * 0.65)),
+        profile: Dict[str, float] = {}
+        if self._adaptive_loss_recovery_enabled():
+            profile = self._loss_recovery_personality_profile()
+            pan_span *= 1.0 + (0.20 * float(profile.get("pan_bias", 0.0) or 0.0))
+            tilt_span *= 1.0 + (0.16 * float(profile.get("tilt_bias", 0.0) or 0.0))
+
+        heading_pan, heading_tilt = self._active_target_heading_norm(max(0.10, pursuit_window))
+        pan_dir = 1.0 if heading_pan >= 0.0 else -1.0
+        tilt_dir = 1.0 if heading_tilt >= 0.0 else -1.0
+        if abs(heading_pan) < 0.08:
+            pan_dir = 1.0 if float(profile.get("pan_bias", 0.0) or 0.0) >= 0.0 else -1.0
+        if abs(heading_tilt) < 0.08:
+            tilt_dir = 1.0 if float(profile.get("tilt_bias", 0.0) or 0.0) >= 0.0 else -1.0
+
+        style = self._loss_search_style()
+        if style == "fast_reacquire":
+            near_pan = max(0.45, pan_span * 0.52)
+            near_tilt = max(0.30, tilt_span * 0.56)
+            mid_pan = max(near_pan + 0.35, pan_span * 0.82)
+            mid_tilt = max(near_tilt + 0.25, tilt_span * 0.78)
+        else:
+            near_pan = max(0.35, pan_span * 0.28)
+            near_tilt = max(0.22, tilt_span * 0.32)
+            mid_pan = max(near_pan + 0.30, pan_span * 0.56)
+            mid_tilt = max(near_tilt + 0.20, tilt_span * 0.58)
+
+        points: List[Tuple[float, float]] = []
+        seen: set[Tuple[float, float]] = set()
+
+        def _append_point(pan: float, tilt: float) -> None:
+            point = (self._clamp_pan(pan), self._clamp_tilt(tilt))
+            if point in seen:
+                return
+            seen.add(point)
+            points.append(point)
+
+        _append_point(center_pan, center_tilt)
+
+        local_pattern = [
+            (pan_dir * near_pan, 0.0),
+            (pan_dir * near_pan * 0.70, tilt_dir * near_tilt),
+            (pan_dir * near_pan * 0.70, -tilt_dir * near_tilt),
+            (0.0, tilt_dir * near_tilt),
+            (0.0, -tilt_dir * near_tilt),
+            (-pan_dir * near_pan * 0.45, 0.0),
+            (pan_dir * mid_pan, 0.0),
+            (pan_dir * mid_pan * 0.72, tilt_dir * mid_tilt),
+            (pan_dir * mid_pan * 0.72, -tilt_dir * mid_tilt),
+            (0.0, tilt_dir * mid_tilt),
+            (0.0, -tilt_dir * mid_tilt),
+            (pan_span, 0.0),
+            (-pan_span, 0.0),
+            (0.0, tilt_span),
+            (0.0, -tilt_span),
+            (pan_span * 0.65, tilt_span * 0.65),
+            (-pan_span * 0.65, tilt_span * 0.65),
+            (pan_span * 0.65, -tilt_span * 0.65),
+            (-pan_span * 0.65, -tilt_span * 0.65),
         ]
+        if style != "fast_reacquire":
+            local_pattern[11:11] = [
+                (-pan_dir * near_pan * 0.55, tilt_dir * near_tilt * 0.90),
+                (-pan_dir * near_pan * 0.55, -tilt_dir * near_tilt * 0.90),
+            ]
+
+        for pan_offset, tilt_offset in local_pattern:
+            _append_point(center_pan + pan_offset, center_tilt + tilt_offset)
+        return self._apply_loss_search_rounds(points, center_pan, center_tilt)
 
     def _loss_recovery_expanding_search_points(self, pursuit_window: float) -> List[Tuple[float, float]]:
         if not bool(getattr(self.cfg.engagement, "loss_expanding_search_enabled", True)):
@@ -1261,6 +1694,9 @@ class SentryV2Engine:
         for ring_idx in range(1, ring_count + 1):
             pan_span = base_pan + (pan_step * ring_idx)
             tilt_span = base_tilt + (tilt_step * ring_idx)
+            if self._adaptive_loss_recovery_enabled():
+                pan_span *= max(1.0, float(getattr(self.cfg.engagement, "loss_persistent_expand_scale", 1.18) or 1.18))
+                tilt_span *= 1.0 + ((max(1.0, float(getattr(self.cfg.engagement, "loss_persistent_expand_scale", 1.18) or 1.18)) - 1.0) * 0.65)
             points.extend([
                 (center_pan + pan_span, center_tilt),
                 (center_pan - pan_span, center_tilt),
@@ -1271,6 +1707,48 @@ class SentryV2Engine:
                 (center_pan + pan_span, center_tilt - tilt_span),
                 (center_pan - pan_span, center_tilt - tilt_span),
             ])
+        return self._apply_loss_search_rounds(points, center_pan, center_tilt)
+
+    def _rapid_handoff_search_points(self, pursuit_window: float) -> List[Tuple[float, float]]:
+        center_pan, center_tilt = self._loss_recovery_search_origin(pursuit_window)
+        profile = self._loss_recovery_personality_profile()
+        heading_pan, heading_tilt = self._active_target_heading_norm(0.10)
+        if abs(heading_pan) < 0.08:
+            heading_pan = 1.0 if float(profile.get("pan_bias", 0.0) or 0.0) >= 0.0 else -1.0
+        if abs(heading_tilt) < 0.08:
+            heading_tilt = 1.0 if float(profile.get("tilt_bias", 0.0) or 0.0) >= 0.0 else -1.0
+        backoff_pan = max(0.4, float(getattr(self.cfg.engagement, "loss_handoff_backoff_pan_deg", 1.4) or 1.4))
+        tilt_step = max(0.2, float(getattr(self.cfg.engagement, "loss_handoff_tilt_step_deg", 0.9) or 0.9))
+        return self._apply_loss_search_rounds([
+            (center_pan - (backoff_pan * heading_pan), center_tilt),
+            (center_pan - (backoff_pan * 0.45 * heading_pan), center_tilt + (tilt_step * max(0.5, heading_tilt))),
+            (center_pan - (backoff_pan * 0.35 * heading_pan), center_tilt - (tilt_step * max(0.5, heading_tilt))),
+            (center_pan, center_tilt),
+        ], center_pan, center_tilt)
+
+    def _persistent_loss_recovery_points(self, pursuit_window: float) -> List[Tuple[float, float]]:
+        local_points = self._loss_recovery_local_search_points(pursuit_window)
+        expanding_points = self._loss_recovery_expanding_search_points(pursuit_window)
+        base_points: List[Tuple[float, float]] = []
+        base_points.extend(local_points)
+        base_points.extend(expanding_points)
+        if not base_points:
+            return []
+        visible_count = int(self._loss_recovery_context.get("visible_target_count", 0) or 0)
+        crowd_threshold = max(1, int(getattr(self.cfg.engagement, "loss_scene_crowding_threshold", 3) or 3))
+        pass_count = int(getattr(self.cfg.engagement, "loss_persistent_retry_passes_sparse", 2) or 2)
+        if visible_count >= crowd_threshold:
+            pass_count = int(getattr(self.cfg.engagement, "loss_persistent_retry_passes_crowded", 1) or 1)
+        pass_count = max(1, pass_count)
+        center_pan, center_tilt = self._loss_recovery_search_origin(pursuit_window)
+        points: List[Tuple[float, float]] = []
+        for pass_index in range(pass_count):
+            scale = 1.0 + (0.10 * pass_index)
+            for point_pan, point_tilt in base_points:
+                points.append((
+                    center_pan + ((point_pan - center_pan) * scale),
+                    center_tilt + ((point_tilt - center_tilt) * scale),
+                ))
         return points
 
     def _move_loss_recovery_target(self, pan: float, tilt: float, now: float) -> None:
@@ -1626,6 +2104,7 @@ class SentryV2Engine:
             "engage_phase": str(getattr(self, "_engage_phase", "")),
             "targets_visible": len(self.last_targets),
             "targets_qualified": len(self.last_qualified),
+            "active_engagements": 1 if self.active_order is not None else 0,
             "queue_length": len(self._queue),
             "queue_position": self._queue_index,
             "engagements_total": len(self.engagement_log),
@@ -1646,6 +2125,10 @@ class SentryV2Engine:
     def get_ml_logger(self) -> MLTrainingLogger:
         """Return the ML training logger for recording engagement data."""
         return self._ml_logger
+
+    def save_ml_training_data(self) -> bool:
+        """Persist the current ML training examples to disk."""
+        return bool(self._ml_logger.save())
 
     def train_ml_model(self) -> bool:
         """

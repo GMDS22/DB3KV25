@@ -1,7 +1,135 @@
 {
   "schema": 1,
-  "max_items": 10,
+  "max_items": 11,
   "items": [
+    {
+      "date": "2026-04-09",
+      "title": "Smart Sentry v2.3.2 layout persistence refinement: `app/sentry_v2/sentry_v2_config.py` now persists standalone window geometry plus main/layout/bottom splitter sizes, `app/sentry_v2/sentry_v2_tab.py` now restores those sizes through a unified startup path, ignores zero-size pre-layout splitter snapshots, and reruns the restore pass on first show so responsive panel state is captured only after the widget has a real layout, and `app/run_smart_sentry_v2_3_2.py` now restores and saves the frameless shell window position, size, and maximized state on close. The result is that the responsive settings panel, lower panes, and standalone window reopen where the operator left them instead of resetting each launch."
+    },
+    {
+      "date": "2026-04-09",
+      "title": "Smart Sentry v2.3.2 hunting-behavior refinement: app/sentry_v2/sentry_v2_config.py now carries a shared `Hunting` vs `Fast Reacquire` search-style preference plus explicit PIR `cue_hold_time_s`, app/sentry_v2/sentry_v2_engine.py now leaves PIR cues after a short hold and runs a tighter zone-biased local hunt while after-target-loss recovery now performs a denser direction-aware local hunt with faster step cadence before wider expansion, app/sentry_v2/sentry_v2_pir_manager.py now starts PIR no-detect scans with local cue-area points before broader mirrored coverage, and app/sentry_v2/sentry_v2_tab.py plus app/sentry_v2/sentry_v2_tooltips.py expose the new controls and wording. SMART_SENTRY_MANUAL.md, PIR_GUARD_QUICK_START.md, PIR_GUARD_IMPLEMENTATION_COMPLETE.md, PIR_INTEGRATION_SUMMARY.md, PIR_AT_A_GLANCE.md, SMART_SENTRY_APP_CHANGE_IMPACT.md, and SMART_SENTRY_ISSUE_LOG.md were synced to the same contract."
+    },
+    {
+      "date": "2026-04-09",
+      "title": "Smart Sentry v2.3.2 identity-and-operator expansion: app/sentry_v2/face_identity.py now provides a lightweight Haar-cascade plus embedding-based known-face library that works without cv2.face, app/sentry_v2/target_filter.py now carries identity metadata on detections, app/sentry_v2/sentry_v2_tab.py now replaces the placeholder Facial Recognition, Shortcut Keys, and AI Assistant pages with working runtime panels, adds a pinned Quick Keys button in the top strip, registers live window-focused keyboard shortcuts, lets operators register faces from imported images or the current live frame, labels recognized names on the preview, and can suppress friendly known faces from engagement. The same runtime now supports both robot buzzer cues and local human-like speech through Qt text-to-speech, including a Conversational Voice assistant mode with spoken replies, richer local operator commands, speech-style presets, a dedicated Voice Diagnostics panel, a `Validate Voices` check for every detected Qt voice, explicit tooltip coverage for the newer speech controls, and a guard that mutes the ESP32 buzzer while human voice mode is enabled. SMART_SENTRY_MANUAL.md, SMART_SENTRY_APP_CHANGE_IMPACT.md, SMART_SENTRY_ISSUE_LOG.md, and the new SMART_SENTRY_SHORTCUT_KEYS.md were synced to the same contract."
+    },
+    {
+      "date": "2026-04-09",
+      "title": "Smart Sentry v2.3.2 responsive UI refresh: `app/sentry_v2/sentry_v2_tab.py` now uses shared settings-panel metrics to scale the icon tab bar, previous and next tab buttons, manual movement matrix, preset-grid column count, key list heights, compact label widths, and several dense QBoxLayout control rows from the live right-panel size instead of relying on scattered fixed values, while the theme spacing was tightened to reduce panel bulk at the same footprint. Dense rows in Presets, Camera, Detection, and Prompted Targets can now flip vertical on narrower settings widths instead of only compressing. `app/run_smart_sentry_v2_3_2.py` now launches the standalone frameless shell at a softer 1280x860 default with a smaller minimum footprint. The settings panel can now compress more cleanly, the tab icon buttons follow panel width during splitter drags, and the overall operator layout stays more balanced across narrow and wide window sizes without changing Smart Sentry workflow or transport behavior."
+    },
+    {
+      "date": "2026-04-08",
+      "title": "Smart Sentry v2.3.2 rest-execution refinement documented: `app/sentry_v2/sentry_v2_tab.py` now honors saved rest tilts below the normal guard minimum by clamping rest moves against the absolute sentry tilt limits instead of the generic guard/manual minimum path, so valid parked poses no longer snap back up during `Go Rest`. `SMART_SENTRY_MANUAL.md`, `SMART_SENTRY_APP_CHANGE_IMPACT.md`, and `SMART_SENTRY_ISSUE_LOG.md` were updated to record the separate guard-vs-rest tilt contract and the guided home/rest move workflow."
+    },
+    {
+      "date": "2026-04-08",
+      "title": "Smart Sentry v2.3.2 PIR no-detect search visibility documented: `app/sentry_v2/sentry_v2_pir_manager.py` and `app/sentry_v2/sentry_v2_engine.py` now treat the cue point as the center-confirmation step and, when scanning is enabled, begin the no-detect search from the first offset point instead of reissuing the already-visited center. `PIR_GUARD_QUICK_START.md`, `PIR_INTEGRATION_SUMMARY.md`, `PIR_AT_A_GLANCE.md`, `SMART_SENTRY_MANUAL.md`, and `SMART_SENTRY_ISSUE_LOG.md` now describe that visible offset-first search behavior."
+    },
+    {
+      "date": "2026-04-08",
+      "title": "Smart Sentry rest-position workflow implemented across app and firmware: `app/sentry_v2/sentry_v2_config.py` now persists a separate rest pan/tilt that defaults to the current home position, `app/sentry_v2/sentry_v2_tab.py` adds Guard-tab rest controls plus startup and shutdown rest sequencing, `app/run_smart_sentry_v2_3_1.py` and `app/run_smart_sentry_v2_3_2.py` now defer window close to the tab’s graceful shutdown path, and `app/sentry_v2/sound_engine.py` keeps the new rest cue on the existing buzzer-tone system rather than adding a separate audio stack. The active WiFi firmware at `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` now accepts `rest` config, reports `rest_pan` / `rest_tilt`, and exposes `{\"action\":\"rest\"}` while continuing to use the existing `{\"action\":\"sound\"}` payload for buzzer playback."
+    },
+    {
+      "date": "2026-04-08",
+      "title": "Smart Sentry v2 adaptive after-target-loss recovery documented and locked in: `app/sentry_v2/sentry_v2_engine.py` now treats target loss as a context-aware branch instead of a single generic scan, choosing `rapid_handoff_search` when a stronger visible target is available and `persistent_reacquire_search` when the scene is sparse and no strong replacement is present. `app/sentry_v2/sentry_v2_config.py` and `app/sentry_v2/sentry_v2_tab.py` now expose the protocol-selection and tuning fields behind the `After Target Loss` controls, while `SMART_SENTRY_MANUAL.md`, `SMART_SENTRY_APP_CHANGE_IMPACT.md`, `SMART_SENTRY_V2_3_2_LIVE_VALIDATION_CHECKLIST.md`, and `SMART_SENTRY_ISSUE_LOG.md` now record this behavior as a protected app contract that must stay bounded, scene-aware, and return to guard cleanly when recovery expires."
+    },
+    {
+      "date": "2026-04-07",
+      "title": "Smart Sentry v2.3.1 environment and release workflow standardized: `build_smart_sentry_v2_3_1_portable.ps1` now defaults release output to `F:`, prefers Python 3.11 from `.venv311`, still supports explicit interpreter override through `SMART_SENTRY_PYTHON_EXE`, and validates against the active interpreter runtime DLL instead of a hard-coded Python 3.12 filename. `.vscode/settings.json` now pins the workspace interpreter to `.venv311`, the compilation protocol and packaging docs now treat `F:/SMART SENTRY V2.3.1` as the canonical release folder, and the docs now record the PyQt5 VC-runtime cleanup rule plus a future hardening checklist for build logs, interpreter reporting, release manifests, and smoke-test tracing."
+    },
+    {
+      "date": "2026-04-07",
+      "title": "Smart Sentry v2.3.1 portable YOLO release contract corrected: app/sentry_v2/sentry_v2_tab.py now treats the release-root YOLO_MODELS folder as the public frozen-build drop location while still discovering bundled default models under SMART_SENTRY_V2_3_1_FILES/YOLO_MODELS, quick startup now schedules a later lazy YOLO auto-load instead of leaving YOLO fully manual, build_smart_sentry_v2_3_1_portable.ps1 now creates the public root-level YOLO_MODELS folder beside the packaged executable, and the compilation protocol, include list, manual, change-impact reference, and issue log were synced to the same release behavior. Optional ML support was also made truly lazy again so normal portable builds do not need to pull sklearn into PyInstaller analysis unless that runtime path is actually used."
+    },
+    {
+      "date": "2026-04-07",
+      "title": "Smart Sentry v2.3.1 runtime polish sync: app/sentry_v2/sentry_v2_tab.py now keeps motion-led viewing smoother through preview-side presentation throttling, restores a readable command-status surface by suppressing automatic tracking-move churn while still surfacing manual actions and failures, flushes stale detector work immediately when detection modes change so the new mode takes effect faster, and adds timestamped Serial Output export plus open-folder actions for later AI analysis. app/sentry_v2/sentry_v2_detector.py keeps resize acceleration limited to pure motion-only modes, app/sentry_v2/sentry_v2_overlay.py removes the stale upper-left branding label, drops the forced 'moving' prefix, and now uses the operator-approved no-center-fill monochrome scope reticle, and app/sentry_v2/sentry_v2_engine.py completes a finite target-loss pursuit plus scan sequence before returning fixed-guard mode cleanly to the configured home position. Threat AI saved-data and model-status messaging were also tightened through app/sentry_v2/ml_training_logger.py, app/sentry_v2/sentry_v2_engine.py, and app/sentry_v2/sentry_v2_tab.py."
+    },
+    {
+      "date": "2026-04-06",
+      "title": "Smart Sentry v2.3.1 WiFi baseline created: arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino now replaces the older GPIO0-driven sweep behavior with an app-triggered UDP sweep action, keeps GPIO0 reserved strictly as the ESP32 BOOT strap, renames the DB3000 WiFi SSID to SMART-SENTRY-V2.3, and updates app/sentry_v2/sentry_v2_comm.py plus app/sentry_v2/sentry_v2_tab.py so the manual control tab exposes a dedicated Run Sweep button over the same queued transport path. ESP32_CURRENT_SKETCH.md, ESP32_UDP_FLASH.md, CHANGE_IMPACT_REFERENCE.md, and SMART_SENTRY_V2_3_1_COMPILATION_PROTOCOL.md were synced for the new 2.3.1 release workflow."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Smart Sentry v2.3 DB3000 FlySky baseline added: arduino/SMART_SENTRY_V2_3_DB3000_ESP32_UDP_PIR_FLYSKY/SMART_SENTRY_V2_3_DB3000_ESP32_UDP_PIR_FLYSKY.ino now provides the documented DB3000 WiFi baseline with FS-iA6 i-Bus telemetry on GPIO21, a physical APP or RC mode switch on GPIO22, firmware-side app-vs-RC source arbitration with safe APP fallback when no receiver frames are present, and capability/runtime fields that drive the existing V2.3 control-source UI. ESP32_CURRENT_SKETCH.md, ESP32_UDP_FLASH.md, app/sentry_v2/sentry_v2_tab.py, and app/sentry_v2/sentry_v2_overlay.py were updated alongside the new sketch path, and the V2.3 UI now also removes the stale 'moving' target prefix and throttles main-thread video repainting to reduce navigation lag."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Waveshare single-board attempt closed and hybrid fallback activated: the later Step 9 state-machine retest did not produce confirmed visible servo movement, direct probing destabilized the motion-capable single-board path after initial command acceptance, and the user explicitly stopped further bench testing. SMART_SENTRY_V3_0_WAVESHARE_FULL_TEST_SUMMARY_2026-04-05.md, SMART_SENTRY_V3_0_WAVESHARE_HANDOFF_AND_USB_ACCESSORY_FALLBACK_2026-04-05.md, and SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST_PLAN.md now record that Step 7.6 was scheduler-only, Step 9 remained unstable with no confirmed motion, a `1000000` baud Step 9 build was compiled but not hardware-validated, and the active Smart Sentry runtime was switched to hybrid mode 2 so Debug Board USB handles pan and tilt while the Waveshare ESP32 remains on WiFi for IO and accessories."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Waveshare Step-gating correction documented: post-flash validation showed the Step 7.6 state-machine build was network-stable but not motion-capable because SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST.ino still compiles servo writes and bus_ping bridging only at REINTRO_STEP 9 and above. SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST_PLAN.md now explicitly marks Step 7.6 as a WiFi plus UART-scheduler validation build and adds the correct Step 9.6 compile override for the first motion-capable state-machine test."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Waveshare Step 7.6 UART state-machine path added: SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST.ino now supports a compile-time REINTRO_UART_STATE_MACHINE_MODE override that replaces the old Step 7 single-byte receive path with a non-blocking UART transaction state machine using a 2 ms settle delay, a 15 ms bounded RX window, a 64-byte total cap, and a 16-byte per-loop chunk limit so servo UART response collection can be spread across multiple loop passes without continuous draining. SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST_PLAN.md now documents this Step 7.6 variant, its exact compile override, and the first tuning reductions to try if WiFi or UDP regress."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Waveshare full test summary and app-path correction documented: SMART_SENTRY_V3_0_WAVESHARE_FULL_TEST_SUMMARY_2026-04-05.md now records the full single-board Waveshare validation chain from the minimal isolation sketch through Step 8 B3, identifies Step 7 A3 as the highest stable firmware, records that Step 8 base, B2, and B3 all failed, and captures the live app integration finding that movement failures were caused by connection_type 4 dual-ESP32 WiFi mode targeting 192.168.4.2:9001 instead of the actual single-board bridge endpoint 192.168.4.1:9000. app/config/smart_sentry_v3_settings.json and app/app/config/sentry_v2_settings.json were corrected back to connection_type 3 for the active single-board WiFi bridge path."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Waveshare reintroduction B3 ring-buffer path added: SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST.ino now supports a compile-time REINTRO_UART_RING_MODE override that stores UART bytes into a small ring buffer from the dedicated poll task and processes buffered bytes separately from the main WiFi and UDP loop. SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST_PLAN.md now includes the exact B3 compile override that combines delayed UART init, task-based polling, and ring-buffered UART handling."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Waveshare reintroduction B2 task-mode path added: SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST.ino now supports a compile-time REINTRO_UART_TASK_MODE override that moves Step 8 bounded UART polling into a dedicated FreeRTOS task with vTaskDelay(1), keeping the main loop free for WiFi and UDP servicing while preserving the existing delayed UART init path. SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST_PLAN.md now includes the exact B2 compile override for this task-based UART polling variant."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Final Waveshare UART execution path staged: SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST.ino now defaults to Step 6A, keeps UART init-only behavior gated away from any reads or writes until later stages, and supports compile-time overrides for UART RX pin, TX pin, baud, and init delay so Solution Path A variants can be tested without editing source again. SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST_PLAN.md now documents Solution Path A, Solution Path B, and the fallback architectures for when UART plus WiFi cannot be stabilized on the single-board bridge design."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Waveshare reintroduction sketch aligned to Step 5 and Step 6A execution: SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST.ino now defaults to REINTRO_STEP 5, supports direct GPIO control with {\"cmd\":\"set\",\"pin\":N,\"value\":0|1} for pins 4, 27, 25, and 26, and uses 250000 baud for the UART init-only stage on GPIO18 and GPIO19 without any UART reads or writes before Step 7. SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST_PLAN.md was updated to match the same Step 5 and Step 6A contract."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "PlatformIO Step 1-4 validation passed: platformio/SMART_SENTRY_V3_0_WAVESHARE_STEP_1_4_TEST built cleanly with PlatformIO, uploaded successfully to the Waveshare ESP32 on COM30, and passed runtime checks once the Windows SMART-SENTRY-V3 Wi-Fi profile was rebuilt for the new password 12345678. Serial showed the expected boot banner and stable [DIAG] logs, ARP resolved 192.168.4.1, ping returned 0 percent loss, station count reached 1, and UDP JSON test traffic replied with {\"status\":\"ok\",\"cmd\":\"test\",...}."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "PlatformIO Step 1-4 project added: platformio/SMART_SENTRY_V3_0_WAVESHARE_STEP_1_4_TEST now contains a standalone Waveshare SoftAP plus UDP test project with structured packet handling, JSON parsing without actions, structured JSON replies, and GPIO initialization only. This mirrors the controlled reintroduction path through steps 1 to 4 while keeping UART, bus traffic, and GPIO toggling out of the runtime."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Controlled reintroduction path added: arduino/SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST/SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST.ino now provides a compile-time REINTRO_STEP ladder that rebuilds the Waveshare bridge one feature at a time from the known-good UDP echo baseline, with explicit diagnostics for station count, heap, loop timing, UDP traffic, and UART activity. SMART_SENTRY_V3_0_WAVESHARE_BRIDGE_REINTRO_TEST_PLAN.md documents the strict flash-and-test order from raw UDP echo through JSON, GPIO, UART init, UART RX, and bus motion handling."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Waveshare WiFi isolation result: the minimal SoftAP plus UDP echo firmware at arduino/SMART_SENTRY_V3_0_WAVESHARE_WIFI_UDP_ECHO_TEST/SMART_SENTRY_V3_0_WAVESHARE_WIFI_UDP_ECHO_TEST.ino was flashed successfully and passed the hardware-stack validation. Windows associated to SMART-SENTRY-V3, ARP resolved 192.168.4.1 to 44-1d-64-86-3a-7d, ping replied with 0 percent loss, UDP echoed payloads correctly on port 9000, and serial reported stations=1. This rules out a board-level SoftAP failure and shifts the root cause back to interaction inside the full bridge firmware path."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Waveshare WiFi stability retry: arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino now runs bus UART work through a dedicated FreeRTOS task pinned to Core 0, adds explicit cooperative yielding in the main loop, simplifies SoftAP startup back to WiFi.mode(WIFI_AP) plus softAP() plus udp.begin(9000), and temporarily drops the Yahboom bus baud to 250000 in WIFI_STABILITY_TEST_MODE so SoftAP and UDP reachability can be revalidated under lower load. A new minimal hardware-isolation sketch was also added at arduino/SMART_SENTRY_V3_0_WAVESHARE_WIFI_UDP_ECHO_TEST/SMART_SENTRY_V3_0_WAVESHARE_WIFI_UDP_ECHO_TEST.ino for direct SoftAP plus UDP echo testing."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Waveshare v3 handoff and fallback documentation added: SMART_SENTRY_V3_0_WAVESHARE_HANDOFF_AND_USB_ACCESSORY_FALLBACK_2026-04-05.md now records the full single-board WiFi bridge attempt, the firmware and network fixes tried, where flashing and source alignment succeeded, where SoftAP/IP/UDP servicing still failed, and the approved fallback plan to keep the Waveshare USB servo-driver path for motion while using the on-board ESP32 only for accessory outputs on the confirmed Pi-style header pins."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Smart Sentry v3 Waveshare switch-removal update: arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino no longer configures or gates on the previous GPIO21 hardware arm switch, the bridge now reports switch_supported=false and relies on software safety for trigger blocking, app/sentry_v2/sentry_v2_tab.py and app/sentry_v2/sentry_v2_tooltips.py now present that switchless bridge state cleanly in the UI, and ESP32_CURRENT_SKETCH.md, ESP32_UDP_FLASH.md, CHANGE_IMPACT_REFERENCE.md, SMART_SENTRY_V3_0_APP_BRIDGE_COMPATIBILITY.md, SMART_SENTRY_V3_0_WAVESHARE_PREP_REPORT_2026-04-05.md, and SMART_SENTRY_V3_0_WAVESHARE_BENCH_CHECKLIST.md were synced to the same contract."
+    },
+    {
+      "date": "2026-04-05",
+      "title": "Smart Sentry v3 Waveshare firmware-alignment update: arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino now matches the vendor-confirmed bus path with GPIO18/GPIO19 at 1000000 baud, sends little-endian goal-position and move-time bytes, reports the real active-low hardware arm switch on GPIO21/header 40 in ack/state/cap packets, and keeps LED, laser, and trigger-servo outputs explicitly unassigned so the app only exposes confirmed hardware. arduino/SMART_SENTRY_V3_0_WAVESHARE_FULL_PIN_TEST/SMART_SENTRY_V3_0_WAVESHARE_FULL_PIN_TEST.ino, ESP32_CURRENT_SKETCH.md, ESP32_UDP_FLASH.md, SMART_SENTRY_V3_0_WAVESHARE_NANO_UPGRADE_SPEC.md, and CHANGE_IMPACT_REFERENCE.md were synced to the same bridge contract, and a bench-prep report was added for tomorrow's flash and validation pass."
+    },
+    {
+      "date": "2026-04-04",
+      "title": "Smart Sentry v3 live FlySky override update: arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino now turns the previously passive FS-iA6 i-Bus telemetry path into an active bridge control source, so CH1 and CH2 drive live pan and tilt override with a center deadband, CH3 drives the guarded MOSFET fire request path, CH4 and CH5 drive the accessory and spare relays, and CH6 selects local APP-vs-RC authority when the bridge is in auto mode. The bridge now blocks competing app motion/output writes while RC owns control, continues to honor the existing hardware switch and software safety chain, and reports RC signal validation from live decoded frames. SMART_SENTRY_V3_0_FLYSKY_FSIA6_INTEGRATION.md, SMART_SENTRY_V3_0_FLYSKY_FSIA6_VALIDATION_CHECKLIST.md, and CHANGE_IMPACT_REFERENCE.md now reflect that live RC override is implemented in firmware while bench validation of the exact receiver wiring path remains a separate hardware step."
+    },
+    {
+      "date": "2026-04-04",
+      "title": "Smart Sentry v3 passive FlySky decode update: arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino now includes a built-in passive i-Bus parser on header pin 10 / GPIO15 so the Waveshare bridge can publish live FS-iA6 channel telemetry and RC link health without depending on the outdated external IBusBM library timer path. SMART_SENTRY_V3_0_FLYSKY_FSIA6_INTEGRATION.md, SMART_SENTRY_V3_0_FLYSKY_FSIA6_VALIDATION_CHECKLIST.md, and CHANGE_IMPACT_REFERENCE.md now reflect that passive decode is implemented while live RC override and bench validation remain separate next steps."
+    },
+    {
+      "date": "2026-04-04",
+      "title": "Smart Sentry v3 Waveshare flash-readiness update: arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino now uses an ArduinoJson 7-compatible trigger payload read so it compiles cleanly with the installed esp32:esp32 toolchain, tools/flash_esp32_udp.ps1 has been restored as the canonical local compile-and-upload helper, and ESP32_CURRENT_SKETCH.md, ESP32_UDP_FLASH.md, and CHANGE_IMPACT_REFERENCE.md now include the Waveshare v3 bridge sketch and direct flash workflow."
+    },
     {
       "date": "2026-04-03",
       "title": "Smart Sentry v2 sound transport and volume update: app/sentry_v2/sentry_v2_comm.py now checks the actual ESP32 sound transport instead of treating a mode-2 Debug Board USB link as sufficient for buzzer playback, so sound no longer silently queues into a missing WiFi path. app/sentry_v2/sentry_v2_tab.py now adds an always-visible pinned sound row in the Status panel with live transport state plus a persisted volume slider, and arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino now accepts volume_pct in the sound action payload and applies it as buzzer duty level after reflash."
