@@ -6,6 +6,14 @@ Desktop app version numbers and firmware sketch names are not required to advanc
 
 If firmware is changed, this file MUST be updated in the same change.
 
+## Pinned Current App Firmware
+
+For the current Smart Sentry desktop app, treat the ESP32 WiFi plus Debug Board USB path as the live firmware contract unless a newer app-side release protocol explicitly says otherwise.
+
+- Current app topology: ESP32 WiFi + Debug Board USB
+- Current app firmware: [arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino](arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino)
+- Current app note: Waveshare single-board files are on hold and are not part of the current Smart Sentry app runtime.
+
 ## Current Required Sketches
 
 1. USB Serial IO / Dual-Port IO (ESP32 handles fire/safety/relays over USB serial)
@@ -15,7 +23,7 @@ If firmware is changed, this file MUST be updated in the same change.
 
 2. Full WiFi UDP Runtime (ESP32 receives motion + IO over UDP JSON)
 - Current sketch: [arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino](arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino)
-- Why: This is the current content-stable Smart Sentry WiFi baseline for the DB3000 IO board. It keeps PIR support, GPIO2 status/blink output, runtime trigger-servo tuning, optional PIR-event blink suppression, periodic pan/tilt/total current telemetry, keeps GPIO0 reserved strictly for ESP32 BOOT behavior, moves sweep execution to an app-triggered UDP action instead of a local GPIO0 input, and now accepts an explicit UDP rest-position contract (`rest` config plus `{"action":"rest"}`) while continuing to drive buzzer tones through the existing `{"action":"sound"}` path.
+- Why: This is the current content-stable Smart Sentry WiFi baseline for the DB3000 IO board. It keeps PIR support, GPIO2 status/blink output, runtime trigger-servo tuning, optional PIR-event blink suppression, periodic pan/tilt/total current telemetry, keeps GPIO0 reserved strictly for ESP32 BOOT behavior, moves sweep execution to an app-triggered UDP action instead of a local GPIO0 input, accepts an explicit UDP rest-position contract (`rest` config plus `{"action":"rest"}`) while continuing to drive buzzer tones through the existing `{"action":"sound"}` path, and now enters a link-loss safe mode that turns off relays, stops fire output, and suppresses PIR event emission when the app goes inactive.
 - Used with: Smart Sentry v2 mode 3 Full WiFi runtime and as the current baseline for the primary ESP32 WiFi board, including desktop app releases that do not change the firmware contract.
 
 3. Yahboom Servo Driver UDP Runtime (ESP32 with integrated serial bus servo driver)
@@ -23,10 +31,11 @@ If firmware is changed, this file MUST be updated in the same change.
 - Why: Accepts JSON servo commands over UDP, controls Yahboom YB-SD35M servos via integrated driver.
 - Used with: Smart Sentry v2 Dual ESP32 WiFi mode (secondary ESP32 for servos).
 
-4. Waveshare Single-Board UDP Bus Bridge (Smart Sentry v3 candidate)
-- Current sketch: [arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino](arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino)
-- Why: Runs the Waveshare-only v3 topology with vendor-aligned bus UART on GPIO18/GPIO19 at 1000000 baud, little-endian goal-position/time writes, direct header-backed trigger/accessory outputs, software-only safety gating for the trigger path, sound output on GPIO4/header 7, and capability-gated optional outputs that remain intentionally unassigned.
-- Used with: Smart Sentry v3 Waveshare Servo Driver HAT single-controller bring-up and bench validation.
+4. Waveshare Single-Board UDP Bus Bridge (On Hold / Not Current App)
+- On-hold sketch: [arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino](arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino)
+- Status: Failed single-board attempt kept only for bench history and possible future reintroduction.
+- Do not use this for the current Smart Sentry app unless a future release protocol explicitly restores the Waveshare path.
+- Used with: Archived Waveshare bench validation only, not the live desktop app.
 
 ## Legacy Firmware Note
 
@@ -48,7 +57,7 @@ From repository root:
 # Yahboom Servo Driver UDP sketch (secondary ESP32)
 .\tools\flash_esp32_udp.ps1 -Port COM6 -Sketch "arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino"
 
-# Waveshare single-board v3 bridge sketch
+# Waveshare single-board v3 bridge sketch (on hold, not current app)
 .\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino"
 ```
 

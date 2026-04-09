@@ -23,6 +23,7 @@ import json
 import importlib
 import os
 import queue
+import re
 import subprocess
 import sys
 import tempfile
@@ -47,8 +48,8 @@ from PyQt5.QtWidgets import (
     QStylePainter,
     QStyleOptionTab,
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject, QProcess, QProcessEnvironment, QSize, QUrl, QRectF, QPointF, QRect
-from PyQt5.QtGui import QImage, QPixmap, QColor, QIcon, QDesktopServices, QPainter, QPainterPath, QPen, QKeySequence
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject, QProcess, QProcessEnvironment, QSize, QUrl, QRectF, QPointF, QRect, QPropertyAnimation, QEasingCurve
+from PyQt5.QtGui import QImage, QPixmap, QColor, QIcon, QDesktopServices, QPainter, QPainterPath, QPen, QKeySequence, QCursor
 try:
     from PyQt5.QtTextToSpeech import QTextToSpeech
 except Exception:
@@ -57,6 +58,10 @@ try:
     from runtime_paths import app_root_path, runtime_root_path
 except ImportError:
     from app.runtime_paths import app_root_path, runtime_root_path
+try:
+    from smart_sentry_meta import get_app_title, get_version
+except ImportError:
+    from app.smart_sentry_meta import get_app_title, get_version
 
 
 def _windows_hidden_subprocess_kwargs() -> dict:
@@ -106,6 +111,7 @@ from .sentry_v2_config import (
     SENTRY_TILT_MIN,
 )
 from .target_filter import DetectedObject
+from .assistant import AssistantReply, LocalAssistantService, OllamaClient
 
 
 class NoWheelScrollFilter(QObject):
@@ -290,7 +296,8 @@ SMART_SENTRY_V2_WIFI_SSID = "SMART-SENTRY-V2.3"
 SMART_SENTRY_V2_WIFI_PASSWORD = "db3000pass"
 SMART_SENTRY_V3_WIFI_SSID = "SMART-SENTRY-V3"
 SMART_SENTRY_V3_WIFI_PASSWORD = "smartv3pass"
-SMART_SENTRY_RELEASE_TITLE = "Smart Sentry V2.3.2"
+SMART_SENTRY_RELEASE_VERSION = get_version()
+SMART_SENTRY_RELEASE_TITLE = get_app_title("Smart Sentry")
 SMART_SENTRY_RELEASE_SUBTITLE = "ESP32 WiFi + USB Control"
 SMART_SENTRY_RELEASE_BADGE = ""
 
@@ -325,6 +332,27 @@ SETTINGS_TAB_NAV_LABELS = {
     "Shortcut Keys": "SHORTCUT KEYS",
     "AI Assistant": "AI ASSISTANT",
 }
+
+# Release-hold convention: keep unfinished tabs out of the active release UI until validated.
+SETTINGS_TAB_RELEASE_HOLDS: Dict[str, Dict[str, str]] = {
+    "Facial Recognition": {
+        "badge": "Release Hold",
+        "message": f"Temporarily disabled for the Smart Sentry v{SMART_SENTRY_RELEASE_VERSION} release while the face-recognition workflow completes release validation.",
+    },
+    "AI Assistant": {
+        "badge": "Release Hold",
+        "message": f"Temporarily disabled for the Smart Sentry v{SMART_SENTRY_RELEASE_VERSION} release while the local assistant workflow completes release validation.",
+    },
+}
+
+SERIAL_LOG_FILTER_SPECS: List[Tuple[str, str]] = [
+    ("all", "All"),
+    ("system", "System"),
+    ("movement", "Move"),
+    ("camera", "Camera"),
+    ("safety", "Safety"),
+    ("accessory", "Accessory"),
+]
 
 
 def _build_settings_tab_icon(icon_key: str, color_value: str, size: int = 18) -> QIcon:
@@ -594,7 +622,7 @@ DETECTION_PRESETS = {
     },
     "color_motion": {
         "label": "Color + Motion",
-        "description": "Color mask plus frame-diff motion for moving colored objects. With the shipped red-color preset, detections must overlap both the selected color and motion before they count.",
+        "description": "Color mask plus frame-diff motion for moving colored objects. With the shipped red-color preset and a specific color selected, detections must overlap both the selected color and motion before they count.",
         "tooltip_key": "preset_detection_color_motion",
         "settings": {
             "detection_mode": 7,
@@ -613,7 +641,7 @@ DETECTION_PRESETS = {
     },
     "color_backsub": {
         "label": "Color + Background",
-        "description": "Color mask plus foreground agreement for moving colored objects. With the shipped red-color preset, detections must overlap both the selected color and foreground motion.",
+        "description": "Color mask plus foreground agreement for moving colored objects. With the shipped red-color preset and a specific color selected, detections must overlap both the selected color and foreground motion.",
         "tooltip_key": "preset_detection_color_backsub",
         "settings": {
             "detection_mode": 8,
@@ -632,7 +660,7 @@ DETECTION_PRESETS = {
     },
     "color_yolo": {
         "label": "Color + YOLO",
-        "description": "Color mask fused with YOLO for class-aware colored-object follow. With the shipped red-color preset, detections must overlap both the selected color and the YOLO box.",
+        "description": "Color mask fused with YOLO for class-aware colored-object follow. With the shipped red-color preset and a specific color selected, detections must overlap both the selected color and the YOLO box.",
         "tooltip_key": "preset_detection_color_yolo",
         "settings": {
             "detection_mode": 9,
@@ -2806,29 +2834,12 @@ def _mix_hex(color_a: str, color_b: str, ratio: float) -> str:
 
 def _rgba_hex(color: str, alpha_pct: int) -> str:
     red, green, blue = _hex_to_rgb(color)
-    alpha = max(0.0, min(1.0, float(alpha_pct) / 100.0))
-    return f"rgba({red}, {green}, {blue}, {alpha:.3f})"
+    alpha = _clamp_int(alpha_pct, 0, 100)
+    return f"rgba({red}, {green}, {blue}, {alpha}%)"
 
 
 class SentryV2TabWidget(QWidget):
-    """
-    Complete SMART SENTRY V2.3.2 tab widget.
-
-    Signals for main app integration:
-        turret_move_requested(pan, tilt)
-        fire_requested(burst_count)
-        sentry_enabled_changed(enabled)
-        detection_mode_changed(mode_index)
-        trigger_mode_changed(is_bb)
-        toggle_led_requested(on)
-        toggle_laser_requested(on)
-        toggle_safety_requested()
-        go_home_requested()
-        manual_move_requested(pan_delta, tilt_delta)
-        manual_fire_requested(state)  # 1=press, 0=release
-        auto_trigger_changed(enabled)
-        color_preset_changed(preset_name)
-    """
+    """Primary Smart Sentry desktop control surface and runtime host."""
 
     # Signals for main app integration.
     turret_move_requested = pyqtSignal(float, float)
@@ -2843,13 +2854,15 @@ class SentryV2TabWidget(QWidget):
     color_preset_changed = pyqtSignal(str)
     pir_event_received = pyqtSignal(int, float)
     # Thread-safe camera open result signals (emitted from bg thread, handled on main thread)
-    _cam_bg_opened = pyqtSignal(object, str, str, int, int, bool)   # cap, src_text, kind, rw, rh, rfs
+    _cam_bg_opened = pyqtSignal(object, str, str, int, int, bool)   # (src, backend, backend_name), src_text, kind, rw, rh, rfs
     _cam_bg_failed = pyqtSignal(str)                                 # src_text
     _cam_url_error = pyqtSignal(str)                                 # error message from URL-open bg thread
     _cam_url_ready = pyqtSignal(str, str, int, int, int)             # display_label, source_text, w, h, gen
     _cam_url_status = pyqtSignal(str)                                # live status text from URL-open bg thread
     _yolo_load_result = pyqtSignal(bool, str, str)                   # ok, model_name, error_text
     wifi_autojoin_result = pyqtSignal(bool, str)
+    assistant_reply_ready = pyqtSignal(object)
+    assistant_models_ready = pyqtSignal(bool, object, str)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -2877,6 +2890,12 @@ class SentryV2TabWidget(QWidget):
         self._speech_voice_names: List[str] = []
         self._speech_state_label: str = "waiting"
         self._last_spoken_ai_response: str = ""
+        self._assistant_busy: bool = False
+        self._assistant_models_loading: bool = False
+        self._assistant_available: bool = False
+        self._assistant_last_error: str = ""
+        self._assistant_models: List[str] = []
+        self._assistant_last_reply: Optional[AssistantReply] = None
         self._init_human_speech_engine()
         self._face_library = self._load_face_identity_library()
         self._face_runtime = FaceIdentityRuntime(self._face_library)
@@ -2918,12 +2937,16 @@ class SentryV2TabWidget(QWidget):
         self._test_media_loop_enabled: bool = True
         self._grab_fail_count: int = 0
         self._MAX_GRAB_FAILS: int = 90  # tolerate brief camera stalls before recovery/close
+        self._camera_black_frame_count: int = 0
+        self._MAX_CAMERA_BLACK_FRAMES: int = 24
+        self._camera_partial_frame_count: int = 0
+        self._MAX_CAMERA_PARTIAL_FRAMES: int = 6
         self._camera_recovery_attempts: int = 0
         self._MAX_CAMERA_RECOVERY_ATTEMPTS: int = 2
         self._camera_recovery_in_progress: bool = False
         self._startup_retry_count: int = -1  # tracks auto-open retries
         # Wire thread-safe camera open result signals
-        self._cam_bg_opened.connect(self._finish_camera_open)
+        self._cam_bg_opened.connect(self._on_camera_probe_ready)
         self._cam_bg_failed.connect(self._on_camera_open_failed)
         self._cam_url_error.connect(self._on_url_open_error)
         self._cam_url_ready.connect(self._on_url_ready)
@@ -2970,6 +2993,7 @@ class SentryV2TabWidget(QWidget):
         self._last_detected_objects: List[DetectedObject] = []
         self._last_display_frame: Optional[np.ndarray] = None
         self._last_raw_frame: Optional[np.ndarray] = None
+        self._last_processed_frame_s: float = 0.0
         self._display_frame_interval_s: float = 1.0 / 15.0
         self._busy_display_frame_interval_s: float = 1.0 / 10.0
         self._last_display_present_s: float = 0.0
@@ -2980,8 +3004,14 @@ class SentryV2TabWidget(QWidget):
         self._sound_prev_visible_targets: int = 0
         self._sound_prev_qualified_targets: int = 0
         self._sound_lock_active: bool = False
+        self._tracking_diag_last_key: str = ""
+        self._tracking_diag_last_log_s: float = 0.0
+        self._tracking_diag_min_interval_s: float = 0.75
         self._last_sound_transport_warn_s: float = 0.0
         self._last_face_matches: List[FaceMatchResult] = []
+        self._last_face_match_eval_s: float = 0.0
+        self._last_face_person_boxes: List[Tuple[int, int, int, int]] = []
+        self._last_face_runtime_status_text: str = ""
         self._last_announced_identity_at: Dict[str, float] = {}
         self._last_gesture_identity_at: Dict[str, float] = {}
         self._shortcut_bindings: List[QShortcut] = []
@@ -3009,6 +3039,7 @@ class SentryV2TabWidget(QWidget):
         self._shutdown_complete_callback: Optional[Callable[[], None]] = None
         self._startup_rest_completed: bool = False
         self._startup_rest_pending: bool = bool(getattr(self.config.guard, "rest_on_startup_enabled", True))
+        self._startup_rest_schedule_token: int = 0
         self._connection_busy: bool = False
         self._comm_task_queue: "queue.Queue[object]" = queue.Queue()
         self._pending_move_lock = threading.Lock()
@@ -3050,6 +3081,8 @@ class SentryV2TabWidget(QWidget):
         self.command_result_ready.connect(self._on_command_result_ready)
         self.pir_event_received.connect(self._on_comm_pir_event_received)
         self._yolo_load_result.connect(self._on_yolo_load_result)
+        self.assistant_reply_ready.connect(self._on_ai_assistant_reply_ready)
+        self.assistant_models_ready.connect(self._on_ai_assistant_models_ready)
         self._yolo_loading: bool = False
         self._yolo_runtime_prepared: bool = False
         self._startup_autoconnect_active: bool = False
@@ -3075,6 +3108,11 @@ class SentryV2TabWidget(QWidget):
         self._manual_control_buttons: list[QPushButton] = []
         self._responsive_lists: list[tuple[QListWidget, str]] = []
         self._responsive_labels: list[tuple[QLabel, str]] = []
+        self._log_entries: list[tuple[str, str, str]] = []
+        self._log_paused: bool = False
+        self._log_filter_key: str = "all"
+        self._log_paused_pending_count: int = 0
+        self._log_filter_buttons: Dict[str, QPushButton] = {}
         self._layout_restore_attempts: int = 0
         self._layout_restore_complete: bool = False
 
@@ -3091,6 +3129,7 @@ class SentryV2TabWidget(QWidget):
         self._status_timer = QTimer(self)
         self._status_timer.timeout.connect(self._refresh_status)
         self._status_timer.start(1200)
+        QTimer.singleShot(0, self._refresh_ai_provider_status)
         self._link_watchdog_timer = QTimer(self)
         self._link_watchdog_timer.timeout.connect(self._connection_watchdog_tick)
         self._link_watchdog_timer.start(2000)
@@ -3447,10 +3486,14 @@ class SentryV2TabWidget(QWidget):
         self._startup_rest_pending = False
         self._startup_rest_completed = True
         delay_ms = max(0, int(getattr(self.config.guard, "rest_startup_delay_ms", 900) or 0))
-        QTimer.singleShot(delay_ms, self._execute_startup_rest_move)
+        self._startup_rest_schedule_token += 1
+        token = int(self._startup_rest_schedule_token)
+        QTimer.singleShot(delay_ms, lambda current_token=token: self._execute_startup_rest_move(current_token))
 
-    def _execute_startup_rest_move(self) -> None:
+    def _execute_startup_rest_move(self, token: Optional[int] = None) -> None:
         if self._closing or self._cleanup_started or self._shutdown_in_progress:
+            return
+        if token is not None and int(token) != int(getattr(self, "_startup_rest_schedule_token", 0)):
             return
         if not bool(getattr(self.config.guard, "rest_on_startup_enabled", True)):
             self._startup_rest_pending = False
@@ -3626,7 +3669,7 @@ class SentryV2TabWidget(QWidget):
         self._bottom_info_splitter.setStretchFactor(0, 2)
         self._bottom_info_splitter.setStretchFactor(1, 3)
         self._layout_splitter.addWidget(self._bottom_info_splitter)
-        self._layout_splitter.setStretchFactor(0, 6)
+        self._layout_splitter.setStretchFactor(0, 5)
         self._layout_splitter.setStretchFactor(1, 1)
         left_layout.addWidget(self._layout_splitter)
         self._main_splitter.addWidget(left_panel)
@@ -3734,7 +3777,7 @@ class SentryV2TabWidget(QWidget):
         tabs_nav.setObjectName("sentryV2TabsNav")
         tabs_nav_layout = QHBoxLayout(tabs_nav)
         self._tabs_nav_layout = tabs_nav_layout
-        tabs_nav_layout.setContentsMargins(6, 2, 6, 2)
+        tabs_nav_layout.setContentsMargins(6, 6, 6, 6)
         tabs_nav_layout.setSpacing(10)
         tabs_nav_title = QLabel("")
         self._tabs_nav_title_label = tabs_nav_title
@@ -3743,18 +3786,21 @@ class SentryV2TabWidget(QWidget):
         tabs_nav_layout.addWidget(tabs_nav_title)
         self._settings_nav_label = QLabel("")
         self._settings_nav_label.setObjectName("sentryV2TabsNavCount")
+        self._settings_nav_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         tabs_nav_layout.addWidget(self._settings_nav_label)
         tabs_nav_layout.addStretch(1)
-        self._btn_prev_settings_tab = QPushButton("‹")
+        self._btn_prev_settings_tab = QPushButton("❮")
         self._btn_prev_settings_tab.setToolTip("Go to the previous settings tab")
         self._btn_prev_settings_tab.clicked.connect(self._select_previous_settings_tab)
-        self._btn_prev_settings_tab.setMinimumSize(32, 32)
+        self._btn_prev_settings_tab.setFixedSize(34, 26)
+        self._btn_prev_settings_tab.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self._set_button_role(self._btn_prev_settings_tab, "dpadArrow")
         tabs_nav_layout.addWidget(self._btn_prev_settings_tab)
-        self._btn_next_settings_tab = QPushButton("›")
+        self._btn_next_settings_tab = QPushButton("❯")
         self._btn_next_settings_tab.setToolTip("Go to the next settings tab")
         self._btn_next_settings_tab.clicked.connect(self._select_next_settings_tab)
-        self._btn_next_settings_tab.setMinimumSize(32, 32)
+        self._btn_next_settings_tab.setFixedSize(34, 26)
+        self._btn_next_settings_tab.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self._set_button_role(self._btn_next_settings_tab, "dpadArrow")
         tabs_nav_layout.addWidget(self._btn_next_settings_tab)
         panel_layout.addWidget(tabs_nav)
@@ -3770,7 +3816,12 @@ class SentryV2TabWidget(QWidget):
         self._settings_tabs.currentChanged.connect(lambda _index: QTimer.singleShot(0, self._settings_tabs.updateGeometry))
         self._settings_tabs.currentChanged.connect(self._update_settings_tab_nav_label)
 
-        self._settings_tab_titles = [title for title, _icon_key, _color in SETTINGS_TAB_SPECS]
+        self._settings_tab_release_holds = dict(SETTINGS_TAB_RELEASE_HOLDS)
+        self._settings_tab_specs = [
+            spec for spec in SETTINGS_TAB_SPECS
+            if spec[0] not in self._settings_tab_release_holds
+        ]
+        self._settings_tab_titles = [title for title, _icon_key, _color in self._settings_tab_specs]
         settings_pages = [
             self._build_connection_tab,
             self._build_master_profiles_tab,
@@ -3787,7 +3838,10 @@ class SentryV2TabWidget(QWidget):
             self._build_ai_assistant_tab,
         ]
         for (title, _icon_key, _color), builder in zip(SETTINGS_TAB_SPECS, settings_pages):
-            index = self._settings_tabs.addTab(self._wrap_settings_tab(builder()), "")
+            if title in self._settings_tab_release_holds:
+                continue
+            page = builder()
+            index = self._settings_tabs.addTab(self._wrap_settings_tab(page), "")
             self._settings_tabs.setTabToolTip(index, title)
             self._settings_tabs.setTabWhatsThis(index, title)
         for index in range(self._settings_tabs.count()):
@@ -3923,6 +3977,55 @@ QWidget#sentryV2Root QWidget#sentryV2RightPane {{
     background-color: transparent;
     border: none;
 }}
+QWidget#sentryV2Root QFrame#sentryV2QuickAccess {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 {tokens['hero_start']},
+        stop:0.45 {tokens['hero_mid']},
+        stop:1 {tokens['surface_alt_rgba']});
+    border: 1px solid {tokens['accent_soft']};
+    border-radius: {radius_large}px;
+}}
+QWidget#sentryV2Root QFrame#sentryV2QuickAccess[drawerExpanded="true"] {{
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QFrame#sentryV2QuickAccessHeader {{
+    background-color: rgba(12, 10, 8, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: {radius_medium + 2}px;
+}}
+QWidget#sentryV2Root QLabel#sentryV2QuickAccessTitle {{
+    color: {tokens['hero_text']};
+    font-family: "Segoe UI Variable Display", "Segoe UI Semibold", "Segoe UI";
+    font-size: {max(base_font + 0.7, 10.6):.2f}pt;
+    font-weight: 800;
+}}
+QWidget#sentryV2Root QLabel#sentryV2QuickAccessHint {{
+    color: {tokens['hero_subtle']};
+    font-size: {max(status_font + 0.1, 9.2):.2f}pt;
+    font-weight: 600;
+}}
+QWidget#sentryV2Root QPushButton#sentryV2QuickAccessHandle {{
+    background-color: rgba(255, 255, 255, 0.08);
+    color: {tokens['hero_text']};
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: {radius_medium + 2}px;
+    padding: 4px 12px;
+    min-height: {max(button_min_h - 4, 28)}px;
+    font-size: {max(base_font - 0.1, 9.4):.2f}pt;
+    font-weight: 700;
+}}
+QWidget#sentryV2Root QPushButton#sentryV2QuickAccessHandle:hover {{
+    background-color: {tokens['accent_faint']};
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QPushButton[quickAccessChip="true"] {{
+    border-radius: {radius_medium + 1}px;
+    min-height: {max(button_min_h - 6, 28)}px;
+    max-height: {max(button_min_h - 1, 32)}px;
+    padding: {max(button_pad_y - 1, 3)}px {max(button_pad_x - 4, 8)}px;
+    font-size: {max(base_font - 0.35, 9.2):.2f}pt;
+    font-weight: 700;
+}}
 QWidget#sentryV2Root QSplitter {{
     background-color: transparent;
 }}
@@ -3981,7 +4084,7 @@ QWidget#sentryV2Root QWidget#sentryV2TabsNav {{
     background-color: {tokens['surface_alt_rgba']};
     border: 1px solid {tokens['border']};
     border-radius: {radius_medium + 2}px;
-    padding: 4px 8px;
+    padding: 4px 7px;
 }}
 QWidget#sentryV2Root QLabel#sentryV2TabsNavTitle {{
     color: {tokens['hero_text']};
@@ -3994,6 +4097,7 @@ QWidget#sentryV2Root QLabel#sentryV2TabsNavCount {{
     font-family: "Segoe UI Variable Display", "Segoe UI Semibold", "Segoe UI";
     font-size: {nav_count:.2f}pt;
     font-weight: 700;
+    padding-left: 8px;
 }}
 QWidget#sentryV2Root QWidget#sentryV2ToggleRow {{
     background-color: {tokens['surface_alt_rgba']};
@@ -4128,10 +4232,10 @@ QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"] {{
     border: 1px solid {tokens['accent_soft']};
     border-radius: {radius_medium + 2}px;
     color: {tokens['hero_text']};
-    font-weight: 700;
-    font-size: {base_font:.2f}pt;
-    min-height: {dpad_min_h}px;
-    padding: {dpad_pad_y}px {dpad_pad_x}px;
+    font-weight: 800;
+    font-size: {max(base_font + 3.2, 14.0):.2f}pt;
+    min-height: {max(dpad_min_h - 8, 26)}px;
+    padding: {max(dpad_pad_y - 2, 2)}px {max(dpad_pad_x - 3, 5)}px;
 }}
 QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"]:hover {{
     background-color: {tokens['accent_mid']};
@@ -4357,7 +4461,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         else:
             tab_bar.setIconSize(QSize(24, 24))
         tokens = self._theme_tokens()
-        for idx, (_title, icon_key, color_value) in enumerate(SETTINGS_TAB_SPECS):
+        for idx, (_title, icon_key, color_value) in enumerate(getattr(self, "_settings_tab_specs", SETTINGS_TAB_SPECS)):
             if idx < tab_bar.count():
                 resolved_color = tokens["accent"] if color_value == "accent" else color_value
                 tab_bar.setTabTextColor(idx, QColor(resolved_color))
@@ -4377,11 +4481,24 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             label_text = f"{safe_index + 1}/{count} {nav_title}"
         if hasattr(self, "_settings_nav_label") and self._settings_nav_label is not None:
             self._settings_nav_label.setText(label_text)
-        can_navigate = count > 1
+        enabled_count = sum(1 for tab_index in range(count) if self._settings_tabs.isTabEnabled(tab_index)) if count > 0 else 0
+        can_navigate = enabled_count > 1
         if hasattr(self, "_btn_prev_settings_tab") and self._btn_prev_settings_tab is not None:
             self._btn_prev_settings_tab.setEnabled(can_navigate)
         if hasattr(self, "_btn_next_settings_tab") and self._btn_next_settings_tab is not None:
             self._btn_next_settings_tab.setEnabled(can_navigate)
+
+    def _find_navigable_settings_tab(self, start_index: int, step: int) -> int:
+        if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
+            return start_index
+        count = self._settings_tabs.count()
+        if count <= 0:
+            return start_index
+        for offset in range(1, count + 1):
+            candidate = (start_index + (step * offset)) % count
+            if self._settings_tabs.isTabEnabled(candidate):
+                return candidate
+        return start_index
 
     def _select_previous_settings_tab(self) -> None:
         if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
@@ -4389,7 +4506,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         count = self._settings_tabs.count()
         if count <= 1:
             return
-        self._settings_tabs.setCurrentIndex((self._settings_tabs.currentIndex() - 1) % count)
+        self._settings_tabs.setCurrentIndex(self._find_navigable_settings_tab(self._settings_tabs.currentIndex(), -1))
 
     def _select_next_settings_tab(self) -> None:
         if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
@@ -4397,7 +4514,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         count = self._settings_tabs.count()
         if count <= 1:
             return
-        self._settings_tabs.setCurrentIndex((self._settings_tabs.currentIndex() + 1) % count)
+        self._settings_tabs.setCurrentIndex(self._find_navigable_settings_tab(self._settings_tabs.currentIndex(), 1))
 
     def _wrap_settings_tab(self, content: QWidget) -> QScrollArea:
         content.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
@@ -4490,7 +4607,8 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         panel_height = self.height() if self.height() > 0 else 880
         compact = panel_width < 500
         dense = panel_width < 620
-        nav_button = _clamp_int_range(panel_width * 0.098, 40, 62)
+        nav_button = _clamp_int_range(panel_width * 0.082, 34, 52)
+        nav_button_height = _clamp_int_range(nav_button * 0.74, 26, 38)
         manual_button_width = _clamp_int_range((panel_width - 86) / 5.0, 58, 94)
         manual_button_height = _clamp_int_range(manual_button_width * 0.50, 32, 44)
         list_height = _clamp_int_range(panel_height * 0.18, 112, 220)
@@ -4502,8 +4620,9 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             "compact": compact,
             "dense": dense,
             "nav_button": nav_button,
-            "nav_spacing": 6 if compact else 10,
-            "nav_margin_x": 4 if compact else 6,
+            "nav_button_height": nav_button_height,
+            "nav_spacing": 5 if compact else 8,
+            "nav_margin_x": 8 if compact else 12,
             "tab_bar_height_min": 42 if compact else 46,
             "tab_bar_height_max": 60 if compact else 72,
             "manual_button_width": manual_button_width,
@@ -4515,9 +4634,12 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
     def _update_settings_nav_controls(self) -> None:
         metrics = self._responsive_panel_metrics()
-        button_size = int(metrics["nav_button"])
+        button_width = int(metrics["nav_button"])
+        button_height = int(metrics["nav_button_height"])
         if self._tabs_nav_layout is not None:
-            self._tabs_nav_layout.setContentsMargins(int(metrics["nav_margin_x"]), 2, int(metrics["nav_margin_x"]), 2)
+            left_margin = int(metrics["nav_margin_x"])
+            right_margin = 6
+            self._tabs_nav_layout.setContentsMargins(left_margin, right_margin, right_margin, right_margin)
             self._tabs_nav_layout.setSpacing(int(metrics["nav_spacing"]))
         if self._tabs_nav_title_label is not None:
             self._tabs_nav_title_label.setText("")
@@ -4525,9 +4647,9 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         for button in (getattr(self, "_btn_prev_settings_tab", None), getattr(self, "_btn_next_settings_tab", None)):
             if button is None:
                 continue
-            button.setMinimumSize(40, 40)
-            button.setMaximumSize(68, 68)
-            button.setFixedSize(button_size, button_size)
+            button.setMinimumSize(28, 26)
+            button.setMaximumSize(56, 38)
+            button.setFixedSize(button_width, button_height)
 
     def _update_manual_control_button_sizes(self) -> None:
         if not self._manual_control_buttons:
@@ -4860,22 +4982,29 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._btn_laser: "laser_toggle",
             self._btn_safety: "safety_toggle",
             self._btn_fire: "manual_fire",
-            self._chk_human_voice_enabled: "human_voice_enabled",
-            self._chk_mute_buzzer_for_human_voice: "mute_buzzer_when_human_voice_enabled",
-            self._combo_human_voice_style: "human_voice_style",
-            self._combo_human_voice: "human_voice_name",
-            self._btn_test_human_voice: "human_voice_test",
-            self._slider_human_voice_rate: "human_voice_rate",
-            self._slider_human_voice_pitch: "human_voice_pitch",
-            self._slider_human_voice_volume: "human_voice_volume",
-            self._btn_human_voice_fallback: "human_voice_fallback",
-            self._btn_human_voice_stop: "human_voice_stop",
-            self._btn_human_voice_refresh: "human_voice_refresh",
-            self._btn_human_voice_validate: "human_voice_validate",
-            self._chk_ai_auto_speak: "ai_auto_speak",
-            self._btn_ai_speak_last: "ai_speak_last",
-            self._lbl_ai_examples: "ai_request_examples",
         }
+        optional_widget_keys = {
+            "_chk_human_voice_enabled": "human_voice_enabled",
+            "_chk_mute_buzzer_for_human_voice": "mute_buzzer_when_human_voice_enabled",
+            "_combo_human_voice_style": "human_voice_style",
+            "_combo_human_voice": "human_voice_name",
+            "_btn_test_human_voice": "human_voice_test",
+            "_slider_human_voice_rate": "human_voice_rate",
+            "_slider_human_voice_pitch": "human_voice_pitch",
+            "_slider_human_voice_volume": "human_voice_volume",
+            "_btn_human_voice_fallback": "human_voice_fallback",
+            "_btn_human_voice_stop": "human_voice_stop",
+            "_btn_human_voice_refresh": "human_voice_refresh",
+            "_btn_human_voice_validate": "human_voice_validate",
+            "_btn_human_voice_validate_all": "human_voice_validate_all",
+            "_chk_ai_auto_speak": "ai_auto_speak",
+            "_btn_ai_speak_last": "ai_speak_last",
+            "_lbl_ai_examples": "ai_request_examples",
+        }
+        for attr_name, tooltip_key in optional_widget_keys.items():
+            widget = getattr(self, attr_name, None)
+            if widget is not None:
+                widget_map[widget] = tooltip_key
         for widget, key in widget_map.items():
             self._apply_tooltip(widget, key)
 
@@ -4992,12 +5121,12 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._edit_custom_master_name.setPlaceholderText("Example: Yellow Indoor Sniper")
         self._apply_tooltip(self._edit_custom_master_name, "custom_master_name")
         save_row.addWidget(self._edit_custom_master_name, 1)
-        self._btn_update_custom_master = QPushButton("Update Selected")
+        self._btn_update_custom_master = QPushButton("Update")
         self._set_button_role(self._btn_update_custom_master, "utility")
         self._btn_update_custom_master.clicked.connect(self._update_selected_custom_master_profile)
         self._apply_tooltip(self._btn_update_custom_master, "custom_master_update")
         save_row.addWidget(self._btn_update_custom_master)
-        btn_save_custom = QPushButton("Save As New")
+        btn_save_custom = QPushButton("Save New")
         self._set_button_role(btn_save_custom, "utility")
         btn_save_custom.clicked.connect(self._save_new_custom_master_profile)
         self._apply_tooltip(btn_save_custom, "custom_master_save_as_new")
@@ -5052,7 +5181,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._combo_theme_preset.addItem(data["label"], key)
         self._combo_theme_preset.currentIndexChanged.connect(self._on_theme_preset_changed)
         preset_row.addWidget(self._combo_theme_preset, 1)
-        btn_theme_apply = QPushButton("Apply Now")
+        btn_theme_apply = QPushButton("Apply")
         self._set_button_role(btn_theme_apply, "utility")
         btn_theme_apply.clicked.connect(self._apply_theme)
         preset_row.addWidget(btn_theme_apply)
@@ -7140,7 +7269,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         name_row.addWidget(self._edit_mask_name)
         mask_lay.addLayout(name_row)
 
-        self._btn_mask_capture = QPushButton("Capture From Video")
+        self._btn_mask_capture = QPushButton("Capture")
         self._btn_mask_capture.setCheckable(True)
         self._set_button_role(self._btn_mask_capture, "mode")
         self._btn_mask_capture.toggled.connect(self._on_mask_capture_toggled)
@@ -7175,16 +7304,18 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         mask_lay.addWidget(self._mask_list)
 
         manage_row = QHBoxLayout()
-        self._btn_mask_toggle = QPushButton("Toggle Selected")
+        self._btn_mask_toggle = QPushButton("Toggle")
         self._set_button_role(self._btn_mask_toggle, "utility")
         self._btn_mask_toggle.clicked.connect(self._toggle_selected_no_fire_masks)
         self._apply_tooltip(self._btn_mask_toggle, "no_fire_mask_toggle")
         manage_row.addWidget(self._btn_mask_toggle)
-        self._btn_mask_remove = QPushButton("Remove Selected")
+        self._btn_mask_remove = QPushButton("Remove")
         self._set_button_role(self._btn_mask_remove, "danger")
         self._btn_mask_remove.clicked.connect(self._remove_selected_no_fire_masks)
         self._apply_tooltip(self._btn_mask_remove, "no_fire_mask_remove")
         manage_row.addWidget(self._btn_mask_remove)
+        self._register_responsive_box_layout(draft_row, "dense_row")
+        self._register_responsive_box_layout(manage_row, "dense_row")
         mask_lay.addLayout(manage_row)
 
         self._chk_show_no_fire_masks = QCheckBox("Show no-fire masks")
@@ -7495,24 +7626,24 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._face_profile_list.currentItemChanged.connect(self._on_face_profile_selected)
         enroll_lay.addWidget(self._face_profile_list, 5, 0, 1, 3)
 
-        btn_import_faces = QPushButton("Add From Images")
+        btn_import_faces = QPushButton("Add Images")
         self._set_button_role(btn_import_faces, "utility")
         btn_import_faces.clicked.connect(self._register_face_from_images)
         enroll_lay.addWidget(btn_import_faces, 6, 0)
 
-        btn_capture_face = QPushButton("Add From Live Frame")
+        btn_capture_face = QPushButton("Add Live")
         self._set_button_role(btn_capture_face, "utility")
         btn_capture_face.clicked.connect(self._register_face_from_live_frame)
         enroll_lay.addWidget(btn_capture_face, 6, 1)
 
-        btn_remove_face = QPushButton("Remove Selected")
+        btn_remove_face = QPushButton("Remove")
         self._set_button_role(btn_remove_face, "utility")
         btn_remove_face.clicked.connect(self._remove_selected_face_profile)
         enroll_lay.addWidget(btn_remove_face, 6, 2)
         lay.addWidget(enroll_grp)
 
         test_row = QHBoxLayout()
-        btn_test = QPushButton("Test Current Frame")
+        btn_test = QPushButton("Test Frame")
         self._set_button_role(btn_test, "utility")
         btn_test.clicked.connect(self._run_face_recognition_test)
         test_row.addWidget(btn_test)
@@ -7550,16 +7681,17 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         global_lay.addWidget(self._lbl_shortcut_summary)
 
         btn_row = QHBoxLayout()
-        btn_reload = QPushButton("Reload Shortcuts")
+        btn_reload = QPushButton("Reload")
         self._set_button_role(btn_reload, "utility")
         btn_reload.clicked.connect(self._install_global_shortcuts)
         btn_row.addWidget(btn_reload)
 
-        btn_open_doc = QPushButton("Open Quick Reference")
+        btn_open_doc = QPushButton("Quick Guide")
         self._set_button_role(btn_open_doc, "utility")
         btn_open_doc.clicked.connect(self._open_shortcut_quick_view)
         btn_row.addWidget(btn_open_doc)
         btn_row.addStretch(1)
+        self._register_responsive_box_layout(btn_row, "dense_row")
         global_lay.addLayout(btn_row)
         lay.addWidget(global_grp)
 
@@ -7582,98 +7714,273 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         lay.setSpacing(6)
 
         intro = QLabel(
-            "Rule-based in-app assistant for diagnostics, operator questions, and safe runtime suggestions without needing an external model service."
+            "Local offline assistant powered by Ollama. It uses deterministic runtime checks plus a local model for analysis, coaching, and operator Q and A while keeping live actions permission-gated."
         )
         intro.setWordWrap(True)
         self._set_theme_role(intro, "subtleBody")
         lay.addWidget(intro)
 
-        session_grp = QGroupBox("Conversation Bridge")
+        session_grp = QGroupBox("Local Model Bridge")
         session_lay = QGridLayout(session_grp)
         session_lay.addWidget(QLabel("Assistant Mode:"), 0, 0)
         self._combo_ai_mode = QComboBox()
         self._combo_ai_mode.addItem("Read-Only Advisor", "read_only")
         self._combo_ai_mode.addItem("Guided Tuning", "guided_tuning")
-        self._combo_ai_mode.addItem("Mode Recommendations", "mode_recommendations")
+        self._combo_ai_mode.addItem("Runtime Analyst", "mode_recommendations")
         self._combo_ai_mode.addItem("Conversational Voice", "conversational_voice")
         mode_index = max(0, self._combo_ai_mode.findData(str(self.config.ai_assistant.mode or "guided_tuning")))
         self._combo_ai_mode.setCurrentIndex(mode_index)
         self._combo_ai_mode.currentIndexChanged.connect(self._on_ai_assistant_settings_changed)
         session_lay.addWidget(self._combo_ai_mode, 0, 1, 1, 2)
 
+        session_lay.addWidget(QLabel("Ollama Endpoint:"), 1, 0)
+        self._edit_ai_endpoint = QLineEdit(str(getattr(self.config.ai_assistant, "endpoint_url", "http://localhost:11434") or "http://localhost:11434"))
+        self._edit_ai_endpoint.editingFinished.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._edit_ai_endpoint, 1, 1, 1, 2)
+
+        session_lay.addWidget(QLabel("Fast Model:"), 2, 0)
+        self._combo_ai_model = QComboBox()
+        self._combo_ai_model.setEditable(True)
+        self._combo_ai_model.currentTextChanged.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._combo_ai_model, 2, 1, 1, 2)
+
+        session_lay.addWidget(QLabel("Analyst Model:"), 3, 0)
+        self._combo_ai_analyst_model = QComboBox()
+        self._combo_ai_analyst_model.setEditable(True)
+        self._combo_ai_analyst_model.currentTextChanged.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._combo_ai_analyst_model, 3, 1, 1, 2)
+
+        session_lay.addWidget(QLabel("Model Tier:"), 4, 0)
+        model_tier_row = QHBoxLayout()
+        model_tier_row.setContentsMargins(0, 0, 0, 0)
+        model_tier_row.setSpacing(6)
+        self._btn_ai_use_fast_model = QPushButton("Fast")
+        self._btn_ai_use_fast_model.setCheckable(True)
+        self._set_button_role(self._btn_ai_use_fast_model, "utility")
+        self._btn_ai_use_fast_model.clicked.connect(lambda: self._set_ai_model_tier("fast"))
+        model_tier_row.addWidget(self._btn_ai_use_fast_model)
+        self._btn_ai_use_analyst_model = QPushButton("Analyst")
+        self._btn_ai_use_analyst_model.setCheckable(True)
+        self._set_button_role(self._btn_ai_use_analyst_model, "utility")
+        self._btn_ai_use_analyst_model.clicked.connect(lambda: self._set_ai_model_tier("analyst"))
+        model_tier_row.addWidget(self._btn_ai_use_analyst_model)
+        model_tier_row.addStretch(1)
+        model_tier_host = QWidget()
+        model_tier_host.setLayout(model_tier_row)
+        session_lay.addWidget(model_tier_host, 4, 1, 1, 2)
+
+        self._lbl_ai_provider_status = QLabel("Checking local model service...")
+        self._set_theme_role(self._lbl_ai_provider_status, "mutedCompact")
+        session_lay.addWidget(self._lbl_ai_provider_status, 5, 0, 1, 3)
+
         self._chk_ai_enabled = QCheckBox("Enable in-app AI assistant")
         self._chk_ai_enabled.setChecked(bool(self.config.ai_assistant.enabled))
         self._chk_ai_enabled.toggled.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._chk_ai_enabled, 1, 0, 1, 3)
+        session_lay.addWidget(self._chk_ai_enabled, 6, 0, 1, 3)
 
         self._chk_ai_allow_modes = QCheckBox("Allow the assistant to suggest or switch detection modes")
         self._chk_ai_allow_modes.setChecked(bool(self.config.ai_assistant.allow_mode_switch))
         self._chk_ai_allow_modes.toggled.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._chk_ai_allow_modes, 2, 0, 1, 3)
+        session_lay.addWidget(self._chk_ai_allow_modes, 7, 0, 1, 3)
 
         self._chk_ai_allow_tuning = QCheckBox("Allow the assistant to draft tuning or runtime-setting changes")
         self._chk_ai_allow_tuning.setChecked(bool(self.config.ai_assistant.allow_setting_drafts))
         self._chk_ai_allow_tuning.toggled.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._chk_ai_allow_tuning, 3, 0, 1, 3)
+        session_lay.addWidget(self._chk_ai_allow_tuning, 8, 0, 1, 3)
 
         self._chk_ai_allow_analysis = QCheckBox("Allow runtime-state analysis and summaries")
         self._chk_ai_allow_analysis.setChecked(bool(self.config.ai_assistant.allow_runtime_analysis))
         self._chk_ai_allow_analysis.toggled.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._chk_ai_allow_analysis, 4, 0, 1, 3)
+        session_lay.addWidget(self._chk_ai_allow_analysis, 9, 0, 1, 3)
+
+        self._chk_ai_allow_actions = QCheckBox("Allow supported local actions to execute from explicit operator requests")
+        self._chk_ai_allow_actions.setChecked(bool(getattr(self.config.ai_assistant, "allow_action_execution", True)))
+        self._chk_ai_allow_actions.toggled.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._chk_ai_allow_actions, 10, 0, 1, 3)
+
+        self._chk_ai_include_logs = QCheckBox("Include recent log lines in local AI prompts")
+        self._chk_ai_include_logs.setChecked(bool(getattr(self.config.ai_assistant, "include_recent_logs", True)))
+        self._chk_ai_include_logs.toggled.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._chk_ai_include_logs, 11, 0, 1, 3)
+
+        btn_refresh_models = QPushButton("Refresh")
+        self._set_button_role(btn_refresh_models, "utility")
+        btn_refresh_models.clicked.connect(self._refresh_ai_provider_status)
+        session_lay.addWidget(btn_refresh_models, 12, 0)
+
+        btn_check_provider = QPushButton("Check Ollama")
+        self._set_button_role(btn_check_provider, "utility")
+        btn_check_provider.clicked.connect(self._refresh_ai_provider_status)
+        session_lay.addWidget(btn_check_provider, 12, 1)
+
+        lay.addWidget(session_grp)
+
+        lay.addWidget(self._build_ai_voice_validation_group())
+
+        coach_grp = QGroupBox("Assistant Workspace")
+        coach_lay = QVBoxLayout(coach_grp)
+        self._tabs_ai_workspace = QTabWidget()
+
+        self._ai_assistant_page = QWidget()
+        assistant_lay = QVBoxLayout(self._ai_assistant_page)
+        assistant_lay.setContentsMargins(0, 0, 0, 0)
+        assistant_lay.setSpacing(6)
+
+        prompt_row = QHBoxLayout()
+        self._edit_ai_prompt = QLineEdit()
+        self._edit_ai_prompt.setPlaceholderText("Example: explain why nothing is engaging, summarize runtime state, or explicitly say switch to color detection")
+        self._edit_ai_prompt.returnPressed.connect(self._run_ai_assistant_request)
+        prompt_row.addWidget(self._edit_ai_prompt)
+        btn_chat = QPushButton("Run Request")
+        self._set_button_role(btn_chat, "utility")
+        btn_chat.clicked.connect(self._run_ai_assistant_request)
+        prompt_row.addWidget(btn_chat)
+        assistant_lay.addLayout(prompt_row)
+
+        self._txt_ai_output = QTextEdit()
+        self._txt_ai_output.setReadOnly(True)
+        self._txt_ai_output.setMinimumHeight(180)
+        assistant_lay.addWidget(self._txt_ai_output)
+
+        self._lbl_ai_examples = QLabel(
+            "Try: 'why is nothing engaging?', 'summarize the current runtime', 'switch to color detection', 'enable human voice', 'go rest', or 'draft safer settings'."
+        )
+        self._lbl_ai_examples.setWordWrap(True)
+        self._set_theme_role(self._lbl_ai_examples, "mutedCompact")
+        assistant_lay.addWidget(self._lbl_ai_examples)
+
+        self._tabs_ai_workspace.addTab(self._ai_assistant_page, "Assistant")
+
+        self._ai_runtime_page = QWidget()
+        runtime_lay = QVBoxLayout(self._ai_runtime_page)
+        runtime_lay.setContentsMargins(0, 0, 0, 0)
+        runtime_lay.setSpacing(6)
+
+        self._lbl_ai_runtime_snapshot = QLabel(self._assistant_runtime_snapshot())
+        self._lbl_ai_runtime_snapshot.setWordWrap(True)
+        self._set_theme_role(self._lbl_ai_runtime_snapshot, "mutedCompact")
+        runtime_lay.addWidget(self._lbl_ai_runtime_snapshot)
+
+        runtime_btn_row = QHBoxLayout()
+        btn_snapshot = QPushButton("Analyze")
+        self._set_button_role(btn_snapshot, "utility")
+        btn_snapshot.clicked.connect(self._run_ai_assistant_analysis)
+        runtime_btn_row.addWidget(btn_snapshot)
+        btn_suggest = QPushButton("Draft Tips")
+        self._set_button_role(btn_suggest, "utility")
+        btn_suggest.clicked.connect(self._run_ai_assistant_recommendations)
+        runtime_btn_row.addWidget(btn_suggest)
+        runtime_btn_row.addStretch(1)
+        self._register_responsive_box_layout(runtime_btn_row, "dense_row")
+        runtime_lay.addLayout(runtime_btn_row)
+
+        self._txt_ai_runtime_output = QTextEdit()
+        self._txt_ai_runtime_output.setReadOnly(True)
+        self._txt_ai_runtime_output.setMinimumHeight(180)
+        runtime_lay.addWidget(self._txt_ai_runtime_output)
+
+        self._tabs_ai_workspace.addTab(self._ai_runtime_page, "Runtime Analyst")
+        coach_lay.addWidget(self._tabs_ai_workspace)
+        lay.addWidget(coach_grp)
+
+        lay.addStretch()
+        self._set_ai_model_tier(str(getattr(self.config.ai_assistant, "preferred_model_tier", "fast") or "fast"), persist=False)
+        self._sync_ai_model_combo_entries([])
+        self._append_ai_output(
+            "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline."
+        )
+        self._append_ai_output(
+            "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+            task_kind="analysis",
+        )
+        return w
+
+    def _build_ai_voice_validation_group(self) -> QGroupBox:
+        voice_grp = QGroupBox("AI Voice Validation")
+        voice_lay = QVBoxLayout(voice_grp)
+        voice_lay.setSpacing(6)
+
+        intro = QLabel(
+            "Validate the speech path used by spoken assistant replies. This checks Qt voice routing, selected voice application, and speech-state transitions before you rely on AI auto-speak."
+        )
+        intro.setWordWrap(True)
+        self._set_theme_role(intro, "subtleBody")
+        voice_lay.addWidget(intro)
 
         self._chk_ai_auto_speak = QCheckBox("Speak assistant replies with the local human voice")
         self._chk_ai_auto_speak.setChecked(bool(self.config.ai_assistant.auto_speak_responses))
         self._chk_ai_auto_speak.setEnabled(self._human_voice_supported())
         self._chk_ai_auto_speak.toggled.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._chk_ai_auto_speak, 5, 0, 1, 3)
+        voice_lay.addWidget(self._chk_ai_auto_speak)
 
-        btn_chat = QPushButton("Run Request")
-        self._set_button_role(btn_chat, "utility")
-        btn_chat.clicked.connect(self._run_ai_assistant_request)
-        session_lay.addWidget(btn_chat, 6, 0)
+        self._lbl_ai_voice_validation_status = QLabel("AI voice route: waiting")
+        self._lbl_ai_voice_validation_status.setWordWrap(True)
+        self._set_theme_role(self._lbl_ai_voice_validation_status, "statusStrong")
+        voice_lay.addWidget(self._lbl_ai_voice_validation_status)
 
-        btn_snapshot = QPushButton("Analyze Current Behavior")
-        self._set_button_role(btn_snapshot, "utility")
-        btn_snapshot.clicked.connect(self._run_ai_assistant_analysis)
-        session_lay.addWidget(btn_snapshot, 6, 1)
+        self._lbl_human_voice_diag_backend = QLabel("Backend: waiting")
+        self._lbl_human_voice_diag_backend.setWordWrap(True)
+        self._set_theme_role(self._lbl_human_voice_diag_backend, "mutedCompact")
+        voice_lay.addWidget(self._lbl_human_voice_diag_backend)
 
-        btn_suggest = QPushButton("Draft Recommendations")
-        self._set_button_role(btn_suggest, "utility")
-        btn_suggest.clicked.connect(self._run_ai_assistant_recommendations)
-        session_lay.addWidget(btn_suggest, 6, 2)
-        lay.addWidget(session_grp)
+        self._lbl_human_voice_diag_selected = QLabel("Selected voice: waiting")
+        self._lbl_human_voice_diag_selected.setWordWrap(True)
+        self._set_theme_role(self._lbl_human_voice_diag_selected, "mutedCompact")
+        voice_lay.addWidget(self._lbl_human_voice_diag_selected)
 
-        coach_grp = QGroupBox("Assistant Output")
-        coach_lay = QVBoxLayout(coach_grp)
-        self._edit_ai_prompt = QLineEdit()
-        self._edit_ai_prompt.setPlaceholderText("Example: switch to people-only mode, analyze current state, or explain why nothing is engaging")
-        self._edit_ai_prompt.returnPressed.connect(self._run_ai_assistant_request)
-        coach_lay.addWidget(self._edit_ai_prompt)
+        self._lbl_human_voice_diag_state = QLabel("Speech state: waiting")
+        self._lbl_human_voice_diag_state.setWordWrap(True)
+        self._set_theme_role(self._lbl_human_voice_diag_state, "mutedCompact")
+        voice_lay.addWidget(self._lbl_human_voice_diag_state)
 
-        self._txt_ai_output = QTextEdit()
-        self._txt_ai_output.setReadOnly(True)
-        self._txt_ai_output.setMinimumHeight(180)
-        coach_lay.addWidget(self._txt_ai_output)
+        self._lbl_human_voice_diag_route = QLabel("Route: Windows SAPI uses the current default playback device")
+        self._lbl_human_voice_diag_route.setWordWrap(True)
+        self._set_theme_role(self._lbl_human_voice_diag_route, "mutedCompact")
+        voice_lay.addWidget(self._lbl_human_voice_diag_route)
 
-        self._btn_ai_speak_last = QPushButton("Speak Last Reply")
+        btn_row = QHBoxLayout()
+        self._btn_ai_speak_last = QPushButton("Speak Reply")
         self._set_button_role(self._btn_ai_speak_last, "utility")
         self._btn_ai_speak_last.setEnabled(self._human_voice_supported())
         self._btn_ai_speak_last.clicked.connect(self._speak_last_ai_output)
-        coach_lay.addWidget(self._btn_ai_speak_last)
+        btn_row.addWidget(self._btn_ai_speak_last)
 
-        self._lbl_ai_examples = QLabel(
-            "Try: 'wake up', 'go rest', 'enable face recognition', 'switch to color detection', 'disable shortcuts', or 'speak a status summary'."
-        )
-        self._lbl_ai_examples.setWordWrap(True)
-        self._set_theme_role(self._lbl_ai_examples, "mutedCompact")
-        coach_lay.addWidget(self._lbl_ai_examples)
-        lay.addWidget(coach_grp)
+        self._btn_human_voice_refresh = QPushButton("Refresh")
+        self._set_button_role(self._btn_human_voice_refresh, "utility")
+        self._btn_human_voice_refresh.clicked.connect(self._on_refresh_human_voice_diagnostics_clicked)
+        btn_row.addWidget(self._btn_human_voice_refresh)
 
-        lay.addStretch()
-        self._append_ai_output(
-            "AI assistant ready. Try requests like 'analyze current state', 'wake up', 'switch to color detection', 'enable human voice', or 'suggest safer settings'."
-        )
-        return w
+        self._btn_human_voice_stop = QPushButton("Stop Voice")
+        self._set_button_role(self._btn_human_voice_stop, "utility")
+        self._btn_human_voice_stop.clicked.connect(self._on_stop_human_voice_clicked)
+        btn_row.addWidget(self._btn_human_voice_stop)
+        self._register_responsive_box_layout(btn_row, "dense_row")
+        voice_lay.addLayout(btn_row)
+
+        validate_row = QHBoxLayout()
+        self._btn_human_voice_validate = QPushButton("Test Voice")
+        self._set_button_role(self._btn_human_voice_validate, "utility")
+        self._btn_human_voice_validate.clicked.connect(self._on_validate_human_voices_clicked)
+        validate_row.addWidget(self._btn_human_voice_validate)
+
+        self._btn_human_voice_validate_all = QPushButton("Scan Voices")
+        self._set_button_role(self._btn_human_voice_validate_all, "utility")
+        self._btn_human_voice_validate_all.clicked.connect(self._on_validate_all_human_voices_clicked)
+        validate_row.addWidget(self._btn_human_voice_validate_all)
+
+        self._btn_human_voice_fallback = QPushButton("Fallback")
+        self._set_button_role(self._btn_human_voice_fallback, "utility")
+        self._btn_human_voice_fallback.clicked.connect(self._on_test_human_voice_fallback_clicked)
+        validate_row.addWidget(self._btn_human_voice_fallback)
+        validate_row.addStretch(1)
+        self._register_responsive_box_layout(validate_row, "dense_row")
+        voice_lay.addLayout(validate_row)
+
+        self._lbl_human_voice_diag_validation = QLabel("Validation: not run yet")
+        self._lbl_human_voice_diag_validation.setWordWrap(True)
+        self._set_theme_role(self._lbl_human_voice_diag_validation, "mutedCompact")
+        voice_lay.addWidget(self._lbl_human_voice_diag_validation)
+        return voice_grp
 
     # ------------------------------------------------------------------ #
     #  Manual Controls Tab
@@ -7698,34 +8005,37 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         quick_lay.setHorizontalSpacing(8)
         quick_lay.setVerticalSpacing(8)
 
-        self._btn_quick_link = QPushButton("Toggle Link")
+        self._btn_quick_link = QPushButton("Link")
         self._btn_quick_link.setMinimumHeight(34)
         self._set_button_role(self._btn_quick_link, "primary")
         self._btn_quick_link.setToolTip(
-            "Connect or disconnect the active Smart Sentry link. Use the header Wake Up and Go Rest buttons for manual position testing, Export Runtime Data for a timestamped read-only runtime capture, and Open Export Folder to jump to the saved files."
+            "Connect or disconnect the active Smart Sentry link. Use the header Wake Up and Go Rest buttons for manual position testing, Export for a timestamped read-only runtime capture, and Open Folder to jump to the saved files."
         )
         self._btn_quick_link.clicked.connect(self._toggle_connection)
         quick_lay.addWidget(self._btn_quick_link, 0, 0)
 
-        btn_quick_save = QPushButton("Save Settings")
+        btn_quick_save = QPushButton("Save")
         btn_quick_save.setMinimumHeight(34)
         self._set_button_role(btn_quick_save, "utility")
+        btn_quick_save.setToolTip("Write the current Smart Sentry settings to disk immediately.")
         btn_quick_save.clicked.connect(self._save_config)
         quick_lay.addWidget(btn_quick_save, 0, 1)
 
-        self._btn_export_runtime_snapshot = QPushButton("Export Runtime Data")
+        self._btn_export_runtime_snapshot = QPushButton("Export")
         self._btn_export_runtime_snapshot.setMinimumHeight(34)
         self._set_button_role(self._btn_export_runtime_snapshot, "utility")
         self._btn_export_runtime_snapshot.clicked.connect(self._export_runtime_snapshot)
         self._apply_tooltip(self._btn_export_runtime_snapshot, "export_runtime_snapshot")
         quick_lay.addWidget(self._btn_export_runtime_snapshot, 0, 2)
 
-        self._btn_open_runtime_snapshot_folder = QPushButton("Open Export Folder")
+        self._btn_open_runtime_snapshot_folder = QPushButton("Open Folder")
         self._btn_open_runtime_snapshot_folder.setMinimumHeight(34)
         self._set_button_role(self._btn_open_runtime_snapshot_folder, "utility")
         self._btn_open_runtime_snapshot_folder.clicked.connect(self._open_runtime_snapshot_folder)
         self._apply_tooltip(self._btn_open_runtime_snapshot_folder, "open_runtime_snapshot_folder")
         quick_lay.addWidget(self._btn_open_runtime_snapshot_folder, 0, 3)
+        self._register_responsive_button_grid(quick_lay)
+        self._reflow_responsive_button_grid(quick_lay)
 
         lay.addWidget(quick_grp)
 
@@ -7759,7 +8069,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._spin_command_rest_tilt.valueChanged.connect(self._on_command_rest_position_changed)
         rest_lay.addWidget(self._spin_command_rest_tilt, 1, 3)
 
-        btn_set_rest_current = QPushButton("Set Current As Rest")
+        btn_set_rest_current = QPushButton("Set As Rest")
         btn_set_rest_current.setMinimumHeight(34)
         self._set_button_role(btn_set_rest_current, "utility")
         btn_set_rest_current.clicked.connect(self._set_current_as_rest)
@@ -8184,57 +8494,6 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._set_theme_role(self._lbl_human_voice_status, "statusStrong")
         fire_lay.addWidget(self._lbl_human_voice_status)
 
-        voice_diag_grp = QGroupBox("Voice Diagnostics")
-        voice_diag_lay = QVBoxLayout(voice_diag_grp)
-        self._lbl_human_voice_diag_backend = QLabel("Backend: waiting")
-        self._lbl_human_voice_diag_backend.setWordWrap(True)
-        self._set_theme_role(self._lbl_human_voice_diag_backend, "mutedCompact")
-        voice_diag_lay.addWidget(self._lbl_human_voice_diag_backend)
-
-        self._lbl_human_voice_diag_selected = QLabel("Selected voice: waiting")
-        self._lbl_human_voice_diag_selected.setWordWrap(True)
-        self._set_theme_role(self._lbl_human_voice_diag_selected, "mutedCompact")
-        voice_diag_lay.addWidget(self._lbl_human_voice_diag_selected)
-
-        self._lbl_human_voice_diag_state = QLabel("Speech state: waiting")
-        self._lbl_human_voice_diag_state.setWordWrap(True)
-        self._set_theme_role(self._lbl_human_voice_diag_state, "mutedCompact")
-        voice_diag_lay.addWidget(self._lbl_human_voice_diag_state)
-
-        self._lbl_human_voice_diag_route = QLabel("Route: Windows SAPI uses the current default playback device")
-        self._lbl_human_voice_diag_route.setWordWrap(True)
-        self._set_theme_role(self._lbl_human_voice_diag_route, "mutedCompact")
-        voice_diag_lay.addWidget(self._lbl_human_voice_diag_route)
-
-        voice_diag_btn_row = QHBoxLayout()
-        self._btn_human_voice_fallback = QPushButton("Fallback Phrase")
-        self._set_button_role(self._btn_human_voice_fallback, "utility")
-        self._btn_human_voice_fallback.clicked.connect(self._on_test_human_voice_fallback_clicked)
-        voice_diag_btn_row.addWidget(self._btn_human_voice_fallback)
-
-        self._btn_human_voice_stop = QPushButton("Stop Voice")
-        self._set_button_role(self._btn_human_voice_stop, "utility")
-        self._btn_human_voice_stop.clicked.connect(self._on_stop_human_voice_clicked)
-        voice_diag_btn_row.addWidget(self._btn_human_voice_stop)
-
-        self._btn_human_voice_refresh = QPushButton("Refresh Diagnostics")
-        self._set_button_role(self._btn_human_voice_refresh, "utility")
-        self._btn_human_voice_refresh.clicked.connect(self._on_refresh_human_voice_diagnostics_clicked)
-        voice_diag_btn_row.addWidget(self._btn_human_voice_refresh)
-
-        self._btn_human_voice_validate = QPushButton("Validate Voices")
-        self._set_button_role(self._btn_human_voice_validate, "utility")
-        self._btn_human_voice_validate.clicked.connect(self._on_validate_human_voices_clicked)
-        voice_diag_btn_row.addWidget(self._btn_human_voice_validate)
-        voice_diag_btn_row.addStretch(1)
-        voice_diag_lay.addLayout(voice_diag_btn_row)
-
-        self._lbl_human_voice_diag_validation = QLabel("Validation: not run yet")
-        self._lbl_human_voice_diag_validation.setWordWrap(True)
-        self._set_theme_role(self._lbl_human_voice_diag_validation, "mutedCompact")
-        voice_diag_lay.addWidget(self._lbl_human_voice_diag_validation)
-        fire_lay.addWidget(voice_diag_grp)
-
         self._lbl_sound_status = QLabel("Sound link: waiting")
         self._lbl_sound_status.setWordWrap(True)
         self._set_theme_role(self._lbl_sound_status, "statusStrong")
@@ -8427,26 +8686,58 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._log_text.setReadOnly(True)
         lay.addWidget(self._log_text, stretch=1)
 
-        controls = QHBoxLayout()
-        controls.addStretch(1)
+        filter_row = QHBoxLayout()
+        filter_row.setContentsMargins(0, 0, 0, 0)
+        filter_row.setSpacing(4)
 
-        btn_export = QPushButton("Export Logs")
-        self._set_button_role(btn_export, "utility")
+        def _log_chip(text: str, *, role: str = "utility", checkable: bool = False) -> QPushButton:
+            b = QPushButton(text)
+            b.setCheckable(checkable)
+            b.setProperty("quickAccessChip", "true")
+            b.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+            b.setMinimumWidth(48)
+            self._set_button_role(b, role)
+            return b
+
+        self._btn_log_pause = _log_chip("Pause", role="utility")
+        self._btn_log_pause.clicked.connect(lambda: self._set_log_pause(True))
+        filter_row.addWidget(self._btn_log_pause)
+
+        self._btn_log_resume = _log_chip("Resume", role="primary")
+        self._btn_log_resume.clicked.connect(lambda: self._set_log_pause(False))
+        filter_row.addWidget(self._btn_log_resume)
+
+        self._lbl_log_state = QLabel("Live")
+        self._lbl_log_state.setObjectName("sentryV2QuickAccessHint")
+        filter_row.addWidget(self._lbl_log_state)
+
+        filter_row.addSpacing(6)
+        for key, label in SERIAL_LOG_FILTER_SPECS:
+            button = _log_chip(label, role="mode", checkable=True)
+            button.clicked.connect(lambda _checked=False, selected=key: self._set_log_filter(selected))
+            filter_row.addWidget(button)
+            self._log_filter_buttons[key] = button
+
+        filter_row.addSpacing(6)
+
+        btn_export = _log_chip("Export", role="utility")
         btn_export.clicked.connect(self._export_serial_log)
         self._apply_tooltip(btn_export, "export_serial_log")
-        controls.addWidget(btn_export)
+        filter_row.addWidget(btn_export)
 
-        btn_open_folder = QPushButton("Open Log Folder")
-        self._set_button_role(btn_open_folder, "utility")
+        btn_open_folder = _log_chip("Log Folder", role="utility")
         btn_open_folder.clicked.connect(self._open_serial_log_folder)
         self._apply_tooltip(btn_open_folder, "open_serial_log_folder")
-        controls.addWidget(btn_open_folder)
+        filter_row.addWidget(btn_open_folder)
 
-        btn_clear = QPushButton("Clear")
-        self._set_button_role(btn_clear, "utility")
-        btn_clear.clicked.connect(self._log_text.clear)
-        controls.addWidget(btn_clear)
-        lay.addLayout(controls)
+        btn_clear = _log_chip("Clear", role="danger")
+        btn_clear.clicked.connect(self._clear_serial_log)
+        filter_row.addWidget(btn_clear)
+
+        filter_row.addStretch(1)
+        lay.addLayout(filter_row)
+
+        self._sync_log_controls()
 
         return grp
 
@@ -8455,7 +8746,8 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             return
         total_height = max(1, self._layout_splitter.size().height())
         lower_height = max(150, min(300, int(total_height * 0.24)))
-        self._layout_splitter.setSizes([max(1, total_height - lower_height), lower_height])
+        video_height = max(1, total_height - lower_height)
+        self._layout_splitter.setSizes([video_height, lower_height])
 
     def _apply_bottom_info_panel_widths(self) -> None:
         if not hasattr(self, "_bottom_info_splitter"):
@@ -8595,6 +8887,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         if self._has_local_source() and not _from_own_camera:
             return
         now = time.time()
+        self._last_processed_frame_s = now
         h, w_frame = frame.shape[:2]
         self._last_raw_frame = frame if _from_own_camera else frame.copy()
 
@@ -8621,6 +8914,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         # Run engine
         self._sync_engine_pose_from_feedback()
         self.engine.update(det_objects, now)
+        self._log_tracking_pipeline_diagnostics(det_objects, now)
         self._update_sound_runtime_cues()
         self._last_detected_objects = list(det_objects)
 
@@ -8671,6 +8965,146 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._last_display_present_s = now
         self._force_next_display_refresh = False
         self._set_preview_perf_mode(mode)
+
+    @staticmethod
+    def _is_probable_camera_blackout(frame: np.ndarray) -> bool:
+        if frame is None or frame.size == 0:
+            return False
+        try:
+            frame_max = int(frame.max())
+            frame_mean = float(frame.mean())
+        except Exception:
+            return False
+        return frame_max <= 12 and frame_mean <= 2.5
+
+    @staticmethod
+    def _is_probable_partial_frame(frame: np.ndarray) -> bool:
+        """Detect frames where camera content occupies only a sub-rectangle.
+
+        After a USB webcam driver glitch on Windows (MSMF/DSHOW), the camera
+        can enter a degraded state where it returns a full-size frame buffer
+        but only populates the upper-left portion with actual video data; the
+        remainder stays zero-filled (black).  The existing blackout detector
+        misses this because the frame is *not* entirely black.
+
+        Strategy: sample the bottom-right quadrant.  If it is near-black while
+        the top-left quadrant has real content, this is a partial frame.
+        """
+        if frame is None or frame.size == 0:
+            return False
+        try:
+            h, w = frame.shape[:2]
+            if h < 32 or w < 32:
+                return False
+            # Top-left 25 % of the frame
+            tl = frame[: h // 4, : w // 4]
+            # Bottom-right 25 % of the frame
+            br = frame[h * 3 // 4 :, w * 3 // 4 :]
+            tl_mean = float(tl.mean())
+            br_max = int(br.max())
+            br_mean = float(br.mean())
+            # Content in top-left but bottom-right is dead black
+            return tl_mean > 8.0 and br_max <= 6 and br_mean <= 1.5
+        except Exception:
+            return False
+
+    @staticmethod
+    def _crop_to_content(frame: np.ndarray) -> np.ndarray:
+        """Crop a partial frame to its actual content area.
+
+        Scans rows/columns from the edges inward to find the boundary where
+        content ends and the black padding begins.  Returns the cropped frame
+        or the original if no significant padding is detected.
+        """
+        try:
+            h, w = frame.shape[:2]
+            if h < 32 or w < 32:
+                return frame
+            gray = frame if frame.ndim == 2 else frame.max(axis=2)
+            threshold = 6
+
+            # Find last row with content (scan from bottom up)
+            row_max = gray.max(axis=1)
+            content_rows = int(np.where(row_max > threshold)[0][-1]) + 1 if (row_max > threshold).any() else h
+
+            # Find last column with content (scan from right)
+            col_max = gray.max(axis=0)
+            content_cols = int(np.where(col_max > threshold)[0][-1]) + 1 if (col_max > threshold).any() else w
+
+            # Only crop if padding is significant (> 15 % of each dimension)
+            if content_rows < h * 0.85 and content_cols < w * 0.85:
+                cropped = frame[:content_rows, :content_cols]
+                if cropped.size > 0 and cropped.shape[0] >= 16 and cropped.shape[1] >= 16:
+                    return cropped
+        except Exception:
+            pass
+        return frame
+
+    def _handle_camera_frame_health(self, frame: np.ndarray) -> bool:
+        if self._local_source_kind != "camera":
+            self._camera_black_frame_count = 0
+            self._camera_partial_frame_count = 0
+            return False
+
+        # --- Full blackout check ---
+        if self._is_probable_camera_blackout(frame):
+            self._camera_black_frame_count += 1
+            if self._camera_black_frame_count >= self._MAX_CAMERA_BLACK_FRAMES:
+                self._camera_black_frame_count = 0
+                if self._attempt_camera_recovery("Camera is returning repeated black frames."):
+                    return True
+                self._log("Camera blackout persisted — auto-closing source")
+                self._close_camera()
+                return True
+            return False
+        else:
+            self._camera_black_frame_count = 0
+
+        # --- Partial frame check (content only in upper-left quadrant) ---
+        if self._is_probable_partial_frame(frame):
+            self._camera_partial_frame_count += 1
+            if self._camera_partial_frame_count == 1:
+                self._log(
+                    "[CAMERA-HEALTH] Partial frame detected — camera content "
+                    "occupies only part of the buffer (possible driver degradation)"
+                )
+            if self._camera_partial_frame_count >= self._MAX_CAMERA_PARTIAL_FRAMES:
+                self._camera_partial_frame_count = 0
+                if self._attempt_camera_recovery(
+                    "Camera is returning partial frames (content only in upper-left)."
+                ):
+                    return True
+                self._log("Partial-frame condition persisted — auto-closing source")
+                self._close_camera()
+                return True
+            # Don't discard the frame — let _queue_local_frame crop it so the
+            # user still sees something useful while recovery is pending.
+            return False
+        else:
+            self._camera_partial_frame_count = 0
+
+        return False
+
+    def _should_show_live_preview_fallback(self, now: float) -> bool:
+        if not self._show_video_feed:
+            return False
+        if not self._should_present_display_frame(now, busy=True):
+            return False
+        processed_age_s = now - float(getattr(self, "_last_processed_frame_s", 0.0) or 0.0)
+        stale_threshold_s = max(0.20, self._busy_display_frame_interval_s * 2.5)
+        return self._detector_worker_busy or processed_age_s >= stale_threshold_s
+
+    def _present_live_preview_frame(self, frame: np.ndarray, now: float) -> None:
+        display = self._build_display_frame(
+            frame,
+            mode=self.config.detection_mode.detection_mode,
+            use_internal_detector=False,
+            include_target_boxes=not self._busy_preview_skip_target_boxes,
+            include_scope_view=not self._busy_preview_skip_scope_view,
+        )
+        self._last_display_frame = display
+        self._show_frame(display)
+        self._mark_display_present(now, mode="busy-lite")
 
     def _build_display_frame(
         self,
@@ -8768,6 +9202,9 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             return
         move_delta = self._get_command_delta(pan, tilt)
         move_time_ms = self._get_tracking_move_time_ms(move_delta)
+        if self._should_defer_auto_move(move_time_ms, move_delta):
+            self._resync_engine_pose_after_deferred_move()
+            return
         self._last_tracking_move_time_ms = int(move_time_ms)
         self._sound_engine.note_tracking_move(move_delta, self._current_sound_area_ratio())
         if self._host_controls_hardware():
@@ -8788,6 +9225,75 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         if old_scope != new_scope:
             self._last_scope_view_active = new_scope
             self._log("Scope view: ON (ENGAGING display mode)" if new_scope else "Scope view: OFF (normal video restored)")
+
+    def _log_tracking_pipeline_diagnostics(self, detections: List[DetectedObject], now: float) -> None:
+        person_visible = [det for det in detections if str(getattr(det, "class_name", "")).strip().lower() == "person"]
+        diagnostics = list(getattr(self.engine, "last_filter_diagnostics", []) or [])
+        person_decisions = [
+            decision for decision in diagnostics
+            if str(getattr(decision, "class_name", "")).strip().lower() == "person"
+        ]
+        person_qualified = [decision for decision in person_decisions if bool(getattr(decision, "passed", False))]
+        active_order = getattr(self.engine, "active_order", None)
+        active_det = getattr(getattr(active_order, "target", None), "det", None)
+        engaged_person = bool(active_det is not None and str(getattr(active_det, "class_name", "")).strip().lower() == "person")
+
+        if engaged_person:
+            stage = "engaged"
+        elif person_qualified:
+            stage = "qualified"
+        elif person_visible:
+            stage = "visible_filtered"
+        else:
+            stage = "idle"
+
+        lead_visible = max(person_visible, key=lambda det: float(getattr(det, "confidence", 0.0)), default=None)
+        lead_decision = max(person_decisions, key=lambda decision: float(getattr(decision, "confidence", 0.0)), default=None)
+        lead_track_id = int(getattr(lead_decision, "track_id", getattr(lead_visible, "track_id", -1)))
+        lead_conf = float(getattr(lead_decision, "confidence", getattr(lead_visible, "confidence", 0.0)) or 0.0)
+        lead_reason = str(getattr(lead_decision, "reason", "")) if lead_decision is not None else ""
+        lead_detail = str(getattr(lead_decision, "detail", "")) if lead_decision is not None else ""
+        lead_hits = int(getattr(lead_decision, "confirm_hits", 0) or 0) if lead_decision is not None else 0
+        lead_required = int(getattr(lead_decision, "confirm_required", 1) or 1) if lead_decision is not None else 1
+        engaged_track_id = int(getattr(active_det, "track_id", -1) or -1) if engaged_person else -1
+
+        state_name = str(getattr(self.engine.state, "name", self.engine.state))
+        diag_key = "|".join([
+            stage,
+            state_name,
+            str(len(person_visible)),
+            str(len(person_qualified)),
+            str(1 if engaged_person else 0),
+            str(lead_track_id),
+            lead_reason,
+            lead_detail,
+            str(engaged_track_id),
+        ])
+        if diag_key == self._tracking_diag_last_key and (now - self._tracking_diag_last_log_s) < self._tracking_diag_min_interval_s:
+            return
+
+        self._tracking_diag_last_key = diag_key
+        self._tracking_diag_last_log_s = now
+
+        if stage == "idle":
+            self._log(f"[TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state={state_name}")
+            return
+
+        message = (
+            f"[TRACKDBG] person pipeline: visible={len(person_visible)} qualified={len(person_qualified)} "
+            f"engaged={1 if engaged_person else 0} state={state_name}"
+        )
+        if lead_track_id >= 0:
+            message += f" lead_track={lead_track_id} conf={lead_conf:.2f}"
+        if stage == "visible_filtered" and lead_reason:
+            message += f" reason={lead_reason}"
+            if lead_detail:
+                message += f" ({lead_detail})"
+        elif stage == "qualified" and lead_decision is not None:
+            message += f" reason=qualified ({lead_hits}/{max(1, lead_required)})"
+        elif stage == "engaged" and engaged_track_id >= 0:
+            message += f" active_track={engaged_track_id}"
+        self._log(message)
 
     def _emit_comm_pir_event(self, sensor_id: int, timestamp: float) -> None:
         try:
@@ -9834,23 +10340,15 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
     def _queue_local_frame(self, frame: np.ndarray) -> None:
         if self._local_source_kind in {"test_video", "test_image"}:
             self._test_media_last_frame = frame.copy()
+        # If the webcam driver is delivering partial frames (content in upper-
+        # left only), crop to the actual content so detection and display use
+        # the correct resolution while camera recovery is pending.
+        if self._camera_partial_frame_count > 0:
+            frame = self._crop_to_content(frame)
         effective_frame = self._apply_source_zoom(frame)
         now = time.time()
-        if (
-            self._show_video_feed
-            and self._detector_worker_busy
-            and self._should_present_display_frame(now, busy=True)
-        ):
-            display = self._build_display_frame(
-                effective_frame,
-                mode=self.config.detection_mode.detection_mode,
-                use_internal_detector=False,
-                include_target_boxes=not self._busy_preview_skip_target_boxes,
-                include_scope_view=not self._busy_preview_skip_scope_view,
-            )
-            self._last_display_frame = display
-            self._show_frame(display)
-            self._mark_display_present(now, mode="busy-lite")
+        if self._should_show_live_preview_fallback(now):
+            self._present_live_preview_frame(effective_frame, now)
         with self._detector_frame_lock:
             self._detector_pending_frame = effective_frame
 
@@ -9915,7 +10413,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                 _src=src, _src_text=source_text, _sk=source_kind,
                 _rw=requested_w, _rh=requested_h, _rfs=request_frame_size,
             ) -> None:
-                cap = None
+                selected_backend = None
                 backends = (
                     (cv2.CAP_DSHOW, "DSHOW"),
                     (cv2.CAP_MSMF, "MSMF"),
@@ -9932,23 +10430,23 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                         # Verify at least one readable frame — MSMF can report
                         # isOpened=True but then immediately fail on grabFrame
                         ok, _frame = c.read()
-                        print(f"[CAM-BG] index={_src} backend={bname} opened=True read_ok={ok}", flush=True)
-                        if ok:
-                            cap = c
+                        usable_frame = self._detach_capture_frame(_frame) if ok else None
+                        print(
+                            f"[CAM-BG] index={_src} backend={bname} opened=True read_ok={ok} usable_frame={usable_frame is not None}",
+                            flush=True,
+                        )
+                        if usable_frame is not None:
+                            selected_backend = (_src, backend, bname)
+                            c.release()
                             break
                         c.release()
                     except Exception as _e:
                         print(f"[CAM-BG] index={_src} backend={bname} exception: {_e}", flush=True)
                 # Emit thread-safe signal back to main thread
-                if cap is not None and cap.isOpened():
-                    print(f"[CAM-BG] SUCCESS index={_src}, emitting opened signal", flush=True)
-                    self._cam_bg_opened.emit(cap, _src_text, _sk, _rw, _rh, _rfs)
+                if selected_backend is not None:
+                    print(f"[CAM-BG] SUCCESS index={_src}, emitting probe result", flush=True)
+                    self._cam_bg_opened.emit(selected_backend, _src_text, _sk, _rw, _rh, _rfs)
                 else:
-                    if cap is not None:
-                        try:
-                            cap.release()
-                        except Exception:
-                            pass
                     print(f"[CAM-BG] FAILED index={_src}, emitting failed signal", flush=True)
                     self._cam_bg_failed.emit(_src_text)
 
@@ -9967,6 +10465,50 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         except Exception:
             pass
+
+    @staticmethod
+    def _detach_capture_frame(frame: Optional[np.ndarray]) -> Optional[np.ndarray]:
+        if not isinstance(frame, np.ndarray) or frame.size == 0 or frame.ndim < 2:
+            return None
+        try:
+            return np.ascontiguousarray(frame).copy()
+        except Exception:
+            return None
+
+    def _on_camera_probe_ready(
+        self,
+        probe_result: object,
+        source_text: str,
+        source_kind: str,
+        requested_w: int,
+        requested_h: int,
+        request_frame_size: bool,
+    ) -> None:
+        if self._closing:
+            return
+        try:
+            src, backend, backend_name = probe_result
+        except Exception:
+            self._on_camera_open_failed(source_text)
+            return
+
+        self._log(f"[CAM-DEBUG] Reopening camera on UI thread with backend {backend_name}")
+        try:
+            cap = cv2.VideoCapture(src) if backend is None else cv2.VideoCapture(src, backend)
+        except Exception as exc:
+            self._log(f"Camera open failed on UI thread ({backend_name}): {exc}")
+            self._on_camera_open_failed(source_text)
+            return
+        if cap is None or not cap.isOpened():
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+            self._log(f"Camera open failed on UI thread with backend {backend_name}: {source_text}")
+            self._on_camera_open_failed(source_text)
+            return
+        self._finish_camera_open(cap, source_text, source_kind, requested_w, requested_h, request_frame_size)
 
     def _finish_camera_open(
         self,
@@ -10090,8 +10632,9 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                     ret, fr = cap.read()
                     print(f"[URL-WORKER] frame attempt {_attempt+1}: ret={ret}, shape={fr.shape if (fr is not None and ret) else None}", flush=True)
                     if ret and fr is not None:
-                        first_frame = fr
-                        break
+                        first_frame = self._detach_capture_frame(fr)
+                        if first_frame is not None:
+                            break
                     time.sleep(0.4)
             except Exception as exc:
                 print(f"[URL-WORKER] cap.read() exception: {exc}", flush=True)
@@ -10139,8 +10682,11 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                     if frames_read == 1:
                         print("[URL-WORKER] first loop-frame delivered to buffer", flush=True)
                     if self._url_stream_gen == gen:
+                        safe_frame = self._detach_capture_frame(frame)
+                        if safe_frame is None:
+                            continue
                         with self._url_stream_frame_lock:
-                            self._url_stream_frame = frame
+                            self._url_stream_frame = safe_frame
             except Exception as exc:
                 print(f"[URL-WORKER] read loop exception: {exc}", flush=True)
             print(f"[URL-WORKER] exiting read loop, frames_read={frames_read}", flush=True)
@@ -10278,6 +10824,8 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
     def _close_camera(self, *, log_close: bool = True) -> None:
         self._cam_timer.stop()
         self._grab_fail_count = 0
+        self._camera_black_frame_count = 0
+        self._camera_partial_frame_count = 0
         self._last_display_frame = None
         # Signal URL reader thread to stop; it will release the cap itself.
         self._url_stream_stop.set()
@@ -10361,8 +10909,21 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                 return
         if frame is None:
             return
+        safe_frame = self._detach_capture_frame(frame)
+        if safe_frame is None:
+            self._grab_fail_count += 1
+            if self._grab_fail_count == 1 or self._grab_fail_count % 5 == 0:
+                self._log("Camera returned a malformed frame buffer")
+            if self._grab_fail_count >= self._MAX_GRAB_FAILS:
+                if self._attempt_camera_recovery("Camera returned malformed frame buffers."):
+                    return
+                self._log("Camera returned malformed frame buffers — auto-closing")
+                self._close_camera()
+            return
         self._grab_fail_count = 0
-        self._queue_local_frame(frame)
+        if self._handle_camera_frame_health(safe_frame):
+            return
+        self._queue_local_frame(safe_frame)
 
     def _detector_worker_loop(self) -> None:
         while not self._detector_worker_stop.is_set():
@@ -10413,6 +10974,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._last_detector_error = ""
         self._force_next_display_refresh = True
         self._last_display_present_s = 0.0
+        self._last_processed_frame_s = 0.0
 
     # ------------------------------------------------------------------ #
     #  Detection mode handlers
@@ -11982,6 +12544,9 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._refresh_status()
 
     def _on_home_clicked(self) -> None:
+        self._startup_rest_schedule_token += 1
+        self._startup_rest_pending = False
+        self._startup_rest_completed = True
         pan = self._spin_guard_pan.value()
         tilt = self._spin_guard_tilt.value()
         waking_from_rest = self._is_near_rest_position(float(self.engine.current_pan), float(self.engine.current_tilt), tolerance_deg=8.0)
@@ -12581,10 +13146,20 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
         def _summarize_tracked_target(target: object) -> dict:
             det = getattr(target, "det", None)
+            raw_track_id = getattr(target, "target_id", None)
+            if raw_track_id is None:
+                raw_track_id = getattr(target, "track_id", None)
+            if raw_track_id is None and det is not None:
+                raw_track_id = getattr(det, "track_id", None)
+
+            raw_score = getattr(target, "threat_score", None)
+            if raw_score is None:
+                raw_score = getattr(target, "score", None)
+
             return {
-                "track_id": str(getattr(target, "track_id", "") or ""),
-                "score": float(getattr(target, "score", 0.0) or 0.0),
-                "persistence": int(getattr(target, "persistence", 0) or 0),
+                "track_id": str(raw_track_id or ""),
+                "score": float(raw_score or 0.0),
+                "persistence": float(getattr(target, "persistence", 0.0) or 0.0),
                 "heading_x": float(getattr(target, "heading_x", 0.0) or 0.0),
                 "heading_y": float(getattr(target, "heading_y", 0.0) or 0.0),
                 "detection": _summarize_detection(det),
@@ -12639,7 +13214,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                     "target": _summarize_tracked_target(active_target) if active_target is not None else None,
                     "target_pan": float(getattr(active_order, "pan", 0.0) or 0.0) if active_order is not None else None,
                     "target_tilt": float(getattr(active_order, "tilt", 0.0) or 0.0) if active_order is not None else None,
-                    "burst_count": int(getattr(active_order, "burst_count", 0) or 0) if active_order is not None else None,
+                    "burst_count": int(self.config.engagement.burst_count) if active_order is not None else None,
                     "detection": _summarize_detection(active_detection),
                 },
                 "visible_targets": [_summarize_tracked_target(target) for target in list(getattr(self.engine, "last_targets", []))[:8]],
@@ -12683,6 +13258,8 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                 "test_media_paused": bool(self._test_media_paused),
                 "test_media_loop_enabled": bool(self._test_media_loop_enabled),
                 "grab_fail_count": int(self._grab_fail_count),
+                "black_frame_count": int(self._camera_black_frame_count),
+                "partial_frame_count": int(self._camera_partial_frame_count),
                 "camera_recovery_attempts": int(self._camera_recovery_attempts),
                 "camera_recovery_in_progress": bool(self._camera_recovery_in_progress),
             },
@@ -12696,6 +13273,18 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                 "allowed_classes": [str(name) for name in self.config.target_filter.allowed_classes],
                 "confidence": float(self.config.detection_mode.yolo_confidence),
                 "min_area": int(self.config.detection_mode.yolo_min_area),
+            },
+            "assistant_runtime": {
+                "provider_available": bool(getattr(self, "_assistant_available", False)),
+                "provider_status_label": self._assistant_model_status_text(),
+                "installed_models": [str(model) for model in list(getattr(self, "_assistant_models", []) or [])],
+                "selected_prompt_model": self._selected_ai_model_for_task("prompt"),
+                "selected_prompt_installed": self._selected_ai_model_for_task("prompt") in set(getattr(self, "_assistant_models", []) or []),
+                "selected_analysis_model": self._selected_ai_model_for_task("analysis"),
+                "speech_supported": bool(self._human_voice_supported()),
+                "human_voice_enabled": bool(getattr(self.config.sound, "human_voice_enabled", False)),
+                "auto_speak": bool(getattr(self.config.ai_assistant, "auto_speak_responses", False)),
+                "voice_status": self._assistant_voice_route_status()[0],
             },
             "external_file_references": {
                 "settings_json": _path_entry(SMART_SENTRY_V2_3_2_SETTINGS_PATH),
@@ -12722,7 +13311,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         recent_logs = payload.get("recent_log_lines", [])
 
         lines = [
-            "# SMART SENTRY V2.3.2 Runtime Snapshot",
+            f"# {SMART_SENTRY_RELEASE_TITLE} Runtime Snapshot",
             "",
             f"- Generated: {payload.get('generated_at_local', '')}",
             f"- Engine state: {engine_state.get('state', '')}",
@@ -12773,7 +13362,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             f"- Connected: {comm.get('is_connected')}",
             f"- Host managed: {comm.get('host_hardware_managed')}",
             f"- Mode: {comm.get('mode_label', '')}",
-            f"- Trigger mode uses BB servo: {comm.get('trigger_mode_bb')}",
+            f"- Trigger mode: {'Projectile (ESP32 GPIO13 Servo)' if comm.get('trigger_mode_bb') else 'Water (MOSFET)'}",
             f"- Last command: {comm.get('last_command', '') or 'none'}",
             f"- Last error: {comm.get('last_error', '') or 'none'}",
         ])
@@ -12803,6 +13392,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             f"- Requested resolution: {camera.get('requested_width')} x {camera.get('requested_height')}",
             f"- Raw frame: {camera.get('raw_frame')}",
             f"- Display frame: {camera.get('display_frame')}",
+            f"- Blackout frame count: {camera.get('black_frame_count')}",
             f"- Recovery attempts/in progress: {camera.get('camera_recovery_attempts')} / {camera.get('camera_recovery_in_progress')}",
         ])
 
@@ -12887,7 +13477,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             if not hasattr(self, "_log_text") or self._log_text is None:
                 self._log("Serial log export failed: log panel is unavailable")
                 return
-            log_text = self._log_text.toPlainText()
+            log_text = self._serialize_log_entries(include_filter=False)
             if not log_text.strip():
                 self._log("Serial log export skipped: log panel is empty")
                 return
@@ -12895,7 +13485,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             export_path = SENTRY_V2_LOG_EXPORT_DIR / f"sentry_v2_serial_log_{timestamp}.txt"
             header = [
-                f"# SMART SENTRY V2.3.2 Serial Log Export",
+                f"# {SMART_SENTRY_RELEASE_TITLE} Serial Log Export",
                 f"# Exported: {time.strftime('%Y-%m-%d %H:%M:%S')}",
                 "",
             ]
@@ -13028,9 +13618,13 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         if self._last_face_matches:
             top = max(self._last_face_matches, key=lambda item: float(item.confidence))
             match_text = f"{top.name} ({top.confidence:.2f})"
-        self._lbl_face_runtime_status.setText(
+        status_text = (
             f"Known profiles: {len(self._face_library.profiles)} | last recognized: {match_text} | file: {self._portable_path_string(self._resolved_face_library_path())}"
         )
+        if status_text == self._last_face_runtime_status_text:
+            return
+        self._last_face_runtime_status_text = status_text
+        self._lbl_face_runtime_status.setText(status_text)
 
     def _on_face_runtime_settings_changed(self) -> None:
         cfg = self.config.face_recognition
@@ -13145,6 +13739,33 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         person_boxes = [tuple(det.bbox) for det in objects if str(det.class_name or "").strip().lower() == "person"]
         return person_boxes or None
 
+    def _face_match_refresh_interval_s(self, frame: np.ndarray) -> float:
+        height, width = frame.shape[:2]
+        pixels = int(height * width)
+        interval = 0.85
+        if pixels >= (1280 * 720):
+            interval = 1.15
+        if pixels >= (1920 * 1080):
+            interval = 1.65
+        if bool(getattr(self, "_detector_worker_busy", False)):
+            interval = max(interval, 2.0)
+        if bool(getattr(self.config, "prompted_targets_enabled", False)):
+            interval += 0.15
+        return interval
+
+    def _face_person_boxes_similar(
+        self,
+        current: List[Tuple[int, int, int, int]],
+        previous: List[Tuple[int, int, int, int]],
+    ) -> bool:
+        if len(current) != len(previous):
+            return False
+        if not current:
+            return True
+        current_sorted = sorted(current)
+        previous_sorted = sorted(previous)
+        return all(self._bbox_iou(a, b) >= 0.5 for a, b in zip(current_sorted, previous_sorted))
+
     @staticmethod
     def _bbox_iou(a: Tuple[int, int, int, int], b: Tuple[int, int, int, int]) -> float:
         ax, ay, aw, ah = a
@@ -13163,15 +13784,11 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         union = max(1, (aw * ah) + (bw * bh) - inter)
         return inter / union
 
-    def _apply_face_identity_to_objects(self, frame: np.ndarray, objects: List[DetectedObject], now: float) -> Tuple[List[DetectedObject], List[FaceMatchResult]]:
-        if not bool(self.config.face_recognition.enabled) or not self._face_library.profiles:
-            return list(objects), []
-        matches = self._face_runtime.match_known_faces(
-            frame,
-            min_face_size_px=int(self.config.face_recognition.min_face_size_px),
-            person_boxes=self._face_person_boxes(objects),
-            threshold=float(self.config.face_recognition.recognition_threshold),
-        )
+    def _annotate_objects_with_face_matches(
+        self,
+        objects: List[DetectedObject],
+        matches: List[FaceMatchResult],
+    ) -> List[DetectedObject]:
         annotated = list(objects)
         for match in matches:
             best_det = None
@@ -13196,8 +13813,47 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             )
             if not is_suppressed:
                 filtered.append(det)
+        return filtered
+
+    def _apply_face_identity_to_objects(self, frame: np.ndarray, objects: List[DetectedObject], now: float) -> Tuple[List[DetectedObject], List[FaceMatchResult]]:
+        if not bool(self.config.face_recognition.enabled) or not self._face_library.profiles:
+            self._last_face_match_eval_s = 0.0
+            self._last_face_person_boxes = []
+            return list(objects), []
+        person_boxes = list(self._face_person_boxes(objects) or [])
+        if not person_boxes:
+            self._last_face_match_eval_s = now
+            self._last_face_person_boxes = []
+            return list(objects), []
+
+        refresh_interval_s = self._face_match_refresh_interval_s(frame)
+        last_eval_s = float(getattr(self, "_last_face_match_eval_s", 0.0) or 0.0)
+        elapsed_s = now - last_eval_s if last_eval_s > 0.0 else refresh_interval_s
+        box_layout_changed = not self._face_person_boxes_similar(
+            person_boxes,
+            list(getattr(self, "_last_face_person_boxes", []) or []),
+        )
+        should_refresh = (
+            not self._last_face_matches
+            or elapsed_s >= refresh_interval_s
+            or (box_layout_changed and elapsed_s >= 0.45)
+        )
+
+        if should_refresh:
+            matches = self._face_runtime.match_known_faces(
+                frame,
+                min_face_size_px=int(self.config.face_recognition.min_face_size_px),
+                person_boxes=person_boxes,
+                threshold=float(self.config.face_recognition.recognition_threshold),
+            )
+            self._last_face_match_eval_s = now
+            self._last_face_person_boxes = list(person_boxes)
+        else:
+            matches = list(getattr(self, "_last_face_matches", []) or [])
+
+        filtered = self._annotate_objects_with_face_matches(objects, matches)
         best_match = max(matches, key=lambda item: float(item.confidence), default=None)
-        if best_match is not None:
+        if should_refresh and best_match is not None:
             self._maybe_announce_face_match(best_match, now)
             self._maybe_run_friendly_identity_gesture(best_match, now)
         return filtered, matches
@@ -13325,21 +13981,362 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._log(f"Shortcut reference opened: {self._portable_path_string(path)}")
 
     def _on_ai_assistant_settings_changed(self) -> None:
+        if not hasattr(self, "_chk_ai_enabled") or not hasattr(self, "_combo_ai_mode"):
+            return
         cfg = self.config.ai_assistant
         cfg.enabled = bool(self._chk_ai_enabled.isChecked())
         cfg.mode = str(self._combo_ai_mode.currentData() or "guided_tuning")
+        cfg.endpoint_url = str(getattr(self, "_edit_ai_endpoint", QLineEdit()).text()).strip() or "http://localhost:11434"
+        cfg.preferred_model_tier = self._current_ai_model_tier()
+        cfg.model = self._current_ai_model(analyst=False)
+        cfg.analyst_model = self._current_ai_model(analyst=True)
         cfg.allow_mode_switch = bool(self._chk_ai_allow_modes.isChecked())
         cfg.allow_setting_drafts = bool(self._chk_ai_allow_tuning.isChecked())
         cfg.allow_runtime_analysis = bool(self._chk_ai_allow_analysis.isChecked())
+        cfg.allow_action_execution = bool(getattr(self, "_chk_ai_allow_actions", None) and self._chk_ai_allow_actions.isChecked())
+        cfg.include_recent_logs = bool(getattr(self, "_chk_ai_include_logs", None) and self._chk_ai_include_logs.isChecked())
         cfg.auto_speak_responses = bool(getattr(self, "_chk_ai_auto_speak", None) and self._chk_ai_auto_speak.isChecked())
+        self._update_ai_runtime_snapshot_view()
         self._save_config_quietly()
 
-    def _append_ai_output(self, text: str, *, speak: bool = False) -> None:
-        if hasattr(self, "_txt_ai_output"):
-            self._txt_ai_output.append(text)
-        self._last_spoken_ai_response = str(text)
+    def _create_ai_service(self) -> LocalAssistantService:
+        cfg = self.config.ai_assistant
+        client = OllamaClient(
+            host=str(getattr(cfg, "endpoint_url", "http://localhost:11434") or "http://localhost:11434"),
+            timeout_s=float(getattr(cfg, "request_timeout_s", 45.0) or 45.0),
+        )
+        return LocalAssistantService(client=client)
+
+    def _sync_ai_model_combo_entries(self, models: List[str]) -> None:
+        fast_current = str(getattr(self.config.ai_assistant, "model", "llama3.2:latest") or "llama3.2:latest")
+        analyst_current = str(getattr(self.config.ai_assistant, "analyst_model", "gpt-oss:20b") or "gpt-oss:20b")
+        shared = []
+        for item in [fast_current, analyst_current, *[str(model) for model in models]]:
+            cleaned = str(item or "").strip()
+            if cleaned and cleaned not in shared:
+                shared.append(cleaned)
+        for combo, current in ((getattr(self, "_combo_ai_model", None), fast_current), (getattr(self, "_combo_ai_analyst_model", None), analyst_current)):
+            if combo is None:
+                continue
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems(shared)
+            combo.setEditText(current)
+            combo.blockSignals(False)
+
+    def _current_ai_model(self, *, analyst: bool) -> str:
+        combo = getattr(self, "_combo_ai_analyst_model", None) if analyst else getattr(self, "_combo_ai_model", None)
+        if combo is not None:
+            value = str(combo.currentText() or "").strip()
+            if value:
+                return value
+        if analyst:
+            return str(getattr(self.config.ai_assistant, "analyst_model", "gpt-oss:20b") or "gpt-oss:20b")
+        return str(getattr(self.config.ai_assistant, "model", "llama3.2:latest") or "llama3.2:latest")
+
+    def _current_ai_model_tier(self) -> str:
+        if getattr(self, "_btn_ai_use_analyst_model", None) and self._btn_ai_use_analyst_model.isChecked():
+            return "analyst"
+        return "fast"
+
+    def _set_ai_model_tier(self, tier: str, *, persist: bool = True) -> None:
+        resolved = "analyst" if str(tier or "").strip().lower() == "analyst" else "fast"
+        if getattr(self, "_btn_ai_use_fast_model", None) is not None:
+            self._btn_ai_use_fast_model.blockSignals(True)
+            self._btn_ai_use_fast_model.setChecked(resolved == "fast")
+            self._btn_ai_use_fast_model.blockSignals(False)
+        if getattr(self, "_btn_ai_use_analyst_model", None) is not None:
+            self._btn_ai_use_analyst_model.blockSignals(True)
+            self._btn_ai_use_analyst_model.setChecked(resolved == "analyst")
+            self._btn_ai_use_analyst_model.blockSignals(False)
+        if hasattr(self, "_lbl_ai_provider_status"):
+            selected_model = self._current_ai_model(analyst=(resolved == "analyst"))
+            self._lbl_ai_provider_status.setText(f"Selected {resolved} model tier: {selected_model}")
+        if persist:
+            self._on_ai_assistant_settings_changed()
+
+    def _selected_ai_model_for_task(self, task_kind: str) -> str:
+        if task_kind in ("analysis", "recommendations"):
+            return self._current_ai_model(analyst=(self._current_ai_model_tier() != "fast"))
+        if self._current_ai_model_tier() == "analyst":
+            return self._current_ai_model(analyst=True)
+        return self._current_ai_model(analyst=False)
+
+    def _assistant_voice_route_status(self) -> tuple[str, bool]:
+        auto_speak = bool(getattr(self.config.ai_assistant, "auto_speak_responses", False))
+        human_voice_enabled = bool(getattr(self.config.sound, "human_voice_enabled", False))
+        speech_supported = bool(self._human_voice_supported())
+        if not auto_speak:
+            return "auto-speak off", False
+        if not speech_supported:
+            return "speech backend unavailable", False
+        if not human_voice_enabled:
+            return "human voice off", False
+        return "spoken replies ready", True
+
+    def _assistant_model_status_text(self) -> str:
+        prompt_model = self._selected_ai_model_for_task("prompt")
+        available_models = set(getattr(self, "_assistant_models", []) or [])
+        provider_available = bool(getattr(self, "_assistant_available", False))
+        if not provider_available:
+            return f"Ollama unavailable. Replies will fall back to deterministic guidance. Selected model: {prompt_model}"
+        if available_models and prompt_model not in available_models:
+            return f"Ollama reachable, but selected model {prompt_model} is not installed locally."
+        return f"Ollama ready. Selected prompt model: {prompt_model}"
+
+    def _update_ai_runtime_snapshot_view(self) -> None:
+        if hasattr(self, "_lbl_ai_runtime_snapshot"):
+            self._lbl_ai_runtime_snapshot.setText(self._assistant_runtime_snapshot())
+
+    def _focus_ai_workspace(self, task_kind: str) -> None:
+        tabs = getattr(self, "_tabs_ai_workspace", None)
+        if tabs is None:
+            return
+        if task_kind in ("analysis", "recommendations") and hasattr(self, "_ai_runtime_page"):
+            tabs.setCurrentWidget(self._ai_runtime_page)
+            return
+        if hasattr(self, "_ai_assistant_page"):
+            tabs.setCurrentWidget(self._ai_assistant_page)
+
+    def _refresh_ai_provider_status(self) -> None:
+        self._on_ai_assistant_settings_changed()
+        if self._assistant_models_loading:
+            return
+        self._assistant_models_loading = True
+        if hasattr(self, "_lbl_ai_provider_status"):
+            self._lbl_ai_provider_status.setText("Checking Ollama endpoint and installed models...")
+
+        endpoint = str(getattr(self.config.ai_assistant, "endpoint_url", "http://localhost:11434") or "http://localhost:11434")
+
+        def _worker() -> None:
+            try:
+                service = self._create_ai_service()
+                models = service.list_models()
+                message = f"Ollama ready at {endpoint}. {len(models)} model(s) detected."
+                self.assistant_models_ready.emit(True, models, message)
+            except Exception as exc:
+                self.assistant_models_ready.emit(False, [], f"Ollama unavailable at {endpoint}: {exc}")
+
+        threading.Thread(target=_worker, name="sentry-v2-ai-models", daemon=True).start()
+
+    def _on_ai_assistant_models_ready(self, ok: bool, models: object, message: str) -> None:
+        self._assistant_models_loading = False
+        self._assistant_available = bool(ok)
+        self._assistant_models = [str(item) for item in (models or []) if str(item).strip()]
+        self._assistant_last_error = "" if ok else str(message or "")
+        self._sync_ai_model_combo_entries(self._assistant_models)
+        if hasattr(self, "_lbl_ai_provider_status"):
+            voice_status, _voice_ready = self._assistant_voice_route_status()
+            provider_text = str(message or ("Ollama ready" if ok else "Ollama unavailable"))
+            self._lbl_ai_provider_status.setText(f"{provider_text} | voice: {voice_status}")
+
+    def _assistant_runtime_snapshot(self) -> str:
+        visible_targets = len(getattr(self, "_last_detected_objects", []) or [])
+        known_faces = ", ".join(f"{match.name} {match.confidence:.2f}" for match in self._last_face_matches[:3]) or "none"
+        voice_status, _voice_ready = self._assistant_voice_route_status()
+        return (
+            f"State: {self.engine.state.name} | sentry: {'enabled' if self._chk_enable.isChecked() else 'disabled'} | "
+            f"mode: {self._assistant_detection_mode_name()} ({self._combo_detection_mode.currentIndex()}) | targets: {visible_targets} | "
+            f"faces: {known_faces} | face recognition: {'on' if self.config.face_recognition.enabled else 'off'} | "
+            f"shortcuts: {'on' if self.config.shortcuts.enabled else 'off'} | connection: {self._connection_status_level} | "
+            f"camera: {'open' if self._has_local_source() else 'closed'} | human voice: {'on' if self.config.sound.human_voice_enabled else 'off'} ({self._assistant_human_voice_style_key()}) | "
+            f"ai model: {self._selected_ai_model_for_task('prompt')} | ai voice: {voice_status}"
+        )
+
+    def _assistant_set_busy(self, busy: bool, note: str = "") -> None:
+        self._assistant_busy = bool(busy)
+        if hasattr(self, "_lbl_ai_provider_status") and note:
+            self._lbl_ai_provider_status.setText(note)
+
+    def _start_ai_background_task(self, task_kind: str, prompt: str = "") -> None:
+        if self._assistant_busy:
+            self._append_ai_output("Assistant request already in progress. Wait for the current local response first.", task_kind=task_kind)
+            return
+        if not bool(self.config.ai_assistant.enabled):
+            self._append_ai_output("Assistant is disabled.", task_kind=task_kind)
+            return
+        self._on_ai_assistant_settings_changed()
+        self._focus_ai_workspace(task_kind)
+        snapshot = self._collect_runtime_snapshot()
+        self._update_ai_runtime_snapshot_view()
+        model = self._selected_ai_model_for_task(task_kind)
+        include_logs = bool(getattr(self.config.ai_assistant, "include_recent_logs", True))
+        self._assistant_set_busy(True, f"Running local assistant task with {model}...")
+
+        def _worker() -> None:
+            service = self._create_ai_service()
+            if task_kind == "analysis":
+                reply = service.analyze_runtime(snapshot, model=model, include_logs=include_logs)
+            elif task_kind == "recommendations":
+                reply = service.recommend_settings(snapshot, model=model, include_logs=include_logs)
+            else:
+                reply = service.answer_operator_prompt(prompt, snapshot, model=model, include_logs=include_logs)
+            self.assistant_reply_ready.emit({
+                "task_kind": task_kind,
+                "prompt": prompt,
+                "reply": reply,
+            })
+
+        threading.Thread(target=_worker, name=f"sentry-v2-ai-{task_kind}", daemon=True).start()
+
+    def _execute_supported_ai_actions(self, actions: List[object]) -> List[str]:
+        notes: List[str] = []
+        if not bool(getattr(self.config.ai_assistant, "allow_action_execution", True)):
+            return ["Supported actions were detected, but assistant action execution is disabled."]
+        for raw_action in actions:
+            action_type = str(getattr(raw_action, "action_type", "") or "")
+            payload = dict(getattr(raw_action, "payload", {}) or {})
+            if action_type == "go_home":
+                self._on_home_clicked()
+                notes.append("Moved to the guard home position.")
+            elif action_type == "go_rest":
+                self._on_rest_clicked()
+                notes.append("Moved to the configured rest position.")
+            elif action_type == "set_detection_mode":
+                mode_index = int(payload.get("mode_index", 10) or 10)
+                mode_label = DETECTION_MODES[mode_index] if 0 <= mode_index < len(DETECTION_MODES) else f"Mode {mode_index}"
+                notes.append(self._assistant_apply_detection_mode(mode_index, mode_label))
+            elif action_type == "toggle_face_recognition" and hasattr(self, "_chk_face_enabled"):
+                enabled = bool(payload.get("enabled", True))
+                self._chk_face_enabled.setChecked(enabled)
+                notes.append(f"Face recognition {'enabled' if enabled else 'disabled'}." )
+            elif action_type == "toggle_shortcuts" and hasattr(self, "_chk_shortcuts_enabled"):
+                enabled = bool(payload.get("enabled", True))
+                self._chk_shortcuts_enabled.setChecked(enabled)
+                notes.append(f"Shortcuts {'enabled' if enabled else 'disabled'}." )
+            elif action_type == "toggle_human_voice" and hasattr(self, "_chk_human_voice_enabled"):
+                enabled = bool(payload.get("enabled", True))
+                self._chk_human_voice_enabled.setChecked(enabled)
+                notes.append(f"Human voice {'enabled' if enabled else 'disabled'}." )
+            elif action_type == "toggle_ai_auto_speak" and hasattr(self, "_chk_ai_auto_speak"):
+                enabled = bool(payload.get("enabled", True))
+                self._chk_ai_auto_speak.setChecked(enabled)
+                self._on_ai_assistant_settings_changed()
+                notes.append(f"Assistant auto-speak {'enabled' if enabled else 'disabled'}." )
+            elif action_type == "set_human_voice_style":
+                style_key = str(payload.get("style_key", "neutral") or "neutral")
+                self._apply_human_voice_style(style_key)
+                style_label = str(HUMAN_VOICE_STYLE_PRESETS.get(self._human_voice_style_key(), HUMAN_VOICE_STYLE_PRESETS["neutral"])["label"])
+                notes.append(f"Human voice style set to {style_label}.")
+            elif action_type == "move_position":
+                target_pan = payload.get("pan", self.engine.current_pan)
+                target_tilt = payload.get("tilt", self.engine.current_tilt)
+                try:
+                    pan = float(target_pan)
+                    tilt = float(target_tilt)
+                except Exception:
+                    notes.append("Requested position could not be parsed into numeric pan/tilt values.")
+                else:
+                    clamped_pan, clamped_tilt = self._clamp_manual_angles(pan, tilt)
+                    self._move_to_absolute_position(
+                        clamped_pan,
+                        clamped_tilt,
+                        log_message=f"Assistant position command: P{clamped_pan:.1f} T{clamped_tilt:.1f}",
+                    )
+                    if abs(clamped_pan - pan) > 0.01 or abs(clamped_tilt - tilt) > 0.01:
+                        notes.append(f"Moved to clamped position pan {clamped_pan:.1f}, tilt {clamped_tilt:.1f} within safe limits.")
+                    else:
+                        notes.append(f"Moved to requested position pan {clamped_pan:.1f}, tilt {clamped_tilt:.1f}.")
+            elif action_type == "connect_link":
+                if self._comm.is_connected():
+                    notes.append("Controller link was already connected.")
+                else:
+                    self._toggle_connection()
+                    notes.append("Controller link connection requested.")
+            elif action_type == "disconnect_link":
+                if not self._comm.is_connected():
+                    notes.append("Controller link was already disconnected.")
+                else:
+                    self._toggle_connection()
+                    notes.append("Controller link disconnect requested.")
+            elif action_type == "toggle_camera":
+                should_open = bool(payload.get("open", True))
+                if should_open and not self._has_local_source():
+                    self._toggle_camera()
+                    notes.append("Camera open requested.")
+                elif not should_open and self._has_local_source():
+                    self._toggle_camera()
+                    notes.append("Camera close requested.")
+                else:
+                    notes.append(f"Camera was already {'open' if should_open else 'closed'}." )
+        self._refresh_human_voice_diagnostics()
+        return notes
+
+    def _render_ai_reply(self, reply: AssistantReply, *, task_kind: str, action_notes: List[str]) -> str:
+        lines: List[str] = []
+        title = {
+            "analysis": "Analysis",
+            "recommendations": "Recommendations",
+            "prompt": "Assistant",
+        }.get(task_kind, "Assistant")
+        origin_label = "Ollama" if str(reply.source or "") == "ollama" else "Deterministic fallback"
+        origin = f"{origin_label} / {reply.model}" if reply.model else origin_label
+        lines.append(f"{title} [{origin}]")
+        if reply.error and str(reply.source or "") != "ollama":
+            lines.append("The local model reply was unavailable, so this response used the built-in deterministic fallback.")
+            lines.append("")
+        if action_notes:
+            lines.append("Local Action Result:")
+            for item in action_notes:
+                lines.append(f"- {item}")
+            lines.append("")
+        lines.append(str(reply.text or "").strip())
+        if reply.findings and task_kind in ("analysis", "recommendations"):
+            lines.append("")
+            lines.append("Supporting Findings:")
+            for finding in reply.findings[:4]:
+                lines.append(f"- [{finding.severity}] {finding.title}: {finding.detail}")
+        if reply.recommendations and task_kind == "recommendations":
+            lines.append("")
+            lines.append("Supporting Recommendations:")
+            for item in reply.recommendations[:5]:
+                lines.append(f"- {item}")
+        if reply.error:
+            lines.append("")
+            lines.append(f"Model note: {reply.error}")
+        return "\n".join(lines).strip()
+
+    def _on_ai_assistant_reply_ready(self, payload: object) -> None:
+        self._assistant_set_busy(False)
+        if not isinstance(payload, dict):
+            self._append_ai_output("Assistant reply payload was invalid.")
+            return
+        task_kind = str(payload.get("task_kind") or "prompt")
+        reply = payload.get("reply")
+        if not isinstance(reply, AssistantReply):
+            self._append_ai_output("Assistant reply was invalid.")
+            return
+        self._assistant_last_reply = reply
+        action_notes: List[str] = []
+        if task_kind == "prompt" and reply.actions:
+            action_notes = self._execute_supported_ai_actions(reply.actions)
+        conversational = bool(self.config.ai_assistant.mode == "conversational_voice")
+        rendered = self._assistant_format_response(self._render_ai_reply(reply, task_kind=task_kind, action_notes=action_notes), conversational=conversational)
+        self._append_ai_output(rendered, speak=conversational, task_kind=task_kind)
+        self._update_ai_runtime_snapshot_view()
+        voice_status, _voice_ready = self._assistant_voice_route_status()
+        status = f"Local assistant completed with {'Ollama' if reply.source == 'ollama' else 'deterministic fallback'} | voice: {voice_status}"
+        if hasattr(self, "_lbl_ai_provider_status"):
+            self._lbl_ai_provider_status.setText(status)
+        self._log(f"AI assistant {task_kind}: source={reply.source} model={reply.model or 'n/a'} error={reply.error or 'none'}")
+
+    def _append_ai_output(self, text: str, *, speak: bool = False, task_kind: str = "prompt") -> None:
+        target = getattr(self, "_txt_ai_runtime_output", None) if task_kind in ("analysis", "recommendations") else getattr(self, "_txt_ai_output", None)
+        if target is not None:
+            target.append(text)
+        self._last_spoken_ai_response = self._assistant_speech_summary(text)
         if speak:
-            self._maybe_speak_ai_output(text)
+            self._maybe_speak_ai_output(self._last_spoken_ai_response)
+
+    def _assistant_speech_summary(self, text: str) -> str:
+        raw = " ".join(str(text or "").split()).strip()
+        if not raw:
+            return ""
+        raw = re.sub(r"\b(?:Analysis|Recommendations|Assistant) \[[^\]]+\]\s*", "", raw)
+        raw = re.sub(r"\b(?:Supporting Findings|Supporting Recommendations|Model note):", ".", raw, flags=re.IGNORECASE)
+        sentence_parts = re.split(r"(?<=[.!?])\s+", raw)
+        compact = " ".join(part.strip() for part in sentence_parts[:3] if part.strip()).strip()
+        return compact[:280].strip()
 
     def _maybe_speak_ai_output(self, text: str) -> None:
         if not bool(getattr(self.config.ai_assistant, "auto_speak_responses", False)):
@@ -13351,7 +14348,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._append_ai_output("No assistant reply is available to speak yet.")
             return
         if not self._speak_human_phrase(self._last_spoken_ai_response):
-            self._append_ai_output("Human voice speech is unavailable or disabled. Enable Human voice speech in Controls first.")
+            self._append_ai_output("Human voice speech is unavailable or disabled. Enable it and validate the route in AI Voice Validation first.")
 
     def _assistant_detection_mode_name(self) -> str:
         mode_index = int(self._combo_detection_mode.currentIndex()) if hasattr(self, "_combo_detection_mode") else 0
@@ -13364,7 +14361,16 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         return style if style in HUMAN_VOICE_STYLE_PRESETS else "neutral"
 
     def _assistant_format_response(self, text: str, *, conversational: bool) -> str:
-        cleaned = " ".join(str(text or "").split()).strip()
+        raw_text = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
+        if conversational:
+            cleaned = " ".join(raw_text.split()).strip()
+        else:
+            cleaned_lines = [line.rstrip() for line in raw_text.split("\n")]
+            while cleaned_lines and not cleaned_lines[0].strip():
+                cleaned_lines.pop(0)
+            while cleaned_lines and not cleaned_lines[-1].strip():
+                cleaned_lines.pop()
+            cleaned = "\n".join(cleaned_lines).strip()
         if not conversational or not cleaned:
             return cleaned
         prefix = {
@@ -13387,44 +14393,17 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._log(f"AI assistant changed detection mode to {label}")
         return f"I switched Smart Sentry to {label}."
 
-    def _assistant_runtime_snapshot(self) -> str:
-        visible_targets = len(getattr(self, "_last_detected_objects", []) or [])
-        known_faces = ", ".join(f"{match.name} {match.confidence:.2f}" for match in self._last_face_matches[:3]) or "none"
-        return (
-            f"State: {self.engine.state.name} | sentry: {'enabled' if self._chk_enable.isChecked() else 'disabled'} | "
-            f"mode: {self._assistant_detection_mode_name()} ({self._combo_detection_mode.currentIndex()}) | targets: {visible_targets} | "
-            f"faces: {known_faces} | face recognition: {'on' if self.config.face_recognition.enabled else 'off'} | "
-            f"shortcuts: {'on' if self.config.shortcuts.enabled else 'off'} | connection: {self._connection_status_level} | "
-            f"camera: {'open' if self._has_local_source() else 'closed'} | human voice: {'on' if self.config.sound.human_voice_enabled else 'off'} ({self._assistant_human_voice_style_key()})"
-        )
-
     def _run_ai_assistant_analysis(self) -> None:
         if not bool(self.config.ai_assistant.enabled and self.config.ai_assistant.allow_runtime_analysis):
-            self._append_ai_output("Assistant analysis is disabled in the current settings.")
+            self._append_ai_output("Assistant analysis is disabled in the current settings.", task_kind="analysis")
             return
-        snapshot = self._assistant_runtime_snapshot()
-        self._append_ai_output(f"Analysis: {snapshot}", speak=bool(self.config.ai_assistant.mode == "conversational_voice"))
-        self._log(f"AI assistant analysis: {snapshot}")
+        self._start_ai_background_task("analysis")
 
     def _run_ai_assistant_recommendations(self) -> None:
         if not bool(self.config.ai_assistant.enabled and self.config.ai_assistant.allow_setting_drafts):
-            self._append_ai_output("Assistant recommendation drafts are disabled.")
+            self._append_ai_output("Assistant recommendation drafts are disabled.", task_kind="recommendations")
             return
-        suggestions: List[str] = []
-        if not bool(self.config.face_recognition.enabled) and self._face_library.profiles:
-            suggestions.append("Enable face recognition because known profiles already exist in the library.")
-        if not bool(self.config.shortcuts.enabled):
-            suggestions.append("Re-enable shortcuts so Quick Keys and operator hotkeys are available during testing.")
-        if bool(self.config.ai_assistant.mode == "conversational_voice") and not bool(getattr(self.config.sound, "human_voice_enabled", False)):
-            suggestions.append("Enable Human voice speech so Conversational Voice mode can respond audibly instead of text only.")
-        if bool(getattr(self.config.sound, "human_voice_enabled", False)) and bool(self.config.ai_assistant.mode == "conversational_voice") and not bool(self.config.ai_assistant.auto_speak_responses):
-            suggestions.append("Turn on assistant auto-speak so conversational replies are spoken without pressing Speak Last Reply.")
-        if self.engine.state == SentryV2State.GUARDING and not bool(getattr(self, "_show_video_feed", True)):
-            suggestions.append("Video is hidden while idle; show the feed if you need visual verification during setup.")
-        if not suggestions:
-            suggestions.append("Current runtime looks balanced. No immediate assistant changes are recommended.")
-        for item in suggestions:
-            self._append_ai_output(f"Suggestion: {item}", speak=bool(self.config.ai_assistant.mode == "conversational_voice"))
+        self._start_ai_background_task("recommendations")
 
     def _run_ai_assistant_request(self) -> None:
         prompt = str(getattr(self, "_edit_ai_prompt", QLineEdit()).text()).strip()
@@ -13435,8 +14414,6 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._append_ai_output("Assistant is disabled.")
             return
         lower_prompt = prompt.lower()
-        conversational = bool(self.config.ai_assistant.mode == "conversational_voice")
-        response = ""
         if "analy" in lower_prompt or "status" in lower_prompt:
             self._run_ai_assistant_analysis()
             self._edit_ai_prompt.clear()
@@ -13451,115 +14428,11 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             response = f"Status summary: {summary}"
             if not spoken:
                 response += " Human voice speech is currently disabled or unavailable, so I returned the summary as text only."
-        elif ("wake up" in lower_prompt or "go home" in lower_prompt or "return home" in lower_prompt):
-            self._on_home_clicked()
-            response = "Smart Sentry is moving to the guard home position."
-        elif "go rest" in lower_prompt or "rest position" in lower_prompt:
-            self._on_rest_clicked()
-            response = "Smart Sentry is moving to the configured rest position."
-        elif ("enable" in lower_prompt or "turn on" in lower_prompt) and ("sentry" in lower_prompt or "smart sentry" in lower_prompt):
-            self._chk_enable.setChecked(True)
-            response = "Smart Sentry is enabled."
-        elif ("disable" in lower_prompt or "turn off" in lower_prompt) and ("sentry" in lower_prompt or "smart sentry" in lower_prompt):
-            self._chk_enable.setChecked(False)
-            response = "Smart Sentry is disabled."
-        elif ("connect" in lower_prompt or "open link" in lower_prompt) and "disconnect" not in lower_prompt:
-            if self._comm.is_connected():
-                response = "The controller link is already connected."
-            else:
-                self._toggle_connection()
-                response = "Controller link connection requested."
-        elif "disconnect" in lower_prompt:
-            if not self._comm.is_connected():
-                response = "The controller link is already disconnected."
-            else:
-                self._toggle_connection()
-                response = "Controller link disconnect requested."
-        elif ("open" in lower_prompt or "start" in lower_prompt) and "camera" in lower_prompt:
-            if self._has_local_source():
-                response = "The camera feed is already open."
-            else:
-                self._toggle_camera()
-                response = "Camera open requested."
-        elif ("close" in lower_prompt or "stop" in lower_prompt) and "camera" in lower_prompt:
-            if not self._has_local_source():
-                response = "The camera feed is already closed."
-            else:
-                self._toggle_camera()
-                response = "Camera close requested."
-        elif ("motion" in lower_prompt or "frame difference" in lower_prompt) and ("mode" in lower_prompt or "detection" in lower_prompt or "switch" in lower_prompt):
-            response = self._assistant_apply_detection_mode(0, "Motion mode")
-        elif ("background" in lower_prompt or "backsub" in lower_prompt) and ("mode" in lower_prompt or "detection" in lower_prompt or "switch" in lower_prompt):
-            response = self._assistant_apply_detection_mode(1, "Background Subtraction mode")
-        elif "yolo" in lower_prompt and ("mode" in lower_prompt or "detection" in lower_prompt or "switch" in lower_prompt):
-            response = self._assistant_apply_detection_mode(2, "YOLO Object Detection mode")
-        elif "color" in lower_prompt and ("mode" in lower_prompt or "detection" in lower_prompt or "switch" in lower_prompt):
-            response = self._assistant_apply_detection_mode(6, "Color Detection mode")
-        elif ("filtered" in lower_prompt or "target mode" in lower_prompt or "motion-locked" in lower_prompt) and ("mode" in lower_prompt or "detection" in lower_prompt or "switch" in lower_prompt):
-            response = self._assistant_apply_detection_mode(10, "Motion-Locked Filtered Target mode")
-        elif ("human voice" in lower_prompt or "normal voice" in lower_prompt or "speak" in lower_prompt) and ("enable" in lower_prompt or "turn on" in lower_prompt):
-            self.config.sound.human_voice_enabled = True
-            if hasattr(self, "_chk_human_voice_enabled"):
-                self._chk_human_voice_enabled.setChecked(True)
-            if hasattr(self, "_chk_ai_auto_speak"):
-                self._chk_ai_auto_speak.setChecked(True)
-            if conversational:
-                response = "Human voice mode is enabled. I can now speak replies like a normal local assistant."
-            else:
-                response = "Human voice mode is enabled. Switch the assistant to Conversational Voice if you want spoken replies by default."
-        elif ("human voice" in lower_prompt or "normal voice" in lower_prompt) and ("disable" in lower_prompt or "turn off" in lower_prompt):
-            self.config.sound.human_voice_enabled = False
-            if hasattr(self, "_chk_human_voice_enabled"):
-                self._chk_human_voice_enabled.setChecked(False)
-            response = "Human voice mode is disabled."
-        elif ("auto speak" in lower_prompt or "speak replies" in lower_prompt) and ("enable" in lower_prompt or "turn on" in lower_prompt):
-            if hasattr(self, "_chk_ai_auto_speak"):
-                self._chk_ai_auto_speak.setChecked(True)
-            response = "Assistant auto-speak is enabled for future replies."
-        elif ("auto speak" in lower_prompt or "speak replies" in lower_prompt) and ("disable" in lower_prompt or "turn off" in lower_prompt):
-            if hasattr(self, "_chk_ai_auto_speak"):
-                self._chk_ai_auto_speak.setChecked(False)
-            response = "Assistant auto-speak is disabled."
-        elif ("shortcut" in lower_prompt or "quick key" in lower_prompt) and ("enable" in lower_prompt or "turn on" in lower_prompt):
-            if hasattr(self, "_chk_shortcuts_enabled"):
-                self._chk_shortcuts_enabled.setChecked(True)
-            response = "Window-focused operator shortcuts are enabled."
-        elif ("shortcut" in lower_prompt or "quick key" in lower_prompt) and ("disable" in lower_prompt or "turn off" in lower_prompt):
-            if hasattr(self, "_chk_shortcuts_enabled"):
-                self._chk_shortcuts_enabled.setChecked(False)
-            response = "Window-focused operator shortcuts are disabled."
-        elif "hello" in lower_prompt or "hi" in lower_prompt or "hey" in lower_prompt:
-            response = "Hello. I am Smart Sentry's local assistant. I can analyze the current runtime, adjust supported modes, and speak with a human voice when that option is enabled."
-        elif "who are you" in lower_prompt:
-            response = "I am the local Smart Sentry assistant built into this control panel. I handle diagnostics, safe mode changes, and conversational voice replies without requiring an external AI service."
-        elif "what can you do" in lower_prompt or "help" in lower_prompt:
-            response = "I can analyze the current runtime, draft recommendations, switch supported detection modes, move to home or rest, control face recognition and shortcuts, and speak replies with the local human voice engine if you enable it."
-        elif "person" in lower_prompt or "people" in lower_prompt:
-            response = "Use the Target Filter tab to keep only person detections. That pairs best with face recognition and family-safe identity labeling."
-        elif "face" in lower_prompt and "enable" in lower_prompt:
-            self._chk_face_enabled.setChecked(True)
-            response = "Face recognition is now enabled. You can register identities from images or from the current live frame in the Facial Recognition tab."
-        elif "face" in lower_prompt and ("disable" in lower_prompt or "turn off" in lower_prompt):
-            self._chk_face_enabled.setChecked(False)
-            response = "Face recognition is disabled."
-        elif ("voice style" in lower_prompt or "speech style" in lower_prompt) and "quiet" in lower_prompt:
-            self._apply_human_voice_style("operator")
-            response = "Human voice style is now set to Quiet Operator."
-        elif ("voice style" in lower_prompt or "speech style" in lower_prompt) and ("alert" in lower_prompt or "guard" in lower_prompt):
-            self._apply_human_voice_style("alert")
-            response = "Human voice style is now set to Alert Guard."
-        elif ("voice style" in lower_prompt or "speech style" in lower_prompt) and ("warm" in lower_prompt or "friendly" in lower_prompt):
-            self._apply_human_voice_style("warm")
-            response = "Human voice style is now set to Warm Greeter."
-        elif ("voice style" in lower_prompt or "speech style" in lower_prompt) and ("neutral" in lower_prompt or "default" in lower_prompt):
-            self._apply_human_voice_style("neutral")
-            response = "Human voice style is now set to Neutral Assistant."
-        else:
-            response = (
-                "I can help with runtime analysis, recommendations, home or rest moves, link or camera control, detection mode changes, shortcuts, face recognition, and human voice setup. "
-                "Try requests like 'wake up', 'go rest', 'switch to color detection', 'disable shortcuts', or 'enable human voice'."
-            )
-        self._append_ai_output(self._assistant_format_response(response, conversational=conversational), speak=conversational)
+            conversational = bool(self.config.ai_assistant.mode == "conversational_voice")
+            self._append_ai_output(self._assistant_format_response(response, conversational=conversational), speak=conversational)
+            self._edit_ai_prompt.clear()
+            return
+        self._start_ai_background_task("prompt", prompt)
         self._edit_ai_prompt.clear()
 
     def _reset_prompted_runtime(self) -> None:
@@ -15311,6 +16184,9 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             return
         detail_text = str(detail or "command failed")
         if command_name == "move":
+            if not self._host_controls_hardware() and not self._comm.is_connected():
+                self._log("Move skipped: hardware is not connected yet")
+                return
             self._log(f"Move failed: {detail_text}")
         elif command_name == "refresh_wifi_runtime_link":
             self._log(f"WiFi runtime refresh failed: {detail_text}")
@@ -15388,6 +16264,138 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._last_commanded_pose_time_s = time.time()
         if move_time_ms is not None:
             self._last_commanded_move_time_ms = max(0, int(move_time_ms))
+
+    def _tracking_move_settle_window_s(self, move_time_ms: int) -> float:
+        commanded_s = max(0.0, float(move_time_ms) / 1000.0)
+        return max(0.09, min(0.42, (commanded_s * 0.82) + 0.03))
+
+    def _resync_engine_pose_after_deferred_move(self) -> None:
+        feedback = self._comm.get_servo_feedback_snapshot()
+        if bool(feedback.get("active")) and str(feedback.get("source") or "") == "debug-board":
+            feedback_pan = feedback.get("pan_deg")
+            feedback_tilt = feedback.get("tilt_deg")
+            feedback_age = feedback.get("age_s")
+            try:
+                feedback_age_s = float(feedback_age) if feedback_age is not None else 999.0
+            except Exception:
+                feedback_age_s = 999.0
+            if feedback_pan is not None and feedback_tilt is not None and feedback_age_s <= 1.2:
+                pan, tilt = self._clamp_manual_angles(float(feedback_pan), float(feedback_tilt))
+                self.engine.current_pan = pan
+                self.engine.current_tilt = tilt
+                return
+        pan, tilt = self._clamp_manual_angles(
+            float(getattr(self, "_last_commanded_pan", self.engine.current_pan)),
+            float(getattr(self, "_last_commanded_tilt", self.engine.current_tilt)),
+        )
+        self.engine.current_pan = pan
+        self.engine.current_tilt = tilt
+
+    def _should_defer_auto_move(self, move_time_ms: int, move_delta: float) -> bool:
+        if self._host_controls_hardware():
+            return False
+
+        preview_window_s = max(self._display_frame_interval_s * 1.15, 0.08)
+        if self.engine.state == SentryV2State.ENGAGING:
+            if not self._should_defer_tracking_move(move_time_ms):
+                return False
+            if move_delta <= 1.2:
+                return True
+
+        commanded_at = float(getattr(self, "_last_commanded_pose_time_s", 0.0) or 0.0)
+        if commanded_at <= 0.0:
+            return False
+
+        now = time.time()
+        command_age_s = max(0.0, now - commanded_at)
+        settle_window_s = max(
+            self._tracking_move_settle_window_s(int(move_time_ms)),
+            preview_window_s,
+        )
+        if self.engine.state != SentryV2State.ENGAGING or move_delta >= 1.2:
+            settle_window_s = max(settle_window_s, min(0.58, (float(move_time_ms) / 1000.0) + 0.08))
+        if command_age_s >= settle_window_s:
+            return False
+
+        feedback = self._comm.get_servo_feedback_snapshot()
+        if not bool(feedback.get("active")):
+            return move_delta >= 0.9 and command_age_s < preview_window_s
+        if str(feedback.get("source") or "") != "debug-board":
+            return move_delta >= 0.9 and command_age_s < preview_window_s
+
+        feedback_age = feedback.get("age_s")
+        if feedback_age is None:
+            return True
+        try:
+            feedback_age_s = float(feedback_age)
+        except Exception:
+            feedback_age_s = 999.0
+        if feedback_age_s > 0.45:
+            return True
+
+        feedback_pan = feedback.get("pan_deg")
+        feedback_tilt = feedback.get("tilt_deg")
+        if feedback_pan is None or feedback_tilt is None:
+            return True
+
+        commanded_pan = float(getattr(self, "_last_commanded_pan", feedback_pan))
+        commanded_tilt = float(getattr(self, "_last_commanded_tilt", feedback_tilt))
+        remaining_error = max(
+            abs(float(feedback_pan) - commanded_pan),
+            abs(float(feedback_tilt) - commanded_tilt),
+        )
+        tolerance = 0.85 if self.engine.state == SentryV2State.ENGAGING else 0.55
+        if move_delta >= 2.5:
+            tolerance = max(tolerance, 0.95)
+        elif move_delta >= 1.2:
+            tolerance = max(tolerance, 0.70)
+        return remaining_error > tolerance
+
+    def _should_defer_tracking_move(self, move_time_ms: int) -> bool:
+        if self._host_controls_hardware():
+            return False
+        if self.engine.state != SentryV2State.ENGAGING:
+            return False
+
+        commanded_at = float(getattr(self, "_last_commanded_pose_time_s", 0.0) or 0.0)
+        if commanded_at <= 0.0:
+            return False
+
+        now = time.time()
+        command_age_s = max(0.0, now - commanded_at)
+        settle_window_s = self._tracking_move_settle_window_s(int(move_time_ms))
+        if command_age_s >= settle_window_s:
+            return False
+
+        feedback = self._comm.get_servo_feedback_snapshot()
+        if not bool(feedback.get("active")):
+            return False
+        if str(feedback.get("source") or "") != "debug-board":
+            return False
+
+        feedback_age = feedback.get("age_s")
+        if feedback_age is None:
+            return True
+
+        try:
+            feedback_age_s = float(feedback_age)
+        except Exception:
+            feedback_age_s = 999.0
+        if feedback_age_s > 0.35:
+            return True
+
+        feedback_pan = feedback.get("pan_deg")
+        feedback_tilt = feedback.get("tilt_deg")
+        if feedback_pan is None or feedback_tilt is None:
+            return True
+
+        commanded_pan = float(getattr(self, "_last_commanded_pan", feedback_pan))
+        commanded_tilt = float(getattr(self, "_last_commanded_tilt", feedback_tilt))
+        remaining_error = max(
+            abs(float(feedback_pan) - commanded_pan),
+            abs(float(feedback_tilt) - commanded_tilt),
+        )
+        return remaining_error > 0.85
 
     def _get_command_delta(self, pan: float, tilt: float) -> float:
         prev_pan = float(getattr(self, "_last_commanded_pan", pan))
@@ -15536,6 +16544,23 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             if self._buzzer_suppressed_for_human_voice():
                 route_note += " | ESP32 buzzer is intentionally muted while human voice mode is enabled"
             self._lbl_human_voice_diag_route.setText(f"Route: {route_note}")
+        if hasattr(self, "_lbl_ai_voice_validation_status"):
+            auto_speak = bool(getattr(self.config.ai_assistant, "auto_speak_responses", False))
+            human_voice_enabled = bool(getattr(self.config.sound, "human_voice_enabled", False))
+            selected_voice = self._human_voice_name() or (self._speech_voice_names[0] if self._speech_voice_names else "default voice")
+            if not self._human_voice_supported():
+                readiness = "unavailable"
+            elif auto_speak and human_voice_enabled:
+                readiness = "ready"
+            elif auto_speak and not human_voice_enabled:
+                readiness = "auto-speak armed but human voice is off"
+            elif human_voice_enabled:
+                readiness = "manual speech only"
+            else:
+                readiness = "text-only"
+            self._lbl_ai_voice_validation_status.setText(
+                f"AI voice route: {readiness} | auto-speak {'ON' if auto_speak else 'OFF'} | voice {selected_voice}"
+            )
 
     def _on_human_speech_state_changed(self, state: object) -> None:
         if QTextToSpeech is None:
@@ -15793,6 +16818,15 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._btn_human_voice_refresh.setEnabled(True)
         if hasattr(self, "_btn_human_voice_validate"):
             self._btn_human_voice_validate.setEnabled(self._human_voice_supported())
+        if hasattr(self, "_btn_human_voice_validate_all"):
+            self._btn_human_voice_validate_all.setEnabled(self._human_voice_supported() and bool(voice_names))
+        if hasattr(self, "_chk_ai_auto_speak"):
+            self._chk_ai_auto_speak.blockSignals(True)
+            self._chk_ai_auto_speak.setChecked(bool(getattr(self.config.ai_assistant, "auto_speak_responses", False)))
+            self._chk_ai_auto_speak.setEnabled(self._human_voice_supported())
+            self._chk_ai_auto_speak.blockSignals(False)
+        if hasattr(self, "_btn_ai_speak_last"):
+            self._btn_ai_speak_last.setEnabled(self._human_voice_supported())
         self._refresh_human_voice_diagnostics()
         if hasattr(self, "_lbl_sound_status") and self._buzzer_suppressed_for_human_voice() and bool(getattr(self.config.sound, "enabled", True)):
             self._set_label_content(
@@ -16002,6 +17036,12 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         )
 
     def _on_validate_human_voices_clicked(self) -> None:
+        self._run_human_voice_validation(scan_all=False)
+
+    def _on_validate_all_human_voices_clicked(self) -> None:
+        self._run_human_voice_validation(scan_all=True)
+
+    def _run_human_voice_validation(self, *, scan_all: bool) -> None:
         if not self._human_voice_supported():
             self._set_human_voice_runtime_state("unavailable")
             if hasattr(self, "_lbl_human_voice_diag_validation"):
@@ -16016,8 +17056,17 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         app = QApplication.instance()
         engine = getattr(self, "_speech_engine", None)
         original_voice = self._human_voice_name()
+        selected_voice = original_voice or (self._speech_voice_names[0] if self._speech_voice_names else "")
+        target_voices = list(getattr(self, "_speech_voice_names", []) or []) if scan_all else ([selected_voice] if selected_voice else [])
+        if not target_voices:
+            summary = "Validation: no Qt voices are available to test"
+            if hasattr(self, "_lbl_human_voice_diag_validation"):
+                self._lbl_human_voice_diag_validation.setText(summary)
+            self._log(summary)
+            return
         results: List[str] = []
-        for voice_name in list(getattr(self, "_speech_voice_names", []) or []):
+        passed = 0
+        for voice_name in target_voices:
             index = self._combo_human_voice.findData(voice_name) if hasattr(self, "_combo_human_voice") else -1
             if index >= 0:
                 self._combo_human_voice.setCurrentIndex(index)
@@ -16026,9 +17075,13 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                 self.config.sound.human_voice_name = str(voice_name)
                 self._sync_human_speech_engine()
             started = self._speak_human_phrase(f"Voice validation. {voice_name}.")
-            deadline = time.time() + 0.18
+            deadline = time.time() + (0.75 if scan_all else 0.55)
+            seen_states: List[str] = []
             while app is not None and time.time() < deadline:
                 app.processEvents()
+                state_label = str(getattr(self, "_speech_state_label", "waiting") or "waiting")
+                if not seen_states or seen_states[-1] != state_label:
+                    seen_states.append(state_label)
             engine_voice = ""
             if engine is not None and hasattr(engine, "voice"):
                 try:
@@ -16036,9 +17089,16 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                 except Exception:
                     engine_voice = ""
             state_label = str(getattr(self, "_speech_state_label", "waiting") or "waiting")
-            accepted = bool(started and engine_voice.lower() == str(voice_name).strip().lower() and state_label in {"speaking", "ready", "paused"})
-            status_text = "accepted by Qt" if accepted else f"check state={state_label} engine={engine_voice or 'none'}"
-            results.append(f"{voice_name}: {status_text}")
+            if not seen_states:
+                seen_states.append(state_label)
+            engine_matches = engine_voice.lower() == str(voice_name).strip().lower()
+            speech_transition_seen = any(state in {"speaking", "paused", "ready"} for state in seen_states)
+            accepted = bool(started and engine_matches and speech_transition_seen)
+            if accepted:
+                passed += 1
+            state_chain = "->".join(seen_states)
+            status_text = "pass" if accepted else "check"
+            results.append(f"{voice_name}: {status_text} (engine={engine_voice or 'none'} states={state_chain})")
             self._stop_human_speech()
         if original_voice:
             restore_index = self._combo_human_voice.findData(original_voice) if hasattr(self, "_combo_human_voice") else -1
@@ -16049,10 +17109,19 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                 self.config.sound.human_voice_name = original_voice
                 self._sync_human_speech_engine()
         self._refresh_human_voice_diagnostics()
-        summary = "Validation: " + " | ".join(results) if results else "Validation: no voices were available to test"
+        mode_label = "all voices" if scan_all else "current voice"
+        if scan_all:
+            summary = f"Validation: {passed}/{len(target_voices)} voices passed during {mode_label} scan"
+        else:
+            summary = f"Validation: {'pass' if passed else 'check'} for {target_voices[0]} during {mode_label} test"
         if hasattr(self, "_lbl_human_voice_diag_validation"):
-            self._lbl_human_voice_diag_validation.setText(summary + " | This confirms Qt voice selection and speech-state transitions, not physical speaker audibility.")
-        self._log(summary)
+            self._lbl_human_voice_diag_validation.setText(
+                summary
+                + " | "
+                + " | ".join(results)
+                + " | This confirms Qt voice selection and speech-state transitions, not physical speaker audibility."
+            )
+        self._log(summary + " | " + " | ".join(results))
 
     def _suppress_motion_detection(self, seconds: Optional[float] = None) -> None:
         suppress_for = self.config.detection_mode.motion_ignore_after_move_s if seconds is None else seconds
@@ -16826,12 +17895,90 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._last_mask_trace_snapshot = snapshot
             self._log(f"Mask trace: {snapshot}")
 
+    def _classify_log_message(self, msg: str) -> str:
+        text = str(msg or "").lower()
+        if any(token in text for token in ("fire", "safety", "mask", "blocked", "warn", "engag")):
+            return "safety"
+        if any(token in text for token in ("laser", "led", "acc", "spare", "control source", "app ctrl")):
+            return "accessory"
+        if any(token in text for token in ("camera", "video", "snapshot", "frame", "model", "yolo")):
+            return "camera"
+        if any(token in text for token in ("move", "pan", "tilt", "rest", "home", "sweep", "patrol")):
+            return "movement"
+        return "system"
+
+    def _format_log_line(self, timestamp: str, category: str, msg: str) -> str:
+        label = category.upper()
+        return f"[{timestamp}] [{label}] {msg}"
+
+    def _entry_matches_log_filter(self, category: str) -> bool:
+        active_filter = str(getattr(self, "_log_filter_key", "all") or "all")
+        return active_filter == "all" or active_filter == str(category)
+
+    def _serialize_log_entries(self, *, include_filter: bool) -> str:
+        lines: List[str] = []
+        for timestamp, category, msg in getattr(self, "_log_entries", []):
+            if include_filter and not self._entry_matches_log_filter(category):
+                continue
+            lines.append(self._format_log_line(timestamp, category, msg))
+        return "\n".join(lines)
+
+    def _render_serial_log(self, *, force_scroll: bool = False) -> None:
+        if not hasattr(self, "_log_text") or self._log_text is None:
+            return
+        scroll_bar = self._log_text.verticalScrollBar()
+        was_at_bottom = force_scroll or scroll_bar.value() >= max(0, scroll_bar.maximum() - 6)
+        self._log_text.setPlainText(self._serialize_log_entries(include_filter=True))
+        if was_at_bottom:
+            scroll_bar.setValue(scroll_bar.maximum())
+
+    def _sync_log_controls(self) -> None:
+        paused = bool(getattr(self, "_log_paused", False))
+        pending = int(getattr(self, "_log_paused_pending_count", 0) or 0)
+        if hasattr(self, "_btn_log_pause"):
+            self._btn_log_pause.setEnabled(not paused)
+        if hasattr(self, "_btn_log_resume"):
+            self._btn_log_resume.setEnabled(paused)
+            self._btn_log_resume.setText(f"Resume ({pending})" if paused and pending > 0 else "Resume")
+        if hasattr(self, "_lbl_log_state"):
+            self._lbl_log_state.setText(f"Paused ({pending} queued)" if paused and pending > 0 else ("Paused" if paused else "Live"))
+        for key, button in getattr(self, "_log_filter_buttons", {}).items():
+            button.blockSignals(True)
+            button.setChecked(str(key) == str(getattr(self, "_log_filter_key", "all")))
+            button.blockSignals(False)
+
+    def _set_log_pause(self, paused: bool) -> None:
+        self._log_paused = bool(paused)
+        if not self._log_paused:
+            self._log_paused_pending_count = 0
+            self._render_serial_log(force_scroll=True)
+        self._sync_log_controls()
+
+    def _set_log_filter(self, filter_key: str) -> None:
+        selected = str(filter_key or "all")
+        if selected not in dict(SERIAL_LOG_FILTER_SPECS):
+            selected = "all"
+        self._log_filter_key = selected
+        self._render_serial_log(force_scroll=True)
+        self._sync_log_controls()
+
+    def _clear_serial_log(self) -> None:
+        self._log_entries.clear()
+        self._log_paused_pending_count = 0
+        if hasattr(self, "_log_text") and self._log_text is not None:
+            self._log_text.clear()
+        self._sync_log_controls()
+
     def _log(self, msg: str) -> None:
         ts = time.strftime("%H:%M:%S")
-        self._log_text.append(f"[{ts}] {msg}")
-        # Auto-scroll
-        sb = self._log_text.verticalScrollBar()
-        sb.setValue(sb.maximum())
+        category = self._classify_log_message(msg)
+        self._log_entries.append((ts, category, str(msg)))
+        if bool(getattr(self, "_log_paused", False)):
+            self._log_paused_pending_count += 1
+            self._sync_log_controls()
+            return
+        self._render_serial_log(force_scroll=True)
+        self._sync_log_controls()
 
     def _report_runtime_warning(self, context: str, exc: Exception) -> None:
         message = f"{context}: {exc}"

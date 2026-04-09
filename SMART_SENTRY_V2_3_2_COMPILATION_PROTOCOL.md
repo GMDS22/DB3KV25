@@ -1,5 +1,7 @@
 # Smart Sentry v2.3.2 Compilation Protocol
 
+> Historical protocol note: the active v3.0.0 release-prep path is now documented in `SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md`. This v2.3.2 document is kept for the earlier release line.
+
 This document is the release-prep checklist for Smart Sentry v2.3.2.
 
 Use it before compiling firmware, packaging the app, or publishing release artifacts.
@@ -100,6 +102,12 @@ At minimum, sync these files when the release version changes:
 6. `SMART_SENTRY_V2_3_2_LIVE_VALIDATION_CHECKLIST.md`
 7. `RECENT_UPDATES.json`
 8. This file
+
+Current version-aware packaging note:
+
+1. `build_smart_sentry_v2_3_2_portable.ps1` now resolves the active version marker dynamically.
+2. `run.py` now resolves the active launcher dynamically.
+3. Use `SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md` for the current v3.0.0 release target.
 
 If topology, wiring, transport, or packaging changed, also review:
 

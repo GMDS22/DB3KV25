@@ -15,6 +15,8 @@
 //   - Sound action payload: {"action":"sound","freq_hz":N,"duration_ms":M,"volume_pct":V}
 //   - Rest action payload: {"action":"rest"}
 //   - Sweep action payload: {"action":"sweep"}
+//   - Link-loss safe mode: disables fire, turns off relays, and silences PIR
+//     event emission after app inactivity or client disconnect
 //   - Safety: 0=ARMED, 1=LOCKED
 //   - Trigger mode: 0=water(MOSFET), 1=projectile(servo)
 //   - PIR events sent back as {"v":1,"t":"pir_event","p":{"sensor_id":N,"timestamp_ms":T}}
@@ -253,6 +255,9 @@ static uint32_t bus_send_count   = 0;
 static bool     first_client_seen = false;
 static uint32_t last_wifi_check_ms = 0;
 static uint32_t wifi_recover_count = 0;
+static bool     link_safe_mode_active = true;
+
+static const uint32_t LINK_IDLE_SAFE_TIMEOUT_MS = 1500;
 
 // ─────────────────────────────────────────────────────────────
 // Command sweep
@@ -511,6 +516,58 @@ static int clamped_rest_tilt() { return clamp_int(rest_cfg.tilt, 0, limits_cfg.t
 static int read_current_mA(int pin, float scale) {
   if (pin < 0) return 0;
   return (int)(analogRead(pin) * scale);
+}
+
+static void clear_remote_endpoint() {
+  last_remote_ip = IPAddress();
+  last_remote_port = 0;
+}
+
+#if ENABLE_PIR_SUPPORT
+static void reset_pir_runtime_state() {
+  for (int i = 0; i < PIR_COUNT; i++) {
+    pir_last_state[i] = (digitalRead(PIR_PINS[i]) == HIGH);
+    pir_last_event_ms[i] = 0;
+  }
+}
+#endif
+
+static void enter_link_safe_mode(const char *reason) {
+  if (link_safe_mode_active) return;
+
+  link_safe_mode_active = true;
+  allow_rest_tilt_motion = false;
+  safety_state = 1;
+  fire_request = 0;
+  fire_hold = false;
+  fire_active = false;
+  rapid_fire_active = false;
+  led_state = 0;
+  laser_state = 0;
+  acc_state = 0;
+  spare_state = 0;
+  move_time_override_ms = 0;
+  move_time_override_until_ms = 0;
+  set_mosfet(false);
+  set_trigger_servo_target(false);
+  stop_sound_tone();
+#if ENABLE_PIR_SUPPORT
+  pir_enabled = false;
+  reset_pir_runtime_state();
+#endif
+  clear_remote_endpoint();
+  Serial.printf("[LINK] Safe mode engaged: %s\n", reason ? reason : "unspecified");
+}
+
+static void note_link_activity() {
+  if (link_safe_mode_active) {
+    link_safe_mode_active = false;
+    Serial.println("[LINK] Client activity detected; leaving safe mode");
+#if ENABLE_PIR_SUPPORT
+    reset_pir_runtime_state();
+#endif
+  }
+  last_cmd_ms = now_ms();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1430,6 +1487,7 @@ void setup() {
   }
 
   last_cmd_ms = now_ms();
+  link_safe_mode_active = false;
   Serial.println("================================================");
   Serial.printf("  READY  WiFi='%s'  %s:%u\n", WIFI_SSID, AP_IP.toString().c_str(), UDP_PORT);
 #if ENABLE_PIR_SUPPORT
@@ -1446,6 +1504,10 @@ void setup() {
 void loop() {
   uint32_t now = now_ms();
 
+  if ((now - last_cmd_ms) > LINK_IDLE_SAFE_TIMEOUT_MS) {
+    enter_link_safe_mode("app inactivity timeout");
+  }
+
   // UDP receive
   int pkt = Udp.parsePacket();
   if (pkt > 0) {
@@ -1455,7 +1517,7 @@ void loop() {
       buffer[len]      = '\0';
       last_remote_ip   = Udp.remoteIP();
       last_remote_port = Udp.remotePort();
-      last_cmd_ms      = now;
+      note_link_activity();
       process_packet(buffer, (size_t)len, last_remote_ip, last_remote_port);
     }
   }
@@ -1501,10 +1563,8 @@ void loop() {
   update_pir_sensors(now);
 #endif
 
-  // Link timeout — kill fire if app stops sending
-  if ((now - last_cmd_ms) > 1000 && fire_request != 0) {
-    Serial.println("[LINK] Timeout >1s — fire stopped");
-    fire_request = 0;
+  if (WiFi.softAPgetStationNum() <= 0 && !link_safe_mode_active) {
+    enter_link_safe_mode("no WiFi stations connected");
   }
 
   status_led_tick(now);

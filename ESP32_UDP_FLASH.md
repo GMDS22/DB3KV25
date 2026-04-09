@@ -6,6 +6,8 @@ Canonical sketch mapping is maintained in [ESP32_CURRENT_SKETCH.md](ESP32_CURREN
 
 Selected runtime topology: Smart Sentry WiFi baseline.
 
+Pinned current app path: use the ESP32 WiFi + Debug Board USB firmware contract backed by `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`. Waveshare single-board firmware files are on hold and are not part of the current Smart Sentry app workflow.
+
 Firmware sketch names are treated as content-stable identifiers. An app release bump does not require a sketch rename unless the firmware itself changed or the team intentionally wants a new firmware identity.
 
 - Primary baseline ESP32: WiFi/UDP control for motion, trigger, PIR, relays, and telemetry
@@ -13,7 +15,8 @@ Firmware sketch names are treated as content-stable identifiers. An app release 
 - ESP32 USB remains useful for flashing and diagnostics
 - Current single-board WiFi baseline is the existing Smart Sentry WiFi UDP PIR sketch at the documented v2.3.1 path
 - That active WiFi sketch now carries the rest-position firmware contract too: it accepts `rest` config, exposes `{"action":"rest"}`, and keeps buzzer playback on the existing `{"action":"sound"}` UDP action.
-- Waveshare v3 single-board bring-up uses a separate UDP bus-bridge sketch
+- That same active WiFi sketch now also enforces a link-loss safe mode: after app inactivity it drops fire output, turns off relays/accessories, clears the last UDP client endpoint, and stops PIR event emission until the app reconnects and re-enables PIR.
+- Waveshare v3 single-board bring-up remains archived and on hold; do not treat it as the current app flash target
 
 ## Prereqs
 - Board: ESP32 DevKit v1 (WROOM-32)
@@ -41,9 +44,6 @@ From repo root:
 ```powershell
 # Primary ESP32 (IO/accessories) - Full WiFi UDP baseline sketch
 .\tools\flash_esp32_udp.ps1 -Port COM28 -Sketch "arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino"
-
-# Waveshare Servo Driver HAT (v3 single-board bridge)
-.\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino"
 
 # Secondary ESP32 (servos) - Yahboom Servo Driver UDP sketch
 .\tools\flash_esp32_udp.ps1 -Port COM6 -Sketch "arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino"
@@ -91,6 +91,7 @@ Add -InstallCore if you want the script to attempt core install:
 - Full WiFi UDP runtime for the current Smart Sentry WiFi baseline:
 	- arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino
 - Waveshare v3 single-board UDP bus bridge:
+	- archived and on hold for the current app
 	- arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino
 - USB Serial IO + PIR runtime (current serial/dual-port firmware):
 	- arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
@@ -102,6 +103,7 @@ The current Smart Sentry WiFi baseline sketch currently adds:
 - Periodic pan, tilt, and total current telemetry in `state` packets
 - App-triggered sweep action over UDP instead of a GPIO0 runtime button
 - GPIO0 reserved strictly for ESP32 BOOT strapping
+- Link-loss safe mode that forces accessories OFF and silences PIR events when the app is closed or stops sending packets
 
 Upload the Smart Sentry WiFi baseline sketch:
 
@@ -109,7 +111,7 @@ Upload the Smart Sentry WiFi baseline sketch:
 .\tools\flash_esp32_udp.ps1 -Port COM28 -Sketch "arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino"
 ```
 
-Upload the Waveshare v3 bridge sketch:
+Upload the Waveshare v3 bridge sketch only for archived bench work, not for the current app:
 
 ```powershell
 .\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino"
@@ -131,7 +133,7 @@ Upload USB Serial IO + PIR sketch:
 - UDP port: 9000
 - Default AP IP: 192.168.4.1
 
-Waveshare v3 bridge defaults:
+Waveshare v3 bridge defaults for archived bench work only:
 - WiFi AP SSID: SMART-SENTRY-V3
 - WiFi AP password: smartv3pass
 - UDP port: 9000
@@ -141,7 +143,7 @@ Waveshare v3 bridge defaults:
 - Confirmed active outputs: GPIO27 trigger MOSFET, GPIO25 accessory relay, GPIO26 spare relay, GPIO4 buzzer
 - Intentionally unassigned outputs: LED relay, laser relay, trigger-servo PWM, buzzer volume ADC, speaker volume ADC
 
-If normal upload does not enter bootloader automatically, use the manual helper:
+If archived Waveshare bench work is explicitly resumed and normal upload does not enter bootloader automatically, use the manual helper:
 
 ```powershell
 .\tools\flash_waveshare_bridge_manual_boot.ps1 -Port COM30

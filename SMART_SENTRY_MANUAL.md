@@ -1,9 +1,11 @@
 # SMART SENTRY V2 — COMPLETE REFERENCE MANUAL
 
-> **Version:** 2.3.2  
+> **Version:** 3.0.0  
 > **Module Path:** `app/sentry_v2/`  
-> **Last Updated:** 2026-04-08  
-> **Status:** Verified against the current standalone Smart Sentry v2.3.2 implementation. The canonical runtime settings file is `app/config/smart_sentry_v2_3_2_settings.json`; older settings paths remain compatibility fallbacks only. The live UI now includes the rest-position workflow, visible `Wake Up` / `Go Rest` controls, smooth guided home/rest motion tuning, procedural sound with transport-aware status, read-only runtime/log export actions, adaptive after-target-loss recovery, hidden Shift+wheel panel zoom, and PIR cue confirmation that immediately advances into an offset search when no target is found at the cue point.
+> **Last Updated:** 2026-04-09  
+> **Status:** Verified against the current standalone Smart Sentry release candidate for v3.0.0. The canonical runtime settings file remains `app/config/smart_sentry_v2_3_2_settings.json`; older settings paths remain compatibility fallbacks only. The full settings system still defines 13 tabs, but `Facial Recognition` and `AI Assistant` are temporarily hidden by release hold for v3.0.0 and can be restored quickly by removing their hold entries.
+
+Primary behavior-contract note: for the current authoritative tracking, PIR, target-loss, center-aim, and fire-gating blueprint, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md` first before changing engine or preset behavior.
 
 ---
 
@@ -33,6 +35,8 @@
 
 Smart Sentry v2 is a standalone turret control application launched from the DB3000 launcher. Its **detection logic**, **serial/UDP communication**, **camera ownership**, and **state machine** are self-contained inside `app/sentry_v2/`.
 
+Pinned firmware note: the current live app contract uses the ESP32 WiFi + Debug Board USB path with `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` as the active WiFi firmware. Waveshare single-board firmware files remain in the repo for archived bench work only and are not part of the current app.
+
 - **Standalone camera ownership:** Smart Sentry opens and owns its own camera or stream source
 - **Separate runtime settings:** Smart Sentry persists to `app/config/smart_sentry_v2_3_2_settings.json` and mirrors older files only for compatibility
 - **One-app-at-a-time workflow:** Smart Sentry and the main app may use the same COM values, but never at the same time
@@ -41,12 +45,14 @@ On single-camera systems, Smart Sentry should normally use camera index `0` unle
 
 ### Recent Verified Standalone Upgrades
 
+- **Quick access control deck:** the left pane now includes a retractable quick-access panel between the video feed and the serial/status area, with pin-to-persist behavior, mirrored runtime controls for enable/video/link/camera/auto motion, a compact manual movement pad, and direct safety/fire/accessory toggles that reuse the same handlers as the Controls tab
 - **Quick startup policy:** launch defers auto camera open and auto-connect, then performs a later lazy YOLO auto-load so startup stays responsive without leaving YOLO permanently unloaded
 - **Sound system:** procedural non-blocking buzzer cues now route through `sound_engine.py` and `SentryV2Comm` with transport-aware status and persisted volume
 - **Voice output modes:** Smart Sentry now supports both robot buzzer cues and optional human-like local speech through Qt text-to-speech, so identity alerts and assistant replies can use either path or both together
 - **Runtime diagnostics:** the status area now includes pinned hardware-monitor cards plus a live sound-link readout
 - **Runtime data export:** the Controls page can write timestamped JSON and Markdown runtime captures under the repo snapshot folder and expose a direct open-folder action for the saved files
-- **Operator expansion:** the live settings surface now includes Facial Recognition, Shortcut Keys, and AI Assistant tabs plus a pinned top-row `Quick Keys` action
+- **Preview resiliency:** local camera preview now keeps a reduced-overlay live fallback active when detector callbacks lag and records blackout-frame counts in runtime snapshots; sustained successful-but-near-black webcam frames now trigger source recovery instead of silently remaining black
+- **Operator expansion:** the underlying settings system still includes Facial Recognition, Shortcut Keys, and AI Assistant surfaces plus a pinned top-row `Quick Keys` action, with Facial Recognition and AI Assistant currently held out of the v3.0.0 release through the documented release-hold workflow
 - **Known-face support:** Smart Sentry can now load and persist a lightweight face library, register new identities from images or the current live frame, label recognized faces in the preview, and optionally keep friendly known faces out of the engagement path
 - **Settings compatibility:** the canonical runtime settings file remains authoritative while the legacy nested settings file is kept synchronized for compatibility
 
@@ -55,6 +61,7 @@ On single-camera systems, Smart Sentry should normally use camera index `0` unle
 - **Current standalone implementation:** Smart Sentry v2 is no longer hosted inside the main app and no longer depends on pushed main-app frames.
 - **Current own-camera implementation:** Smart Sentry opens its configured camera source itself and runs its full internal detector pipeline on that feed.
 - **Current protected baseline:** the live visual-servo controller, precision refinement, motion suppression, and fire-gating behavior are the preserved baseline and should only change for measured improvement.
+- **Current hunt-motion contract:** automatic target-loss and PIR-adjacent hunt motion must stay bounded by real servo settle state, not just commanded pose; if a move is deferred because debug-board feedback is stale or unsettled, the tab must resync the engine pose before the next hunt step is planned.
 
 ### Module Philosophy
 
@@ -102,7 +109,8 @@ process_frame(frame, raw_boxes)
     │      │  ThreatScorer.score() → sorted TrackedTargets
     │      │  State-specific logic (guard/engage/return)
     │      │  → cb_move(pan, tilt) → SentryV2Comm.send_command()
-    │      │  → cb_fire(burst)     → SentryV2Comm.send_fire_burst()
+   │      │  → cb_fire(burst)     → SentryV2TabWidget._start_fire_burst()
+   │      │                        → SentryV2Comm.send_command(fire on/off)
     │
     ▼
 overlay.draw(frame, engine)
@@ -177,19 +185,19 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 8. **Guard** — Guard position, rest position, startup/close rest behavior, PIR guard controls, patrol mode, sweep/waypoint/random parameters, guided home/rest motion tuning
 9. **Theme** — visual preset selection plus live accent, transparency, contrast, radius, and contrast tuning; panel font zoom remains supported through the hidden Shift+wheel shortcut rather than a visible slider
 10. **Controls** — Manual pan/tilt matrix, visible `Wake Up` / `Go Rest` actions, sound controls, runtime data export and open-folder actions, LED/laser/safety toggles
-11. **Facial Recognition** — known-face library controls, image and live-frame registration, friendly-face behavior, runtime thresholding, and recognition testing
+11. **Facial Recognition** — visible release-held tab for the unfinished known-face workflow; kept in the UI but disabled for the v3.0.0 release
 12. **Shortcut Keys** — live shortcut status, assigned key summary, and quick-reference access
-13. **AI Assistant** — rule-based diagnostics, request input, runtime analysis, and safe recommendation tools
+13. **AI Assistant** — visible release-held tab for the unfinished local assistant workflow; kept in the UI but disabled for the v3.0.0 release
 
-**Verified current layout note:** the live UI currently renders 13 icon-forward settings tabs inside a full-height right-side panel, with a pinned header and top-row `Quick Keys` button above the tabs and compact Status/Log areas below the video rather than as separate tabs.
+**Verified current layout note:** the underlying settings architecture still defines 13 icon-forward settings tabs inside a full-height right-side panel, with a pinned header and top-row `Quick Keys` button above the tabs and compact Status/Log areas below the video rather than as separate tabs. For the v3.0.0 release target, the Facial Recognition and AI Assistant tabs are temporarily hidden through the documented release-hold convention and restored by removing their hold entries.
 
 **Verified current runtime note:** the Controls page now includes persisted Sound ON/OFF and volume controls, visible `Wake Up` / `Go Rest` buttons, read-only runtime data export controls, and an open-folder shortcut for saved exports, while the Status area surfaces live sound-link transport state alongside the hardware monitor. The Serial Output panel now also supports timestamped log export plus a direct open-folder action for AI analysis and troubleshooting.
 
-**Verified current identity note:** the Facial Recognition page persists its face library separately at `app/config/smart_sentry_v2_3_2_faces.json`, uses Haar-cascade face detection plus lightweight DCT and histogram embeddings, and can either label friendly known faces only or keep them out of the engagement stream entirely when that protection is enabled. Recognized names can be announced through the buzzer, the local human voice engine, or both, but the current Controls contract now also supports muting the ESP32 buzzer automatically while human voice mode is enabled so those outputs do not overlap.
+**Verified current identity note:** the underlying Facial Recognition implementation still persists its face library separately at `app/config/smart_sentry_v2_3_2_faces.json` and keeps the lightweight Haar-cascade plus embedding workflow in the codebase, but the tab is intentionally on release hold for v3.0.0 and is not part of the active release surface.
 
 **Verified current shortcut note:** the top-row `Quick Keys` button and the Shortcut Keys tab both point operators to `SMART_SENTRY_SHORTCUT_KEYS.md`, and the live shortcut runtime stays window-focused so hotkeys only fire while the Smart Sentry window is active.
 
-**Verified current AI assistant note:** the AI Assistant tab is now a local rule-based assistant surface, not a cloud LLM client. It can summarize runtime state, draft simple recommendations, and apply a small set of safe operator actions from text requests, including home or rest moves, shortcut toggling, face-recognition toggling, and detection-mode changes. In `Conversational Voice` mode it can also speak replies through the local human voice engine, and the color-detection request path now maps to the real Color Detection mode instead of the older hybrid index.
+**Verified current AI assistant note:** the underlying local Ollama-backed assistant implementation remains in the codebase with deterministic runtime analysis and fallback behavior, but the AI Assistant tab is intentionally on release hold for v3.0.0 and is not part of the active release surface.
 
 **Verified current Threat AI note:** the Threat AI page now shows saved-data and model status text, exposes an `Open ML Folder` action only when real saved data or model artifacts exist, and includes an operator-facing description of how logged training examples and optional ML refinement interact with the weighted threat scorer.
 
@@ -433,12 +441,20 @@ tilt = current_tilt + offset_y
 - Debug Board serial (bus servo pan/tilt) + ESP32 UDP (IO tokens)
 - UDP packets contain JSON payload + CRC32 integrity check
 - Best for reducing wire clutter while keeping precise servo control
+- This is the pinned current app topology for the live Smart Sentry firmware path
 
 **Mode 3 — Full WiFi:**
 - Everything over UDP to ESP32
 - Motion and IO are sent as JSON payloads with CRC32 integrity check
 - Typical payload fields are `pan_cmd`, `tilt_cmd`, `fire`, `safety`, `mode`, `led`, `laser`, and optional `move_time_ms`
 - ESP32 relays bus servo commands to debug board via UART2
+- The current WiFi firmware baseline for app-managed ESP32 work is still `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+
+### Current Firmware Warning
+
+- Do not treat the Waveshare single-board bridge files as active Smart Sentry app firmware.
+- Those files remain on hold from a failed attempt and are retained only as archived bench material.
+- For editor work on the live app, start from the ESP32 WiFi + Debug Board USB path and the v2.3.1 WiFi firmware above.
 
 **Mode 4 — Dual ESP32 WiFi:**
 - Primary ESP32 handles IO (fire, safety, laser, LED, PIR)
@@ -840,7 +856,7 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 | `return_delay` | `float` | 1.5 | Seconds before returning to guard |
 | `engagement_speed` | `int` | 80 | Servo speed multiplier |
 | `auto_trigger_enabled` | `bool` | False | Enable automatic firing |
-| `trigger_mode_bb` | `bool` | False | False=Water, True=BB |
+| `trigger_mode_bb` | `bool` | False | False=Water/MOSFET path, True=Projectile/ESP32 GPIO13 trigger-servo path on the current DB3000 ESP32 contract |
 | `precision_aim_enabled` | `bool` | True | Enable PID refinement |
 | `precision_settle_time` | `float` | 0.5 | Max PID refinement duration |
 | `precision_kp` | `float` | 0.02 | PID proportional gain |
@@ -1019,13 +1035,11 @@ The pinned header and Controls page now share the operator workflow for explicit
 
 ### Facial Recognition Tab
 
-The Facial Recognition tab is now a live runtime surface rather than a placeholder.
+For the v3.0.0 release target, the Facial Recognition tab is intentionally hidden from the active tab strip through the release-hold convention. Removing its hold entry restores the normal tab.
 
-- It can register identities from imported still images or from the current live frame.
-- The face library is stored separately from the main settings file in `app/config/smart_sentry_v2_3_2_faces.json`.
-- Recognition uses a lightweight Haar-cascade and embedding approach so it works in the current environment where `cv2.face` is not available.
-- Friendly known faces can be announced, greeted with a small friendly gesture, and optionally suppressed from the engagement pipeline.
-- Recognized names are drawn directly on the preview, even when a friendly face is excluded from engagement.
+- The unfinished face-library workflow stays in the codebase for later release activation.
+- The tab stays visible so operators and editors can see that the feature exists.
+- The disabled state prevents the unfinished workflow from affecting normal v3.0.0 runtime behavior.
 
 ### Shortcut Keys Tab
 
@@ -1037,16 +1051,11 @@ The Shortcut Keys tab is now the runtime status page for operator hotkeys.
 
 ### AI Assistant Tab
 
-The AI Assistant tab is now a live local assistant surface.
+For the v3.0.0 release target, the AI Assistant tab is intentionally hidden from the active tab strip through the release-hold convention. Removing its hold entry restores the normal tab.
 
-- It accepts short operator text requests.
-- It can summarize the current runtime state.
-- It can draft safe recommendations.
-- It can apply a small set of rule-based actions such as switching detection mode, moving to home or rest, toggling shortcuts, controlling face recognition, and speaking a live status summary when allowed by the assistant settings.
-- It now includes a `Conversational Voice` mode plus an option to speak replies through the local Qt text-to-speech engine, giving the operator a normal human-style spoken response path without requiring a cloud service.
-- The human voice path now supports speech-style presets such as quiet operator, alert guard, warm greeter, and neutral assistant. Each preset updates the local voice rate, pitch, and volume together so operators can shift the spoken character quickly without hand-tuning every slider.
-- When human voice mode is enabled, the Controls tab can now mute the ESP32 buzzer path so AI speech does not collide with firmware-driven buzzer cues on the integrated board.
-- The newer human-voice and assistant speech controls now carry explicit in-app tooltips so operators can see what each setting validates, changes, or suppresses without leaving the tab.
+- The unfinished local assistant workflow stays in the codebase for later release activation.
+- The tab stays visible so operators and editors can see that the feature exists.
+- The disabled state prevents unfinished assistant workflows from affecting normal v3.0.0 runtime behavior.
 
 ### Engage Tab
 
@@ -1120,10 +1129,17 @@ P{pan}T{tilt}F{fire}L{led}R{laser}G{acc3}S{safety}M{mode}\n
 | L | 0 or 1 | LED relay (1=on) |
 | R | 0 or 1 | Laser relay (1=on) |
 | G | 0–3 | Accelerometer mode / aux |
+| A | 0 or 1 | Spare relay (1=on) |
 | S | 0 or 1 | Safety (0=armed, 1=locked) |
 | M | 0 or 1 | Trigger mode (0=water, 1=BB) |
 
 **Example:** `P90T50F0L1R0G0S1M0\n`
+
+Notes:
+
+- `M0` and `M1` select which trigger output semantics the IO firmware should use. They do not change target selection, centering, or fire-gate logic in the engine.
+- On the current Smart Sentry app path, `M0` means the water/MOSFET output and `M1` means the projectile trigger-servo path on ESP32 GPIO13.
+- Archived Waveshare single-board bridge material is different and may intentionally leave trigger-servo PWM unassigned. Do not assume `M1` implies a live projectile output on archived Waveshare-only docs or bench paths.
 
 ### Bus Servo Packet Format
 
@@ -1183,7 +1199,10 @@ CRC32 computed over the JSON string (before adding `crc` field), using `zlib.crc
 [SentryV2Engine state machine]
    │ aim → precision PID → fire
    ├──► cb_move(pan, tilt)  →  SentryV2Comm.send_command()
-   └──► cb_fire(burst)      →  SentryV2Comm.send_fire_burst()
+   └──► cb_fire(burst)      →  SentryV2TabWidget._start_fire_burst()
+                                    │
+                                    ▼
+                   SentryV2Comm.send_command(fire on/off)
                                     │
                                     ▼
                    [Serial/UDP/Bus Servo hardware]
@@ -1271,7 +1290,7 @@ Use this section to assess which files are affected by common modifications.
 | Modify engagement phases | `sentry_v2_engine.py` — `_update_engaging()` |
 | Change PID gains | `sentry_v2_config.py` — `EngagementConfig` |
 | Change after-target-loss behavior | `sentry_v2_engine.py` — `_capture_loss_recovery_context()`, `_select_loss_recovery_protocol()`, `_update_rapid_handoff_recovery()`, `_update_persistent_recovery()` |
-| Add trigger type | `sentry_v2_comm.py` — `send_fire_burst()` |
+| Change trigger transport semantics or add a new trigger path | `sentry_v2_comm.py` — `send_command()`, transport send helpers, and runtime trigger-config routing; keep the engine fire gate mode-agnostic |
 | Update burst UI | `sentry_v2_tab.py` — `_build_engagement_tab()` |
 
 ### Adding a New Guard Patrol Mode
@@ -1442,7 +1461,9 @@ These are current implementation risks verified during documentation review and 
 |---|---|---|
 | Sentry detects but doesn't engage | `min_threat_score` too high | Lower from default 0.30 |
 | Fires too fast | Cooldown too short | Increase `inter_target_cooldown` |
-| Doesn't fire at all | Auto-trigger disabled | Enable auto-trigger in Engagement tab |
+| Doesn't fire at all in auto mode | `auto_trigger_enabled` is off or the fire gate never qualifies the aim | Enable auto-trigger first, then check aim-lock tolerances, confidence/persistence thresholds, and no-fire mask status before assuming transport failure. |
+| Manual fire works in water mode but not projectile mode | Trigger mode is set to projectile but the active transport or hardware path does not expose a live trigger-servo output | On the current DB3000 ESP32 app path, verify the ESP32 WiFi/IO side is connected and the projectile path is intended to use GPIO13. If you are following archived Waveshare single-board material, check capability notes such as `trigger_servo_assigned=false` before treating this as a software fire-gate bug. |
+| Mode 2 WiFi + Debug moves pan/tilt but trigger IO does not react | Debug-board movement is available but ESP32 WiFi IO is offline or degraded | Restore the ESP32 WiFi link first. In mode 2, movement and trigger IO are split, so a movement-only connection can still aim without a live fire path. |
 | Aims wrong spot | Camera FOV mismatch | Adjust `camera_hfov` / `camera_vfov` in Guard tab |
 | PID oscillation | Gains too high | Lower `precision_kp`, increase `precision_kd` |
 | `Go Rest` stops above the saved rest tilt | Rest tilt is below the normal guard minimum and the saved value or limits are inconsistent | Verify `rest_tilt` is inside the absolute sentry tilt range. The current app allows rest moves below `tilt_min`/guard minimum when executing a rest command. |

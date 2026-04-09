@@ -217,6 +217,32 @@ def test_pir_no_detect_returns_guard_home():
     print("  ✓ PIR no-detect completion returns to configured guard/home position")
 
 
+def test_paused_pir_events_do_not_queue_stale_motion():
+    """Verify PIR hits received while paused do not trigger a stale cue on enable."""
+    print("[Test 7/7] Ignore Paused PIR Events...")
+
+    config = SentryV2Config()
+    config.guard.guard_pan = 140.0
+    config.guard.guard_tilt = 87.0
+    config.pir_guard.pir_enabled = True
+    config.pir_guard.sensors[0].enabled = True
+    config.pir_guard.sensors[0].cue_pan = 270.0
+    config.pir_guard.sensors[0].cue_tilt = 55.0
+
+    engine = SentryV2Engine(config)
+
+    engine.on_pir_sensor_fired(0, 1.0)
+    engine.start()
+
+    assert engine.state == SentryV2State.GUARDING, "Engine should be guarding after start"
+    assert engine.current_pan == config.guard.guard_pan, "Start should move to guard pan, not a stale PIR cue"
+    assert engine.current_tilt == config.guard.guard_tilt, "Start should move to guard tilt, not a stale PIR cue"
+    assert engine._pir_cue_mode == False, "Paused PIR events should not arm PIR cue mode"
+    assert engine._pir_manager.peek_queue_count() == 0, "Paused PIR events should not remain queued after start"
+
+    print("  ✓ Paused PIR events no longer queue stale startup motion")
+
+
 def main():
     print("\n=== SMART SENTRY V3 PIR UI Configuration Tests ===\n")
     
@@ -227,8 +253,9 @@ def main():
         test_pir_scan_settings()
         test_pir_manager_creation()
         test_pir_no_detect_returns_guard_home()
+        test_paused_pir_events_do_not_queue_stale_motion()
         
-        print("\n✓ All 6 tests passed!\n")
+        print("\n✓ All 7 tests passed!\n")
         return 0
     
     except AssertionError as e:

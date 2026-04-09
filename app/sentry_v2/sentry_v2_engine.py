@@ -29,7 +29,7 @@ if __package__ in (None, ""):
         sys.path.insert(0, str(app_dir))
     from sentry_v2.sentry_v2_config import SentryV2Config
     from sentry_v2.sentry_v2_no_fire_masks import find_blocking_mask
-    from sentry_v2.target_filter import DetectedObject, TargetFilter
+    from sentry_v2.target_filter import DetectedObject, FilterDecision, TargetFilter
     from sentry_v2.threat_scorer import ThreatScorer, TrackedTarget
     from sentry_v2.engagement_planner import EngagementPlanner, EngagementOrder
     from sentry_v2.ml_training_logger import MLTrainingLogger
@@ -38,7 +38,7 @@ if __package__ in (None, ""):
 else:
     from .sentry_v2_config import SentryV2Config
     from .sentry_v2_no_fire_masks import find_blocking_mask
-    from .target_filter import DetectedObject, TargetFilter
+    from .target_filter import DetectedObject, FilterDecision, TargetFilter
     from .threat_scorer import ThreatScorer, TrackedTarget
     from .engagement_planner import EngagementPlanner, EngagementOrder
     from .ml_training_logger import MLTrainingLogger
@@ -149,6 +149,8 @@ class SentryV2Engine:
         self._return_start: float = 0.0
 
         # Per-frame results (exposed for overlay)
+        self.last_detections: List[DetectedObject] = []
+        self.last_filter_diagnostics: List[FilterDecision] = []
         self.last_targets: List[TrackedTarget] = []
         self.last_qualified: List[DetectedObject] = []
         self.last_queue: List[EngagementOrder] = []
@@ -231,7 +233,7 @@ class SentryV2Engine:
 
     def start(self) -> None:
         """Activate sentry — move to guard position and start watching."""
-        self._filter.reset()
+        self._reset_runtime_state()
         self._change_state(SentryV2State.GUARDING)
         self._move_turret(self.cfg.guard.guard_pan, self.cfg.guard.guard_tilt)
 
@@ -239,6 +241,8 @@ class SentryV2Engine:
         self._filter.reset()
         self._queue.clear()
         self.last_queue = []
+        self.last_detections = []
+        self.last_filter_diagnostics = []
         self.last_targets = []
         self.last_qualified = []
         self._queue_index = 0
@@ -318,9 +322,11 @@ class SentryV2Engine:
             return
 
         self._last_no_fire_mask_name = ""
+        self.last_detections = list(detections)
 
         # 1. Filter
-        qualified = self._filter.filter(detections, now)
+        qualified, diagnostics = self._filter.filter_with_diagnostics(detections, now)
+        self.last_filter_diagnostics = diagnostics
         self.last_qualified = qualified
 
         # 2. Score
@@ -342,14 +348,18 @@ class SentryV2Engine:
     def on_pir_sensor_fired(self, sensor_id: int, timestamp: Optional[float] = None) -> None:
         """Called when a PIR sensor event is received from ESP32."""
         now = timestamp or time.time()
+
+        # Ignore stale/pre-enable PIR hits. Queuing them while PAUSED causes the
+        # first enable cycle to consume old events and lunge toward a sensor cue
+        # that the operator did not request.
+        if self.state == SentryV2State.PAUSED or not self.cfg.pir_guard.pir_enabled:
+            return
+
         self._pir_manager.on_pir_event(sensor_id, now)
 
         # PIR is a blind-spot cueing input, not a higher-priority override than a
         # camera-confirmed active engagement. Queue the PIR event immediately, but
         # only convert it into motion outside live ENGAGING tracking.
-        if self.state == SentryV2State.PAUSED or not self.cfg.pir_guard.pir_enabled:
-            return
-
         if self.state == SentryV2State.ENGAGING:
             return
 
@@ -481,7 +491,11 @@ class SentryV2Engine:
             )
             next_point = self._pir_manager.get_next_scan_point()
             if next_point is not None:
-                self._move_turret(next_point[0], next_point[1])
+                # Apply organic jitter on the very first scan move too
+                jitter_rng = random.Random(int(now * 1000) % 7919)
+                scan_pan = self._clamp_pan(next_point[0] + jitter_rng.gauss(0.0, 0.40))
+                scan_tilt = self._clamp_tilt(next_point[1] + jitter_rng.gauss(0.0, 0.25))
+                self._move_turret(scan_pan, scan_tilt)
                 self._pir_scan_awaiting_settle = True
                 self._pir_settle_start = now
             else:
@@ -523,7 +537,13 @@ class SentryV2Engine:
         # Move to next scan point
         next_point = self._pir_manager.get_next_scan_point()
         if next_point is not None:
-            self._move_turret(next_point[0], next_point[1])
+            # Add subtle organic jitter for natural-looking PIR hunt movement
+            jitter_rng = random.Random(int(now * 1000) % 9973)
+            jitter_pan = jitter_rng.gauss(0.0, 0.40)
+            jitter_tilt = jitter_rng.gauss(0.0, 0.25)
+            scan_pan = self._clamp_pan(next_point[0] + jitter_pan)
+            scan_tilt = self._clamp_tilt(next_point[1] + jitter_tilt)
+            self._move_turret(scan_pan, scan_tilt)
             self._pir_scan_awaiting_settle = True
             self._pir_settle_start = now
         else:
@@ -561,7 +581,9 @@ class SentryV2Engine:
         if self._engage_phase == "aim":
             self._last_err_pan_deg = 0.0
             self._last_err_tilt_deg = 0.0
-            aim_settle_time = 0.35
+            # Scale aim settle with engagement speed — fast presets skip delay
+            speed_ratio = float(max(10, min(100, int(getattr(self.cfg.engagement, "engagement_speed", 80) or 80))) - 10) / 90.0
+            aim_settle_time = max(0.06, 0.35 * (1.0 - speed_ratio * 0.75))
             if elapsed >= aim_settle_time:
                 if self.cfg.engagement.precision_aim_enabled:
                     self._enter_precision_phase(now, order)
@@ -632,9 +654,14 @@ class SentryV2Engine:
             else:
                 self._aim_lock_frames = 0
 
+            # Allow early fire when aim has been rock-steady for enough frames,
+            # even before settle time expires (rewards fast-converging presets).
+            early_lock = self._aim_lock_frames >= max(1, self.cfg.engagement.aim_lock_required_frames)
+            settle_met = elapsed >= settle
+
             if (
                 self.cfg.engagement.auto_trigger_enabled
-                and elapsed >= settle
+                and (settle_met or early_lock)
                 and self._ready_to_fire()
                 and target is not None
                 and self._trigger_should_fire(target, lock_pan, lock_tilt, now)
@@ -644,6 +671,7 @@ class SentryV2Engine:
 
             if (
                 self.cfg.engagement.auto_trigger_enabled
+                and now >= self._trigger_refractory_until
                 and elapsed >= float(self.cfg.engagement.aim_lock_timeout)
                 and target is not None
                 and self._ready_to_fire()
@@ -906,9 +934,11 @@ class SentryV2Engine:
     def _engagement_response_scale(self, *, use_fire_limits: bool) -> float:
         speed_value = int(max(10, min(100, int(getattr(self.cfg.engagement, "engagement_speed", 80) or 80))))
         ratio = float(speed_value - 10) / 90.0
-        scale = 0.72 + (ratio * 0.68)
+        # Wider authority range so fast presets (80-100) actually feel fast.
+        # Demo/sniper presets (10-40) remain calm; chase/saturation ramp up.
+        scale = 0.65 + (ratio * 0.85)
         if use_fire_limits:
-            scale = min(scale, 1.08)
+            scale = min(scale, 1.15)
         return scale
 
     def _safe_log_precision_frame(self, **kwargs: object) -> None:
@@ -966,6 +996,11 @@ class SentryV2Engine:
         """Start engagement for a queued order with a stable first step."""
         self._reset_precision_state()
         self._remember_active_target(order.target.det, target=order.target, timestamp=now)
+        # Seed aim anchors to the new order's planned position so that
+        # loss recovery (if triggered immediately) searches near the
+        # correct target, not the previous engagement's last aim point.
+        self._active_target_last_aim_pan = self._clamp_pan(order.pan)
+        self._active_target_last_aim_tilt = self._clamp_tilt(order.tilt)
         if self.cfg.engagement.precision_aim_enabled:
             # Avoid a blind first snap that can jump in the wrong direction.
             self._enter_precision_phase(now, order)
@@ -1010,6 +1045,9 @@ class SentryV2Engine:
     def _begin_fire(self, order: EngagementOrder, now: float) -> None:
         """Transition to fire phase — respects auto_trigger_enabled gate."""
         blocked_mask = self._current_no_fire_mask()
+        prompted_auto_fire_allowed = True
+        if str(getattr(order.target.det, "source", "")) == "prompted":
+            prompted_auto_fire_allowed = bool(getattr(self.cfg, "prompted_allow_auto_fire", False))
         self._engage_phase = "fire"
         self._phase_start = now
         self._trigger_gate_active = False
@@ -1031,7 +1069,12 @@ class SentryV2Engine:
             self._ml_logger.save()
 
         # Only actually fire if auto-trigger is enabled
-        if self.cfg.engagement.auto_trigger_enabled and blocked_mask is None:
+        fired = (
+            self.cfg.engagement.auto_trigger_enabled
+            and blocked_mask is None
+            and prompted_auto_fire_allowed
+        )
+        if fired:
             burst = self.cfg.engagement.burst_count
             if self._cb_fire:
                 self._cb_fire(burst)
@@ -1043,7 +1086,7 @@ class SentryV2Engine:
             "pan": round(order.pan, 1),
             "tilt": round(order.tilt, 1),
             "time": now,
-            "fired": self.cfg.engagement.auto_trigger_enabled and blocked_mask is None,
+            "fired": fired,
             "blocked_by_mask": str(blocked_mask.name) if blocked_mask is not None else "",
         })
         # Keep log bounded
@@ -1228,12 +1271,12 @@ class SentryV2Engine:
         style = self._loss_search_style()
         phase_key = str(phase or "local_search")
         if "expand" in phase_key:
-            scale = 0.60 if style == "fast_reacquire" else 0.70
+            scale = 1.00 if style == "fast_reacquire" else 1.22
         elif "handoff" in phase_key:
-            scale = 0.52 if style == "fast_reacquire" else 0.60
+            scale = 0.90 if style == "fast_reacquire" else 1.08
         else:
-            scale = 0.55 if style == "fast_reacquire" else 0.64
-        return float(max(0.08, min(base, base * scale)))
+            scale = 0.96 if style == "fast_reacquire" else 1.15
+        return float(max(0.11, min(0.45, base * scale)))
 
     def _search_point_distance(
         self,
@@ -1756,6 +1799,14 @@ class SentryV2Engine:
         target_tilt = self._clamp_tilt(tilt)
         if abs(target_pan - self.current_pan) < 0.05 and abs(target_tilt - self.current_tilt) < 0.05:
             return
+        # Add subtle organic jitter so search movements don't look robotic.
+        # Seeded from the search index for repeatability, but visually natural.
+        jitter_seed = int(self._loss_recovery_search_index * 97 + int(now * 100) % 137)
+        jitter_rng = random.Random(jitter_seed)
+        jitter_pan = jitter_rng.gauss(0.0, 0.35)
+        jitter_tilt = jitter_rng.gauss(0.0, 0.22)
+        target_pan = self._clamp_pan(target_pan + jitter_pan)
+        target_tilt = self._clamp_tilt(target_tilt + jitter_tilt)
         self._loss_recovery_last_move_time = now
         self._move_turret(target_pan, target_tilt)
 
@@ -1832,7 +1883,11 @@ class SentryV2Engine:
     ) -> Tuple[float, float, float, float]:
         eng = self.cfg.engagement
         alpha = max(0.0, min(1.0, float(eng.precision_error_ema)))
-        if alpha <= 0.0:
+        # Seed the EMA with the first real error so the filter doesn't
+        # start cold from 0 and under-correct on the opening frames.
+        first_frame = (self._smoothed_err_pan == 0.0 and self._smoothed_err_tilt == 0.0
+                       and (abs(err_pan) > 0.01 or abs(err_tilt) > 0.01))
+        if alpha <= 0.0 or first_frame:
             self._smoothed_err_pan = err_pan
             self._smoothed_err_tilt = err_tilt
         else:
@@ -1905,9 +1960,14 @@ class SentryV2Engine:
     def _update_returning(self, now: float) -> None:
         """Wait briefly, then return to guard/patrol position."""
         if now - self._return_start >= self.cfg.engagement.return_delay:
-            # For static mode, return to guard point; for patrol modes,
-            # the patrol logic will smoothly resume from current position.
-            if self.cfg.guard.guard_mode == 0:
+            mode = self.cfg.guard.guard_mode
+            if mode == 0:
+                # Static guard — move back to guard point
+                gp, gt = self._planner.get_return_position()
+                self._move_turret(gp, gt)
+            else:
+                # Patrol modes — nudge turret toward guard home so it doesn't
+                # stay stranded at the last engagement point while patrol re-inits.
                 gp, gt = self._planner.get_return_position()
                 self._move_turret(gp, gt)
             self._patrol_initialized = False  # patrol will re-init on next tick
@@ -2102,6 +2162,7 @@ class SentryV2Engine:
         return {
             "state": self.state.name,
             "engage_phase": str(getattr(self, "_engage_phase", "")),
+            "targets_detected": len(self.last_detections),
             "targets_visible": len(self.last_targets),
             "targets_qualified": len(self.last_qualified),
             "active_engagements": 1 if self.active_order is not None else 0,
@@ -2116,6 +2177,20 @@ class SentryV2Engine:
             "loss_recovery_phase": self._loss_recovery_phase,
             "no_fire_mask": self._last_no_fire_mask_name,
             "motion_enabled": bool(self._motion_enabled),
+            "filter_rejections": [
+                {
+                    "track_id": int(decision.track_id),
+                    "class_name": str(decision.class_name),
+                    "source": str(decision.source),
+                    "passed": bool(decision.passed),
+                    "reason": str(decision.reason),
+                    "detail": str(decision.detail),
+                    "confirm_hits": int(decision.confirm_hits),
+                    "confirm_required": int(decision.confirm_required),
+                }
+                for decision in self.last_filter_diagnostics[:12]
+                if not decision.passed
+            ],
         }
 
     # ------------------------------------------------------------------ #

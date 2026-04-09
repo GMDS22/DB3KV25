@@ -3,6 +3,8 @@
 ## Overview
 Updated ESP32 firmware that adds 3 PIR motion sensor inputs while maintaining 100% backward compatibility with existing IO/trigger control logic.
 
+This guide describes the DB3000 ESP32 IO firmware family, not the archived Waveshare single-board bridge path.
+
 **Original File**: `DB3000_ESP32_IO_Telemetry_2026.ino`  
 **New File**: `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`  
 **Status**: Original remains unchanged; new version is fully independent
@@ -14,6 +16,11 @@ Updated ESP32 firmware that adds 3 PIR motion sensor inputs while maintaining 10
 - Water/Projectile trigger modes work identically
 - LED, Laser, Accessory relay logic unchanged
 - PIR code is completely optional via compile-time configuration
+
+Scope note:
+
+- the identical water/projectile statement here applies to this DB3000 ESP32 firmware contract
+- archived Waveshare single-board bridge docs use a different capability surface and may intentionally leave projectile trigger-servo PWM unassigned
 
 ### ✅ PIR Integration
 - 3 independent motion sensor inputs with edge detection

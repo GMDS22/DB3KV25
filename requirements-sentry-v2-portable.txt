@@ -1,3 +1,5 @@
+# For Ollama local AI support
+requests
 # Smart Sentry v2 portable runtime dependencies
 # This file is intentionally self-contained for standalone packaging.
 

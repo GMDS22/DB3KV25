@@ -882,6 +882,11 @@ class SentryV2Comm:
 
     def disconnect(self) -> None:
         """Close all open connections."""
+        try:
+            if self.is_connected():
+                self.send_pir_enabled(False)
+        except Exception:
+            pass
         self._stop_receiver()
         with self._lock:
             ser = self._ser

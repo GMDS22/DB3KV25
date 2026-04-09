@@ -24,10 +24,10 @@ def _repo_root() -> Path:
 
 def get_version(default: str = DEFAULT_VERSION) -> str:
     version_files = [
+        _repo_root() / "SMART_SENTRY_V3_0_VERSION.txt",
         _repo_root() / "SMART_SENTRY_V2_3_2_VERSION.txt",
         _repo_root() / "SMART_SENTRY_V2_3_1_VERSION.txt",
         _repo_root() / "SMART_SENTRY_V2_3_VERSION.txt",
-        _repo_root() / "SMART_SENTRY_V3_0_VERSION.txt",
         _repo_root() / "SMART_SENTRY_V2_0_VERSION.txt",
         _repo_root() / "DB3K_VERSION.txt",
     ]

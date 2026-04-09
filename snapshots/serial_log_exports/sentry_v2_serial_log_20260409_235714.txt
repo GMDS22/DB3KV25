@@ -1,0 +1,12 @@
+# Smart Sentry V3.0.0 Serial Log Export
+# Exported: 2026-04-09 23:57:14
+[23:56:20] [ACCESSORY] Quick startup enabled: deferring auto camera open and auto-connect; scheduling lazy YOLO model load.
+[23:56:21] [SAFETY] [WARN] YOLO detection active but no model loaded — load a model in the Detection tab
+[23:56:30] [SYSTEM] Windows WiFi already on SMART-SENTRY-V2.3
+[23:56:30] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[23:56:30] [CAMERA] YOLO model loaded: yolo11n.pt
+[23:56:33] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[23:56:43] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[23:56:53] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[23:57:03] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[23:57:13] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000

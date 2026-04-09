@@ -1,8 +1,8 @@
 # Phase 0 Testing - File Requirements Checklist
 
-**Objective**: Test Waveshare ESP32 + Pan/Tilt Servos with wireless control from PC application
+**Objective**: Historical Waveshare ESP32 + Pan/Tilt Servo bench checklist
 
-> Status note (2026-04-05): this checklist predates the current Waveshare V3 bridge contract and is not the canonical reference anymore. For the current single-board Waveshare path, use `arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino`, `ESP32_CURRENT_SKETCH.md`, `ESP32_UDP_FLASH.md`, and `SMART_SENTRY_V3_0_WAVESHARE_PREP_REPORT_2026-04-05.md`.
+> Status note (2026-04-09): this checklist is historical only. The Waveshare single-board attempt is on hold and is not part of the current Smart Sentry app. For live app work, use the ESP32 WiFi + Debug Board USB path with `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` and treat this file as archive material only.
 
 ---
 
@@ -10,8 +10,8 @@
 
 ### 1. ESP32 Firmware
 **File**: [arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino](arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino)
-- **Purpose**: Current Waveshare V3 single-board bridge firmware
-- **Status**: Current bench-prep target
+- **Purpose**: Archived Waveshare V3 single-board bridge firmware
+- **Status**: On hold, not current app firmware
 - **Key Features**:
   - WiFi AP mode (192.168.4.1 SSID: "SMART-SENTRY-V3")
   - UDP server on port 9000
@@ -29,7 +29,7 @@
 ### 2. PC Application (Python GUI)
 **File**: [run.py](run.py)
 - **Entry point**: Launches Smart Sentry v2 application
-- **Purpose**: Send WiFi UDP commands to ESP32
+- **Purpose**: Launch the current Smart Sentry app, which now targets the ESP32 WiFi + Debug Board USB path rather than the archived Waveshare bridge path
 - **Startup**: `python run.py` (from DB3000V4.1-main directory)
 - **Phase 0 Role**: Use this to send pan/tilt commands to Waveshare
 

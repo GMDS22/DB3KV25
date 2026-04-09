@@ -184,12 +184,6 @@ class SentryV2Overlay:
         cv2.rectangle(frame, (x1, y1), (x2, y2), _COL_BLACK, 3, cv2.LINE_AA)
         cv2.rectangle(frame, (x1, y1), (x2, y2), accent, 1, cv2.LINE_AA)
 
-        zone_label = "FIRE ZONE" if eng.auto_trigger_enabled else "LOCK ZONE"
-        text_w, text_h, _ = self._text_size(frame, zone_label, _FS_TINY)
-        lx = max(4, cx - text_w // 2)
-        ly = min(h - 6, y2 + text_h + 10)
-        self._put_text(frame, zone_label, (lx, ly), _FS_TINY, accent)
-
     def apply_scope_view(self, frame: np.ndarray, engine: SentryV2Engine) -> np.ndarray:
         """Apply a display-only round scope view during engaging mode."""
         if not bool(getattr(self.cfg, "scope_view_enabled", False)):

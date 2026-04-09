@@ -3,6 +3,8 @@
 ## Feature Summary
 3-sensor blind-spot motion detection with cue-first confirmation, a short cue hold, and a localized hunt around the triggered zone when no target is confirmed at the cue point. Uses the live Smart Sentry v2.3.2 Guard workflow.
 
+For the full editor-facing behavior contract that also covers visual target tracking, target-loss reacquire, preset intent, and fire gating, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md`.
+
 ## Enabling PIR Guard
 
 ### Step 1: Open Smart Sentry v2

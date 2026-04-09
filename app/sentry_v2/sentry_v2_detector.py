@@ -93,6 +93,7 @@ class SentryV2Detector:
         self._yolo_model_path: str = ""
         self._last_error: str = ""
         self._yolo_target_classes: List[str] = ["person"]
+        self._yolo_infer_max_dim: int = 1280
 
         # Detection parameters
         self.blur_kernel: int = 5
@@ -154,6 +155,15 @@ class SentryV2Detector:
         self._yolo_target_classes = [
             c.strip().lower() for c in classes.split(",") if c.strip()
         ]
+
+    def _prepare_yolo_frame(self, frame: np.ndarray) -> tuple[np.ndarray, float]:
+        h, w = frame.shape[:2]
+        max_dim = max(h, w)
+        if max_dim <= int(self._yolo_infer_max_dim):
+            return frame, 1.0
+        scale = float(self._yolo_infer_max_dim) / float(max_dim)
+        resized = cv2.resize(frame, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+        return resized, scale
 
     # ------------------------------------------------------------------ #
     #  Main entry point
@@ -316,13 +326,15 @@ class SentryV2Detector:
     def _detect_yolo(self, frame: np.ndarray) -> list:
         if not self._yolo_loaded or self._yolo_model is None:
             return []
-        results = self._yolo_model(frame, stream=True, verbose=False)
+        infer_frame, infer_scale = self._prepare_yolo_frame(frame)
+        results = self._yolo_model(infer_frame, stream=False, verbose=False)
         model_names = getattr(self._yolo_model, "names", {})
         target_set = set(self._yolo_target_classes) if self._yolo_target_classes else set()
         available = set()
         if isinstance(model_names, dict):
             available = {str(v).strip().lower() for v in model_names.values()}
         use_filter = bool(target_set) and bool(target_set & available)
+        scale_back = 1.0 / float(infer_scale) if infer_scale > 0.0 else 1.0
 
         boxes: list = []
         for r in results:
@@ -337,6 +349,11 @@ class SentryV2Detector:
                 if use_filter and cls_name not in target_set:
                     continue
                 x1, y1, x2, y2 = box.xyxy[0]
+                if infer_scale != 1.0:
+                    x1 = float(x1) * scale_back
+                    y1 = float(y1) * scale_back
+                    x2 = float(x2) * scale_back
+                    y2 = float(y2) * scale_back
                 w = int(x2 - x1)
                 h = int(y2 - y1)
                 area = w * h

@@ -1,0 +1,152 @@
+# Smart Sentry V3.0.0 Serial Log Export
+# Exported: 2026-04-10 00:43:27
+[00:42:09] [ACCESSORY] Quick startup enabled: deferring auto camera open and auto-connect; scheduling lazy YOLO model load.
+[00:42:10] [SAFETY] [WARN] YOLO detection active but no model loaded — load a model in the Detection tab
+[00:42:20] [SYSTEM] Windows WiFi already on SMART-SENTRY-V2.3
+[00:42:20] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[00:42:20] [CAMERA] YOLO model loaded: yolo11n.pt
+[00:42:23] [CAMERA] Detection mode: YOLO Object Detection
+[00:42:23] [CAMERA] [COLOR DETECTION] YOLO Object Detection - Color: ANY | Area: 624-4992px
+[00:42:23] [SYSTEM] State: PAUSED -> GUARDING
+[00:42:23] [ACCESSORY] Smart Sentry ENABLED
+[00:42:23] [MOVEMENT] Move skipped: hardware is not connected yet
+[00:42:24] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[00:42:31] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:42:33] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:42:34] [CAMERA] Camera opened: 0 (1920x1080)
+[00:42:34] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:42:34] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[00:42:34] [SYSTEM] Connecting...
+[00:42:35] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:42:35] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:42:35] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:42:35] [SYSTEM] [PREVIEW] render_mode=full
+[00:42:35] [SYSTEM] Connected: WiFi: 192.168.4.1:9000 | Debug: COM34
+[00:42:35] [SAFETY] Fire config: mode=Projectile (ESP32 GPIO13 Servo) | safety=LOCKED | auto-trigger=ON
+[00:42:35] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:42:36] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:42:38] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:42:39] [CAMERA] Camera opened: 0 (1920x1080)
+[00:42:39] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:42:39] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:42:39] [SYSTEM] [PREVIEW] render_mode=full
+[00:42:39] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:42:39] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:42:39] [SYSTEM] [PREVIEW] render_mode=full
+[00:42:40] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:42:40] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:42:40] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:42:40] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:42:41] [MOVEMENT] Startup rest position: P135 T32
+[00:42:41] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:42:42] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:42:43] [CAMERA] Camera opened: 0 (1920x1080)
+[00:42:43] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:42:44] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:42:44] [SYSTEM] [PREVIEW] render_mode=full
+[00:42:44] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:42:44] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:42:45] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:42:45] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:42:47] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:42:48] [CAMERA] Camera opened: 0 (1920x1080)
+[00:42:48] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:42:48] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[00:42:48] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:42:48] [SYSTEM] [PREVIEW] render_mode=full
+[00:42:48] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:42:49] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:42:49] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:42:51] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:42:52] [CAMERA] Camera opened: 0 (1920x1080)
+[00:42:52] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:42:52] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:42:52] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:42:52] [SYSTEM] [PREVIEW] render_mode=full
+[00:42:52] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:42:52] [SYSTEM] [PREVIEW] render_mode=full
+[00:42:52] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:42:53] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:42:55] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:42:56] [CAMERA] Camera opened: 0 (1920x1080)
+[00:42:56] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:42:56] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:42:56] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:42:56] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:42:56] [SYSTEM] [PREVIEW] render_mode=full
+[00:42:56] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:42:57] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:42:59] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:43:00] [CAMERA] Camera opened: 0 (1920x1080)
+[00:43:00] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:43:00] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[00:43:00] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:43:00] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:43:00] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:00] [SYSTEM] [PREVIEW] render_mode=full
+[00:43:01] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:01] [SYSTEM] [PREVIEW] render_mode=full
+[00:43:01] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:43:01] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:43:03] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:43:04] [CAMERA] Camera opened: 0 (1920x1080)
+[00:43:05] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:43:05] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:43:05] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:43:05] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:05] [SYSTEM] [PREVIEW] render_mode=full
+[00:43:05] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:05] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:43:06] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:43:08] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:43:09] [CAMERA] Camera opened: 0 (1920x1080)
+[00:43:09] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:43:09] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:43:09] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:43:09] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:10] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:43:10] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:10] [SYSTEM] [PREVIEW] render_mode=full
+[00:43:10] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:10] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:43:11] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:43:12] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[00:43:12] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:43:13] [CAMERA] Camera opened: 0 (1920x1080)
+[00:43:13] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:43:14] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:43:14] [SYSTEM] [PREVIEW] render_mode=full
+[00:43:14] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:43:14] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:14] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:43:15] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:43:17] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:43:18] [CAMERA] Camera opened: 0 (1920x1080)
+[00:43:18] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:43:18] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:43:18] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:43:18] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:18] [SYSTEM] [PREVIEW] render_mode=full
+[00:43:19] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:19] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:43:19] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:43:21] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:43:22] [CAMERA] Camera opened: 0 (1920x1080)
+[00:43:22] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:43:22] [SYSTEM] WiFi runtime link refreshed: 192.168.4.1:9000
+[00:43:22] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:43:22] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:43:22] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:22] [SYSTEM] [PREVIEW] render_mode=full
+[00:43:22] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:23] [SYSTEM] [PREVIEW] render_mode=full
+[00:43:23] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)
+[00:43:23] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1920x1080)
+[00:43:25] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend DSHOW
+[00:43:26] [CAMERA] Camera opened: 0 (1920x1080)
+[00:43:26] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[00:43:26] [CAMERA] [CAMERA-HEALTH] Partial frame detected — camera content occupies only part of the buffer (possible driver degradation)
+[00:43:26] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[00:43:26] [ACCESSORY] [PREVIEW] render_mode=throttled
+[00:43:26] [SYSTEM] [PREVIEW] render_mode=full
+[00:43:27] [CAMERA] Camera is returning partial frames (content only in upper-left). Attempting camera recovery (1/2)

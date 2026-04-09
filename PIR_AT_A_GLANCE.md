@@ -7,6 +7,8 @@
 
 ## Current Runtime Notes
 
+Primary behavior-contract note: the current authoritative runtime blueprint for guard, PIR cueing, target loss, center-aim, and firing behavior is `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md`.
+
 For the live Smart Sentry v2.3.2 runtime, keep these updates in mind:
 
 ✅ Canonical settings file is now `app/config/smart_sentry_v2_3_2_settings.json`  
@@ -109,6 +111,12 @@ Check Camera for Target
 
 **All unchanged (existing)** except for the 3 new PIR inputs above.
 
+Trigger note:
+
+- this pin map reflects the current DB3000 ESP32 firmware contract used by the live Smart Sentry app path
+- on that path, both water and projectile trigger modes exist: GPIO27 is the MOSFET path and GPIO13 is the projectile trigger-servo path
+- archived Waveshare single-board bridge material is not the same contract and may intentionally leave projectile trigger-servo PWM unassigned
+
 ---
 
 ## 🎮 Commands
@@ -122,6 +130,8 @@ L0/L1   → LED OFF/ON
 R0/R1   → Laser OFF/ON
 G0/G1   → Accessory OFF/ON
 ```
+
+`M0/M1` select trigger output semantics only. They do not change target selection, centering, or fire-gate rules in Smart Sentry.
 
 ### New (PIR)
 ```

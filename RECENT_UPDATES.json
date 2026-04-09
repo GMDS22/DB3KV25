@@ -4,6 +4,26 @@
   "items": [
     {
       "date": "2026-04-09",
+      "title": "Smart Sentry v3.0.0 quick-access operator deck: `app/sentry_v2/sentry_v2_tab.py` now inserts a retractable quick-access panel between the live video canvas and the lower serial/status area, with pin-aware persistence, mirrored runtime toggles for sentry enable, video visibility, link, camera, and auto motion, a compact manual movement pad, and direct safety, fire, accessory, and control-source actions that reuse the existing Controls-tab handlers instead of introducing a second command path. `app/sentry_v2/sentry_v2_config.py`, `SMART_SENTRY_MANUAL.md`, `SMART_SENTRY_APP_CHANGE_IMPACT.md`, and `SMART_SENTRY_ISSUE_LOG.md` were updated to keep the new panel contract and persistence behavior aligned with the canonical settings file and current release-hold rules."
+    },
+    {
+      "date": "2026-04-09",
+      "title": "Smart Sentry v3.0.0 release-hold visibility refinement: app/sentry_v2/sentry_v2_tab.py now hides release-held settings tabs from the active tab strip instead of rendering disabled placeholder pages, while keeping the original tab definitions in SETTINGS_TAB_SPECS so restoring a held tab only requires removing its entry from SETTINGS_TAB_RELEASE_HOLDS. SMART_SENTRY_RELEASE_HOLD_CONVENTION.md, SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md, SMART_SENTRY_APP_CHANGE_IMPACT.md, and SMART_SENTRY_MANUAL.md were synced to document the temporary hidden-state contract and quick restoration rule."
+    },
+    {
+      "date": "2026-04-09",
+      "title": "Smart Sentry v3.0.0 preview-and-hunt stabilization: app/sentry_v2/sentry_v2_tab.py now keeps the live preview updating with a fallback presentation path when detector callbacks lag, records blackout-frame counts in runtime snapshots, and attempts camera recovery when a local webcam returns sustained near-black frames even if grabs still succeed. The same tab now resyncs engine pose when automatic moves are deferred so target-loss and PIR hunts cannot continue from an optimistic unsent position, while app/sentry_v2/sentry_v2_engine.py now spaces loss-recovery search steps more deliberately to reduce overshoot and keep hunt cadence closer to the real camera-and-servo update budget. SMART_SENTRY_MANUAL.md, SMART_SENTRY_APP_CHANGE_IMPACT.md, and SMART_SENTRY_ISSUE_LOG.md were updated to preserve the new contract." 
+    },
+    {
+      "date": "2026-04-09",
+      "title": "Smart Sentry firmware-source-of-truth correction: ESP32_CURRENT_SKETCH.md, ESP32_UDP_FLASH.md, SMART_SENTRY_MANUAL.md, SMART_SENTRY_APP_CHANGE_IMPACT.md, SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md, and PHASE_0_FILES_REQUIRED.md now pin the live app firmware path to arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino for the ESP32 WiFi plus Debug Board USB workflow and explicitly mark the Waveshare single-board bridge files as archived and on hold, not part of the current Smart Sentry app."
+    },
+    {
+      "date": "2026-04-09",
+      "title": "Smart Sentry v3.0.0 release-hold and packaging-prep update: app/sentry_v2/sentry_v2_tab.py now supports a documented release-hold convention that keeps unfinished tabs visible but disabled, with Facial Recognition and AI Assistant currently held for the v3.0.0 release while previous and next tab navigation skips them safely. run.py, app/smart_sentry_meta.py, smart_sentry_build_config.py, tools/validate_packaging_entrypoints.py, and build_smart_sentry_v2_3_2_portable.ps1 were also aligned so the active version resolves from SMART_SENTRY_V3_0_VERSION.txt first, and the new SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md plus SMART_SENTRY_RELEASE_HOLD_CONVENTION.md now document the active v3.0.0 release workflow."
+    },
+    {
+      "date": "2026-04-09",
       "title": "Smart Sentry v2.3.2 layout persistence refinement: `app/sentry_v2/sentry_v2_config.py` now persists standalone window geometry plus main/layout/bottom splitter sizes, `app/sentry_v2/sentry_v2_tab.py` now restores those sizes through a unified startup path, ignores zero-size pre-layout splitter snapshots, and reruns the restore pass on first show so responsive panel state is captured only after the widget has a real layout, and `app/run_smart_sentry_v2_3_2.py` now restores and saves the frameless shell window position, size, and maximized state on close. The result is that the responsive settings panel, lower panes, and standalone window reopen where the operator left them instead of resetting each launch."
     },
     {

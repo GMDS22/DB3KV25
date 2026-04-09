@@ -8,6 +8,13 @@
 
 ## 📚 Reading Sequence (Start Here)
 
+### For Behavior Tuning / Editor Handoff
+1. **SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md** (Primary behavior contract)
+   - Overall autotracking logic
+   - Guard, PIR cue, target-loss reacquire, and fire protocol
+   - Preset behavior rules
+   - Editor-facing regression warnings
+
 ### For Non-Technical Users / Operations
 1. **PIR_GUARD_QUICK_START.md** (User Guide)
    - What PIR does
@@ -293,8 +300,8 @@ project_root/
 ### Phase 2: ESP32 Firmware Testing
 - [ ] Flash new firmware with ENABLE_PIR_SUPPORT=0
 - [ ] Run all original commands (F1, S0, M0, etc.)
-- [ ] Verify water trigger works
-- [ ] Verify projectile trigger works
+- [ ] Verify water trigger works on the DB3000 ESP32 contract
+- [ ] Verify projectile trigger works on the DB3000 ESP32 contract
 - [ ] Verify LED/Laser/Acc relays work
 - [ ] Confirm no regressions
 
@@ -331,10 +338,15 @@ project_root/
 - [ ] Scan settings adjustable
 - [ ] Status display shows live state
 - [ ] Save/Load settings persists PIR config
-- [ ] Original trigger modes still work (water/projectile)
+- [ ] Original trigger modes still work on the current DB3000 ESP32 path (water/projectile)
 - [ ] LED/Laser/Acc outputs still respond
 - [ ] Turret safety logic unchanged
 - [ ] App stability unaffected
+
+Checklist note:
+
+- this checklist assumes the current DB3000 ESP32 Smart Sentry app path
+- archived Waveshare single-board bridge validation is separate and may not expose projectile trigger-servo PWM even when mode switching is still represented in software
 
 ---
 

@@ -102,6 +102,7 @@ static const int PIR_PINS[PIR_COUNT]   = {35, 34, 39};
 //   Sensor 1  GPIO 34  — front zone  (cue ~135°)
 //   Sensor 2  GPIO 39  — left zone   (cue ~225°)
 static const uint32_t PIR_DEBOUNCE_MS  = 200;
+static const uint32_t PIR_LINK_TIMEOUT_MS = 1500;
 
 static bool     pir_enabled                  = false;
 static bool     pir_last_state[PIR_COUNT]    = {false, false, false};
@@ -774,6 +775,21 @@ static void update_fire_outputs(uint32_t now_val, bool blocked) {
 #if ENABLE_PIR_SUPPORT
 static void send_pir_event(int sensor_id, uint32_t ts_ms);   // forward
 
+static void set_pir_enabled_runtime(bool enabled, const char *reason) {
+  bool next = enabled;
+  if (pir_enabled == next) return;
+  pir_enabled = next;
+  for (int i = 0; i < PIR_COUNT; i++) {
+    pir_last_state[i] = (digitalRead(PIR_PINS[i]) == HIGH);
+    if (!pir_enabled) {
+      pir_last_event_ms[i] = 0;
+    }
+  }
+  Serial.printf("[PIR] %s (%s)\n",
+                pir_enabled ? "ENABLED" : "DISABLED",
+                (reason != nullptr && reason[0] != '\0') ? reason : "runtime");
+}
+
 static void update_pir_sensors(uint32_t now_val) {
   if (!pir_enabled) return;
   for (int i = 0; i < PIR_COUNT; i++) {
@@ -861,7 +877,7 @@ static void send_caps(IPAddress ip, uint16_t port) {
   doc["v"] = 1; doc["t"] = "cap"; doc["seq"] = 0; doc["ts"] = (uint32_t)now_ms();
   JsonObject caps = doc["p"].to<JsonObject>();
   caps["proto"] = 1;
-  caps["fw"]    = "db3000-esp32-udp-pir-v1";
+  caps["fw"]    = "db3000-esp32-udp-pir-v2";
 #if ENABLE_PIR_SUPPORT
   caps["pir_support"] = true;
   caps["pir_count"]   = PIR_COUNT;
@@ -1032,12 +1048,7 @@ static void apply_command(JsonObject payload) {
 
 #if ENABLE_PIR_SUPPORT
   if (payload.containsKey("pir_enabled")) {
-    bool prev = pir_enabled;
-    pir_enabled = (int)payload["pir_enabled"] != 0;
-    if (prev != pir_enabled)
-      Serial.printf("[CMD] pir_enabled: %s->%s\n",
-                    prev ? "true" : "false",
-                    pir_enabled ? "true" : "false");
+    set_pir_enabled_runtime((int)payload["pir_enabled"] != 0, "command");
   }
 #endif
 
@@ -1280,7 +1291,7 @@ void setup() {
 
   Serial.println();
   Serial.println("================================================");
-  Serial.println("  DB3000_ESP32_UDP_PIR  v1");
+  Serial.println("  DB3000_ESP32_UDP_PIR  v2");
   Serial.println("  WiFi/UDP control + PIR blind-spot sensors");
   Serial.printf("  Compiled: %s %s\n", __DATE__, __TIME__);
   Serial.printf("  SDK: %s   Heap: %u\n", ESP.getSdkVersion(), ESP.getFreeHeap());
@@ -1318,7 +1329,7 @@ void setup() {
 #if ENABLE_PIR_SUPPORT
   for (int i = 0; i < PIR_COUNT; i++) {
     pinMode(PIR_PINS[i], INPUT);   // active HIGH, no internal pull needed
-    pir_last_state[i]    = false;
+    pir_last_state[i]    = (digitalRead(PIR_PINS[i]) == HIGH);
     pir_last_event_ms[i] = 0;
   }
   Serial.printf("[BOOT] PIR sensors: GPIO%d GPIO%d GPIO%d\n",
@@ -1406,6 +1417,10 @@ void loop() {
 
 #if ENABLE_PIR_SUPPORT
   update_pir_sensors(now);
+
+  if (pir_enabled && last_cmd_ms > 0 && (now - last_cmd_ms) > PIR_LINK_TIMEOUT_MS) {
+    set_pir_enabled_runtime(false, "link-timeout");
+  }
 #endif
 
   // Link timeout — kill fire if app stops sending

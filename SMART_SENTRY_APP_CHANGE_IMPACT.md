@@ -6,10 +6,16 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 
 ## 1. Canonical Runtime Facts
 
+### Pinned current firmware path
+
+- Current Smart Sentry app topology: ESP32 WiFi + Debug Board USB
+- Current Smart Sentry app firmware: `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+- Waveshare single-board firmware files are on hold and are not part of the current app contract.
+
 ### App identity
 
 - Active desktop app family: Smart Sentry v2.x
-- Current documented WiFi baseline release: Smart Sentry v2.3.2
+- Current documented desktop release target: Smart Sentry v3.0.0
 - Main launcher from this repo: `run.py`
 
 ### Canonical settings path
@@ -27,19 +33,23 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 ### Current app-side release deltas
 
 - Preview smoothness relief for busy motion-led modes now lives in `app/sentry_v2/sentry_v2_tab.py`; do not move that optimization into detector cadence without revalidating tracking sensitivity.
+- Preview continuity now has a second contract in `app/sentry_v2/sentry_v2_tab.py`: when local detector callbacks lag, the tab may present live camera frames through a reduced-overlay fallback path, and sustained successful-but-near-black webcam frames must trigger recovery instead of silently leaving the operator with a black screen.
 - Motion-frame resize acceleration in `app/sentry_v2/sentry_v2_detector.py` is intentionally limited to pure motion-only modes; hybrid and motion-locked paths keep their full-resolution gating unless they are explicitly re-benched.
 - Fixed-guard target loss in `app/sentry_v2/sentry_v2_engine.py` now follows a finite recovery path and must end in a clean return-to-guard instead of indefinite hunt.
 - Adaptive after-target-loss behavior in `app/sentry_v2/sentry_v2_engine.py` is now a two-protocol contract, not a single generic scan: `rapid_handoff_search` is for quick transfer toward a stronger visible candidate, while `persistent_reacquire_search` is for bounded sparse-scene searching around the last loss anchor.
+- Automatic hunt movement now spans `app/sentry_v2/sentry_v2_engine.py` and `app/sentry_v2/sentry_v2_tab.py` together: if the tab defers an engine-requested move because debug-board feedback is stale or unsettled, the engine pose must be resynced to settled hardware state so target-loss and PIR hunts cannot continue from an optimistic unsent position.
 - Known-face recognition now depends on `app/sentry_v2/face_identity.py`, `app/sentry_v2/target_filter.py`, `app/sentry_v2/sentry_v2_tab.py`, and `app/sentry_v2/sentry_v2_overlay.py` staying aligned: identity labels, friendly suppression, and preview annotations are intentionally split across those layers.
 - The Smart Sentry buzzer is now used for short robotic identity-name cues in `app/sentry_v2/sound_engine.py`; do not fork that into a separate PC audio path without updating transport assumptions and docs together.
 - Human-like local speech now depends on the PyQt5 QtTextToSpeech runtime and its Windows SAPI plugin path; if packaging changes, review voice-engine availability at the same time as assistant and sound UI changes.
 - Human voice presets and assistant spoken tone are now coupled through `human_voice_style` plus the rate/pitch/volume sliders in `app/sentry_v2/sentry_v2_config.py` and `app/sentry_v2/sentry_v2_tab.py`; if one changes, review both the Controls tab preset behavior and the assistant reply path together.
 - The Controls-tab human voice contract now also includes `mute_buzzer_when_human_voice_enabled` plus the Voice Diagnostics surface in `app/sentry_v2/sentry_v2_tab.py`; if buzzer or human voice behavior changes, review both the ESP32 sound path and the Windows speech path together so they do not overlap or misreport state.
 - Operator shortcuts are now a documented runtime surface, not a hidden convenience: `app/sentry_v2/sentry_v2_tab.py`, `SMART_SENTRY_SHORTCUT_KEYS.md`, `SMART_SENTRY_MANUAL.md`, and `RECENT_UPDATES.json` must move together when the key map changes.
-- The in-app AI Assistant is currently a local rule-based controller inside `app/sentry_v2/sentry_v2_tab.py`; treat it as an operator workflow surface, not a generic external-model integration point.
+- The in-app AI Assistant is now a local Ollama-backed operator workflow surface inside `app/sentry_v2/sentry_v2_tab.py`, with deterministic runtime analysis and deterministic fallback behavior around it; treat it as an operator workflow surface, not a generic external-model integration point.
+- The current v3.0.0 release target intentionally puts `Facial Recognition` and `AI Assistant` on release hold: the tab definitions stay in `SETTINGS_TAB_SPECS`, but `SETTINGS_TAB_RELEASE_HOLDS` filters them out of the active release UI so unfinished operator workflows do not affect normal release behavior. Restoring them should only require removing the hold entry.
 - Guard and rest are now separate runtime contracts in `app/sentry_v2/sentry_v2_config.py` and `app/sentry_v2/sentry_v2_tab.py`: `guard_pan` / `guard_tilt` remain the defended home position, while `rest_pan` / `rest_tilt` plus startup/close rest timers drive the parked pose and the visible `Wake Up` / `Go Rest` actions.
 - Rest execution is intentionally allowed to use a saved `rest_tilt` below the normal guard minimum as long as it remains inside the absolute sentry tilt limits; do not reintroduce generic guard/manual clamp logic into the rest move path.
 - Guided home/rest motion in `app/sentry_v2/sentry_v2_tab.py` now uses separate cruise and approach speeds plus `guided_move_approach_window_deg`; if any home/rest command path changes, preserve the two-stage easing behavior and review the same tuning fields together.
+- The left-pane quick-access deck in `app/sentry_v2/sentry_v2_tab.py` is a mirrored-control surface, not a second behavior source: it must keep reusing the existing handlers and control widgets for enable/video/link/camera/auto motion, movement, safety, fire, accessory outputs, and control-source state, and its expanded-plus-pinned persistence must stay aligned with the canonical settings file.
 - PIR no-detect recovery in `app/sentry_v2/sentry_v2_engine.py` and `app/sentry_v2/sentry_v2_pir_manager.py` now starts from the first offset scan point after cue confirmation instead of reusing the already-visited cue center; this visible-search behavior is intentional and must stay aligned with the PIR docs.
 - Threat AI status, saved-data visibility, and model-data summaries now depend on `app/sentry_v2/ml_training_logger.py`, `app/sentry_v2/sentry_v2_engine.py`, and `app/sentry_v2/sentry_v2_tab.py` staying aligned.
 - The visible command-status surface in `app/sentry_v2/sentry_v2_tab.py` is intentionally human-scale now: automatic tracking moves should not overwrite the readable operator command line, while manual actions and failures still should.
@@ -64,11 +74,12 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
   - Rest audio must stay on the existing buzzer transport by sending the normal `{"action":"sound"}` UDP tone payload, not a separate PC-local sound path.
   - SSID contract is `SMART-SENTRY-V2.3`.
 
-### Waveshare single-board bridge candidate
+### Waveshare single-board bridge archive
 
 - Sketch: `arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino`
-- Treat this as a bench and bridge candidate path, not the default Smart Sentry v2 runtime.
-- When this path changes, review the Waveshare helper scripts and docs in the same change.
+- Treat this as an archived, on-hold bench path, not the current Smart Sentry app runtime.
+- Do not route app-default firmware, flashing, or release documentation through this path unless the user explicitly reactivates it.
+- If this path is ever resumed, review the Waveshare helper scripts and docs in the same change.
 
 ## 3. Code Areas That Must Be Reviewed Together
 
@@ -131,6 +142,8 @@ Rule: face registration, identity matching, friendly suppression, buzzer or huma
 
 Additional rule: if human-like speech is changed, review Qt text-to-speech initialization, voice-selection UI, assistant auto-speak behavior, and packaging hooks in the same pass.
 
+Additional release rule: if the feature is not release-ready, apply the release-hold workflow from `SMART_SENTRY_RELEASE_HOLD_CONVENTION.md` instead of removing the tab or leaving the runtime partially active.
+
 ### Guard, rest, and PIR workflow changes
 
 - `app/sentry_v2/sentry_v2_tab.py`
@@ -138,6 +151,7 @@ Additional rule: if human-like speech is changed, review Qt text-to-speech initi
 - `app/sentry_v2/sound_engine.py`
 - `app/sentry_v2/sentry_v2_engine.py`
 - `app/sentry_v2/sentry_v2_pir_manager.py`
+- `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md`
 - `SMART_SENTRY_MANUAL.md`
 - `PIR_GUARD_QUICK_START.md`
 - `PIR_INTEGRATION_SUMMARY.md`
@@ -157,6 +171,7 @@ Rule: treat guard-home behavior, rest-position behavior, PIR cue-confirm-scan be
 - Packaging specs and generated output naming
 - Release-root `YOLO_MODELS/` folder contract versus bundled support-folder defaults
 - Release notes and compilation protocol docs
+- `SMART_SENTRY_RELEASE_HOLD_CONVENTION.md` when unfinished tabs are intentionally kept visible but inactive
 
 ## 4. Workspace Canonical Vendor Folders
 
@@ -201,6 +216,7 @@ Before calling a firmware or runtime change complete, verify all of the followin
 - Version marker files and launcher text match the intended release.
 - `RECENT_UPDATES.json` includes a concise summary entry when behavior or release identity changed.
 - `SMART_SENTRY_ISSUE_LOG.md` records each Smart Sentry issue and fix attempt that materially changed runtime behavior.
+- Any release-held unfinished tab is documented and still disabled before packaging.
 
 ## 7. Naming Standard
 
@@ -217,11 +233,12 @@ Before calling a firmware or runtime change complete, verify all of the followin
 - One canonical vendor folder per package.
 - One app-facing change-impact reference.
 
-## 9. Compile-Readiness Notes For v2.3.2
+## 9. Compile-Readiness Notes For v3.0.0
 
 - App-side Smart Sentry Python should be treated as compile-ready only after `app/sentry_v2/sentry_v2_engine.py`, `app/sentry_v2/sentry_v2_overlay.py`, and `app/sentry_v2/sentry_v2_tab.py` pass diagnostics together.
 - Release packaging should ignore generated bench churn under `platformio/**/.pio/**` and runtime exports under `snapshots/`; those are not desktop app release-source inputs.
 - In frozen builds, treat the release-root `YOLO_MODELS/` folder as the public operator drop location and the versioned support-folder `YOLO_MODELS/` copy as bundled defaults only.
 - Quick startup now defers camera open and auto-connect, but still schedules a later lazy YOLO auto-load so the packaged app can come up fast without staying permanently unloaded.
-- Before a v2.3.2 package is signed off, verify one fixed-guard loss-recovery pass in Frame Difference mode so the turret returns to the configured guard position after its bounded recovery scan.
+- Before a v3.0.0 package is signed off, verify one fixed-guard loss-recovery pass in Frame Difference mode so the turret returns to the configured guard position after its bounded recovery scan.
 - Before an adaptive-loss-recovery change is signed off, verify both operator-visible branches: a quick handoff to a stronger visible target and a bounded persistent search when no such target appears.
+- Before a v3.0.0 package is signed off, verify `Facial Recognition` and `AI Assistant` remain hidden by the release-hold convention and can be restored by removing their hold entries.

@@ -425,13 +425,21 @@ class FaceRecognitionConfig:
 
 @dataclass
 class AIAssistantConfig:
-    """Rule-based assistant controls for Smart Sentry diagnostics and guided tuning."""
+    """Local assistant controls for Smart Sentry diagnostics and Ollama-backed reasoning."""
     enabled: bool = True
-    mode: str = "guided_tuning"
+    mode: str = "conversational_voice"
+    provider: str = "ollama"
+    endpoint_url: str = "http://localhost:11434"
+    preferred_model_tier: str = "fast"
+    model: str = "llama3.2:latest"
+    analyst_model: str = "gpt-oss:20b"
+    request_timeout_s: float = 45.0
+    include_recent_logs: bool = True
     allow_mode_switch: bool = True
     allow_setting_drafts: bool = True
     allow_runtime_analysis: bool = True
-    auto_speak_responses: bool = False
+    allow_action_execution: bool = True
+    auto_speak_responses: bool = True
 
 
 @dataclass
@@ -523,6 +531,9 @@ class SentryV2Config:
     main_splitter_sizes: List[int] = field(default_factory=list)
     layout_splitter_sizes: List[int] = field(default_factory=list)
     bottom_info_splitter_sizes: List[int] = field(default_factory=list)
+    quick_access_expanded: bool = False
+    quick_access_pinned: bool = False
+    quick_access_panel_height: int = 156
     window_x: int = -1
     window_y: int = -1
     window_width: int = 1280
@@ -661,6 +672,9 @@ class SentryV2Config:
             main_splitter_sizes=[int(v) for v in d.get("main_splitter_sizes", []) if isinstance(v, (int, float))],
             layout_splitter_sizes=[int(v) for v in d.get("layout_splitter_sizes", []) if isinstance(v, (int, float))],
             bottom_info_splitter_sizes=[int(v) for v in d.get("bottom_info_splitter_sizes", []) if isinstance(v, (int, float))],
+            quick_access_expanded=bool(d.get("quick_access_expanded", False)),
+            quick_access_pinned=bool(d.get("quick_access_pinned", False)),
+            quick_access_panel_height=int(d.get("quick_access_panel_height", 156)),
             window_x=int(d.get("window_x", -1)),
             window_y=int(d.get("window_y", -1)),
             window_width=int(d.get("window_width", 1280)),

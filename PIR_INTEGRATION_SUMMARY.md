@@ -171,6 +171,12 @@ PC app: Guard tab → "Enable PIR sensors" checkbox
 | **34** | **PIR Sensor 1** | **Input** | **3.3V** | **Front-left (~150°)** |
 | **39** | **PIR Sensor 2** | **Input** | **3.3V** | **Front-right (~30°)** |
 
+Trigger contract note:
+
+- this GPIO table describes the DB3000 ESP32 trigger contract used by the current Smart Sentry app workflow
+- on that contract, water mode uses the MOSFET trigger on GPIO27 and projectile mode uses the trigger-servo PWM path on GPIO13
+- archived Waveshare single-board bridge docs are a different hardware contract and may intentionally report no assigned trigger-servo output
+
 ### Wiring Summary
 
 Each PIR sensor is a 3-pin module:
