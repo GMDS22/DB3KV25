@@ -351,28 +351,44 @@ def _build_pin_assignment_dialog_content(mode_index: int, tokens: Dict[str, str]
             f"<div style='margin-bottom:8px; color:{body_color};'>PC to bridge: WiFi/UDP on {SMART_SENTRY_V3_WIFI_SSID}<br>Pan/Tilt bus servos: local bus UART on GPIO18/GPIO19 at 1000000 baud<br>Use the Waveshare 40-pin header numbers exactly as shown here</div>",
             section("Header-backed outputs"),
             table(
-                row("Header 7 / GPIO4", "Buzzer output"),
-                row("Header 13 / GPIO27", "Trigger MOSFET"),
+                row("Header 7 / GPIO4", "Buzzer — passive buzzer / tone output"),
+                row("Header 13 / GPIO27", "Trigger MOSFET — water-mode fire relay"),
                 row("Header 22 / GPIO25", "Accessory relay"),
                 row("Header 37 / GPIO26", "Spare relay"),
             ),
-            section("Onboard PIR inputs"),
-            pir_rows,
-            f"<div style='color:{note_color}; margin:-2px 0 8px 0;'>GPIO35, GPIO34, and GPIO39 are ESP32 input-only PIR lines. On the ESP32 expansion board, VN = GPIO39. They are not part of the 40-pin header output assignments above.</div>",
-            section("Reserved and unassigned paths"),
+            section("Direct ESP32 GPIO outputs (not on 40-pin header)"),
             table(
-                row("Header 29 / GPIO5", "Speaker reserved only"),
-                row("LED relay", "Unassigned on current Waveshare map"),
-                row("Laser relay", "Unassigned on current Waveshare map"),
-                row("Trigger-servo PWM", "Unassigned on current Waveshare map"),
+                row("GPIO2", "Status LED — mirrors command activity"),
+                row("GPIO13", "Trigger servo PWM (LEDC) — projectile fire"),
+                row("GPIO12", "Pan servo PWM (LEDC)"),
+                row("GPIO14", "Tilt servo PWM (LEDC)"),
+                row("GPIO32", "LED relay — controlled via accessory commands"),
+                row("GPIO33", "Laser relay — controlled via accessory commands"),
             ),
-            section("Reserved transport pins"),
+            f"<div style='color:{note_color}; margin:-2px 0 8px 0;'>GPIO32 and GPIO33 are direct ESP32 outputs. They are not exposed on the 40-pin header and require direct wiring to the ESP32 board.</div>",
+            section("Communication"),
             table(
-                row("GPIO18 / GPIO19", "Yahboom bus-servo UART RX/TX"),
+                row("GPIO16 (UART2 RX)", "Debug board TX — bus-servo UART bridge"),
+                row("GPIO17 (UART2 TX)", "Debug board RX — bus-servo UART bridge"),
+                row("GPIO18 / GPIO19", "Yahboom bus-servo alternative UART RX/TX"),
                 row("Header 10 / GPIO15", "FlySky FS-iA6 i-Bus RX"),
                 row("Header 8 / GPIO14", "Reserved RC TX / telemetry path"),
             ),
-            f"<div style='color:{note_color}; margin-top:8px;'>This is the current flashed Smart Sentry Waveshare map with the live PIR inputs called out explicitly.</div>",
+            section("Onboard PIR inputs (input-only)"),
+            pir_rows,
+            f"<div style='color:{note_color}; margin:-2px 0 8px 0;'>GPIO35, GPIO34, and GPIO39 are input-only lines. On the ESP32 expansion board, VN = GPIO39. They are not part of the 40-pin header output assignments.</div>",
+            section("ADC current sense (input-only)"),
+            table(
+                row("GPIO36 (VP)", "Pan motor current sense ADC"),
+                row("GPIO39 (VN)", "Tilt current sense ADC — disabled when PIR S3 active"),
+                row("GPIO34", "Total current sense ADC — disabled when PIR S2 active"),
+            ),
+            section("Reserved"),
+            table(
+                row("Header 29 / GPIO5", "Speaker reserved only"),
+                row("GPIO0", "BOOT button — reserved for boot strapping"),
+            ),
+            f"<div style='color:{note_color}; margin-top:8px;'>This is the current flashed Smart Sentry Waveshare map with all accessory pins shown.</div>",
             "</div>",
         ])
         return title, text
@@ -383,15 +399,40 @@ def _build_pin_assignment_dialog_content(mode_index: int, tokens: Dict[str, str]
             f"<div style='font-size:13px; line-height:1.4; color:{body_color};'>",
             f"<div style='font-weight:700; color:{heading_color}; margin-bottom:8px;'>Dual ESP32 WiFi topology</div>",
             f"<div style='margin-bottom:8px; color:{body_color};'>Primary ESP32 handles IO and accessories over WiFi.<br>Secondary ESP32 handles Yahboom bus-servo motion over its own WiFi bridge.</div>",
+            section("Primary ESP32 — trigger outputs"),
             table(
-                row("Primary GPIO27", "Trigger MOSFET"),
-                row("Primary GPIO25", "Accessory relay"),
-                row("Primary GPIO26", "Spare relay"),
-                row("Secondary servo bridge", "Pan/Tilt Yahboom motion path"),
+                row("GPIO27", "Trigger MOSFET — water-mode fire relay"),
+                row("GPIO13", "Trigger servo PWM (LEDC) — projectile fire"),
             ),
-            section("Primary ESP32 PIR inputs"),
+            section("Primary ESP32 — accessory outputs"),
+            table(
+                row("GPIO2", "Status LED — mirrors command activity"),
+                row("GPIO4", "Buzzer — passive buzzer / tone output"),
+                row("GPIO32", "LED relay — controlled via accessory commands"),
+                row("GPIO33", "Laser relay — controlled via accessory commands"),
+                row("GPIO25", "Accessory relay"),
+                row("GPIO26", "Spare relay"),
+            ),
+            section("Primary ESP32 — servo PWM"),
+            table(
+                row("GPIO12", "Pan servo PWM (LEDC)"),
+                row("GPIO14", "Tilt servo PWM (LEDC)"),
+            ),
+            section("Primary ESP32 — communication"),
+            table(
+                row("GPIO16 (UART2 RX)", "Debug board TX — bus-servo UART bridge"),
+                row("GPIO17 (UART2 TX)", "Debug board RX — bus-servo UART bridge"),
+                row("Secondary servo bridge", "Pan/Tilt Yahboom motion path via secondary ESP32"),
+            ),
+            section("Primary ESP32 PIR inputs (input-only)"),
             pir_rows,
-            f"<div style='color:{note_color}; margin-top:8px;'>Use the Waveshare header map only for the single-board bridge mode. PIR sensing still follows the primary ESP32 GPIO35/GPIO34/GPIO39 map.</div>",
+            section("Primary ESP32 — ADC current sense (input-only)"),
+            table(
+                row("GPIO36 (VP)", "Pan motor current sense ADC"),
+                row("GPIO39 (VN)", "Tilt current sense ADC — disabled when PIR S3 active"),
+                row("GPIO34", "Total current sense ADC — disabled when PIR S2 active"),
+            ),
+            f"<div style='color:{note_color}; margin-top:8px;'>GPIO32/33 require direct wiring. PIR sensing follows GPIO35/GPIO34/GPIO39 on the primary ESP32.</div>",
             "</div>",
         ])
         return title, text
@@ -402,16 +443,36 @@ def _build_pin_assignment_dialog_content(mode_index: int, tokens: Dict[str, str]
             f"<div style='font-size:13px; line-height:1.4; color:{body_color};'>",
             f"<div style='font-weight:700; color:{heading_color}; margin-bottom:8px;'>ESP32 WiFi IO with Debug Board USB motion</div>",
             f"<div style='margin-bottom:8px; color:{body_color};'>PC to ESP32: WiFi/UDP for trigger, PIR, and accessories<br>Debug Board to PC: USB serial for pan/tilt bus-servo motion</div>",
+            section("Trigger outputs"),
             table(
-                row("GPIO27", "Trigger MOSFET"),
-                row("GPIO13", "Trigger Servo"),
+                row("GPIO27", "Trigger MOSFET — water-mode fire relay"),
+                row("GPIO13", "Trigger servo PWM (LEDC) — projectile fire"),
+            ),
+            section("Accessory outputs"),
+            table(
+                row("GPIO2", "Status LED — mirrors command activity"),
+                row("GPIO4", "Buzzer — passive buzzer / tone output"),
+                row("GPIO32", "LED relay — controlled via accessory commands"),
+                row("GPIO33", "Laser relay — controlled via accessory commands"),
                 row("GPIO25", "Accessory relay"),
                 row("GPIO26", "Spare relay"),
-                row("PIR S1 / Sensor 0 / GPIO35", "Right zone cue (~45 deg)"),
-                row("PIR S2 / Sensor 1 / GPIO34", "Front zone cue (~135 deg)"),
-                row("PIR S3 / Sensor 2 / GPIO39 (VN)", "Left zone cue (~225 deg). Expansion board silk label: VN"),
             ),
-            f"<div style='color:{note_color}; margin-top:8px;'>ESP32 expansion board note: VN = GPIO39. If only one PIR is firing right now, compare GPIO35 (S1), GPIO34 (S2), and GPIO39/VN (S3).</div>",
+            section("Communication — pan/tilt motion path"),
+            table(
+                row("GPIO16 (UART2 RX)", "Debug board TX — bus-servo UART bridge"),
+                row("GPIO17 (UART2 TX)", "Debug board RX — bus-servo UART bridge"),
+            ),
+            f"<div style='color:{note_color}; margin:-2px 0 8px 0;'>Pan/tilt is driven by the Debug Board over USB serial. GPIO12 and GPIO14 (Waveshare servo header PWM) are not used in this mode.</div>",
+            section("PIR inputs (input-only)"),
+            pir_rows,
+            f"<div style='color:{note_color}; margin:-2px 0 8px 0;'>ESP32 expansion board: VN = GPIO39. Compare GPIO35 (S1), GPIO34 (S2), GPIO39/VN (S3) if only one PIR fires.</div>",
+            section("ADC current sense (input-only)"),
+            table(
+                row("GPIO36 (VP)", "Pan motor current sense ADC"),
+                row("GPIO39 (VN)", "Tilt current sense ADC — disabled when PIR S3 active"),
+                row("GPIO34", "Total current sense ADC — disabled when PIR S2 active"),
+            ),
+            f"<div style='color:{note_color}; margin-top:8px;'>GPIO32 (LED relay) and GPIO33 (Laser relay) require direct wiring to the ESP32 board — they are not on the standard debug board connector.</div>",
             "</div>",
         ])
         return title, text
@@ -425,7 +486,21 @@ def _build_pin_assignment_dialog_content(mode_index: int, tokens: Dict[str, str]
             row("ESP32 USB", "Primary ASCII IO link when using direct USB"),
             row("Debug Board USB", "Pan/Tilt bus-servo motion path in dual-USB layouts"),
         ),
-        f"<div style='color:{note_color}; margin-top:8px;'>Switch to a WiFi mode if you want the live PIR GPIO map in this window. The active PIR wiring remains S1/GPIO35, S2/GPIO34, and S3/GPIO39.</div>",
+        section("Complete ESP32 accessory map (all modes)"),
+        table(
+            row("GPIO2", "Status LED"),
+            row("GPIO4", "Buzzer"),
+            row("GPIO13", "Trigger servo PWM"),
+            row("GPIO27", "Trigger MOSFET"),
+            row("GPIO32", "LED relay"),
+            row("GPIO33", "Laser relay"),
+            row("GPIO25", "Accessory relay"),
+            row("GPIO26", "Spare relay"),
+            row("GPIO35", "PIR S1 — right zone"),
+            row("GPIO34", "PIR S2 — front zone"),
+            row("GPIO39 (VN)", "PIR S3 — left zone"),
+        ),
+        f"<div style='color:{note_color}; margin-top:8px;'>Switch to a WiFi mode to see the full sectioned pin map. Active PIR wiring: S1/GPIO35, S2/GPIO34, S3/GPIO39.</div>",
         "</div>",
     ])
     return title, text
@@ -5788,6 +5863,33 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._apply_tooltip(self._spin_udp_port, "udp_port")
         udp_lay.addWidget(self._spin_udp_port, 1, 1)
 
+        udp_lay.addWidget(QLabel("WiFi Adapter:"), 2, 0)
+        self._combo_wifi_adapter = QComboBox()
+        self._combo_wifi_adapter.setToolTip(
+            "Select the Windows WiFi adapter to use for the ESP32 SSID.\n"
+            "'(auto)' uses the first available adapter.\n"
+            "Set to your dedicated USB dongle (e.g. SMART SENTRY CON) to prevent\n"
+            "Windows from switching to a different adapter during reconnects."
+        )
+        self._combo_wifi_adapter.addItem("(auto)", "")
+        _saved_iface = str(getattr(self.config.connection, "wifi_interface", "") or "").strip()
+        _iface_names = self._enumerate_windows_wifi_interfaces()
+        _iface_set: set = set()
+        for _iname in _iface_names:
+            if _iname and _iname not in _iface_set:
+                self._combo_wifi_adapter.addItem(_iname, _iname)
+                _iface_set.add(_iname)
+        if _saved_iface and _saved_iface not in _iface_set:
+            self._combo_wifi_adapter.addItem(_saved_iface, _saved_iface)
+        _target_idx = 0
+        if _saved_iface:
+            for _i in range(self._combo_wifi_adapter.count()):
+                if self._combo_wifi_adapter.itemData(_i) == _saved_iface:
+                    _target_idx = _i
+                    break
+        self._combo_wifi_adapter.setCurrentIndex(_target_idx)
+        udp_lay.addWidget(self._combo_wifi_adapter, 2, 1)
+
         lay.addWidget(self._grp_udp)
 
         # --- Secondary ESP32 WiFi settings (mode 4) ---
@@ -10163,6 +10265,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         cc.debug_baud = self._spin_debug_baud.value()
         cc.udp_host = self._edit_udp_host.text().strip()
         cc.udp_port = self._spin_udp_port.value()
+        cc.wifi_interface = str(self._combo_wifi_adapter.currentData() or "").strip()
         cc.servo_udp_host = self._edit_servo_udp_host.text().strip()
         cc.servo_udp_port = self._spin_servo_udp_port.value()
         cc.pan_servo_id = self._spin_pan_id.value()
@@ -13451,6 +13554,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             cc.debug_baud = self._spin_debug_baud.value()
             cc.udp_host = self._edit_udp_host.text().strip()
             cc.udp_port = self._spin_udp_port.value()
+            cc.wifi_interface = str(self._combo_wifi_adapter.currentData() or "").strip()
             cc.servo_udp_host = self._edit_servo_udp_host.text().strip()
             cc.servo_udp_port = self._spin_servo_udp_port.value()
             cc.pan_servo_id = self._spin_pan_id.value()
@@ -13619,9 +13723,37 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             return ""
         return f"{result.stdout}\n{result.stderr}"
 
+    def _enumerate_windows_wifi_interfaces(self) -> list:
+        """Return a list of Windows WiFi interface names from netsh."""
+        if os.name != "nt":
+            return []
+        try:
+            result = subprocess.run(
+                ["netsh", "wlan", "show", "interfaces"],
+                capture_output=True,
+                text=True,
+                timeout=6,
+                check=False,
+                **_windows_hidden_subprocess_kwargs(),
+            )
+        except Exception:
+            return []
+        names = []
+        for raw_line in (result.stdout or "").splitlines():
+            line = raw_line.strip()
+            if line.lower().startswith("name") and ":" in line:
+                name = line.split(":", 1)[1].strip()
+                if name:
+                    names.append(name)
+        return names
+
     def _windows_wifi_primary_interface_name(self) -> str:
         if os.name != "nt":
             return ""
+        # If the user has configured a specific adapter, use it directly.
+        preferred = str(getattr(self.config.connection, "wifi_interface", "") or "").strip()
+        if preferred:
+            return preferred
         try:
             result = subprocess.run(
                 ["netsh", "wlan", "show", "interfaces"],

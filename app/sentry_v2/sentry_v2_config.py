@@ -515,6 +515,9 @@ class ConnectionConfig:
     # Inversion
     invert_pan: bool = False
     invert_tilt: bool = False
+    # WiFi adapter (Windows only) — name of the interface to use for ESP32 SSID
+    # e.g. "SMART SENTRY CON"; leave empty to auto-select first available adapter
+    wifi_interface: str = ""
     # Camera
     camera_source: str = "0"       # Standalone default camera index; may also be a URL or file path
     camera_width: int = 1280

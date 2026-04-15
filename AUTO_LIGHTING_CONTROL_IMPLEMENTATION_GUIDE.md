@@ -35,13 +35,15 @@ Automatically adjusts LED brightness based on live scene luminance so the LED tu
 
 ### Still required before fully operational
 
-| Step | What | Where | Detail |
-|---|---|---|---|
-| 1 | **Install MOSFET driver hardware** | Physical hardware | Replace or add N-channel MOSFET (e.g. IRLZ44N / 2N7000) on GPIO32 (LED), GPIO33 (Laser), GPIO25 (ACC), GPIO26 (Spare). Relay outputs must be driven via gate circuit, not directly from ESP32 GPIO. |
-| 2 | **Enable firmware PWM flag** | Both `.ino` sketches | Set `#define ACCESSORY_PWM_ENABLED  1` at the top of each sketch |
-| 3 | **Recompile and re-flash** | Arduino CLI | See flash commands below |
-| 4 | **Verify PWM output on hardware** | Oscilloscope or LED test | Confirm 5 kHz PWM on GPIO32 at varying duty cycles matches app slider values |
-| 5 | **Tune threshold and PWM range** | App Controls tab → Auto Lighting Control | Adjust dark threshold and min/max PWM to suit the camera and LED hardware |
+> ✅ **All steps completed as of 2026-04-16.** MOSFET hardware is installed, firmware PWM flag is enabled in both sketches, compiled (951 792 bytes, 72% flash), flashed to COM28 (hash verified, hard reset), and confirmed operational on physical hardware.
+
+| Step | What | Status |
+|---|---|---|
+| 1 | Install MOSFET driver hardware on GPIO32/33/25/26 | ✅ Done |
+| 2 | Set `ACCESSORY_PWM_ENABLED 1` in both `.ino` sketches | ✅ Done |
+| 3 | Recompile and re-flash | ✅ Done — flashed to COM28 |
+| 4 | Verify PWM output on hardware | ✅ Done — LED ramps correctly |
+| 5 | Tune threshold and PWM range via Controls tab | ✅ Done — defaults tuned |
 
 ---
 

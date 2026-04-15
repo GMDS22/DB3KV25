@@ -43,18 +43,17 @@ For the current Smart Sentry desktop app, treat the ESP32 WiFi plus Debug Board 
 - For current Smart Sentry v2 WiFi work, treat those as historical predecessors unless a specific recovery or comparison task explicitly calls for them.
 - Older DB3000 WiFi baseline sketches remain in the repo for comparison and rollback, but the path above is now the documented default for current work.
 
-## Accessory PWM Support (MOSFET driver, disabled by default)
+## Accessory PWM Support (MOSFET driver — **ENABLED and flashed as of 2026-04-16**)
 
-Both `SMART_SENTRY_V2_3_1_ESP32_UDP_PIR` and `SMART_SENTRY_V2_3_DB3000_ESP32_UDP_PIR_FLYSKY` sketches now contain an optional 8-bit LEDC PWM driver for LED, Laser, ACC, and Spare outputs. This is **off by default** (`#define ACCESSORY_PWM_ENABLED 0`) so the existing relay hardware is not affected.
+Both `SMART_SENTRY_V2_3_1_ESP32_UDP_PIR` and `SMART_SENTRY_V2_3_DB3000_ESP32_UDP_PIR_FLYSKY` sketches now contain an optional 8-bit LEDC PWM driver for LED, Laser, ACC, and Spare outputs. **PWM is currently ACTIVE** (`#define ACCESSORY_PWM_ENABLED 1`). MOSFET driver hardware is installed on all four output channels (GPIO32/33/25/26). The firmware was compiled (951 792 bytes, 72% flash) and flashed to COM28 on 2026-04-16 with hash verified and hard reset confirmed.
 
-To enable PWM dimming once MOSFET driver hardware is installed on all four output channels:
-1. Open the sketch and set `#define ACCESSORY_PWM_ENABLED  1`
-2. Recompile and flash (see Upload Commands below)
-3. The app then sends 0-255 per channel: 0=off, 1=full-on compat, 2-255=literal 8-bit duty cycle
+To revert to relay/ON-OFF mode: set `#define ACCESSORY_PWM_ENABLED  0`, recompile, and re-flash.
 
 **PWM parameters** (adjustable at the top of the sketch):
 - `ACCESSORY_PWM_FREQ_HZ  5000` — 5 kHz carrier, silent and MOSFET-safe
 - `ACCESSORY_PWM_BITS     8`    — 0-255 range (8-bit resolution)
+
+App PWM values: 0=off, 1=full-on compat (backward compatible), 2-255=literal 8-bit duty cycle.
 
 **All other sketch logic** (motion, fire, safety, PIR, buzzer, telemetry, link-loss safe mode) is completely unaffected by this flag.
 

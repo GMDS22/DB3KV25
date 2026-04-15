@@ -29,6 +29,7 @@ Smart Sentry keyboard shortcuts are window-focused. They only fire while the Sma
 | `Ctrl+Alt+2` | Toggle LED | Accessory output shortcut |
 | `Ctrl+Alt+3` | Toggle laser | Accessory output shortcut |
 | `Ctrl+Alt+4` | Toggle ACC | Accessory output shortcut |
+| `Ctrl+Alt+L` | Toggle Auto Lighting | Enables or disables auto LED PWM brightness control |
 | `Ctrl+Alt+Plus` | Zoom UI in | Increases panel font scale |
 | `Ctrl+Alt+Minus` | Zoom UI out | Decreases panel font scale |
 
@@ -39,4 +40,5 @@ Smart Sentry keyboard shortcuts are window-focused. They only fire while the Sma
 - The top-row `Quick Keys` button opens this document without changing the header layout.
 - Manual movement shortcuts respect the same motion limits as the on-screen controls.
 - `Space` uses the same safety and trigger path as the on-screen `FIRE` button.
+- `Ctrl+Alt+L` toggles Auto Lighting. The LED button must also be ON for auto lighting to drive LED PWM.
 - Friendly face recognition, AI Assistant commands, and preview overlays do not require shortcuts, but this key map is intended to keep the common setup and control actions reachable without leaving the video view.

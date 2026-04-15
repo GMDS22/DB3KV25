@@ -146,7 +146,8 @@ All configuration in `@dataclass` structures with JSON save/load.
 | `FaceRecognitionConfig` | Known-face runtime rules | enable, library path, threshold, min size, friendly suppression, announce, gesture |
 | `AIAssistantConfig` | In-app assistant controls | enable, mode, mode switching, runtime analysis, setting drafts |
 | `ShortcutConfig` | Operator hotkey runtime | enabled flag and quick-reference document path |
-| `ConnectionConfig` | Hardware topology | `connection_type`, ports/bauds, UDP host/port, servo IDs, camera, inversions |
+| `LightingConfig` | Auto lighting control | `auto_lighting_enabled`, `led_pwm_value`, `auto_brightness_threshold`, `auto_pwm_min`, `auto_pwm_max`, `auto_sample_interval_frames` |
+| `ConnectionConfig` | Hardware topology | `connection_type`, ports/bauds, UDP host/port, `wifi_interface` (dedicated Windows WiFi adapter), servo IDs, camera, inversions |
 | `SentryV2Config` | Top-level container | All sub-configs + overlay flags + `save()`/`load()` |
 
 **Persistence:** `app/config/smart_sentry_v2_3_2_settings.json` (canonical runtime file, auto-created). Compatibility fallbacks and mirrors may also exist at `app/config/smart_sentry_v2_3_1_settings.json`, `app/config/smart_sentry_v3_settings.json`, and `app/config/sentry_v2_settings.json`, but those are not the authoritative live file.
@@ -184,7 +185,7 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 7. **Engage** — Burst/cooldown/PID settings, auto-trigger, trigger mode, aim-lock presets, After Target Loss recovery tuning
 8. **Guard** — Guard position, rest position, startup/close rest behavior, PIR guard controls, patrol mode, sweep/waypoint/random parameters, guided home/rest motion tuning
 9. **Theme** — visual preset selection plus live accent, transparency, contrast, radius, and contrast tuning; panel font zoom remains supported through the hidden Shift+wheel shortcut rather than a visible slider
-10. **Controls** — Manual pan/tilt matrix, visible `Wake Up` / `Go Rest` actions, sound controls, runtime data export and open-folder actions, LED/laser/safety toggles
+10. **Controls** — Manual pan/tilt matrix, visible `Wake Up` / `Go Rest` actions, sound controls, runtime data export and open-folder actions, LED/laser/safety toggles, Auto Lighting Control group (auto enable toggle, manual PWM slider, dark threshold, min/max PWM range, live scene luma readout)
 11. **Facial Recognition** — visible release-held tab for the unfinished known-face workflow; kept in the UI but disabled for the v3.0.0 release
 12. **Shortcut Keys** — live shortcut status, assigned key summary, and quick-reference access
 13. **AI Assistant** — visible release-held tab for the unfinished local assistant workflow; kept in the UI but disabled for the v3.0.0 release
@@ -196,6 +197,10 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 **Verified current identity note:** the underlying Facial Recognition implementation still persists its face library separately at `app/config/smart_sentry_v2_3_2_faces.json` and keeps the lightweight Haar-cascade plus embedding workflow in the codebase, but the tab is intentionally on release hold for v3.0.0 and is not part of the active release surface.
 
 **Verified current shortcut note:** the top-row `Quick Keys` button and the Shortcut Keys tab both point operators to `SMART_SENTRY_SHORTCUT_KEYS.md`, and the live shortcut runtime stays window-focused so hotkeys only fire while the Smart Sentry window is active.
+
+**Verified current auto lighting note:** the Controls tab includes an Auto Lighting Control group. When enabled (`Ctrl+Alt+L` or the checkbox in Controls or the video chip bar), the camera loop samples scene luminance every N frames and adjusts LED PWM: LED ramps toward `auto_pwm_max` as the scene darkens below `auto_brightness_threshold`, and turns off when bright. The LED button is the master on/off gate — auto lighting only acts while the button is ON. Manual LED PWM (`led_pwm_value`) is used when the LED is ON but auto mode is off. Full PWM dimming requires ESP32 firmware `ACCESSORY_PWM_ENABLED 1`; with relay hardware (`ACCESSORY_PWM_ENABLED 0`) the LED still auto-switches ON/OFF but does not dim. All `LightingConfig` fields are persisted to the settings JSON.
+
+**Verified current WiFi adapter note:** the Connection tab WiFi UDP panel includes a `WiFi Adapter` dropdown that lists all Windows WiFi interfaces detected via `netsh`. Setting it to a dedicated USB dongle (e.g. `SMART SENTRY CON`) locks the auto-reconnect watchdog to that adapter for all `netsh wlan connect` calls, preventing the app from accidentally joining the ESP32 SSID on the wrong adapter. The selection is saved to `ConnectionConfig.wifi_interface`.
 
 **Verified current AI assistant note:** the underlying local Ollama-backed assistant implementation remains in the codebase with deterministic runtime analysis and fallback behavior, but the AI Assistant tab is intentionally on release hold for v3.0.0 and is not part of the active release surface.
 

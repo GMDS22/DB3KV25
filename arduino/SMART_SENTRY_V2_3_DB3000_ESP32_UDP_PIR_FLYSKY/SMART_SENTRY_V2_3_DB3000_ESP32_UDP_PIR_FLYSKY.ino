@@ -80,7 +80,7 @@ static const int PIN_SWEEP_BUTTON   = 0;    // DevKit BOOT button (active LOW)
 // 1 = 8-bit LEDC PWM for LED, Laser, ACC, and Spare outputs via MOSFET driver.
 // NOTE: only flip to 1 after MOSFET driver hardware is installed on every output channel.
 //       The app sends 0-255 for each channel: 0=off, 1=full-on compat, 2-255=literal duty.
-#define ACCESSORY_PWM_ENABLED  0
+#define ACCESSORY_PWM_ENABLED  1
 #define ACCESSORY_PWM_FREQ_HZ  5000u
 #define ACCESSORY_PWM_BITS     8
 static const int PIN_RC_UART_RX     = 21;   // FlySky FS-iA6 i-Bus RX
