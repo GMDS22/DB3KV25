@@ -13453,14 +13453,21 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         if state and not host_controls_hardware:
             if not self._comm.trigger_mode_bb:
                 self._log("Manual fire note: trigger mode is Water (MOSFET), not Projectile (ESP32 GPIO13 Servo)")
-            if (
-                getattr(self._comm, "_mode", None) == self._comm.MODE_WIFI_DEBUG_USB
-                and (
-                    getattr(self._comm, "_sock", None) is None
-                    or getattr(self._comm, "_udp_target", None) is None
-                )
+            _comm_mode = getattr(self._comm, "_mode", None)
+            _udp_broken = (
+                getattr(self._comm, "_sock", None) is None
+                or getattr(self._comm, "_udp_target", None) is None
+            )
+            if _udp_broken and _comm_mode in (
+                self._comm.MODE_WIFI_DEBUG_USB,
+                self._comm.MODE_WIFI_FULL,
+                self._comm.MODE_DUAL_ESP32_WIFI,
             ):
-                self._log("Manual fire unavailable: mode 2 routes trigger IO to ESP32 WiFi/GPIO13, and the WiFi link is not connected")
+                self._log(
+                    "Manual fire unavailable: WiFi/UDP link to ESP32 is not connected "
+                    "(mode %d) — check that the PC is connected to the SMART-SENTRY WiFi AP "
+                    "and try reconnecting from the Connection tab." % _comm_mode
+                )
         if host_controls_hardware:
             self.manual_fire_requested.emit(int(state))
             return

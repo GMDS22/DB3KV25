@@ -826,10 +826,71 @@ class SentryV2Comm:
             self._last_error = str(e)
             return False
 
+    @staticmethod
+    def _find_local_ip_on_subnet(host: str) -> str:
+        """Find a local interface IP on the same /24 subnet as *host*.
+
+        On Windows systems with multiple network adapters the OS routing table
+        may direct packets to 192.168.4.1 (ESP32 AP) through the wrong adapter.
+        Binding the UDP socket to the local IP that belongs to the same /24
+        subnet forces the correct physical interface and guarantees the ESP32
+        receives the packets.
+
+        Returns an empty string when no matching local IP is found (caller
+        should leave the socket unbound in that case).
+        """
+        try:
+            parts = host.split(".")
+            if len(parts) != 4:
+                return ""
+            subnet_prefix = ".".join(parts[:3]) + "."
+
+            # Fast path: ask the OS which source address it would use via the
+            # current routing table.  Works correctly when the routing table is
+            # already pointing at the right adapter.
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+                    probe.connect((host, 9000))
+                    candidate = probe.getsockname()[0]
+                    if candidate.startswith(subnet_prefix):
+                        return candidate
+            except Exception:
+                pass
+
+            # Slow path: scan the subnet for an IP that can be bound locally.
+            # Trying sock.bind() on each candidate raises OSError immediately
+            # if the address is not assigned to any local interface, so at most
+            # one candidate succeeds (takes < 5 ms for the full /24 pass).
+            for last in range(2, 255):
+                candidate = f"{subnet_prefix}{last}"
+                try:
+                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+                        probe.bind((candidate, 0))
+                    return candidate
+                except OSError:
+                    pass
+                except Exception:
+                    break
+        except Exception:
+            pass
+        return ""
+
     def _open_udp(self, host: str, port: int) -> bool:
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.setblocking(False)
+            # Bind to the correct local interface so traffic goes through the
+            # adapter that is actually connected to the ESP32 AP.  Without this,
+            # Windows may route packets through the wrong adapter on systems with
+            # multiple network interfaces (e.g. a dedicated USB WiFi dongle plus
+            # a built-in WiFi adapter), causing all UDP commands to be silently
+            # discarded and the firmware to stay safety-locked.
+            local_ip = self._find_local_ip_on_subnet(host)
+            if local_ip:
+                try:
+                    sock.bind((local_ip, 0))
+                except Exception:
+                    pass  # bind failure is non-fatal; socket will use default routing
             # Reachability probe: on a non-blocking UDP socket, sendto raises
             # OSError (WSAENETUNREACH/ENETUNREACH) immediately if there is no
             # route to the host's network — e.g. the ESP32 WiFi AP is off and

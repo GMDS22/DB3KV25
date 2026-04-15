@@ -242,6 +242,7 @@ static float    trigger_servo_current_deg = (float)TRIGGER_SERVO_REST_DEG_DEFAUL
 static float    trigger_servo_target_deg  = (float)TRIGGER_SERVO_REST_DEG_DEFAULT;
 static uint32_t trigger_servo_last_step_ms = 0;
 static bool     pir_event_blink_enabled = false;
+static bool     acc_pwm_ready    = false;  // ACCESSORY_PWM_ENABLED: true once all four acc pins attached
 static bool     buzzer_pwm_ready = false;
 static bool     sound_active = false;
 static uint8_t  sound_owner = 0;
@@ -976,21 +977,24 @@ static void update_motion_outputs(bool blocked) {
 }
 static void update_accessories() {
 #if ACCESSORY_PWM_ENABLED
-  // PWM path: maps 0=off, 1=full-on compat, 2-255=literal duty cycle.
-  auto acc_pwm_duty = [](int s) -> uint8_t {
-    return (s <= 0) ? 0 : (s == 1) ? 255 : (uint8_t)s;
-  };
-  ledcWrite(PIN_LED_RELAY,   acc_pwm_duty(led_state));
-  ledcWrite(PIN_LASER_RELAY, acc_pwm_duty(laser_state));
-  ledcWrite(PIN_ACC_RELAY,   acc_pwm_duty(acc_state));
-  ledcWrite(PIN_SPARE_RELAY, acc_pwm_duty(spare_state));
-#else
-  // Standard ON/OFF relay path (default).
+  if (acc_pwm_ready) {
+    // PWM path: maps 0=off, 1=full-on compat, 2-255=literal duty cycle.
+    auto acc_pwm_duty = [](int s) -> uint8_t {
+      return (s <= 0) ? 0 : (s == 1) ? 255 : (uint8_t)s;
+    };
+    ledcWrite(PIN_LED_RELAY,   acc_pwm_duty(led_state));
+    ledcWrite(PIN_LASER_RELAY, acc_pwm_duty(laser_state));
+    ledcWrite(PIN_ACC_RELAY,   acc_pwm_duty(acc_state));
+    ledcWrite(PIN_SPARE_RELAY, acc_pwm_duty(spare_state));
+    return;
+  }
+  // Fall through to digital path if LEDC attach failed at boot.
+#endif
+  // Standard ON/OFF relay path.
   digitalWrite(PIN_LED_RELAY,   led_state   ? HIGH : LOW);
   digitalWrite(PIN_LASER_RELAY, laser_state ? HIGH : LOW);
   digitalWrite(PIN_ACC_RELAY,   acc_state   ? HIGH : LOW);
   digitalWrite(PIN_SPARE_RELAY, spare_state ? HIGH : LOW);
-#endif
 }
 static void set_mosfet(bool on) { digitalWrite(PIN_TRIGGER_MOSFET, on ? HIGH : LOW); }
 static void set_trigger_servo_target(bool fire_state) {
@@ -1173,6 +1177,11 @@ static void send_caps(IPAddress ip, uint16_t port) {
   caps["led_relay_assigned"] = true;
   caps["laser_relay_assigned"] = true;
   caps["trigger_servo_assigned"] = true;
+#if ACCESSORY_PWM_ENABLED
+  caps["accessory_pwm_enabled"] = acc_pwm_ready;
+#else
+  caps["accessory_pwm_enabled"] = false;
+#endif
   caps["buzzer_volume_assigned"] = true;
   caps["speaker_volume_assigned"] = false;
   caps["header_reference_locked"] = false;
@@ -1685,10 +1694,27 @@ void setup() {
   pinMode(PIN_SPARE_RELAY,    OUTPUT); digitalWrite(PIN_SPARE_RELAY,    LOW);
 #if ACCESSORY_PWM_ENABLED
   // Attach LEDC PWM channels for all four accessory outputs.
-  ledcAttach(PIN_LED_RELAY,   ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
-  ledcAttach(PIN_LASER_RELAY, ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
-  ledcAttach(PIN_ACC_RELAY,   ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
-  ledcAttach(PIN_SPARE_RELAY, ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+  {
+    bool ok_led   = ledcAttach(PIN_LED_RELAY,   ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+    bool ok_laser = ledcAttach(PIN_LASER_RELAY, ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+    bool ok_acc   = ledcAttach(PIN_ACC_RELAY,   ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+    bool ok_spare = ledcAttach(PIN_SPARE_RELAY, ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+    acc_pwm_ready = ok_led && ok_laser && ok_acc && ok_spare;
+    Serial.printf("[BOOT] Accessory PWM attach: LED=%s LASER=%s ACC=%s SPARE=%s -> %s\n",
+                  ok_led   ? "OK" : "FAIL",
+                  ok_laser ? "OK" : "FAIL",
+                  ok_acc   ? "OK" : "FAIL",
+                  ok_spare ? "OK" : "FAIL",
+                  acc_pwm_ready ? "ALL OK" : "PARTIAL/FAIL - PWM mode disabled");
+    if (!acc_pwm_ready) {
+      // If any channel failed, release the ones that succeeded and fall back
+      // to plain digital output so the accessory pins remain functional.
+      pinMode(PIN_LED_RELAY,   OUTPUT); digitalWrite(PIN_LED_RELAY,   LOW);
+      pinMode(PIN_LASER_RELAY, OUTPUT); digitalWrite(PIN_LASER_RELAY, LOW);
+      pinMode(PIN_ACC_RELAY,   OUTPUT); digitalWrite(PIN_ACC_RELAY,   LOW);
+      pinMode(PIN_SPARE_RELAY, OUTPUT); digitalWrite(PIN_SPARE_RELAY, LOW);
+    }
+  }
 #endif
   pinMode(PIN_BUZZER,         OUTPUT); digitalWrite(PIN_BUZZER,         LOW);
   pinMode(PIN_STATUS_LED,     OUTPUT); set_status_led(false);
