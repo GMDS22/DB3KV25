@@ -29,8 +29,10 @@ import sys
 import tempfile
 import threading
 import time
+import traceback
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+
+from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -48,7 +50,7 @@ from PyQt5.QtWidgets import (
     QStylePainter,
     QStyleOptionTab,
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject, QProcess, QProcessEnvironment, QSize, QUrl, QRectF, QPointF, QRect, QPropertyAnimation, QEasingCurve
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer, QEvent, QObject, QProcess, QProcessEnvironment, QSize, QUrl, QRectF, QPointF, QRect, QPropertyAnimation, QEasingCurve, QThread
 from PyQt5.QtGui import QImage, QPixmap, QColor, QIcon, QDesktopServices, QPainter, QPainterPath, QPen, QKeySequence, QCursor
 try:
     from PyQt5.QtTextToSpeech import QTextToSpeech
@@ -112,6 +114,9 @@ from .sentry_v2_config import (
 )
 from .target_filter import DetectedObject
 from .assistant import AssistantReply, LocalAssistantService, OllamaClient
+
+
+MANUAL_TRIGGER_SERVO_LATCH_MS = 160
 
 
 class NoWheelScrollFilter(QObject):
@@ -240,7 +245,6 @@ STANDARD_CAMERA_RESOLUTIONS: List[Tuple[int, int]] = [
     (640, 480),
     (800, 600),
     (960, 540),
-    (1024, 576),
     (1280, 720),
     (1280, 800),
     (1280, 960),
@@ -272,6 +276,17 @@ HUMAN_VOICE_STYLE_PRESETS = {
 APP_ROOT_PATH = app_root_path()
 RUNTIME_ROOT_PATH = runtime_root_path()
 
+SMART_SENTRY_RELEASE_VERSION = get_version()
+SMART_SENTRY_RELEASE_VERSION_TOKEN = SMART_SENTRY_RELEASE_VERSION.replace(".", "_")
+CANONICAL_CUSTOM_PRESET_RELATIVE_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_custom_presets.json"
+CANONICAL_SETTINGS_RELATIVE_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_settings.json"
+CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_prompted_targets.json"
+CANONICAL_FACE_LIBRARY_RELATIVE_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_faces.json"
+CANONICAL_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / f"smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_custom_presets.json"
+CANONICAL_SETTINGS_PATH = APP_ROOT_PATH / "config" / f"smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_settings.json"
+CANONICAL_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / f"smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_prompted_targets.json"
+CANONICAL_FACE_LIBRARY_PATH = APP_ROOT_PATH / "config" / f"smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_faces.json"
+
 SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_2_custom_presets.json"
 SMART_SENTRY_V2_3_1_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_1_custom_presets.json"
 LEGACY_SMART_SENTRY_V3_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_custom_presets.json"
@@ -296,10 +311,124 @@ SMART_SENTRY_V2_WIFI_SSID = "SMART-SENTRY-V2.3"
 SMART_SENTRY_V2_WIFI_PASSWORD = "db3000pass"
 SMART_SENTRY_V3_WIFI_SSID = "SMART-SENTRY-V3"
 SMART_SENTRY_V3_WIFI_PASSWORD = "smartv3pass"
-SMART_SENTRY_RELEASE_VERSION = get_version()
 SMART_SENTRY_RELEASE_TITLE = get_app_title("Smart Sentry")
 SMART_SENTRY_RELEASE_SUBTITLE = "ESP32 WiFi + USB Control"
 SMART_SENTRY_RELEASE_BADGE = ""
+
+
+def _build_pin_assignment_dialog_content(mode_index: int, tokens: Dict[str, str]) -> Tuple[str, str]:
+    heading_color = tokens.get("text", "#f5f7fa")
+    body_color = tokens.get("subtle_text", heading_color)
+    note_color = tokens.get("status_meta", body_color)
+    accent_color = tokens.get("accent", heading_color)
+    border_color = tokens.get("border", note_color)
+
+    def section(title: str) -> str:
+        return f"<div style='font-weight:700; color:{accent_color}; margin:10px 0 4px 0;'>{title}</div>"
+
+    def row(label: str, description: str) -> str:
+        return (
+            "<tr>"
+            f"<td style='padding:4px 8px; font-weight:700; color:{heading_color}; border-bottom:1px solid {border_color}; vertical-align:top;'>{label}</td>"
+            f"<td style='padding:4px 8px; color:{body_color}; border-bottom:1px solid {border_color}; vertical-align:top;'>{description}</td>"
+            "</tr>"
+        )
+
+    def table(*rows: str) -> str:
+        return "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>" + "".join(rows) + "</table>"
+
+    pir_rows = table(
+        row("PIR S1 / Sensor 0 / GPIO35", "Right zone cue (~45 deg). App logs show this as S1."),
+        row("PIR S2 / Sensor 1 / GPIO34", "Front zone cue (~135 deg). App logs show this as S2."),
+        row("PIR S3 / Sensor 2 / GPIO39 (VN)", "Left zone cue (~225 deg). ESP32 expansion board silk label: VN. App logs show this as S3."),
+    )
+
+    if mode_index == SentryV2Comm.MODE_WIFI_FULL:
+        title = "Waveshare Pin Assignments"
+        text = "".join([
+            f"<div style='font-size:13px; line-height:1.4; color:{body_color};'>",
+            f"<div style='font-weight:700; color:{heading_color}; margin-bottom:8px;'>Waveshare Servo Driver HAT single-board bridge</div>",
+            f"<div style='margin-bottom:8px; color:{body_color};'>PC to bridge: WiFi/UDP on {SMART_SENTRY_V3_WIFI_SSID}<br>Pan/Tilt bus servos: local bus UART on GPIO18/GPIO19 at 1000000 baud<br>Use the Waveshare 40-pin header numbers exactly as shown here</div>",
+            section("Header-backed outputs"),
+            table(
+                row("Header 7 / GPIO4", "Buzzer output"),
+                row("Header 13 / GPIO27", "Trigger MOSFET"),
+                row("Header 22 / GPIO25", "Accessory relay"),
+                row("Header 37 / GPIO26", "Spare relay"),
+            ),
+            section("Onboard PIR inputs"),
+            pir_rows,
+            f"<div style='color:{note_color}; margin:-2px 0 8px 0;'>GPIO35, GPIO34, and GPIO39 are ESP32 input-only PIR lines. On the ESP32 expansion board, VN = GPIO39. They are not part of the 40-pin header output assignments above.</div>",
+            section("Reserved and unassigned paths"),
+            table(
+                row("Header 29 / GPIO5", "Speaker reserved only"),
+                row("LED relay", "Unassigned on current Waveshare map"),
+                row("Laser relay", "Unassigned on current Waveshare map"),
+                row("Trigger-servo PWM", "Unassigned on current Waveshare map"),
+            ),
+            section("Reserved transport pins"),
+            table(
+                row("GPIO18 / GPIO19", "Yahboom bus-servo UART RX/TX"),
+                row("Header 10 / GPIO15", "FlySky FS-iA6 i-Bus RX"),
+                row("Header 8 / GPIO14", "Reserved RC TX / telemetry path"),
+            ),
+            f"<div style='color:{note_color}; margin-top:8px;'>This is the current flashed Smart Sentry Waveshare map with the live PIR inputs called out explicitly.</div>",
+            "</div>",
+        ])
+        return title, text
+
+    if mode_index == SentryV2Comm.MODE_DUAL_ESP32_WIFI:
+        title = "Dual ESP32 WiFi Pin Assignments"
+        text = "".join([
+            f"<div style='font-size:13px; line-height:1.4; color:{body_color};'>",
+            f"<div style='font-weight:700; color:{heading_color}; margin-bottom:8px;'>Dual ESP32 WiFi topology</div>",
+            f"<div style='margin-bottom:8px; color:{body_color};'>Primary ESP32 handles IO and accessories over WiFi.<br>Secondary ESP32 handles Yahboom bus-servo motion over its own WiFi bridge.</div>",
+            table(
+                row("Primary GPIO27", "Trigger MOSFET"),
+                row("Primary GPIO25", "Accessory relay"),
+                row("Primary GPIO26", "Spare relay"),
+                row("Secondary servo bridge", "Pan/Tilt Yahboom motion path"),
+            ),
+            section("Primary ESP32 PIR inputs"),
+            pir_rows,
+            f"<div style='color:{note_color}; margin-top:8px;'>Use the Waveshare header map only for the single-board bridge mode. PIR sensing still follows the primary ESP32 GPIO35/GPIO34/GPIO39 map.</div>",
+            "</div>",
+        ])
+        return title, text
+
+    if mode_index == SentryV2Comm.MODE_WIFI_DEBUG_USB:
+        title = "WiFi IO Pin Assignments"
+        text = "".join([
+            f"<div style='font-size:13px; line-height:1.4; color:{body_color};'>",
+            f"<div style='font-weight:700; color:{heading_color}; margin-bottom:8px;'>ESP32 WiFi IO with Debug Board USB motion</div>",
+            f"<div style='margin-bottom:8px; color:{body_color};'>PC to ESP32: WiFi/UDP for trigger, PIR, and accessories<br>Debug Board to PC: USB serial for pan/tilt bus-servo motion</div>",
+            table(
+                row("GPIO27", "Trigger MOSFET"),
+                row("GPIO13", "Trigger Servo"),
+                row("GPIO25", "Accessory relay"),
+                row("GPIO26", "Spare relay"),
+                row("PIR S1 / Sensor 0 / GPIO35", "Right zone cue (~45 deg)"),
+                row("PIR S2 / Sensor 1 / GPIO34", "Front zone cue (~135 deg)"),
+                row("PIR S3 / Sensor 2 / GPIO39 (VN)", "Left zone cue (~225 deg). Expansion board silk label: VN"),
+            ),
+            f"<div style='color:{note_color}; margin-top:8px;'>ESP32 expansion board note: VN = GPIO39. If only one PIR is firing right now, compare GPIO35 (S1), GPIO34 (S2), and GPIO39/VN (S3).</div>",
+            "</div>",
+        ])
+        return title, text
+
+    title = "Connection Pin Notes"
+    text = "".join([
+        f"<div style='font-size:13px; line-height:1.4; color:{body_color};'>",
+        f"<div style='font-weight:700; color:{heading_color}; margin-bottom:8px;'>Current connection mode</div>",
+        f"<div style='margin-bottom:8px; color:{body_color};'>This mode is USB-centered, so the key assignments live on the selected COM ports rather than on a WiFi bridge header map.</div>",
+        table(
+            row("ESP32 USB", "Primary ASCII IO link when using direct USB"),
+            row("Debug Board USB", "Pan/Tilt bus-servo motion path in dual-USB layouts"),
+        ),
+        f"<div style='color:{note_color}; margin-top:8px;'>Switch to a WiFi mode if you want the live PIR GPIO map in this window. The active PIR wiring remains S1/GPIO35, S2/GPIO34, and S3/GPIO39.</div>",
+        "</div>",
+    ])
+    return title, text
 
 SETTINGS_TAB_SPECS: List[Tuple[str, str, str]] = [
     ("Connection", "system", "#72decf"),
@@ -348,6 +477,7 @@ SETTINGS_TAB_RELEASE_HOLDS: Dict[str, Dict[str, str]] = {
 SERIAL_LOG_FILTER_SPECS: List[Tuple[str, str]] = [
     ("all", "All"),
     ("system", "System"),
+    ("pir", "PIR"),
     ("movement", "Move"),
     ("camera", "Camera"),
     ("safety", "Safety"),
@@ -1570,15 +1700,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.08,
             "precision_error_ema": 0.55,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.28,
-            "aim_lock_tilt_tolerance": 0.24,
-            "aim_lock_required_frames": 8,
-            "fire_trigger_enter_pan_tolerance": 0.18,
-            "fire_trigger_enter_tilt_tolerance": 0.15,
-            "fire_trigger_exit_pan_tolerance": 0.28,
-            "fire_trigger_exit_tilt_tolerance": 0.22,
-            "fire_recenter_pan_tolerance": 0.24,
-            "fire_recenter_tilt_tolerance": 0.20,
+            "aim_lock_pan_tolerance": 2.50,
+            "aim_lock_tilt_tolerance": 2.00,
+            "aim_lock_required_frames": 3,
+            "fire_trigger_enter_pan_tolerance": 2.00,
+            "fire_trigger_enter_tilt_tolerance": 1.60,
+            "fire_trigger_exit_pan_tolerance": 2.80,
+            "fire_trigger_exit_tilt_tolerance": 2.20,
+            "fire_recenter_pan_tolerance": 2.50,
+            "fire_recenter_tilt_tolerance": 2.00,
             "target_loss_timeout": 1.90,
         },
     },
@@ -1604,15 +1734,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.08,
             "precision_error_ema": 0.55,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.28,
-            "aim_lock_tilt_tolerance": 0.24,
-            "aim_lock_required_frames": 4,
-            "fire_trigger_enter_pan_tolerance": 0.18,
-            "fire_trigger_enter_tilt_tolerance": 0.15,
-            "fire_trigger_exit_pan_tolerance": 0.28,
-            "fire_trigger_exit_tilt_tolerance": 0.22,
-            "fire_recenter_pan_tolerance": 0.24,
-            "fire_recenter_tilt_tolerance": 0.20,
+            "aim_lock_pan_tolerance": 2.50,
+            "aim_lock_tilt_tolerance": 2.00,
+            "aim_lock_required_frames": 3,
+            "fire_trigger_enter_pan_tolerance": 2.00,
+            "fire_trigger_enter_tilt_tolerance": 1.60,
+            "fire_trigger_exit_pan_tolerance": 2.80,
+            "fire_trigger_exit_tilt_tolerance": 2.20,
+            "fire_recenter_pan_tolerance": 2.50,
+            "fire_recenter_tilt_tolerance": 2.00,
             "target_loss_timeout": 1.20,
         },
     },
@@ -1623,7 +1753,7 @@ ENGAGEMENT_PRESETS = {
         "settings": {
             "auto_trigger_enabled": True,
             "trigger_mode_bb": True,
-            "min_threat_score": 0.52,
+            "min_threat_score": 0.28,
             "burst_count": 1,
             "burst_interval_ms": 100,
             "inter_target_cooldown": 1.80,
@@ -1638,15 +1768,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.06,
             "precision_error_ema": 0.52,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.18,
-            "aim_lock_tilt_tolerance": 0.14,
-            "aim_lock_required_frames": 8,
-            "fire_trigger_enter_pan_tolerance": 0.12,
-            "fire_trigger_enter_tilt_tolerance": 0.09,
-            "fire_trigger_exit_pan_tolerance": 0.18,
-            "fire_trigger_exit_tilt_tolerance": 0.14,
-            "fire_recenter_pan_tolerance": 0.18,
-            "fire_recenter_tilt_tolerance": 0.14,
+            "aim_lock_pan_tolerance": 2.00,
+            "aim_lock_tilt_tolerance": 1.60,
+            "aim_lock_required_frames": 3,
+            "fire_trigger_enter_pan_tolerance": 1.80,
+            "fire_trigger_enter_tilt_tolerance": 1.40,
+            "fire_trigger_exit_pan_tolerance": 2.50,
+            "fire_trigger_exit_tilt_tolerance": 2.00,
+            "fire_recenter_pan_tolerance": 2.20,
+            "fire_recenter_tilt_tolerance": 1.80,
             "target_loss_timeout": 2.00,
         },
     },
@@ -1657,7 +1787,7 @@ ENGAGEMENT_PRESETS = {
         "settings": {
             "auto_trigger_enabled": True,
             "trigger_mode_bb": True,
-            "min_threat_score": 0.36,
+            "min_threat_score": 0.26,
             "burst_count": 2,
             "burst_interval_ms": 70,
             "inter_target_cooldown": 1.00,
@@ -1672,15 +1802,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.08,
             "precision_error_ema": 0.40,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.30,
-            "aim_lock_tilt_tolerance": 0.24,
-            "aim_lock_required_frames": 6,
-            "fire_trigger_enter_pan_tolerance": 0.17,
-            "fire_trigger_enter_tilt_tolerance": 0.13,
-            "fire_trigger_exit_pan_tolerance": 0.26,
-            "fire_trigger_exit_tilt_tolerance": 0.20,
-            "fire_recenter_pan_tolerance": 0.30,
-            "fire_recenter_tilt_tolerance": 0.24,
+            "aim_lock_pan_tolerance": 2.50,
+            "aim_lock_tilt_tolerance": 2.00,
+            "aim_lock_required_frames": 2,
+            "fire_trigger_enter_pan_tolerance": 2.20,
+            "fire_trigger_enter_tilt_tolerance": 1.80,
+            "fire_trigger_exit_pan_tolerance": 3.00,
+            "fire_trigger_exit_tilt_tolerance": 2.40,
+            "fire_recenter_pan_tolerance": 2.80,
+            "fire_recenter_tilt_tolerance": 2.20,
             "target_loss_timeout": 1.10,
         },
     },
@@ -1706,15 +1836,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.10,
             "precision_error_ema": 0.30,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.42,
-            "aim_lock_tilt_tolerance": 0.34,
-            "aim_lock_required_frames": 4,
-            "fire_trigger_enter_pan_tolerance": 0.22,
-            "fire_trigger_enter_tilt_tolerance": 0.17,
-            "fire_trigger_exit_pan_tolerance": 0.32,
-            "fire_trigger_exit_tilt_tolerance": 0.25,
-            "fire_recenter_pan_tolerance": 0.40,
-            "fire_recenter_tilt_tolerance": 0.32,
+            "aim_lock_pan_tolerance": 3.00,
+            "aim_lock_tilt_tolerance": 2.50,
+            "aim_lock_required_frames": 2,
+            "fire_trigger_enter_pan_tolerance": 2.80,
+            "fire_trigger_enter_tilt_tolerance": 2.20,
+            "fire_trigger_exit_pan_tolerance": 3.50,
+            "fire_trigger_exit_tilt_tolerance": 2.80,
+            "fire_recenter_pan_tolerance": 3.20,
+            "fire_recenter_tilt_tolerance": 2.60,
             "target_loss_timeout": 0.80,
         },
     },
@@ -1740,15 +1870,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.13,
             "precision_error_ema": 0.28,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.52,
-            "aim_lock_tilt_tolerance": 0.42,
-            "aim_lock_required_frames": 4,
-            "fire_trigger_enter_pan_tolerance": 0.24,
-            "fire_trigger_enter_tilt_tolerance": 0.19,
-            "fire_trigger_exit_pan_tolerance": 0.36,
-            "fire_trigger_exit_tilt_tolerance": 0.28,
-            "fire_recenter_pan_tolerance": 0.46,
-            "fire_recenter_tilt_tolerance": 0.36,
+            "aim_lock_pan_tolerance": 3.50,
+            "aim_lock_tilt_tolerance": 2.80,
+            "aim_lock_required_frames": 2,
+            "fire_trigger_enter_pan_tolerance": 3.00,
+            "fire_trigger_enter_tilt_tolerance": 2.40,
+            "fire_trigger_exit_pan_tolerance": 4.00,
+            "fire_trigger_exit_tilt_tolerance": 3.20,
+            "fire_recenter_pan_tolerance": 3.50,
+            "fire_recenter_tilt_tolerance": 2.80,
             "target_loss_timeout": 0.70,
         },
     },
@@ -1774,15 +1904,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.07,
             "precision_error_ema": 0.42,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.26,
-            "aim_lock_tilt_tolerance": 0.21,
-            "aim_lock_required_frames": 4,
-            "fire_trigger_enter_pan_tolerance": 0.14,
-            "fire_trigger_enter_tilt_tolerance": 0.12,
-            "fire_trigger_exit_pan_tolerance": 0.22,
-            "fire_trigger_exit_tilt_tolerance": 0.18,
-            "fire_recenter_pan_tolerance": 0.24,
-            "fire_recenter_tilt_tolerance": 0.20,
+            "aim_lock_pan_tolerance": 2.20,
+            "aim_lock_tilt_tolerance": 1.80,
+            "aim_lock_required_frames": 3,
+            "fire_trigger_enter_pan_tolerance": 2.00,
+            "fire_trigger_enter_tilt_tolerance": 1.60,
+            "fire_trigger_exit_pan_tolerance": 2.80,
+            "fire_trigger_exit_tilt_tolerance": 2.20,
+            "fire_recenter_pan_tolerance": 2.50,
+            "fire_recenter_tilt_tolerance": 2.00,
             "target_loss_timeout": 0.70,
         },
     },
@@ -1808,15 +1938,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.06,
             "precision_error_ema": 0.44,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.20,
-            "aim_lock_tilt_tolerance": 0.16,
-            "aim_lock_required_frames": 3,
-            "fire_trigger_enter_pan_tolerance": 0.11,
-            "fire_trigger_enter_tilt_tolerance": 0.09,
-            "fire_trigger_exit_pan_tolerance": 0.17,
-            "fire_trigger_exit_tilt_tolerance": 0.14,
-            "fire_recenter_pan_tolerance": 0.20,
-            "fire_recenter_tilt_tolerance": 0.16,
+            "aim_lock_pan_tolerance": 2.00,
+            "aim_lock_tilt_tolerance": 1.60,
+            "aim_lock_required_frames": 2,
+            "fire_trigger_enter_pan_tolerance": 1.80,
+            "fire_trigger_enter_tilt_tolerance": 1.50,
+            "fire_trigger_exit_pan_tolerance": 2.50,
+            "fire_trigger_exit_tilt_tolerance": 2.00,
+            "fire_recenter_pan_tolerance": 2.20,
+            "fire_recenter_tilt_tolerance": 1.80,
             "target_loss_timeout": 0.55,
         },
     },
@@ -1842,15 +1972,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.05,
             "precision_error_ema": 0.46,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.16,
-            "aim_lock_tilt_tolerance": 0.13,
+            "aim_lock_pan_tolerance": 1.80,
+            "aim_lock_tilt_tolerance": 1.40,
             "aim_lock_required_frames": 2,
-            "fire_trigger_enter_pan_tolerance": 0.09,
-            "fire_trigger_enter_tilt_tolerance": 0.07,
-            "fire_trigger_exit_pan_tolerance": 0.14,
-            "fire_trigger_exit_tilt_tolerance": 0.11,
-            "fire_recenter_pan_tolerance": 0.16,
-            "fire_recenter_tilt_tolerance": 0.13,
+            "fire_trigger_enter_pan_tolerance": 1.60,
+            "fire_trigger_enter_tilt_tolerance": 1.30,
+            "fire_trigger_exit_pan_tolerance": 2.20,
+            "fire_trigger_exit_tilt_tolerance": 1.80,
+            "fire_recenter_pan_tolerance": 2.00,
+            "fire_recenter_tilt_tolerance": 1.60,
             "target_loss_timeout": 0.35,
         },
     },
@@ -1876,15 +2006,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.06,
             "precision_error_ema": 0.42,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.22,
-            "aim_lock_tilt_tolerance": 0.18,
-            "aim_lock_required_frames": 3,
-            "fire_trigger_enter_pan_tolerance": 0.12,
-            "fire_trigger_enter_tilt_tolerance": 0.10,
-            "fire_trigger_exit_pan_tolerance": 0.18,
-            "fire_trigger_exit_tilt_tolerance": 0.14,
-            "fire_recenter_pan_tolerance": 0.20,
-            "fire_recenter_tilt_tolerance": 0.16,
+            "aim_lock_pan_tolerance": 2.00,
+            "aim_lock_tilt_tolerance": 1.60,
+            "aim_lock_required_frames": 2,
+            "fire_trigger_enter_pan_tolerance": 1.80,
+            "fire_trigger_enter_tilt_tolerance": 1.40,
+            "fire_trigger_exit_pan_tolerance": 2.50,
+            "fire_trigger_exit_tilt_tolerance": 2.00,
+            "fire_recenter_pan_tolerance": 2.20,
+            "fire_recenter_tilt_tolerance": 1.80,
             "target_loss_timeout": 0.50,
         },
     },
@@ -1910,15 +2040,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.08,
             "precision_error_ema": 0.42,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.40,
-            "aim_lock_tilt_tolerance": 0.32,
-            "aim_lock_required_frames": 5,
-            "fire_trigger_enter_pan_tolerance": 0.24,
-            "fire_trigger_enter_tilt_tolerance": 0.19,
-            "fire_trigger_exit_pan_tolerance": 0.36,
-            "fire_trigger_exit_tilt_tolerance": 0.28,
-            "fire_recenter_pan_tolerance": 0.38,
-            "fire_recenter_tilt_tolerance": 0.30,
+            "aim_lock_pan_tolerance": 2.50,
+            "aim_lock_tilt_tolerance": 2.00,
+            "aim_lock_required_frames": 2,
+            "fire_trigger_enter_pan_tolerance": 2.50,
+            "fire_trigger_enter_tilt_tolerance": 2.00,
+            "fire_trigger_exit_pan_tolerance": 3.20,
+            "fire_trigger_exit_tilt_tolerance": 2.50,
+            "fire_recenter_pan_tolerance": 3.00,
+            "fire_recenter_tilt_tolerance": 2.40,
             "target_loss_timeout": 3.00,
             "aim_lock_timeout": 2.50,
         },
@@ -1945,15 +2075,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.035,
             "precision_error_ema": 0.36,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.080,
-            "aim_lock_tilt_tolerance": 0.060,
-            "aim_lock_required_frames": 12,
-            "fire_trigger_enter_pan_tolerance": 0.050,
-            "fire_trigger_enter_tilt_tolerance": 0.040,
-            "fire_trigger_exit_pan_tolerance": 0.080,
-            "fire_trigger_exit_tilt_tolerance": 0.060,
-            "fire_recenter_pan_tolerance": 0.090,
-            "fire_recenter_tilt_tolerance": 0.070,
+            "aim_lock_pan_tolerance": 1.00,
+            "aim_lock_tilt_tolerance": 0.80,
+            "aim_lock_required_frames": 8,
+            "fire_trigger_enter_pan_tolerance": 0.80,
+            "fire_trigger_enter_tilt_tolerance": 0.60,
+            "fire_trigger_exit_pan_tolerance": 1.20,
+            "fire_trigger_exit_tilt_tolerance": 1.00,
+            "fire_recenter_pan_tolerance": 1.10,
+            "fire_recenter_tilt_tolerance": 0.90,
             "target_loss_timeout": 2.80,
             "aim_lock_timeout": 3.50,
             "continuous_hunt_on_loss": True,
@@ -1981,15 +2111,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.040,
             "precision_error_ema": 0.38,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.090,
-            "aim_lock_tilt_tolerance": 0.070,
-            "aim_lock_required_frames": 10,
-            "fire_trigger_enter_pan_tolerance": 0.060,
-            "fire_trigger_enter_tilt_tolerance": 0.050,
-            "fire_trigger_exit_pan_tolerance": 0.090,
-            "fire_trigger_exit_tilt_tolerance": 0.070,
-            "fire_recenter_pan_tolerance": 0.100,
-            "fire_recenter_tilt_tolerance": 0.080,
+            "aim_lock_pan_tolerance": 1.20,
+            "aim_lock_tilt_tolerance": 1.00,
+            "aim_lock_required_frames": 7,
+            "fire_trigger_enter_pan_tolerance": 1.00,
+            "fire_trigger_enter_tilt_tolerance": 0.80,
+            "fire_trigger_exit_pan_tolerance": 1.50,
+            "fire_trigger_exit_tilt_tolerance": 1.20,
+            "fire_recenter_pan_tolerance": 1.40,
+            "fire_recenter_tilt_tolerance": 1.10,
             "target_loss_timeout": 2.60,
             "aim_lock_timeout": 3.20,
             "continuous_hunt_on_loss": True,
@@ -2017,15 +2147,15 @@ ENGAGEMENT_PRESETS = {
             "precision_deadzone_tilt_deg": 0.045,
             "precision_error_ema": 0.40,
             "fire_requires_lock": True,
-            "aim_lock_pan_tolerance": 0.110,
-            "aim_lock_tilt_tolerance": 0.080,
-            "aim_lock_required_frames": 9,
-            "fire_trigger_enter_pan_tolerance": 0.080,
-            "fire_trigger_enter_tilt_tolerance": 0.060,
-            "fire_trigger_exit_pan_tolerance": 0.120,
-            "fire_trigger_exit_tilt_tolerance": 0.090,
-            "fire_recenter_pan_tolerance": 0.130,
-            "fire_recenter_tilt_tolerance": 0.100,
+            "aim_lock_pan_tolerance": 1.40,
+            "aim_lock_tilt_tolerance": 1.10,
+            "aim_lock_required_frames": 6,
+            "fire_trigger_enter_pan_tolerance": 1.50,
+            "fire_trigger_enter_tilt_tolerance": 1.20,
+            "fire_trigger_exit_pan_tolerance": 2.00,
+            "fire_trigger_exit_tilt_tolerance": 1.60,
+            "fire_recenter_pan_tolerance": 1.80,
+            "fire_recenter_tilt_tolerance": 1.40,
             "target_loss_timeout": 2.50,
             "aim_lock_timeout": 3.00,
             "continuous_hunt_on_loss": True,
@@ -2185,15 +2315,15 @@ AIM_LOCK_FIRE_GATE_PRESETS = {
             "precision_deadzone_pan_deg": 0.07,
             "precision_deadzone_tilt_deg": 0.06,
             "precision_error_ema": 0.40,
-            "aim_lock_pan_tolerance": 0.18,
-            "aim_lock_tilt_tolerance": 0.14,
-            "aim_lock_required_frames": 8,
-            "fire_trigger_enter_pan_tolerance": 0.12,
-            "fire_trigger_enter_tilt_tolerance": 0.09,
-            "fire_trigger_exit_pan_tolerance": 0.18,
-            "fire_trigger_exit_tilt_tolerance": 0.14,
-            "fire_recenter_pan_tolerance": 0.18,
-            "fire_recenter_tilt_tolerance": 0.14,
+            "aim_lock_pan_tolerance": 2.00,
+            "aim_lock_tilt_tolerance": 1.60,
+            "aim_lock_required_frames": 4,
+            "fire_trigger_enter_pan_tolerance": 1.80,
+            "fire_trigger_enter_tilt_tolerance": 1.40,
+            "fire_trigger_exit_pan_tolerance": 2.50,
+            "fire_trigger_exit_tilt_tolerance": 2.00,
+            "fire_recenter_pan_tolerance": 2.20,
+            "fire_recenter_tilt_tolerance": 1.80,
             "target_loss_timeout": 1.20,
         },
     },
@@ -2204,15 +2334,15 @@ AIM_LOCK_FIRE_GATE_PRESETS = {
             "precision_deadzone_pan_deg": 0.10,
             "precision_deadzone_tilt_deg": 0.08,
             "precision_error_ema": 0.48,
-            "aim_lock_pan_tolerance": 0.30,
-            "aim_lock_tilt_tolerance": 0.24,
-            "aim_lock_required_frames": 5,
-            "fire_trigger_enter_pan_tolerance": 0.18,
-            "fire_trigger_enter_tilt_tolerance": 0.14,
-            "fire_trigger_exit_pan_tolerance": 0.28,
-            "fire_trigger_exit_tilt_tolerance": 0.22,
-            "fire_recenter_pan_tolerance": 0.30,
-            "fire_recenter_tilt_tolerance": 0.24,
+            "aim_lock_pan_tolerance": 2.50,
+            "aim_lock_tilt_tolerance": 2.00,
+            "aim_lock_required_frames": 3,
+            "fire_trigger_enter_pan_tolerance": 2.20,
+            "fire_trigger_enter_tilt_tolerance": 1.80,
+            "fire_trigger_exit_pan_tolerance": 3.00,
+            "fire_trigger_exit_tilt_tolerance": 2.40,
+            "fire_recenter_pan_tolerance": 2.80,
+            "fire_recenter_tilt_tolerance": 2.20,
             "target_loss_timeout": 0.95,
         },
     },
@@ -2223,30 +2353,20 @@ AIM_LOCK_FIRE_GATE_PRESETS = {
             "precision_deadzone_pan_deg": 0.16,
             "precision_deadzone_tilt_deg": 0.13,
             "precision_error_ema": 0.62,
-            "aim_lock_pan_tolerance": 0.50,
-            "aim_lock_tilt_tolerance": 0.40,
+            "aim_lock_pan_tolerance": 3.50,
+            "aim_lock_tilt_tolerance": 2.80,
             "aim_lock_required_frames": 2,
-            "fire_trigger_enter_pan_tolerance": 0.24,
-            "fire_trigger_enter_tilt_tolerance": 0.19,
-            "fire_trigger_exit_pan_tolerance": 0.36,
-            "fire_trigger_exit_tilt_tolerance": 0.28,
-            "fire_recenter_pan_tolerance": 0.44,
-            "fire_recenter_tilt_tolerance": 0.34,
+            "fire_trigger_enter_pan_tolerance": 3.00,
+            "fire_trigger_enter_tilt_tolerance": 2.40,
+            "fire_trigger_exit_pan_tolerance": 4.00,
+            "fire_trigger_exit_tilt_tolerance": 3.20,
+            "fire_recenter_pan_tolerance": 3.50,
+            "fire_recenter_tilt_tolerance": 2.80,
             "target_loss_timeout": 0.65,
         },
     },
 }
 
-SENTRY_V3_MUTED_TEXT_STYLE = "color: #b7a392; font-size: 10px;"
-SENTRY_V3_SUBTLE_TEXT_STYLE = "color: #c8b29d; font-size: 11px;"
-SENTRY_V3_SECTION_LABEL_STYLE = "font-weight: bold; color: #f0c392; padding-top: 4px;"
-SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE = "color: #b7a392; font-size: 10px;"
-SENTRY_V3_CAM_STATUS_WARNING_STYLE = "color: #d8a15c; font-size: 10px;"
-SENTRY_V3_CAM_STATUS_ERROR_STYLE = "color: #d86d5f; font-size: 10px;"
-SENTRY_V3_CAM_STATUS_OK_STYLE = "color: #92c37d; font-size: 10px;"
-SENTRY_V3_CONN_STATUS_ERROR_STYLE = "color: #d86d5f; font-weight: bold;"
-SENTRY_V3_CONN_STATUS_WARNING_STYLE = "color: #d8a15c; font-weight: bold;"
-SENTRY_V3_CONN_STATUS_OK_STYLE = "color: #92c37d; font-weight: bold;"
 SENTRY_V2_THEME = """
 QWidget#sentryV2Root {
     background-color: #171310;
@@ -2586,7 +2706,7 @@ QLabel#sentryV2Video {
     background-color: #130e0b;
     color: #a28d79;
     border: 1px solid #50382b;
-    border-radius: 16px;
+    border-radius: 0px;
 }
 QTextEdit#sentryV2Log {
     background-color: #17110e;
@@ -2863,6 +2983,7 @@ class SentryV2TabWidget(QWidget):
     wifi_autojoin_result = pyqtSignal(bool, str)
     assistant_reply_ready = pyqtSignal(object)
     assistant_models_ready = pyqtSignal(bool, object, str)
+    _log_requested = pyqtSignal(str)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -2882,6 +3003,7 @@ class SentryV2TabWidget(QWidget):
         self._comm.trigger_mode_bb = self.config.engagement.trigger_mode_bb
         self._sync_comm_runtime_settings_from_config()
         self._comm.set_on_pir_event(self._emit_comm_pir_event)
+        self._comm.set_on_transport_log(self._emit_comm_transport_log)
         self._sound_engine = SentryV2SoundEngine(self._queue_sound_tone)
         self._sound_engine.set_enabled(bool(getattr(self.config.sound, "enabled", True)))
         self._sound_engine.set_profile(self._sound_personality_key(), self._sound_attitude_pct())
@@ -2921,6 +3043,9 @@ class SentryV2TabWidget(QWidget):
 
         # Track accessory states locally for button text
         self._led_on = False
+        self._auto_led_pwm: int = 0
+        self._scene_luma: float = 128.0
+        self._auto_lighting_frame_counter: int = 0
         self._laser_on = False
         self._acc_on = False
         self._spare_on = False
@@ -2938,11 +3063,14 @@ class SentryV2TabWidget(QWidget):
         self._grab_fail_count: int = 0
         self._MAX_GRAB_FAILS: int = 90  # tolerate brief camera stalls before recovery/close
         self._camera_black_frame_count: int = 0
-        self._MAX_CAMERA_BLACK_FRAMES: int = 24
+        self._MAX_CAMERA_BLACK_FRAMES: int = 8
         self._camera_partial_frame_count: int = 0
         self._MAX_CAMERA_PARTIAL_FRAMES: int = 6
+        self._CAMERA_HEALTH_GRACE_AFTER_OPEN_S: float = 2.0
+        self._camera_health_grace_until_s: float = 0.0
+        self._camera_open_in_progress: bool = False
         self._camera_recovery_attempts: int = 0
-        self._MAX_CAMERA_RECOVERY_ATTEMPTS: int = 2
+        self._MAX_CAMERA_RECOVERY_ATTEMPTS: int = 3
         self._camera_recovery_in_progress: bool = False
         self._startup_retry_count: int = -1  # tracks auto-open retries
         # Wire thread-safe camera open result signals
@@ -2951,6 +3079,7 @@ class SentryV2TabWidget(QWidget):
         self._cam_url_error.connect(self._on_url_open_error)
         self._cam_url_ready.connect(self._on_url_ready)
         self._cam_url_status.connect(self._on_url_status_update)
+        self._log_requested.connect(self._log)
         self._cam_timer = QTimer(self)
         self._cam_timer.timeout.connect(self._grab_frame)
 
@@ -2958,6 +3087,12 @@ class SentryV2TabWidget(QWidget):
         self._burst_timer = QTimer(self)
         self._burst_timer.setSingleShot(True)
         self._burst_timer.timeout.connect(self._advance_fire_burst)
+        self._manual_projectile_fire_release_timer = QTimer(self)
+        self._manual_projectile_fire_release_timer.setSingleShot(True)
+        self._manual_projectile_fire_release_timer.timeout.connect(self._flush_manual_projectile_fire_release)
+        self._manual_projectile_fire_latched: bool = False
+        self._manual_projectile_fire_release_pan: float = 0.0
+        self._manual_projectile_fire_release_tilt: float = 0.0
         self._manual_sweep_timer = QTimer(self)
         self._manual_sweep_timer.setSingleShot(True)
         self._manual_sweep_timer.timeout.connect(self._advance_manual_sweep)
@@ -2987,6 +3122,7 @@ class SentryV2TabWidget(QWidget):
         self._last_tracking_move_time_ms: int = 0
         self._last_tracking_suppression_s: float = 0.0
         self._last_reacquire_note_seen: str = ""
+        self._last_pir_note_seen: str = ""
         self._last_blocked_mask_seen: str = ""
         self._last_mask_trace_snapshot: str = ""
         self._last_scope_view_active: bool = False
@@ -3015,6 +3151,7 @@ class SentryV2TabWidget(QWidget):
         self._last_announced_identity_at: Dict[str, float] = {}
         self._last_gesture_identity_at: Dict[str, float] = {}
         self._shortcut_bindings: List[QShortcut] = []
+        self._manual_keyboard_fire_active: bool = False
         self._pir_last_event_sensor: Optional[int] = None
         self._pir_last_event_time_s: float = 0.0
         self._pir_event_count: int = 0
@@ -3085,6 +3222,9 @@ class SentryV2TabWidget(QWidget):
         self.assistant_models_ready.connect(self._on_ai_assistant_models_ready)
         self._yolo_loading: bool = False
         self._yolo_runtime_prepared: bool = False
+        self._yolo_runtime_diag_dumped: bool = False
+        self._runtime_lib_paths_prepared: bool = False
+        self._runtime_dll_dir_handles: list[object] = []
         self._startup_autoconnect_active: bool = False
         self._startup_autoconnect_retry: int = 0
         self._pending_quiet_save: bool = False
@@ -3137,10 +3277,11 @@ class SentryV2TabWidget(QWidget):
         self._schedule_startup_tasks()
 
     def _load_settings_config(self) -> SentryV2Config:
-        """Load settings from the canonical 2.3.2 path and migrate older aliases forward."""
-        canonical = SMART_SENTRY_V2_3_2_SETTINGS_PATH
+        """Load settings from the active release path and migrate older aliases forward."""
+        canonical = CANONICAL_SETTINGS_PATH
         selected = canonical
         for candidate in [
+            CANONICAL_SETTINGS_PATH,
             SMART_SENTRY_V2_3_2_SETTINGS_PATH,
             SMART_SENTRY_V2_3_1_SETTINGS_PATH,
             LEGACY_SMART_SENTRY_V3_SETTINGS_PATH,
@@ -3151,12 +3292,12 @@ class SentryV2TabWidget(QWidget):
                 break
 
         cfg = SentryV2Config.load(str(selected))
-        cfg.config_path = "app/config/smart_sentry_v2_3_2_settings.json"
-        prompted_value = str(cfg.prompted_library_path or "app/config/smart_sentry_v2_3_2_prompted_targets.json")
+        cfg.config_path = CANONICAL_SETTINGS_RELATIVE_PATH
+        prompted_value = str(cfg.prompted_library_path or CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH)
         normalized_prompted = prompted_value.replace("\\", "/")
-        if normalized_prompted.endswith("smart_sentry_v3_prompted_targets.json") or normalized_prompted.endswith("sentry_v2_prompted_targets.json") or normalized_prompted.endswith("smart_sentry_v2_3_1_prompted_targets.json"):
-            cfg.prompted_library_path = "app/config/smart_sentry_v2_3_2_prompted_targets.json"
-        prompted = Path(str(cfg.prompted_library_path or "app/config/smart_sentry_v2_3_2_prompted_targets.json"))
+        if normalized_prompted.endswith("smart_sentry_v3_prompted_targets.json") or normalized_prompted.endswith("sentry_v2_prompted_targets.json") or normalized_prompted.endswith("smart_sentry_v2_3_1_prompted_targets.json") or normalized_prompted.endswith("smart_sentry_v2_3_2_prompted_targets.json"):
+            cfg.prompted_library_path = CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH
+        prompted = Path(str(cfg.prompted_library_path or CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH))
         if prompted.is_absolute():
             cfg.prompted_library_path = self._portable_path_string(prompted)
 
@@ -3164,7 +3305,7 @@ class SentryV2TabWidget(QWidget):
             try:
                 cfg.save(str(canonical))
             except Exception as exc:
-                print(f"[SENTRY_V2_TAB] Failed to migrate legacy settings to canonical 2.3.2 path: {exc}", flush=True)
+                print(f"[SENTRY_V2_TAB] Failed to migrate legacy settings to active canonical path: {exc}", flush=True)
 
         return cfg
 
@@ -3181,6 +3322,8 @@ class SentryV2TabWidget(QWidget):
             return str(path_obj)
 
     def _custom_master_preset_path(self) -> Path:
+        if CANONICAL_CUSTOM_PRESET_PATH.exists():
+            return CANONICAL_CUSTOM_PRESET_PATH
         if SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH.exists():
             return SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH
         if SMART_SENTRY_V2_3_1_CUSTOM_PRESET_PATH.exists():
@@ -3189,7 +3332,7 @@ class SentryV2TabWidget(QWidget):
             return LEGACY_SMART_SENTRY_V3_CUSTOM_PRESET_PATH
         if LEGACY_SENTRY_V2_CUSTOM_PRESET_PATH.exists():
             return LEGACY_SENTRY_V2_CUSTOM_PRESET_PATH
-        return SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH
+        return CANONICAL_CUSTOM_PRESET_PATH
 
     def _schedule_startup_tasks(self) -> None:
         """CHANGE WARNING: Startup work here couples camera bring-up, transport auto-connect, and YOLO warmup; keep expensive work deferred when quick startup is enabled."""
@@ -3658,7 +3801,35 @@ class SentryV2TabWidget(QWidget):
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
-        self._layout_splitter.addWidget(self._video_label)
+
+        # Wrap video label + quick-access chip bar in a container
+        _video_container = QWidget()
+        _video_container_lay = QVBoxLayout(_video_container)
+        _video_container_lay.setContentsMargins(0, 0, 0, 0)
+        _video_container_lay.setSpacing(0)
+        _video_container_lay.addWidget(self._video_label, 1)
+
+        # Quick-access chip bar
+        _qa_chip_bar = QWidget()
+        _qa_chip_bar.setObjectName("sentryV2QAChipBar")
+        _qa_chip_bar_lay = QHBoxLayout(_qa_chip_bar)
+        _qa_chip_bar_lay.setContentsMargins(4, 2, 4, 2)
+        _qa_chip_bar_lay.setSpacing(8)
+
+        self._chk_auto_lighting_qa = QCheckBox("Auto Lighting")
+        self._chk_auto_lighting_qa.setChecked(bool(getattr(self.config.lighting, "auto_lighting_enabled", False)))
+        self._chk_auto_lighting_qa.toggled.connect(self._on_auto_lighting_toggled)
+        self._set_theme_role(self._chk_auto_lighting_qa, "compactValue")
+        _qa_chip_bar_lay.addWidget(self._chk_auto_lighting_qa)
+
+        self._lbl_auto_luma_qa = QLabel("")
+        self._set_theme_role(self._lbl_auto_luma_qa, "mutedCompact")
+        _qa_chip_bar_lay.addWidget(self._lbl_auto_luma_qa)
+        _qa_chip_bar_lay.addStretch(1)
+
+        _video_container_lay.addWidget(_qa_chip_bar, 0)
+
+        self._layout_splitter.addWidget(_video_container)
 
         self._bottom_info_splitter = QSplitter(Qt.Horizontal)
         self._bottom_info_splitter.setChildrenCollapsible(False)
@@ -4301,7 +4472,11 @@ QWidget#sentryV2Root QAbstractItemView {{
     selection-background-color: {tokens['accent_mid']};
 }}
 QWidget#sentryV2Root QCheckBox {{
+    color: {tokens['text']};
     spacing: {checkbox_spacing}px;
+}}
+QWidget#sentryV2Root QCheckBox:disabled {{
+    color: {tokens['disabled_text']};
 }}
 QWidget#sentryV2Root QCheckBox::indicator {{
     width: {checkbox_indicator}px;
@@ -4357,7 +4532,7 @@ QLabel#sentryV2Video {{
     background-color: {tokens['video_bg_rgba']};
     color: {tokens['video_text']};
     border: 1px solid {tokens['border']};
-    border-radius: {radius_large}px;
+    border-radius: 0px;
 }}
 QTextEdit#sentryV2Log {{
     background-color: {tokens['panel_rgba']};
@@ -4839,6 +5014,18 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             return
 
         columns = self._responsive_button_grid_columns(grid, len(buttons))
+        for column in range(3):
+            grid.setColumnStretch(column, 0)
+
+        if columns == 1:
+            grid.setColumnStretch(0, 1)
+            grid.setColumnStretch(1, 2)
+            grid.setColumnStretch(2, 1)
+            for index, button in enumerate(buttons):
+                button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+                grid.addWidget(button, index, 1)
+            return
+
         for index, button in enumerate(buttons):
             button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             grid.addWidget(button, index // columns, index % columns)
@@ -5579,7 +5766,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
         self._lbl_servo_time_preset = QLabel("")
         self._lbl_servo_time_preset.setWordWrap(True)
-        self._lbl_servo_time_preset.setStyleSheet(SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE)
+        self._set_theme_role(self._lbl_servo_time_preset, "mutedCompact")
         srv_lay.addWidget(self._lbl_servo_time_preset, 4, 0, 1, 2)
         self._set_servo_time_preset_label(self._match_servo_time_preset_name())
 
@@ -5643,7 +5830,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         lay.addWidget(self._lbl_conn_status)
 
         self._lbl_last_cmd = QLabel("")
-        self._lbl_last_cmd.setStyleSheet(SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE)
+        self._lbl_last_cmd.setStyleSheet(self._compact_status_style("neutral"))
         self._lbl_last_cmd.setWordWrap(True)
         lay.addWidget(self._lbl_last_cmd)
 
@@ -5679,7 +5866,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         # Description label
         self._lbl_mode_desc = QLabel("")
         self._lbl_mode_desc.setWordWrap(True)
-        self._lbl_mode_desc.setStyleSheet(SENTRY_V3_SUBTLE_TEXT_STYLE)
+        self._set_theme_role(self._lbl_mode_desc, "subtleBody")
         mode_lay.addWidget(self._lbl_mode_desc)
         self._update_mode_description()
 
@@ -5705,7 +5892,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
         self._lbl_detection_preset = QLabel("")
         self._lbl_detection_preset.setWordWrap(True)
-        self._lbl_detection_preset.setStyleSheet(SENTRY_V3_MUTED_TEXT_STYLE)
+        self._set_theme_role(self._lbl_detection_preset, "mutedCompact")
         preset_lay.addWidget(self._lbl_detection_preset)
 
         lay.addWidget(preset_grp)
@@ -5735,7 +5922,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         contour_lay.addWidget(self._spin_max_contour, 1, 1)
 
         self._lbl_contour_ratio = QLabel()
-        self._lbl_contour_ratio.setStyleSheet(SENTRY_V3_MUTED_TEXT_STYLE)
+        self._set_theme_role(self._lbl_contour_ratio, "mutedCompact")
         contour_lay.addWidget(self._lbl_contour_ratio, 2, 0, 1, 2)
 
         lay.addWidget(self._grp_contour)
@@ -5798,7 +5985,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         yolo_lay.addWidget(self._spin_yolo_min_area, 4, 1, 1, 3)
 
         self._lbl_yolo_status = QLabel("No model loaded")
-        self._lbl_yolo_status.setStyleSheet(SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE)
+        self._lbl_yolo_status.setStyleSheet(self._compact_status_style("neutral", bold=True))
         yolo_lay.addWidget(self._lbl_yolo_status, 5, 0, 1, 4)
         self._set_yolo_status("info", "Model not loaded yet")
 
@@ -5837,7 +6024,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         color_lay.addWidget(self._spin_color_max, 2, 1)
 
         self._lbl_color_ratio = QLabel()
-        self._lbl_color_ratio.setStyleSheet(SENTRY_V3_MUTED_TEXT_STYLE)
+        self._set_theme_role(self._lbl_color_ratio, "mutedCompact")
         color_lay.addWidget(self._lbl_color_ratio, 5, 0, 1, 2)
 
         color_lay.addWidget(QLabel("Fusion Strategy:"), 3, 0)
@@ -7675,6 +7862,18 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._chk_shortcuts_enabled.toggled.connect(self._on_shortcuts_enabled_changed)
         global_lay.addWidget(self._chk_shortcuts_enabled)
 
+        self._chk_manual_keyboard_enabled = QCheckBox("Enable manual keyboard movement and fire keys (W/A/S/D + Space)")
+        self._chk_manual_keyboard_enabled.setChecked(bool(getattr(self.config.shortcuts, "manual_controls_enabled", False)))
+        self._chk_manual_keyboard_enabled.toggled.connect(self._on_manual_shortcuts_enabled_changed)
+        global_lay.addWidget(self._chk_manual_keyboard_enabled)
+
+        manual_note = QLabel(
+            "Disabled by default so focused-window key presses cannot accidentally move the turret or fire while safety is armed."
+        )
+        manual_note.setWordWrap(True)
+        self._set_theme_role(manual_note, "mutedCompact")
+        global_lay.addWidget(manual_note)
+
         self._lbl_shortcut_summary = QLabel("")
         self._lbl_shortcut_summary.setWordWrap(True)
         self._set_theme_role(self._lbl_shortcut_summary, "mutedCompact")
@@ -8326,6 +8525,71 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
         lay.addWidget(acc_grp)
 
+        # --- Auto Lighting Control ---
+        lighting_grp = QGroupBox("Auto Lighting Control")
+        lighting_lay = QVBoxLayout(lighting_grp)
+
+        lighting_note = QLabel(
+            "When enabled the LED intensity is adjusted automatically based on scene brightness. "
+            "The LED button must be ON for auto-lighting to drive the output."
+        )
+        lighting_note.setWordWrap(True)
+        self._set_theme_role(lighting_note, "subtle")
+        lighting_lay.addWidget(lighting_note)
+
+        self._chk_auto_lighting = QCheckBox("Auto Lighting: OFF")
+        self._chk_auto_lighting.setChecked(bool(getattr(self.config.lighting, "auto_lighting_enabled", False)))
+        self._chk_auto_lighting.toggled.connect(self._on_auto_lighting_toggled)
+        lighting_lay.addWidget(self._chk_auto_lighting)
+
+        pwm_row = QHBoxLayout()
+        pwm_row.addWidget(QLabel("Manual LED PWM:"))
+        self._slider_led_pwm = QSlider(Qt.Horizontal)
+        self._slider_led_pwm.setRange(0, 255)
+        self._slider_led_pwm.setSingleStep(5)
+        self._slider_led_pwm.setPageStep(20)
+        self._slider_led_pwm.setValue(int(max(0, min(255, getattr(self.config.lighting, "led_pwm_value", 255)))))
+        self._slider_led_pwm.valueChanged.connect(self._on_led_pwm_slider_changed)
+        pwm_row.addWidget(self._slider_led_pwm, 1)
+        self._lbl_led_pwm = QLabel("255")
+        self._lbl_led_pwm.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._set_theme_role(self._lbl_led_pwm, "compactValue")
+        pwm_row.addWidget(self._lbl_led_pwm)
+        lighting_lay.addLayout(pwm_row)
+
+        thresh_row = QHBoxLayout()
+        thresh_row.addWidget(QLabel("Dark threshold (0-255):"))
+        self._spin_auto_brightness_threshold = QSpinBox()
+        self._spin_auto_brightness_threshold.setRange(0, 255)
+        self._spin_auto_brightness_threshold.setValue(int(max(0, min(255, getattr(self.config.lighting, "auto_brightness_threshold", 80)))))
+        self._spin_auto_brightness_threshold.valueChanged.connect(self._on_auto_brightness_threshold_changed)
+        thresh_row.addWidget(self._spin_auto_brightness_threshold)
+        thresh_row.addStretch(1)
+        lighting_lay.addLayout(thresh_row)
+
+        pwm_range_row = QHBoxLayout()
+        pwm_range_row.addWidget(QLabel("Auto PWM range:"))
+        self._spin_auto_pwm_min = QSpinBox()
+        self._spin_auto_pwm_min.setRange(0, 255)
+        self._spin_auto_pwm_min.setValue(int(max(0, min(255, getattr(self.config.lighting, "auto_pwm_min", 60)))))
+        self._spin_auto_pwm_min.setPrefix("min: ")
+        self._spin_auto_pwm_min.valueChanged.connect(lambda _: self._on_auto_pwm_range_changed())
+        pwm_range_row.addWidget(self._spin_auto_pwm_min)
+        self._spin_auto_pwm_max = QSpinBox()
+        self._spin_auto_pwm_max.setRange(0, 255)
+        self._spin_auto_pwm_max.setValue(int(max(0, min(255, getattr(self.config.lighting, "auto_pwm_max", 255)))))
+        self._spin_auto_pwm_max.setPrefix("max: ")
+        self._spin_auto_pwm_max.valueChanged.connect(lambda _: self._on_auto_pwm_range_changed())
+        pwm_range_row.addWidget(self._spin_auto_pwm_max)
+        pwm_range_row.addStretch(1)
+        lighting_lay.addLayout(pwm_range_row)
+
+        self._lbl_auto_luma = QLabel("Scene luma: --  PWM: --")
+        self._set_theme_role(self._lbl_auto_luma, "mutedCompact")
+        lighting_lay.addWidget(self._lbl_auto_luma)
+
+        lay.addWidget(lighting_grp)
+
         source_grp = QGroupBox("Source And Interlocks")
         source_lay = QVBoxLayout(source_grp)
 
@@ -8672,7 +8936,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         return grp
 
     def _build_log_group(self) -> QGroupBox:
-        grp = QGroupBox("Serial Output")
+        grp = QGroupBox("Serial / Transport Output")
         grp.setMinimumHeight(120)
         grp.setMaximumHeight(16777215)
         grp.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
@@ -8911,6 +9175,13 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             prompted_objects = self._prompted_matcher.detect(frame, engine_objects, now)
         det_objects = self._tracker.assign_tracks(engine_objects + prompted_objects, now)
 
+        # Auto-lighting: sample scene brightness every N frames
+        self._auto_lighting_frame_counter += 1
+        interval = max(1, int(getattr(self.config.lighting, "auto_sample_interval_frames", 8)))
+        if self._auto_lighting_frame_counter >= interval:
+            self._auto_lighting_frame_counter = 0
+            self._update_auto_lighting(frame)
+
         # Run engine
         self._sync_engine_pose_from_feedback()
         self.engine.update(det_objects, now)
@@ -9040,14 +9311,32 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             pass
         return frame
 
+    def _is_usable_camera_probe_frame(self, frame: Optional[np.ndarray]) -> bool:
+        if frame is None:
+            return False
+        if self._is_probable_camera_blackout(frame):
+            return False
+        if self._is_probable_partial_frame(frame):
+            return False
+        return True
+
     def _handle_camera_frame_health(self, frame: np.ndarray) -> bool:
         if self._local_source_kind != "camera":
             self._camera_black_frame_count = 0
             self._camera_partial_frame_count = 0
             return False
 
+        now_t = time.time()
+        grace_until = float(getattr(self, "_camera_health_grace_until_s", 0.0) or 0.0)
+        if now_t < grace_until:
+            self._camera_black_frame_count = 0
+            self._camera_partial_frame_count = 0
+            return False
+
         # --- Full blackout check ---
-        if self._is_probable_camera_blackout(frame):
+        is_blackout = self._is_probable_camera_blackout(frame)
+        is_partial = self._is_probable_partial_frame(frame)
+        if is_blackout:
             self._camera_black_frame_count += 1
             if self._camera_black_frame_count >= self._MAX_CAMERA_BLACK_FRAMES:
                 self._camera_black_frame_count = 0
@@ -9074,11 +9363,9 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                     "Camera is returning partial frames (content only in upper-left)."
                 ):
                     return True
-                self._log("Partial-frame condition persisted — auto-closing source")
+                self._log("Camera partial-frame condition persisted — auto-closing source")
                 self._close_camera()
                 return True
-            # Don't discard the frame — let _queue_local_frame crop it so the
-            # user still sees something useful while recovery is pending.
             return False
         else:
             self._camera_partial_frame_count = 0
@@ -9197,12 +9484,42 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._start_fire_burst(pan, tilt, burst_count, interval)
         self._log(f"FIRE! Burst: {burst_count}")
 
+    def _engine_pir_motion_active(self) -> bool:
+        engine = getattr(self, "engine", None)
+        if engine is None:
+            return False
+        return bool(getattr(engine, "_pir_cue_mode", False))
+
+    def _describe_engine_auto_move(self, pan: float, tilt: float) -> Optional[str]:
+        engine = getattr(self, "engine", None)
+        if engine is None:
+            return None
+
+        sensor_id = int(getattr(engine, "_pir_cue_sensor_id", -1) or -1)
+        if bool(getattr(engine, "_pir_cue_mode", False)):
+            sensor_text = f" S{sensor_id + 1}" if sensor_id >= 0 else ""
+            if bool(getattr(engine, "_pir_scan_mode", False)):
+                manager = getattr(engine, "_pir_manager", None)
+                step_index = int(getattr(manager, "_scan_index", 0) or 0) if manager is not None else 0
+                total_steps = len(getattr(manager, "_scan_points", []) or []) if manager is not None else 0
+                step_text = f" {max(1, step_index)}/{max(1, total_steps)}" if total_steps else ""
+                return f"PIR search move{sensor_text}{step_text}"
+            return f"PIR cue move{sensor_text}"
+
+        loss_phase = str(getattr(engine, "_loss_recovery_phase", "") or "").strip()
+        if loss_phase:
+            return f"Recovery move {loss_phase.replace('_', ' ')}"
+        return None
+
     def _on_engine_move(self, pan: float, tilt: float) -> None:
         if time.time() < float(getattr(self, "_manual_move_priority_until", 0.0) or 0.0):
             return
+        move_note = self._describe_engine_auto_move(pan, tilt)
         move_delta = self._get_command_delta(pan, tilt)
         move_time_ms = self._get_tracking_move_time_ms(move_delta)
         if self._should_defer_auto_move(move_time_ms, move_delta):
+            if move_note and move_note.lower().startswith("pir "):
+                self._log(f"{move_note} pending (waiting for previous move to settle)")
             self._resync_engine_pose_after_deferred_move()
             return
         self._last_tracking_move_time_ms = int(move_time_ms)
@@ -9216,6 +9533,8 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._last_tracking_suppression_s = float(suppression_s)
         if suppression_s > 0.0:
             self._suppress_motion_detection(suppression_s)
+        if move_note:
+            self._log(f"{move_note} -> pan {float(pan):.1f} tilt {float(tilt):.1f}")
 
     def _on_engine_state_change(self, old: SentryV2State, new: SentryV2State) -> None:
         self._lbl_state.setText(f"State: {new.name}")
@@ -9302,16 +9621,47 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             if not self._closing:
                 self._report_runtime_warning("PIR signal emit failed", exc)
 
+    def _emit_comm_transport_log(self, message: str) -> None:
+        text = str(message or "").strip()
+        if not text:
+            return
+        try:
+            self._log_requested.emit(text)
+        except Exception as exc:
+            if not self._closing:
+                self._report_runtime_warning("Comm log emit failed", exc)
+
     def _on_comm_pir_event_received(self, sensor_id: int, timestamp: float) -> None:
         self._pir_last_event_sensor = int(sensor_id)
         self._pir_last_event_time_s = float(timestamp)
         self._pir_event_count += 1
+        engine_state = self.engine.state if self.engine is not None else None
+        pir_runtime_active = bool(
+            self.engine is not None
+            and engine_state != SentryV2State.PAUSED
+            and bool(getattr(self.config.pir_guard, "pir_enabled", False))
+        )
         self.engine.on_pir_sensor_fired(int(sensor_id), float(timestamp))
-        self._sound_engine.note_pir_event(sensor_id)
+        if pir_runtime_active:
+            self._sound_engine.note_pir_event(sensor_id)
         if hasattr(self, "_lbl_pir_status"):
             self._update_pir_status_display()
+        sensor_label = f"S{int(sensor_id) + 1}"
+        if not pir_runtime_active:
+            if engine_state == SentryV2State.PAUSED:
+                self._log(f"PIR event ignored: {sensor_label} (sentry paused)")
+            elif not bool(getattr(self.config.pir_guard, "pir_enabled", False)):
+                self._log(f"PIR event ignored: {sensor_label} (PIR guard disabled)")
+            else:
+                state_name = engine_state.name if engine_state is not None else "?"
+                self._log(f"PIR event queued without hunt: {sensor_label} (engine={state_name})")
+            return
         state_name = self.engine.state.name if self.engine else "?"
-        self._log(f"PIR event: sensor {int(sensor_id)} (engine={state_name})")
+        self._log(f"PIR event: {sensor_label} (engine={state_name})")
+        pir_note = str(getattr(self.engine, "_last_pir_note", "") or "") if self.engine is not None else ""
+        if pir_note and pir_note != self._last_pir_note_seen:
+            self._last_pir_note_seen = pir_note
+            self._log(pir_note)
 
     def _set_label_content(self, label: QLabel, text: str, style: Optional[str] = None) -> None:
         if label.text() != text:
@@ -9320,6 +9670,12 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             label.setStyleSheet(style)
 
     def eventFilter(self, obj, event):
+        if event is not None and event.type() in (QEvent.KeyPress, QEvent.KeyRelease, QEvent.ApplicationDeactivate, QEvent.WindowDeactivate):
+            try:
+                if self._handle_manual_keyboard_shortcut_event(obj, event):
+                    return True
+            except Exception:
+                pass
         if event is not None and event.type() == QEvent.Wheel:
             try:
                 if bool(event.modifiers() & Qt.ShiftModifier) and self._event_targets_this_widget(obj):
@@ -9338,6 +9694,68 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             if widget is self:
                 return True
             widget = widget.parentWidget()
+        return False
+
+    def _manual_keyboard_shortcuts_enabled(self) -> bool:
+        return bool(self.config.shortcuts.enabled) and bool(getattr(self.config.shortcuts, "manual_controls_enabled", False))
+
+    def _manual_keyboard_focus_is_editing(self) -> bool:
+        widget = QApplication.focusWidget()
+        while widget is not None:
+            if widget is self:
+                return False
+            if isinstance(widget, (QLineEdit, QTextEdit, QSpinBox, QDoubleSpinBox, QComboBox)):
+                return True
+            widget = widget.parentWidget()
+        return False
+
+    def _release_manual_keyboard_fire(self) -> bool:
+        if not bool(getattr(self, "_manual_keyboard_fire_active", False)):
+            return False
+        self._manual_keyboard_fire_active = False
+        self._on_manual_fire(0)
+        return True
+
+    def _handle_manual_keyboard_shortcut_event(self, obj: object, event: QEvent) -> bool:
+        if event is None:
+            return False
+        event_type = event.type()
+        if event_type in (QEvent.ApplicationDeactivate, QEvent.WindowDeactivate):
+            return self._release_manual_keyboard_fire()
+        if event_type not in (QEvent.KeyPress, QEvent.KeyRelease):
+            return False
+        if not self._event_targets_this_widget(obj):
+            return False
+        if not self._manual_keyboard_shortcuts_enabled():
+            return False
+        if self._manual_keyboard_focus_is_editing():
+            return False
+        if int(event.modifiers()) != int(Qt.NoModifier):
+            return False
+        key = int(event.key())
+        if key not in (Qt.Key_W, Qt.Key_A, Qt.Key_S, Qt.Key_D, Qt.Key_Space):
+            return False
+        if bool(event.isAutoRepeat()):
+            event.accept()
+            return True
+        if event_type == QEvent.KeyPress:
+            if key == Qt.Key_W:
+                self._manual_move(0, 1)
+            elif key == Qt.Key_A:
+                self._manual_move(-1, 0)
+            elif key == Qt.Key_S:
+                self._manual_move(0, -1)
+            elif key == Qt.Key_D:
+                self._manual_move(1, 0)
+            elif key == Qt.Key_Space and not self._manual_keyboard_fire_active:
+                self._manual_keyboard_fire_active = True
+                self._on_manual_fire(1)
+            event.accept()
+            return True
+        if key == Qt.Key_Space:
+            released = self._release_manual_keyboard_fire()
+            event.accept()
+            return released or True
         return False
 
     def _adjust_panel_zoom(self, direction: int) -> None:
@@ -9525,6 +9943,22 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             return SMART_SENTRY_V2_WIFI_SSID, SMART_SENTRY_V2_WIFI_PASSWORD
         return SMART_SENTRY_V2_WIFI_SSID, SMART_SENTRY_V2_WIFI_PASSWORD
 
+    def _wifi_credentials_candidates_for_mode(self, mode: int) -> list[tuple[str, str]]:
+        mode_index = int(mode)
+        if mode_index == SentryV2Comm.MODE_WIFI_FULL:
+            # Some deployed Waveshare bridges still advertise the v2.3 SSID.
+            # Accept both to avoid autojoin churn/disconnect loops.
+            return [
+                (SMART_SENTRY_V3_WIFI_SSID, SMART_SENTRY_V3_WIFI_PASSWORD),
+                (SMART_SENTRY_V2_WIFI_SSID, SMART_SENTRY_V2_WIFI_PASSWORD),
+            ]
+        if mode_index in {
+            SentryV2Comm.MODE_WIFI_DEBUG_USB,
+            SentryV2Comm.MODE_DUAL_ESP32_WIFI,
+        }:
+            return [(SMART_SENTRY_V2_WIFI_SSID, SMART_SENTRY_V2_WIFI_PASSWORD)]
+        return [(SMART_SENTRY_V2_WIFI_SSID, SMART_SENTRY_V2_WIFI_PASSWORD)]
+
     def _pin_assignment_button_text(self, mode_index: int) -> str:
         if mode_index == SentryV2Comm.MODE_WIFI_FULL:
             return "Waveshare Pin Assignments"
@@ -9536,104 +9970,14 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
     def _show_full_wifi_pinout(self) -> None:
         mode_index = self._combo_conn_type.currentIndex() if hasattr(self, "_combo_conn_type") else SentryV2Comm.MODE_ESP32_USB
-        title = "Pin Assignments"
-        if mode_index == SentryV2Comm.MODE_WIFI_FULL:
-            title = "Waveshare Pin Assignments"
-            text = (
-                "<div style='font-size:13px; line-height:1.35;'>"
-                "<div style='font-weight:700; color:#0f1720; margin-bottom:8px;'>Waveshare Servo Driver HAT single-board bridge</div>"
-                "<div style='margin-bottom:8px; color:#1e2936;'>"
-                f"PC to bridge: WiFi/UDP on {SMART_SENTRY_V3_WIFI_SSID}<br>"
-                "Pan/Tilt bus servos: local bus UART on GPIO18/GPIO19 at 1000000 baud<br>"
-                "Use the Waveshare 40-pin header numbers exactly as shown here"
-                "</div>"
-                "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>Header-backed outputs</div>"
-                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 7 / GPIO4</td><td style='padding:3px 8px; color:#1e2936;'>Buzzer output</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 13 / GPIO27</td><td style='padding:3px 8px; color:#1e2936;'>Trigger MOSFET</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 22 / GPIO25</td><td style='padding:3px 8px; color:#1e2936;'>Accessory relay</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 37 / GPIO26</td><td style='padding:3px 8px; color:#1e2936;'>Spare relay</td></tr>"
-                "</table>"
-                "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>Reserved and unassigned paths</div>"
-                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 29 / GPIO5</td><td style='padding:3px 8px; color:#1e2936;'>Speaker reserved only</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>LED relay</td><td style='padding:3px 8px; color:#1e2936;'>Unassigned on current Waveshare map</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Laser relay</td><td style='padding:3px 8px; color:#1e2936;'>Unassigned on current Waveshare map</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Trigger-servo PWM</td><td style='padding:3px 8px; color:#1e2936;'>Unassigned on current Waveshare map</td></tr>"
-                "</table>"
-                "<div style='font-weight:700; color:#0f1720; margin:8px 0 4px 0;'>Reserved transport pins</div>"
-                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO18 / GPIO19</td><td style='padding:3px 8px; color:#1e2936;'>Yahboom bus-servo UART RX/TX</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 10 / GPIO15</td><td style='padding:3px 8px; color:#1e2936;'>FlySky FS-iA6 i-Bus RX</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Header 8 / GPIO14</td><td style='padding:3px 8px; color:#1e2936;'>Reserved RC TX / telemetry path</td></tr>"
-                "</table>"
-                "<div style='color:#334155; margin-top:8px;'>"
-                "This is the current flashed Smart Sentry Waveshare map with only confirmed bridge-owned outputs exposed as assigned."
-                "</div>"
-                "</div>"
-            )
-        elif mode_index == SentryV2Comm.MODE_DUAL_ESP32_WIFI:
-            title = "Dual ESP32 WiFi Pin Assignments"
-            text = (
-                "<div style='font-size:13px; line-height:1.35;'>"
-                "<div style='font-weight:700; color:#0f1720; margin-bottom:8px;'>Dual ESP32 WiFi topology</div>"
-                "<div style='margin-bottom:8px; color:#1e2936;'>"
-                "Primary ESP32 handles IO and accessories over WiFi.<br>"
-                "Secondary ESP32 handles Yahboom bus-servo motion over its own WiFi bridge."
-                "</div>"
-                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Primary GPIO27</td><td style='padding:3px 8px; color:#1e2936;'>Trigger MOSFET</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Primary GPIO25</td><td style='padding:3px 8px; color:#1e2936;'>Accessory relay</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Primary GPIO26</td><td style='padding:3px 8px; color:#1e2936;'>Spare relay</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Secondary servo bridge</td><td style='padding:3px 8px; color:#1e2936;'>Pan/Tilt Yahboom motion path</td></tr>"
-                "</table>"
-                "<div style='color:#334155; margin-top:8px;'>"
-                "Use the Waveshare pin map only when you are running the single-board v3 bridge mode."
-                "</div>"
-                "</div>"
-            )
-        elif mode_index == SentryV2Comm.MODE_WIFI_DEBUG_USB:
-            title = "WiFi IO Pin Assignments"
-            text = (
-                "<div style='font-size:13px; line-height:1.35;'>"
-                "<div style='font-weight:700; color:#0f1720; margin-bottom:8px;'>ESP32 WiFi IO with Debug Board USB motion</div>"
-                "<div style='margin-bottom:8px; color:#1e2936;'>"
-                "PC to ESP32: WiFi/UDP for trigger, PIR, and accessories<br>"
-                "Debug Board to PC: USB serial for pan/tilt bus-servo motion"
-                "</div>"
-                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO27</td><td style='padding:3px 8px; color:#1e2936;'>Trigger MOSFET</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO13</td><td style='padding:3px 8px; color:#1e2936;'>Trigger Servo</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO25</td><td style='padding:3px 8px; color:#1e2936;'>Accessory relay</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO26</td><td style='padding:3px 8px; color:#1e2936;'>Spare relay</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>GPIO35 / GPIO34 / GPIO39</td><td style='padding:3px 8px; color:#1e2936;'>PIR sensor inputs</td></tr>"
-                "</table>"
-                "</div>"
-            )
-        else:
-            title = "Connection Pin Notes"
-            text = (
-                "<div style='font-size:13px; line-height:1.35;'>"
-                "<div style='font-weight:700; color:#0f1720; margin-bottom:8px;'>Current connection mode</div>"
-                "<div style='margin-bottom:8px; color:#1e2936;'>"
-                "This mode is USB-centered, so the key assignments live on the selected COM ports rather than on a WiFi bridge header map."
-                "</div>"
-                "<table style='border-collapse:collapse; width:100%; margin-bottom:8px;'>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>ESP32 USB</td><td style='padding:3px 8px; color:#1e2936;'>Primary ASCII IO link when using direct USB</td></tr>"
-                "<tr><td style='padding:3px 8px; font-weight:700; color:#0f1720;'>Debug Board USB</td><td style='padding:3px 8px; color:#1e2936;'>Pan/Tilt bus-servo motion path in dual-USB layouts</td></tr>"
-                "</table>"
-                "<div style='color:#334155; margin-top:8px;'>"
-                "Switch to the Waveshare single-board WiFi mode if you want the full header-level v3 pin assignment view."
-                "</div>"
-                "</div>"
-            )
         msg = QMessageBox(self)
+        tokens = self._theme_tokens()
+        title, text = _build_pin_assignment_dialog_content(mode_index, tokens)
         msg.setWindowTitle(title)
         msg.setIcon(QMessageBox.Information)
         msg.setTextFormat(Qt.RichText)
         msg.setText(text)
         msg.setStandardButtons(QMessageBox.Ok)
-        tokens = self._theme_tokens()
         dialog_radius = max(6, int(tokens["radius"]) - 6)
         msg.setStyleSheet(
             f"QMessageBox {{ background-color: {tokens['panel_rgba']}; color: {tokens['text']}; }}"
@@ -10340,11 +10684,6 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
     def _queue_local_frame(self, frame: np.ndarray) -> None:
         if self._local_source_kind in {"test_video", "test_image"}:
             self._test_media_last_frame = frame.copy()
-        # If the webcam driver is delivering partial frames (content in upper-
-        # left only), crop to the actual content so detection and display use
-        # the correct resolution while camera recovery is pending.
-        if self._camera_partial_frame_count > 0:
-            frame = self._crop_to_content(frame)
         effective_frame = self._apply_source_zoom(frame)
         now = time.time()
         if self._should_show_live_preview_fallback(now):
@@ -10397,6 +10736,10 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         *,
         request_frame_size: bool,
     ) -> None:
+        if isinstance(src, int) and source_kind == "camera" and self._camera_open_in_progress:
+            self._log(f"[CAM-DEBUG] Ignoring duplicate camera open request for {src} while another open is in progress")
+            return
+
         self._close_camera(log_close=False)
         self._video_label.set_placeholder_enabled(False)
         self._video_label.clear_frame("Opening camera...")
@@ -10406,6 +10749,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         if isinstance(src, int):
             # Open integer-index cameras in a background thread so DSHOW/MSMF
             # driver init doesn't freeze the Qt event loop.
+            self._camera_open_in_progress = True
             self._set_camera_status("Opening camera…", "neutral")
             self._log(f"[CAM-DEBUG] Starting background open for index {src} ({requested_w}x{requested_h})")
 
@@ -10415,39 +10759,47 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             ) -> None:
                 selected_backend = None
                 backends = (
-                    (cv2.CAP_DSHOW, "DSHOW"),
                     (cv2.CAP_MSMF, "MSMF"),
                     (None, "DEFAULT"),
+                    (cv2.CAP_DSHOW, "DSHOW"),
                 ) if os.name == "nt" else ((None, "DEFAULT"),)
                 for backend, bname in backends:
                     try:
                         c = cv2.VideoCapture(_src) if backend is None else cv2.VideoCapture(_src, backend)
                         time.sleep(0.5)  # let driver settle
                         if not c.isOpened():
-                            print(f"[CAM-BG] index={_src} backend={bname} not opened", flush=True)
                             c.release()
                             continue
                         # Verify at least one readable frame — MSMF can report
                         # isOpened=True but then immediately fail on grabFrame
                         ok, _frame = c.read()
                         usable_frame = self._detach_capture_frame(_frame) if ok else None
-                        print(
-                            f"[CAM-BG] index={_src} backend={bname} opened=True read_ok={ok} usable_frame={usable_frame is not None}",
-                            flush=True,
-                        )
+                        # Reject frames that are valid buffers but still
+                        # degraded during startup. Give the camera a few extra
+                        # reads before declaring this backend unusable.
+                        if usable_frame is not None and not self._is_usable_camera_probe_frame(usable_frame):
+                            got_real = False
+                            for _warmup in range(8):
+                                time.sleep(0.15)
+                                ok2, _fr2 = c.read()
+                                uf2 = self._detach_capture_frame(_fr2) if ok2 else None
+                                if self._is_usable_camera_probe_frame(uf2):
+                                    usable_frame = uf2
+                                    got_real = True
+                                    break
+                            if not got_real:
+                                usable_frame = None  # treat as unusable
                         if usable_frame is not None:
                             selected_backend = (_src, backend, bname)
                             c.release()
                             break
                         c.release()
                     except Exception as _e:
-                        print(f"[CAM-BG] index={_src} backend={bname} exception: {_e}", flush=True)
+                        pass
                 # Emit thread-safe signal back to main thread
                 if selected_backend is not None:
-                    print(f"[CAM-BG] SUCCESS index={_src}, emitting probe result", flush=True)
                     self._cam_bg_opened.emit(selected_backend, _src_text, _sk, _rw, _rh, _rfs)
                 else:
-                    print(f"[CAM-BG] FAILED index={_src}, emitting failed signal", flush=True)
                     self._cam_bg_failed.emit(_src_text)
 
             threading.Thread(target=_open_bg, daemon=True, name="cam-open-bg").start()
@@ -10485,10 +10837,12 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         request_frame_size: bool,
     ) -> None:
         if self._closing:
+            self._camera_open_in_progress = False
             return
         try:
             src, backend, backend_name = probe_result
         except Exception:
+            self._camera_open_in_progress = False
             self._on_camera_open_failed(source_text)
             return
 
@@ -10496,6 +10850,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         try:
             cap = cv2.VideoCapture(src) if backend is None else cv2.VideoCapture(src, backend)
         except Exception as exc:
+            self._camera_open_in_progress = False
             self._log(f"Camera open failed on UI thread ({backend_name}): {exc}")
             self._on_camera_open_failed(source_text)
             return
@@ -10505,6 +10860,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                     cap.release()
                 except Exception:
                     pass
+            self._camera_open_in_progress = False
             self._log(f"Camera open failed on UI thread with backend {backend_name}: {source_text}")
             self._on_camera_open_failed(source_text)
             return
@@ -10533,6 +10889,16 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
         actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        # Discard a few warm-up frames — some USB webcams (especially on
+        # Windows DSHOW) deliver black frames right after open while the
+        # sensor initialises.  Reading them here keeps the grab timer from
+        # immediately counting blackout frames.
+        if source_kind == "camera":
+            for _warmup in range(5):
+                try:
+                    _ok, _wf = cap.read()
+                except Exception:
+                    break
         self._cap = cap
         self._local_source_kind = source_kind
         self._local_source_label = source_text
@@ -10540,8 +10906,13 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._test_media_last_frame = None
         self._test_media_paused = False
         self._grab_fail_count = 0
-        self._camera_recovery_attempts = 0
+        self._camera_open_in_progress = False
+        # Only reset recovery attempts when NOT in a recovery cycle —
+        # otherwise the counter never advances and recovery loops forever.
+        if not self._camera_recovery_in_progress:
+            self._camera_recovery_attempts = 0
         self._camera_recovery_in_progress = False
+        self._camera_health_grace_until_s = time.time() + float(self._CAMERA_HEALTH_GRACE_AFTER_OPEN_S)
         self._cam_timer.start(50)
         self._btn_cam.setText("Close Source")
 
@@ -10739,7 +11110,9 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
     def _on_camera_open_failed(self, source_text: str) -> None:
         """Called on Qt main thread when the background camera open failed."""
         if self._closing:
+            self._camera_open_in_progress = False
             return
+        self._camera_open_in_progress = False
         retry = getattr(self, "_startup_retry_count", -1)
         self._log(f"Camera open failed: {source_text} (attempt {retry+1})")
         self._btn_cam.setText("Open Source")
@@ -10809,7 +11182,8 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                 self._set_camera_status(f"Camera recovery failed: {exc}", "error")
                 self._log(f"Camera recovery failed ({attempt}/{self._MAX_CAMERA_RECOVERY_ATTEMPTS}): {exc}")
 
-        QTimer.singleShot(250, _reopen)
+        # Give the camera driver enough time to fully release before reopening
+        QTimer.singleShot(1500, _reopen)
         return True
 
     def _sync_source_dimensions(self, width: int, height: int) -> None:
@@ -10826,6 +11200,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._grab_fail_count = 0
         self._camera_black_frame_count = 0
         self._camera_partial_frame_count = 0
+        self._camera_health_grace_until_s = 0.0
         self._last_display_frame = None
         # Signal URL reader thread to stop; it will release the cap itself.
         self._url_stream_stop.set()
@@ -11264,22 +11639,272 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
         threading.Thread(target=_do_load, daemon=True, name="yolo-loader").start()
 
+    def _prepare_frozen_runtime_library_paths(self) -> None:
+        if self._runtime_lib_paths_prepared or not getattr(sys, "frozen", False):
+            return
+
+        candidate_dirs: list[Path] = []
+        for candidate in [
+            RUNTIME_ROOT_PATH,
+            Path(sys.executable).parent,
+            RUNTIME_ROOT_PATH / "torch" / "lib",
+            RUNTIME_ROOT_PATH / "PyQt5" / "Qt5" / "bin",
+            RUNTIME_ROOT_PATH / "numpy.libs",
+            RUNTIME_ROOT_PATH / "scipy.libs",
+        ]:
+            try:
+                if candidate.is_dir() and candidate not in candidate_dirs:
+                    candidate_dirs.append(candidate)
+            except Exception:
+                continue
+
+        if not candidate_dirs:
+            self._runtime_lib_paths_prepared = True
+            return
+
+        path_parts = os.environ.get("PATH", "").split(os.pathsep) if os.environ.get("PATH") else []
+        normalized_path_parts = {
+            os.path.normcase(os.path.abspath(part))
+            for part in path_parts
+            if part
+        }
+        add_dll_directory = getattr(os, "add_dll_directory", None)
+        dll_dir_handles = list(getattr(self, "_runtime_dll_dir_handles", []))
+
+        for folder in candidate_dirs:
+            folder_text = os.path.abspath(str(folder))
+            normalized_folder = os.path.normcase(folder_text)
+            if normalized_folder not in normalized_path_parts:
+                path_parts.insert(0, folder_text)
+                normalized_path_parts.add(normalized_folder)
+            if add_dll_directory is not None:
+                try:
+                    dll_dir_handles.append(add_dll_directory(folder_text))
+                except Exception:
+                    pass
+
+        os.environ["PATH"] = os.pathsep.join(path_parts)
+        self._runtime_dll_dir_handles = dll_dir_handles
+        self._runtime_lib_paths_prepared = True
+
     def _prepare_yolo_runtime(self) -> str:
         if self._yolo_runtime_prepared:
             return ""
         try:
+            self._emit_yolo_runtime_diagnostics("prepare-start")
             os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
             os.environ.setdefault("OMP_NUM_THREADS", "1")
             os.environ.setdefault("MKL_NUM_THREADS", "1")
             os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
             os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
+            self._prepare_frozen_runtime_library_paths()
+            self._sanitize_frozen_import_search_path()
+            self._prune_pyinstaller_path_hooks_for_yolo()
+            self._install_frozen_ultralytics_git_stub()
+            self._prime_frozen_ultralytics_import_cache()
             import torch  # noqa: F401
             from ultralytics import YOLO as _YOLO  # noqa: F401
             self._yolo_runtime_prepared = True
+            self._emit_yolo_runtime_diagnostics("prepare-ok")
             return ""
         except Exception as exc:
             self._yolo_runtime_prepared = False
-            return str(exc)
+            self._emit_yolo_runtime_diagnostics(
+                "prepare-failed",
+                error_text=f"{type(exc).__name__}: {exc}",
+                trace_text=traceback.format_exc(),
+            )
+            return f"{type(exc).__name__}: {exc}"
+
+    def _yolo_runtime_diag_log_path(self) -> Path:
+        candidates = [
+            RUNTIME_ROOT_PATH / "logs" / "yolo_runtime_diag.log",
+            Path(os.environ.get("TEMP", os.environ.get("TMP", os.path.expanduser("~")))) / "yolo_runtime_diag.log",
+        ]
+        for candidate in candidates:
+            try:
+                candidate.parent.mkdir(parents=True, exist_ok=True)
+                # Quick writeability check
+                probe = candidate.parent / ".diag_probe"
+                probe.write_text("x")
+                probe.unlink(missing_ok=True)
+                return candidate
+            except Exception:
+                continue
+        return candidates[-1]
+
+    def _emit_yolo_runtime_diagnostics(self, stage: str, error_text: str = "", trace_text: str = "") -> None:
+        # Keep startup noise low: emit once unless we are recording a failure.
+        if self._yolo_runtime_diag_dumped and stage != "prepare-failed":
+            return
+        should_mark_dumped = stage in {"prepare-start", "prepare-ok", "prepare-failed"}
+        if should_mark_dumped:
+            self._yolo_runtime_diag_dumped = True
+
+        payload: dict = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "stage": str(stage or "").strip(),
+            "frozen": bool(getattr(sys, "frozen", False)),
+            "sys_executable": str(sys.executable),
+            "cwd": str(Path.cwd()),
+            "runtime_root": str(RUNTIME_ROOT_PATH),
+            "app_root": str(APP_ROOT_PATH),
+            "error": str(error_text or "").strip(),
+            "path_head": [
+                part
+                for part in (os.environ.get("PATH", "").split(os.pathsep) if os.environ.get("PATH") else [])
+                if str(part or "").strip()
+            ][:16],
+            "sys_path_head": [
+                str(part)
+                for part in list(sys.path)[:20]
+            ],
+        }
+        if trace_text:
+            payload["traceback"] = trace_text
+
+        folder_checks = {}
+        for candidate in [
+            RUNTIME_ROOT_PATH,
+            RUNTIME_ROOT_PATH / "torch" / "lib",
+            RUNTIME_ROOT_PATH / "PyQt5" / "Qt5" / "bin",
+            RUNTIME_ROOT_PATH / "numpy.libs",
+            RUNTIME_ROOT_PATH / "scipy.libs",
+        ]:
+            key = str(candidate)
+            try:
+                folder_checks[key] = bool(candidate.is_dir())
+            except Exception:
+                folder_checks[key] = False
+        payload["folder_checks"] = folder_checks
+
+        module_locations = {}
+        for module_name in ["torch", "ultralytics", "cv2"]:
+            try:
+                spec = importlib.util.find_spec(module_name)
+                module_locations[module_name] = str(getattr(spec, "origin", "")) if spec else ""
+            except Exception as exc:
+                module_locations[module_name] = f"spec-error: {exc}"
+        payload["module_locations"] = module_locations
+
+        diag_path = self._yolo_runtime_diag_log_path()
+        try:
+            diag_path.parent.mkdir(parents=True, exist_ok=True)
+            with diag_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, ensure_ascii=True))
+                handle.write("\n")
+            self._log(f"YOLO runtime diagnostic captured: {self._portable_path_string(diag_path)}")
+        except Exception:
+            pass
+
+    def _prime_frozen_ultralytics_import_cache(self) -> None:
+        if not getattr(sys, "frozen", False):
+            return
+        try:
+            import importlib.machinery as _machinery
+        except Exception:
+            return
+
+        loader_details = (
+            (_machinery.SourceFileLoader, _machinery.SOURCE_SUFFIXES),
+            (_machinery.SourcelessFileLoader, _machinery.BYTECODE_SUFFIXES),
+            (_machinery.ExtensionFileLoader, _machinery.EXTENSION_SUFFIXES),
+        )
+
+        candidate_dirs: list[Path] = []
+        ultralytics_root = RUNTIME_ROOT_PATH / "ultralytics"
+        if ultralytics_root.is_dir():
+            candidate_dirs.append(ultralytics_root)
+            utils_dir = ultralytics_root / "utils"
+            if utils_dir.is_dir():
+                candidate_dirs.append(utils_dir)
+
+        for directory in candidate_dirs:
+            key = str(directory)
+            if key in sys.path_importer_cache:
+                continue
+            try:
+                finder = _machinery.FileFinder(key, *loader_details)
+                sys.path_importer_cache[key] = finder
+            except Exception:
+                continue
+
+    def _sanitize_frozen_import_search_path(self) -> None:
+        if not getattr(sys, "frozen", False):
+            return
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for entry in list(sys.path):
+            text = str(entry or "").strip()
+            if not text:
+                continue
+            try:
+                normalized = os.path.normcase(os.path.abspath(text))
+            except Exception:
+                continue
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            cleaned.append(text)
+        if cleaned:
+            sys.path[:] = cleaned
+
+    def _prune_pyinstaller_path_hooks_for_yolo(self) -> None:
+        if not getattr(sys, "frozen", False):
+            return
+        try:
+            original_hooks = list(getattr(sys, "path_hooks", []))
+            filtered_hooks = [
+                hook
+                for hook in original_hooks
+                if "pyimod02_importers" not in str(getattr(hook, "__module__", ""))
+            ]
+            if len(filtered_hooks) == len(original_hooks):
+                return
+            sys.path_hooks[:] = filtered_hooks
+            for key in list(sys.path_importer_cache.keys()):
+                key_text = str(key or "")
+                if "ultralytics" in key_text.lower():
+                    sys.path_importer_cache.pop(key, None)
+            importlib.invalidate_caches()
+        except Exception:
+            return
+
+    def _install_frozen_ultralytics_git_stub(self) -> None:
+        if not getattr(sys, "frozen", False):
+            return
+        if "ultralytics.utils.git" in sys.modules:
+            return
+        try:
+            import types
+
+            stub = types.ModuleType("ultralytics.utils.git")
+
+            class _GitRepo:
+                def __init__(self, *args, **kwargs):
+                    self.root = None
+                    self.gitdir = None
+
+                @property
+                def is_repo(self) -> bool:
+                    return False
+
+                @property
+                def branch(self):
+                    return None
+
+                @property
+                def commit(self):
+                    return None
+
+                @property
+                def origin(self):
+                    return None
+
+            stub.GitRepo = _GitRepo
+            sys.modules["ultralytics.utils.git"] = stub
+        except Exception:
+            return
 
     def _on_yolo_load_result(self, ok: bool, model_name: str, err: str) -> None:
         """Called on Qt main thread when the background YOLO load completes."""
@@ -11326,14 +11951,14 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             return
         level_key = (level or "info").lower().strip()
         style_map = {
-            "ok": ("#33cc33", "OK"),
-            "pending": ("#d0b060", "WAIT"),
-            "error": ("#cc3333", "ERR"),
-            "info": ("#8ea4b8", "INFO"),
+            "ok": ("ok", "OK"),
+            "pending": ("warn", "WAIT"),
+            "error": ("error", "ERR"),
+            "info": ("info", "INFO"),
         }
-        color, badge = style_map.get(level_key, style_map["info"])
+        style_level, badge = style_map.get(level_key, style_map["info"])
         self._lbl_yolo_status.setText(f"[{badge}] {message}")
-        self._lbl_yolo_status.setStyleSheet(f"color: {color}; font-size: 10px; font-weight: 600;")
+        self._lbl_yolo_status.setStyleSheet(self._compact_status_style(style_level, bold=True))
         self._lbl_yolo_status.setToolTip(message)
 
     def _repo_root_path(self) -> Path:
@@ -12660,7 +13285,16 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._led_on = checked
         self._btn_led.setText(f"LED: {'ON' if checked else 'OFF'}")
         if not self._host_controls_hardware():
-            self._queue_comm_task("set_led", checked, self.engine.current_pan, self.engine.current_tilt)
+            if checked:
+                auto_enabled = bool(getattr(self.config.lighting, "auto_lighting_enabled", False))
+                if auto_enabled:
+                    # Auto-lighting drives PWM; let next brightness sample set it
+                    self._queue_comm_task("set_led_pwm", self._auto_led_pwm or 1, self.engine.current_pan, self.engine.current_tilt)
+                else:
+                    pwm = int(max(0, min(255, getattr(self.config.lighting, "led_pwm_value", 255))))
+                    self._queue_comm_task("set_led_pwm", pwm, self.engine.current_pan, self.engine.current_tilt)
+            else:
+                self._queue_comm_task("set_led_pwm", 0, self.engine.current_pan, self.engine.current_tilt)
 
     def _on_laser_toggled(self, checked: bool) -> None:
         self._laser_on = checked
@@ -12700,9 +13334,10 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._queue_comm_task("set_safety", checked, self.engine.current_pan, self.engine.current_tilt)
 
     def _on_manual_fire(self, state: int) -> None:
+        host_controls_hardware = self._host_controls_hardware()
         if state and not self._safety_armed:
             self._log("Manual fire blocked: Safety is LOCKED")
-            if not self._host_controls_hardware():
+            if not host_controls_hardware:
                 self._queue_comm_task("send_command",
                     self.engine.current_pan,
                     self.engine.current_tilt,
@@ -12712,7 +13347,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             return
         pan = self.engine.current_pan
         tilt = self.engine.current_tilt
-        if state and not self._host_controls_hardware():
+        if state and not host_controls_hardware:
             if not self._comm.trigger_mode_bb:
                 self._log("Manual fire note: trigger mode is Water (MOSFET), not Projectile (ESP32 GPIO13 Servo)")
             if (
@@ -12723,10 +13358,37 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                 )
             ):
                 self._log("Manual fire unavailable: mode 2 routes trigger IO to ESP32 WiFi/GPIO13, and the WiFi link is not connected")
-        if self._host_controls_hardware():
+        if host_controls_hardware:
             self.manual_fire_requested.emit(int(state))
-        else:
-            self._queue_comm_task("send_command", pan, tilt, fire=state, move_time_ms=self._get_manual_move_time_ms())
+            return
+        if self._comm.trigger_mode_bb:
+            if not state:
+                return
+            self._queue_comm_task("send_command", pan, tilt, fire=1, move_time_ms=self._get_manual_move_time_ms())
+            self._arm_manual_projectile_fire_release(pan, tilt)
+            return
+        self._queue_comm_task("send_command", pan, tilt, fire=state, move_time_ms=self._get_manual_move_time_ms())
+
+    def _arm_manual_projectile_fire_release(self, pan: float, tilt: float) -> None:
+        self._manual_projectile_fire_release_pan = float(pan)
+        self._manual_projectile_fire_release_tilt = float(tilt)
+        self._manual_projectile_fire_latched = True
+        self._manual_projectile_fire_release_timer.stop()
+        self._manual_projectile_fire_release_timer.start(MANUAL_TRIGGER_SERVO_LATCH_MS)
+
+    def _flush_manual_projectile_fire_release(self) -> None:
+        if not bool(getattr(self, "_manual_projectile_fire_latched", False)):
+            return
+        self._manual_projectile_fire_latched = False
+        if self._closing or self._host_controls_hardware():
+            return
+        self._queue_comm_task(
+            "send_command",
+            float(getattr(self, "_manual_projectile_fire_release_pan", self.engine.current_pan)),
+            float(getattr(self, "_manual_projectile_fire_release_tilt", self.engine.current_tilt)),
+            fire=0,
+            move_time_ms=self._get_manual_move_time_ms(),
+        )
 
     # ------------------------------------------------------------------ #
     #  Guard position buttons
@@ -12807,8 +13469,8 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self.config.prompted_library_path = self._portable_path_string(self._resolved_prompted_library_path())
             self.config.face_recognition.library_path = self._portable_path_string(self._resolved_face_library_path())
             self.config.shortcuts.quick_view_doc_path = self._portable_path_string(SMART_SENTRY_SHORTCUT_KEYS_DOC_PATH)
-            self.config.config_path = "app/config/smart_sentry_v2_3_2_settings.json"
-            self.config.save(str(SMART_SENTRY_V2_3_2_SETTINGS_PATH))
+            self.config.config_path = CANONICAL_SETTINGS_RELATIVE_PATH
+            self.config.save(str(CANONICAL_SETTINGS_PATH))
             self._sync_legacy_settings_copy()
             self._save_prompted_target_library()
             self._save_face_identity_library()
@@ -12828,8 +13490,8 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._capture_layout_state()
             self.config.face_recognition.library_path = self._portable_path_string(self._resolved_face_library_path())
             self.config.shortcuts.quick_view_doc_path = self._portable_path_string(SMART_SENTRY_SHORTCUT_KEYS_DOC_PATH)
-            self.config.config_path = "app/config/smart_sentry_v2_3_2_settings.json"
-            self.config.save(str(SMART_SENTRY_V2_3_2_SETTINGS_PATH))
+            self.config.config_path = CANONICAL_SETTINGS_RELATIVE_PATH
+            self.config.save(str(CANONICAL_SETTINGS_PATH))
             self._sync_legacy_settings_copy()
         except Exception as exc:
             self._log(f"Save error: {exc}")
@@ -12849,12 +13511,44 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         except Exception:
             return ""
         output = f"{result.stdout}\n{result.stderr}"
+        preferred_ssid = ""
+        fallback_ssid = ""
+        in_connected_block = False
         for raw_line in output.splitlines():
             line = raw_line.strip()
             lower_line = line.lower()
-            if lower_line.startswith("ssid") and "bssid" not in lower_line and ":" in line:
-                return line.split(":", 1)[1].strip()
+            if not line or ":" not in line:
+                continue
+            key, value = line.split(":", 1)
+            key = key.strip().lower()
+            value = value.strip()
+            if key == "state":
+                in_connected_block = "connected" in value.lower()
+                continue
+            if key == "ssid" and value:
+                if in_connected_block:
+                    preferred_ssid = value
+                    break
+                fallback_ssid = value
+                continue
+        if preferred_ssid:
+            return preferred_ssid
+        if fallback_ssid:
+            return fallback_ssid
         return ""
+
+    def _normalize_ssid(self, ssid: str) -> str:
+        return str(ssid or "").strip().casefold()
+
+    def _ssid_matches_expected(self, candidate_ssid: str, expected_ssids: Iterable[str]) -> bool:
+        normalized_candidate = self._normalize_ssid(candidate_ssid)
+        if not normalized_candidate:
+            return False
+        return normalized_candidate in {
+            self._normalize_ssid(expected)
+            for expected in expected_ssids
+            if str(expected or "").strip()
+        }
 
     def _windows_wifi_network_available(self, ssid: str) -> bool:
         if os.name != "nt" or not ssid:
@@ -12870,7 +13564,15 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             )
         except Exception:
             return False
-        return ssid.lower() in f"{result.stdout}\n{result.stderr}".lower()
+        normalized_target = self._normalize_ssid(ssid)
+        for raw_line in f"{result.stdout}\n{result.stderr}".splitlines():
+            line = str(raw_line or "").strip()
+            if not line.startswith("SSID ") or ":" not in line:
+                continue
+            _key, value = line.split(":", 1)
+            if self._normalize_ssid(value) == normalized_target:
+                return True
+        return False
 
     def _windows_wifi_profile_exists(self, ssid: str) -> bool:
         if os.name != "nt" or not ssid:
@@ -12886,7 +13588,17 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             )
         except Exception:
             return False
-        return ssid.lower() in f"{result.stdout}\n{result.stderr}".lower()
+        normalized_target = self._normalize_ssid(ssid)
+        for raw_line in f"{result.stdout}\n{result.stderr}".splitlines():
+            line = str(raw_line or "").strip()
+            if ":" not in line:
+                continue
+            key, value = line.split(":", 1)
+            if "all user profile" not in key.strip().lower():
+                continue
+            if self._normalize_ssid(value) == normalized_target:
+                return True
+        return False
 
     def _windows_wifi_profile_text(self, ssid: str, *, include_key: bool = False) -> str:
         if os.name != "nt" or not ssid:
@@ -12949,7 +13661,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         if not profile_text:
             return False
         auth_ok = "wpa2" in profile_text and "wpa3" not in profile_text
-        auto_ok = "connection mode    : connect automatically" in profile_text
+        auto_ok = "connect automatically" in profile_text
         key_ok = f"key content            : {password.lower()}" in profile_text
         return auth_ok and auto_ok and key_ok
 
@@ -13017,7 +13729,13 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         now = time.time()
         if now - self._last_wifi_autojoin_attempt_s < 8.0:
             return
-        ssid, password = self._wifi_credentials_for_mode(mode)
+        credential_candidates = self._wifi_credentials_candidates_for_mode(mode)
+        ssid, password = credential_candidates[0]
+        acceptable_ssids = {candidate_ssid for candidate_ssid, _candidate_password in credential_candidates}
+        acceptable_ssids_normalized = {
+            self._normalize_ssid(candidate_ssid)
+            for candidate_ssid in acceptable_ssids
+        }
         self._last_wifi_autojoin_attempt_s = now
         self._wifi_autojoin_inflight = True
 
@@ -13026,15 +13744,24 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             ok = False
             try:
                 current_ssid = self._windows_wifi_current_ssid()
-                if current_ssid == ssid:
+                if self._normalize_ssid(current_ssid) in acceptable_ssids_normalized:
                     ok = True
-                    message = f"Windows WiFi already on {ssid}"
-                elif not self._windows_wifi_network_available(ssid):
-                    message = f"ESP32 WiFi SSID {ssid} not visible yet"
+                    message = f"Windows WiFi already on {current_ssid}"
                 else:
-                    if not self._ensure_windows_wifi_profile(ssid, password):
-                        message = f"Failed to prepare Windows WiFi profile for {ssid}"
+                    selected_credentials: tuple[str, str] | None = None
+                    for candidate_ssid, candidate_password in credential_candidates:
+                        if self._windows_wifi_network_available(candidate_ssid):
+                            selected_credentials = (candidate_ssid, candidate_password)
+                            break
+                    if selected_credentials is None:
+                        visible_list = ", ".join(sorted(acceptable_ssids))
+                        message = f"ESP32 WiFi SSID not visible yet ({visible_list})"
                     else:
+                        ssid, password = selected_credentials
+                        if not self._ensure_windows_wifi_profile(ssid, password):
+                            message = f"Failed to prepare Windows WiFi profile for {ssid}"
+                            self.wifi_autojoin_result.emit(False, message)
+                            return
                         interface_name = self._windows_wifi_primary_interface_name()
                         connect_cmd = ["netsh", "wlan", "connect", f"name={ssid}", f"ssid={ssid}"]
                         if interface_name:
@@ -13048,7 +13775,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                             **_windows_hidden_subprocess_kwargs(),
                         )
                         time.sleep(2.5)
-                        ok = self._windows_wifi_current_ssid() == ssid
+                        ok = self._ssid_matches_expected(self._windows_wifi_current_ssid(), [ssid])
                         if ok:
                             message = f"Windows WiFi connected to {ssid}"
                         else:
@@ -13077,11 +13804,24 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         mode = int(getattr(self.config.connection, "connection_type", 0) or 0)
         if mode not in (2, 3, 4):
             return
-        self._start_windows_wifi_autojoin()
         now = time.time()
         current_ssid = self._windows_wifi_current_ssid() if os.name == "nt" else ""
-        expected_ssid, _expected_password = self._wifi_credentials_for_mode(mode)
-        on_esp32_wifi = current_ssid == expected_ssid
+        expected_credentials = self._wifi_credentials_candidates_for_mode(mode)
+        expected_ssids = {ssid for ssid, _password in expected_credentials}
+        expected_ssids_normalized = {
+            self._normalize_ssid(ssid)
+            for ssid in expected_ssids
+        }
+        on_esp32_wifi = self._normalize_ssid(current_ssid) in expected_ssids_normalized
+
+        mode2_transport_alive = (
+            mode == 2
+            and self._comm.is_connected()
+            and bool(getattr(self._comm, "_bus_ser", None) is not None)
+        )
+
+        if not on_esp32_wifi and not mode2_transport_alive:
+            self._start_windows_wifi_autojoin()
 
         if mode == 3 and not self._comm.is_connected():
             if not on_esp32_wifi:
@@ -13287,7 +14027,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                 "voice_status": self._assistant_voice_route_status()[0],
             },
             "external_file_references": {
-                "settings_json": _path_entry(SMART_SENTRY_V2_3_2_SETTINGS_PATH),
+                "settings_json": _path_entry(CANONICAL_SETTINGS_PATH),
                 "legacy_settings_json": _path_entry(LEGACY_SMART_SENTRY_V3_SETTINGS_PATH if LEGACY_SMART_SENTRY_V3_SETTINGS_PATH.exists() else LEGACY_SENTRY_V2_SETTINGS_PATH),
                 "custom_master_presets": _path_entry(self._custom_master_preset_path()),
                 "prompted_target_library": _path_entry(self._resolved_prompted_library_path()),
@@ -13514,20 +14254,24 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._log(f"Open serial log folder failed: {exc}")
 
     def _resolved_prompted_library_path(self) -> Path:
-        configured = Path(str(self.config.prompted_library_path or "app/config/smart_sentry_v2_3_2_prompted_targets.json"))
-        if configured == Path("app/config/smart_sentry_v2_3_2_prompted_targets.json"):
-            if SMART_SENTRY_V2_3_2_PROMPTED_TARGETS_PATH.exists():
-                return SMART_SENTRY_V2_3_2_PROMPTED_TARGETS_PATH.resolve()
-        if configured == Path("app/config/smart_sentry_v3_prompted_targets.json"):
-            if SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH.exists():
-                return SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH.resolve()
-            if LEGACY_SMART_SENTRY_V3_PROMPTED_TARGETS_PATH.exists():
-                return LEGACY_SMART_SENTRY_V3_PROMPTED_TARGETS_PATH.resolve()
-        if configured == Path("app/config/sentry_v2_prompted_targets.json"):
-            if SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH.exists():
-                return SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH.resolve()
-            if LEGACY_SENTRY_V2_PROMPTED_TARGETS_PATH.exists():
-                return LEGACY_SENTRY_V2_PROMPTED_TARGETS_PATH.resolve()
+        configured = Path(str(self.config.prompted_library_path or CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH))
+        known_relative_prompted_paths = {
+            Path(CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH),
+            Path("app/config/smart_sentry_v2_3_2_prompted_targets.json"),
+            Path("app/config/smart_sentry_v2_3_1_prompted_targets.json"),
+            Path("app/config/smart_sentry_v3_prompted_targets.json"),
+            Path("app/config/sentry_v2_prompted_targets.json"),
+        }
+        if configured in known_relative_prompted_paths:
+            for candidate in [
+                CANONICAL_PROMPTED_TARGETS_PATH,
+                SMART_SENTRY_V2_3_2_PROMPTED_TARGETS_PATH,
+                SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH,
+                LEGACY_SMART_SENTRY_V3_PROMPTED_TARGETS_PATH,
+                LEGACY_SENTRY_V2_PROMPTED_TARGETS_PATH,
+            ]:
+                if candidate.exists():
+                    return candidate.resolve()
         if configured.is_absolute():
             return configured
         return (self._repo_root_path() / configured).resolve()
@@ -13542,9 +14286,12 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._log(f"Prompted target save failed: {exc}")
 
     def _resolved_face_library_path(self) -> Path:
-        configured = Path(str(self.config.face_recognition.library_path or "app/config/smart_sentry_v2_3_2_faces.json"))
-        if configured == Path("app/config/smart_sentry_v2_3_2_faces.json") and SMART_SENTRY_V2_3_2_FACE_LIBRARY_PATH.exists():
-            return SMART_SENTRY_V2_3_2_FACE_LIBRARY_PATH.resolve()
+        configured = Path(str(self.config.face_recognition.library_path or CANONICAL_FACE_LIBRARY_RELATIVE_PATH))
+        if configured in {Path(CANONICAL_FACE_LIBRARY_RELATIVE_PATH), Path("app/config/smart_sentry_v2_3_2_faces.json")}:
+            if CANONICAL_FACE_LIBRARY_PATH.exists():
+                return CANONICAL_FACE_LIBRARY_PATH.resolve()
+            if SMART_SENTRY_V2_3_2_FACE_LIBRARY_PATH.exists():
+                return SMART_SENTRY_V2_3_2_FACE_LIBRARY_PATH.resolve()
         if configured.is_absolute():
             return configured
         return (self._repo_root_path() / configured).resolve()
@@ -13908,8 +14655,18 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.48, (0, 0, 0), 2, cv2.LINE_AA)
             cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.48, color, 1, cv2.LINE_AA)
 
-    def _shortcut_definitions(self) -> List[Tuple[str, str, Callable[[], None], str]]:
+    def _manual_shortcut_definitions(self) -> List[Tuple[str, str, Callable[[], None], str]]:
+        if not bool(getattr(self.config.shortcuts, "manual_controls_enabled", False)):
+            return []
         return [
+            ("Manual pan left", "Ctrl+Shift+Left", lambda: self._manual_move(-1, 0), "Nudge the turret left"),
+            ("Manual pan right", "Ctrl+Shift+Right", lambda: self._manual_move(1, 0), "Nudge the turret right"),
+            ("Manual tilt up", "Ctrl+Shift+Up", lambda: self._manual_move(0, 1), "Nudge the turret up"),
+            ("Manual tilt down", "Ctrl+Shift+Down", lambda: self._manual_move(0, -1), "Nudge the turret down"),
+        ]
+
+    def _shortcut_definitions(self) -> List[Tuple[str, str, Callable[[], None], str]]:
+        definitions = [
             ("Quick keys", "Ctrl+Alt+Q", self._open_shortcut_quick_view, "Open the shortcut reference"),
             ("Enable / disable sentry", "Ctrl+Alt+E", lambda: self._chk_enable.toggle(), "Toggle Smart Sentry runtime"),
             ("Toggle connection", "Ctrl+Alt+C", self._toggle_connection, "Connect or disconnect the controller link"),
@@ -13920,19 +14677,50 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             ("Save settings", "Ctrl+Alt+S", self._save_config, "Write current settings to disk"),
             ("Previous tab", "Ctrl+Alt+Left", self._select_previous_settings_tab, "Move to the previous settings tab"),
             ("Next tab", "Ctrl+Alt+Right", self._select_next_settings_tab, "Move to the next settings tab"),
-            ("Manual pan left", "Ctrl+Shift+Left", lambda: self._manual_move(-1, 0), "Nudge the turret left"),
-            ("Manual pan right", "Ctrl+Shift+Right", lambda: self._manual_move(1, 0), "Nudge the turret right"),
-            ("Manual tilt up", "Ctrl+Shift+Up", lambda: self._manual_move(0, -1), "Nudge the turret up"),
-            ("Manual tilt down", "Ctrl+Shift+Down", lambda: self._manual_move(0, 1), "Nudge the turret down"),
             ("Toggle safety", "Ctrl+Alt+1", lambda: self._btn_safety.toggle(), "Arm or lock safety"),
             ("Toggle LED", "Ctrl+Alt+2", lambda: self._btn_led.toggle(), "Toggle LED output"),
             ("Toggle laser", "Ctrl+Alt+3", lambda: self._btn_laser.toggle(), "Toggle laser output"),
             ("Toggle ACC", "Ctrl+Alt+4", lambda: self._btn_acc.toggle(), "Toggle ACC output"),
+            ("Toggle auto lighting", "Ctrl+Alt+L", lambda: self._chk_auto_lighting.toggle() if hasattr(self, "_chk_auto_lighting") else None, "Toggle automatic LED brightness control"),
             ("Zoom UI in", "Ctrl+Alt+Plus", lambda: self._adjust_panel_zoom(1), "Increase panel zoom"),
             ("Zoom UI out", "Ctrl+Alt+Minus", lambda: self._adjust_panel_zoom(-1), "Decrease panel zoom"),
         ]
+        definitions.extend(self._manual_shortcut_definitions())
+        return definitions
+
+    def _shortcut_display_lines(self) -> List[str]:
+        runtime_suffix = "" if bool(self.config.shortcuts.enabled) else " [shortcut runtime disabled]"
+        manual_suffix = "" if self._manual_keyboard_shortcuts_enabled() else " [manual movement/fire disabled]"
+        return [
+            f"Ctrl+Alt+Q - Quick keys{runtime_suffix}",
+            f"Ctrl+Alt+E - Enable / disable sentry{runtime_suffix}",
+            f"Ctrl+Alt+C - Toggle connection{runtime_suffix}",
+            f"Ctrl+Alt+O - Open / close camera{runtime_suffix}",
+            f"Ctrl+Alt+V - Show / hide video{runtime_suffix}",
+            f"Ctrl+Alt+W - Go home{runtime_suffix}",
+            f"Ctrl+Alt+R - Go rest{runtime_suffix}",
+            f"Ctrl+Alt+S - Save settings{runtime_suffix}",
+            f"Ctrl+Alt+Left - Previous tab{runtime_suffix}",
+            f"Ctrl+Alt+Right - Next tab{runtime_suffix}",
+            f"Ctrl+Alt+1 - Toggle safety{runtime_suffix}",
+            f"Ctrl+Alt+2 - Toggle LED{runtime_suffix}",
+            f"Ctrl+Alt+3 - Toggle laser{runtime_suffix}",
+            f"Ctrl+Alt+4 - Toggle ACC{runtime_suffix}",
+            f"Ctrl+Alt+Plus - Zoom UI in{runtime_suffix}",
+            f"Ctrl+Alt+Minus - Zoom UI out{runtime_suffix}",
+            f"Ctrl+Shift+Left - Manual pan left{manual_suffix}",
+            f"Ctrl+Shift+Right - Manual pan right{manual_suffix}",
+            f"Ctrl+Shift+Up - Manual tilt up{manual_suffix}",
+            f"Ctrl+Shift+Down - Manual tilt down{manual_suffix}",
+            f"A - Manual pan left{manual_suffix}",
+            f"D - Manual pan right{manual_suffix}",
+            f"W - Manual tilt up{manual_suffix}",
+            f"S - Manual tilt down{manual_suffix}",
+            f"Space - Manual fire{manual_suffix}",
+        ]
 
     def _clear_shortcuts(self) -> None:
+        self._release_manual_keyboard_fire()
         for shortcut in list(getattr(self, "_shortcut_bindings", [])):
             try:
                 shortcut.setEnabled(False)
@@ -13957,8 +14745,13 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._update_shortcut_labels()
 
     def _update_shortcut_labels(self) -> None:
-        lines = [f"{sequence} - {label}" for label, sequence, _handler, _description in self._shortcut_definitions()]
-        summary = f"Shortcuts: {len(lines)} active commands | status: {'enabled' if self.config.shortcuts.enabled else 'disabled'}"
+        lines = self._shortcut_display_lines()
+        base_count = 16 if bool(self.config.shortcuts.enabled) else 0
+        manual_count = 9 if self._manual_keyboard_shortcuts_enabled() else 0
+        summary = (
+            f"Shortcuts: {base_count + manual_count} active commands | runtime: {'enabled' if self.config.shortcuts.enabled else 'disabled'} | "
+            f"manual movement/fire: {'enabled' if getattr(self.config.shortcuts, 'manual_controls_enabled', False) else 'disabled'}"
+        )
         if hasattr(self, "_lbl_shortcut_summary"):
             self._lbl_shortcut_summary.setText(summary)
         if hasattr(self, "_lbl_shortcut_keys"):
@@ -13967,6 +14760,14 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
     def _on_shortcuts_enabled_changed(self) -> None:
         self.config.shortcuts.enabled = bool(self._chk_shortcuts_enabled.isChecked())
         self.config.shortcuts.quick_view_doc_path = self._portable_path_string(SMART_SENTRY_SHORTCUT_KEYS_DOC_PATH)
+        self._install_global_shortcuts()
+        self._save_config_quietly()
+
+    def _on_manual_shortcuts_enabled_changed(self) -> None:
+        self.config.shortcuts.manual_controls_enabled = bool(self._chk_manual_keyboard_enabled.isChecked())
+        self.config.shortcuts.quick_view_doc_path = self._portable_path_string(SMART_SENTRY_SHORTCUT_KEYS_DOC_PATH)
+        if not self.config.shortcuts.manual_controls_enabled:
+            self._release_manual_keyboard_fire()
         self._install_global_shortcuts()
         self._save_config_quietly()
 
@@ -15751,7 +16552,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             print(f"[SENTRY_V2_TAB] Failed to load custom master presets: {exc}")
 
     def _save_custom_master_profiles_to_disk(self) -> bool:
-        path = SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH
+        path = self._custom_master_preset_path()
         profiles_out: dict[str, dict] = {}
         for master_key, preset in self._custom_master_profiles.items():
             slug = master_key.replace("custom_master__", "", 1)
@@ -16114,6 +16915,10 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             ok = self._comm.set_led(*args, **kwargs)
             self.command_result_ready.emit("set_led", bool(ok), getattr(self._comm, "_last_error", "") or "")
             return
+        if task_name == "set_led_pwm":
+            ok = self._comm.set_led_pwm(*args, **kwargs)
+            self.command_result_ready.emit("set_led_pwm", bool(ok), getattr(self._comm, "_last_error", "") or "")
+            return
         if task_name == "set_laser":
             ok = self._comm.set_laser(*args, **kwargs)
             self.command_result_ready.emit("set_laser", bool(ok), getattr(self._comm, "_last_error", "") or "")
@@ -16169,7 +16974,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             return
         self._last_visible_command_text = text
         if hasattr(self, "_lbl_last_cmd") and self._lbl_last_cmd is not None:
-            self._set_label_content(self._lbl_last_cmd, f"Last: {text}", SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE)
+            self._set_label_content(self._lbl_last_cmd, f"Last: {text}", self._compact_status_style("neutral"))
 
     def _on_command_result_ready(self, command_name: str, ok: bool, detail: str) -> None:
         if self._closing:
@@ -16293,6 +17098,9 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
     def _should_defer_auto_move(self, move_time_ms: int, move_delta: float) -> bool:
         if self._host_controls_hardware():
+            return False
+
+        if self._engine_pir_motion_active():
             return False
 
         preview_window_s = max(self._display_frame_interval_s * 1.15, 0.08)
@@ -16700,6 +17508,43 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         if bool(getattr(self.config.sound, "enabled", True)):
             self._sound_engine.note_settings_changed()
 
+    def _update_auto_lighting(self, frame: "np.ndarray") -> None:
+        """Sample frame luminance and adjust LED PWM when auto-lighting is enabled."""
+        if not bool(getattr(self.config.lighting, "auto_lighting_enabled", False)):
+            return
+        if not self._led_on:
+            return
+        try:
+            import cv2 as _cv2
+            gray = _cv2.cvtColor(frame, _cv2.COLOR_BGR2GRAY)
+            luma = float(gray.mean())
+        except Exception:
+            return
+        self._scene_luma = luma
+        threshold = int(getattr(self.config.lighting, "auto_brightness_threshold", 80))
+        pwm_min = int(max(0, min(255, getattr(self.config.lighting, "auto_pwm_min", 60))))
+        pwm_max = int(max(0, min(255, getattr(self.config.lighting, "auto_pwm_max", 255))))
+        if luma < threshold:
+            # Dark scene: ramp PWM up toward max as scene gets darker
+            dark_ratio = max(0.0, min(1.0, 1.0 - luma / max(1.0, float(threshold))))
+            new_pwm = int(pwm_min + dark_ratio * (pwm_max - pwm_min))
+        else:
+            new_pwm = 0
+        if new_pwm != self._auto_led_pwm:
+            self._auto_led_pwm = new_pwm
+            luma_text = f"luma:{luma:.0f} pwm:{new_pwm}"
+            if hasattr(self, "_lbl_auto_luma"):
+                self._lbl_auto_luma.setText(f"Scene luma: {luma:.0f}  PWM: {new_pwm}")
+            if hasattr(self, "_lbl_auto_luma_qa"):
+                self._lbl_auto_luma_qa.setText(luma_text)
+            if not self._host_controls_hardware():
+                self._queue_comm_task(
+                    "set_led_pwm",
+                    new_pwm,
+                    self.engine.current_pan,
+                    self.engine.current_tilt,
+                )
+
     def _sound_volume_pct(self) -> int:
         return int(max(0, min(100, int(getattr(self.config.sound, "volume_pct", 100) or 100))))
 
@@ -16884,16 +17729,16 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         if hasattr(self, "_lbl_optional_outputs_status"):
             if caps_age is None and caps_source == "waiting":
                 text = "Optional outputs: waiting for bridge capability packet"
-                style = "font-weight: bold; color: #97a8b8; font-size: 10px;"
+                style = self._compact_status_style("meta", bold=True)
             elif caps_age is None:
                 text = "Optional outputs: capability-driven availability is only shown in bridge mode"
-                style = "font-weight: bold; color: #97a8b8; font-size: 10px;"
+                style = self._compact_status_style("meta", bold=True)
             else:
                 parts = []
                 parts.append("LED assigned" if led_available else "LED unassigned")
                 parts.append("Laser assigned" if laser_available else "Laser unassigned")
                 text = "Optional outputs: " + " • ".join(parts)
-                style = "font-weight: bold; color: #8fe3c4; font-size: 10px;" if (led_available or laser_available) else "font-weight: bold; color: #97a8b8; font-size: 10px;"
+                style = self._compact_status_style("ok", bold=True) if (led_available or laser_available) else self._compact_status_style("meta", bold=True)
             self._set_label_content(self._lbl_optional_outputs_status, text, style)
 
         if hasattr(self, "_grp_trigger_servo"):
@@ -16901,16 +17746,16 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         if hasattr(self, "_lbl_trigger_servo_status"):
             if caps_age is None and caps_source == "waiting":
                 text = "Trigger-servo path: waiting for bridge capability packet"
-                style = "font-weight: bold; color: #97a8b8; font-size: 10px;"
+                style = self._compact_status_style("meta", bold=True)
             elif caps_age is None:
                 text = "Trigger-servo path: capability-driven availability is only shown in bridge mode"
-                style = "font-weight: bold; color: #97a8b8; font-size: 10px;"
+                style = self._compact_status_style("meta", bold=True)
             elif trigger_servo_available:
                 text = "Trigger-servo path: assigned and configurable"
-                style = "font-weight: bold; color: #8fe3c4; font-size: 10px;"
+                style = self._compact_status_style("ok", bold=True)
             else:
                 text = "Trigger-servo path: unassigned on current Waveshare map; water or MOSFET fire path still works"
-                style = "font-weight: bold; color: #97a8b8; font-size: 10px;"
+                style = self._compact_status_style("meta", bold=True)
             self._set_label_content(self._lbl_trigger_servo_status, text, style)
 
     def _refresh_sound_toggle_text(self) -> None:
@@ -16932,6 +17777,41 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._save_config_quietly()
         if bool(getattr(self.config.sound, "enabled", True)) and self._sound_volume_pct() > 0:
             self._sound_engine.note_settings_changed()
+
+    def _on_auto_lighting_toggled(self, checked: bool) -> None:
+        self.config.lighting.auto_lighting_enabled = bool(checked)
+        if hasattr(self, "_chk_auto_lighting"):
+            self._chk_auto_lighting.setText(f"Auto Lighting: {'ON' if checked else 'OFF'}")
+        if hasattr(self, "_chk_auto_lighting_qa"):
+            self._chk_auto_lighting_qa.blockSignals(True)
+            self._chk_auto_lighting_qa.setChecked(checked)
+            self._chk_auto_lighting_qa.blockSignals(False)
+        self._save_config_quietly()
+
+    def _on_led_pwm_slider_changed(self, value: int) -> None:
+        self.config.lighting.led_pwm_value = int(max(0, min(255, value)))
+        if hasattr(self, "_lbl_led_pwm"):
+            self._lbl_led_pwm.setText(str(value))
+        # Only drive PWM directly if auto-lighting is off and LED is on
+        if not bool(getattr(self.config.lighting, "auto_lighting_enabled", False)) and self._led_on:
+            if not self._host_controls_hardware():
+                self._queue_comm_task(
+                    "set_led_pwm",
+                    int(max(0, min(255, value))),
+                    self.engine.current_pan,
+                    self.engine.current_tilt,
+                )
+        self._save_config_quietly()
+
+    def _on_auto_brightness_threshold_changed(self, value: int) -> None:
+        self.config.lighting.auto_brightness_threshold = int(max(0, min(255, value)))
+        self._save_config_quietly()
+
+    def _on_auto_pwm_range_changed(self) -> None:
+        if hasattr(self, "_spin_auto_pwm_min") and hasattr(self, "_spin_auto_pwm_max"):
+            self.config.lighting.auto_pwm_min = int(max(0, min(255, self._spin_auto_pwm_min.value())))
+            self.config.lighting.auto_pwm_max = int(max(0, min(255, self._spin_auto_pwm_max.value())))
+        self._save_config_quietly()
 
     def _on_sound_personality_changed(self, index: int) -> None:
         if not hasattr(self, "_combo_sound_personality"):
@@ -17749,10 +18629,10 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
                             channel_parts.append(f"CH6 {int(ch6)}")
                         if channel_parts:
                             detail += " • " + " / ".join(channel_parts)
-                    style = "font-weight: bold; color: #8fe3c4; font-size: 10px;" if runtime_mode == "rc" else "font-weight: bold; color: #97a8b8; font-size: 10px;"
-                    self._set_label_content(self._lbl_control_source_status, f"FlySky mode: {detail}", style)
-                else:
-                    self._set_label_content(self._lbl_control_source_status, "FlySky mode: waiting for bridge runtime", "font-weight: bold; color: #97a8b8; font-size: 10px;")
+                        style = self._compact_status_style("ok", bold=True) if runtime_mode == "rc" else self._compact_status_style("meta", bold=True)
+                        self._set_label_content(self._lbl_control_source_status, f"FlySky mode: {detail}", style)
+                    else:
+                        self._set_label_content(self._lbl_control_source_status, "FlySky mode: waiting for bridge runtime", self._compact_status_style("meta", bold=True))
             if hasattr(self, "_lbl_fire_interlock_status"):
                 io_age = io_runtime.get("age_s")
                 io_is_live = io_age is not None and float(io_age) <= 2.0
@@ -17856,9 +18736,13 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         if stats.get('reacquire_recent') and reacquire_note and reacquire_note != self._last_reacquire_note_seen:
             self._last_reacquire_note_seen = reacquire_note
             self._log(f"Tracking {reacquire_note}")
+        pir_note = str(stats.get('pir_note') or '')
+        if stats.get('pir_recent') and pir_note and pir_note != self._last_pir_note_seen:
+            self._last_pir_note_seen = pir_note
+            self._log(pir_note)
         # Update last-command diagnostic in connection tab
         if hasattr(self, "_lbl_last_cmd") and self._last_visible_command_text:
-            self._set_label_content(self._lbl_last_cmd, f"Last: {self._last_visible_command_text}", SENTRY_V3_CAM_STATUS_NEUTRAL_STYLE)
+            self._set_label_content(self._lbl_last_cmd, f"Last: {self._last_visible_command_text}", self._compact_status_style("neutral"))
         
         # Update PIR status display in Guard tab
         if hasattr(self, "_lbl_pir_status"):
@@ -17897,13 +18781,15 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
     def _classify_log_message(self, msg: str) -> str:
         text = str(msg or "").lower()
+        if "pir" in text:
+            return "pir"
         if any(token in text for token in ("fire", "safety", "mask", "blocked", "warn", "engag")):
             return "safety"
         if any(token in text for token in ("laser", "led", "acc", "spare", "control source", "app ctrl")):
             return "accessory"
         if any(token in text for token in ("camera", "video", "snapshot", "frame", "model", "yolo")):
             return "camera"
-        if any(token in text for token in ("move", "pan", "tilt", "rest", "home", "sweep", "patrol")):
+        if any(token in text for token in ("move", "pan", "tilt", "rest", "home", "sweep", "patrol", "tracking", "recovery", "search", "hunt", "servo", "feedback", "guard")):
             return "movement"
         return "system"
 
@@ -17970,6 +18856,12 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._sync_log_controls()
 
     def _log(self, msg: str) -> None:
+        if QThread.currentThread() != self.thread():
+            try:
+                self._log_requested.emit(str(msg))
+            except Exception:
+                print(f"[SENTRY_V2_TAB] {msg}", flush=True)
+            return
         ts = time.strftime("%H:%M:%S")
         category = self._classify_log_message(msg)
         self._log_entries.append((ts, category, str(msg)))

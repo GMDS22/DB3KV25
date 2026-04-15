@@ -74,6 +74,15 @@ static const int PIN_SPARE_RELAY    = 26;   // Spare relay
 static const int PIN_BUZZER         = 4;    // Passive buzzer / tone output
 static const int BUZZER_PWM_RES_BITS = 10;
 static const int PIN_SWEEP_BUTTON   = 0;    // DevKit BOOT button (active LOW)
+
+// ---- Accessory PWM via LEDC (optional MOSFET dimming) --------------------------------
+// 0 = standard ON/OFF via digitalWrite – factory default, safe for relay hardware.
+// 1 = 8-bit LEDC PWM for LED, Laser, ACC, and Spare outputs via MOSFET driver.
+// NOTE: only flip to 1 after MOSFET driver hardware is installed on every output channel.
+//       The app sends 0-255 for each channel: 0=off, 1=full-on compat, 2-255=literal duty.
+#define ACCESSORY_PWM_ENABLED  0
+#define ACCESSORY_PWM_FREQ_HZ  5000u
+#define ACCESSORY_PWM_BITS     8
 static const int PIN_RC_UART_RX     = 21;   // FlySky FS-iA6 i-Bus RX
 static const int PIN_RC_UART_TX     = -1;   // unused
 static const int PIN_RC_MODE_SWITCH = 22;   // APP/RC physical source switch (active LOW => RC)
@@ -928,10 +937,22 @@ static void update_motion_outputs(bool blocked) {
   last_bus_send_ms = now;
 }
 static void update_accessories() {
-  digitalWrite(PIN_LED_RELAY,    led_state   ? HIGH : LOW);
-  digitalWrite(PIN_LASER_RELAY,  laser_state ? HIGH : LOW);
-  digitalWrite(PIN_ACC_RELAY,    acc_state   ? HIGH : LOW);
-  digitalWrite(PIN_SPARE_RELAY,  spare_state ? HIGH : LOW);
+#if ACCESSORY_PWM_ENABLED
+  // PWM path: maps 0=off, 1=full-on compat, 2-255=literal duty cycle.
+  auto acc_pwm_duty = [](int s) -> uint8_t {
+    return (s <= 0) ? 0 : (s == 1) ? 255 : (uint8_t)s;
+  };
+  ledcWrite(PIN_LED_RELAY,   acc_pwm_duty(led_state));
+  ledcWrite(PIN_LASER_RELAY, acc_pwm_duty(laser_state));
+  ledcWrite(PIN_ACC_RELAY,   acc_pwm_duty(acc_state));
+  ledcWrite(PIN_SPARE_RELAY, acc_pwm_duty(spare_state));
+#else
+  // Standard ON/OFF relay path (default).
+  digitalWrite(PIN_LED_RELAY,   led_state   ? HIGH : LOW);
+  digitalWrite(PIN_LASER_RELAY, laser_state ? HIGH : LOW);
+  digitalWrite(PIN_ACC_RELAY,   acc_state   ? HIGH : LOW);
+  digitalWrite(PIN_SPARE_RELAY, spare_state ? HIGH : LOW);
+#endif
 }
 static void set_mosfet(bool on) { digitalWrite(PIN_TRIGGER_MOSFET, on ? HIGH : LOW); }
 static void set_trigger_servo_target(bool fire_state) {
@@ -1547,7 +1568,11 @@ static void run_self_test() {
   servo_write_deg(PIN_TRIGGER_SERVO, 40);  delay(400);
   servo_write_deg(PIN_TRIGGER_SERVO, 0);   delay(400);
   Serial.println("[TEST] 2/5 LED relay toggle");
+#if ACCESSORY_PWM_ENABLED
+  ledcWrite(PIN_LED_RELAY, 255); delay(300); ledcWrite(PIN_LED_RELAY, 0); delay(200);
+#else
   digitalWrite(PIN_LED_RELAY, HIGH); delay(300); digitalWrite(PIN_LED_RELAY, LOW); delay(200);
+#endif
   Serial.println("[TEST] 3/5 Laser relay toggle");
   digitalWrite(PIN_LASER_RELAY, HIGH); delay(300); digitalWrite(PIN_LASER_RELAY, LOW); delay(200);
   Serial.println("[TEST] 4/5 MOSFET pulse");
@@ -1607,6 +1632,13 @@ void setup() {
   pinMode(PIN_LASER_RELAY,    OUTPUT); digitalWrite(PIN_LASER_RELAY,    LOW);
   pinMode(PIN_ACC_RELAY,      OUTPUT); digitalWrite(PIN_ACC_RELAY,      LOW);
   pinMode(PIN_SPARE_RELAY,    OUTPUT); digitalWrite(PIN_SPARE_RELAY,    LOW);
+#if ACCESSORY_PWM_ENABLED
+  // Attach LEDC PWM channels for all four accessory outputs.
+  ledcAttach(PIN_LED_RELAY,   ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+  ledcAttach(PIN_LASER_RELAY, ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+  ledcAttach(PIN_ACC_RELAY,   ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+  ledcAttach(PIN_SPARE_RELAY, ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+#endif
   pinMode(PIN_BUZZER,         OUTPUT); digitalWrite(PIN_BUZZER,         LOW);
   pinMode(PIN_STATUS_LED,     OUTPUT); set_status_led(false);
   pinMode(PIN_SWEEP_BUTTON,   INPUT_PULLUP);

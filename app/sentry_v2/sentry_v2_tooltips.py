@@ -228,7 +228,7 @@ SENTRY_V2_TOOLTIPS: dict[str, str] = {
     "acc_toggle": "Toggle the accessory relay (GPIO 25). ON energizes the relay output. OFF disables it. Sends the G token in commands.",
     "spare_toggle": "Toggle the spare relay (GPIO 26). ON energizes the relay output. OFF disables it. Sends the A token in commands.",
     "safety_toggle": "Safety lock for manual firing. LOCKED prevents fire output. ARMED allows manual or automatic fire, depending on other settings.",
-    "manual_fire": "Manual fire button. Press and hold to fire while safety and trigger mode allow it. Use only when the area is safe.",
+    "manual_fire": "Manual fire button. In water mode it holds the fire path on while pressed. In projectile GPIO13 servo mode, pressing it sends a single trigger pulse while safety and trigger mode allow it. Use only when the area is safe.",
     "sound_enabled": "Master toggle for Smart Sentry procedural sound cues. ON sends short buzzer tones for settings changes, detections, tracking movement, target lock, firing, PIR events, and guard scanning. OFF silences all sound commands.",
     "sound_volume": "Always-visible sound volume control for Smart Sentry buzzer cues. Lower values reduce buzzer duty level; 0% mutes sound without turning the feature off.",
     "human_voice_enabled": "Enable local Qt text-to-speech output for Smart Sentry and the in-app assistant. When ON, Test Voice, fallback phrase checks, and conversational replies can use the selected Windows SAPI voice.",

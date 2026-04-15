@@ -1,8 +1,8 @@
 # PIR Sensor Integration - Complete Documentation Index
 
 **Project**: Smart Sentry v2 with 3x PIR Blind-Spot Detection  
-**Status**: ✅ Complete (UI + Firmware + Full Documentation)  
-**Date**: December 2024  
+**Status**: ✅ Complete, contract-audited for current v2.3.2 runtime  
+**Date**: April 2026  
 
 ---
 
@@ -14,6 +14,12 @@
    - Guard, PIR cue, target-loss reacquire, and fire protocol
    - Preset behavior rules
    - Editor-facing regression warnings
+
+2. **PIR_AT_A_GLANCE.md** (Current PIR contract audit)
+   - Current live firmware path
+   - Current desktop runtime path
+   - After-target-loss vs PIR interaction rules
+   - Source-of-truth files
 
 ### For Non-Technical Users / Operations
 1. **PIR_GUARD_QUICK_START.md** (User Guide)
@@ -68,11 +74,12 @@
 ### ESP32 Firmware
 ```
 arduino/
-├── DB3000_ESP32_IO_Telemetry_2026/               [ORIGINAL - Keep as backup]
+├── SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/            [CURRENT LIVE APP WIFI PATH]
+│   └── SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino
+├── DB3000_ESP32_IO_Telemetry_2026/               [ORIGINAL SERIAL IO BACKUP]
 │   └── DB3000_ESP32_IO_Telemetry_2026.ino
-│
-└── DB3000_ESP32_IO_Telemetry_2026_w_PIR/         [NEW - With PIR support]
-    └── DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
+└── DB3000_ESP32_IO_Telemetry_2026_w_PIR/         [CURRENT SERIAL IO + PIR PATH]
+   └── DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
 ```
 
 ### Python Source Code (Smart Sentry v2)
@@ -153,7 +160,7 @@ project_root/
 - Backward compatibility info
 - Performance impact
 
-**Reference**: DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
+**Reference**: DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino for direct serial IO, SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino for the live WiFi path
 - Well-commented code
 - Preprocessor-gated PIR section
 - Compile-time config: ENABLE_PIR_SUPPORT
@@ -175,9 +182,9 @@ project_root/
 - sentry_v2_comm.py (telemetry interface)
 - sentry_v2_tab.py (GUI controls)
 
-**Integration Needed**:
-- sentry_v2_comm.py: Parse `PIR_EVENT` from ESP32 UDP telemetry
-- Future work documented in guide
+**Integration Status**:
+- sentry_v2_comm.py already parses serial `PIR_EVENT` and live WiFi UDP `pir_event`
+- Keep transport docs aligned with the current topology instead of reopening parser work that is already done
 
 ---
 
@@ -284,7 +291,7 @@ project_root/
 - [x] Test suite passing (5/5)
 - [x] Documentation complete
 - [x] Ready for hardware validation
-- [ ] ESP32 telemetry parser (future work)
+- [x] ESP32 telemetry parser documented for serial and live WiFi paths
 - [ ] End-to-end integration testing (future work)
 
 ---
@@ -315,7 +322,8 @@ project_root/
 ### Phase 4: PC Application
 - [ ] Review Smart Sentry v2 Guard tab
 - [ ] Enable PIR master checkbox
-- [ ] Configure sensor angles (270°, 150°, 30° default)
+- [ ] Configure sensor angles for your actual mounting layout
+- [ ] Treat 45°, 135°, 225° as code defaults, not fixed hardware truth
 - [ ] Adjust scan grid settings
 - [ ] Test full behavior (slew → search → engage)
 
@@ -371,7 +379,8 @@ Checklist note:
 **Software (Firmware)**
 - ESP32_PIR_FIRMWARE_GUIDE.md - Architecture
 - FIRMWARE_COMPARISON.md - Code changes
-- DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino - Source code
+- SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino - Live WiFi app path
+- DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino - Direct serial IO path
 
 **Operations & Tuning**
 - PIR_GUARD_QUICK_START.md - Complete user guide

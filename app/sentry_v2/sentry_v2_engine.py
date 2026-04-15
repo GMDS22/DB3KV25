@@ -35,6 +35,7 @@ if __package__ in (None, ""):
     from sentry_v2.ml_training_logger import MLTrainingLogger
     from sentry_v2.sentry_v2_pir_manager import SentryV2PIRManager
     from sentry_v2.precision_tuning_logger import PrecisionTuningLogger
+    from sentry_v2.autotracking_logger import AutotrackingLogger
 else:
     from .sentry_v2_config import SentryV2Config
     from .sentry_v2_no_fire_masks import find_blocking_mask
@@ -44,6 +45,7 @@ else:
     from .ml_training_logger import MLTrainingLogger
     from .sentry_v2_pir_manager import SentryV2PIRManager
     from .precision_tuning_logger import PrecisionTuningLogger
+    from .autotracking_logger import AutotrackingLogger
 
 
 NON_SEMANTIC_REACQUIRE_CLASSES = {"moving_object", "motion", "foreground", "color", "unknown"}
@@ -78,6 +80,10 @@ class SentryV2Engine:
         # Precision Tuning Logger (tracks per-frame aiming dynamics for tuning)
         self._precision_logger = PrecisionTuningLogger()
         self._log_precision_tuning = False  # User toggles this to enable precision logging
+
+        # Autotracking Logger (tracks YOLO detection flow and engagement promotion)
+        self._autotrack_logger = AutotrackingLogger()
+        self._log_autotracking = False  # User toggles this to enable autotracking logging
 
         # Sub-systems
         self._filter = TargetFilter(config.target_filter)
@@ -122,6 +128,8 @@ class SentryV2Engine:
         self._trigger_refractory_until: float = 0.0
         self._last_reacquire_note: str = ""
         self._last_reacquire_time: float = 0.0
+        self._last_pir_note: str = ""
+        self._last_pir_time: float = 0.0
         self._last_no_fire_mask_name: str = ""
         self._loss_recovery_phase: str = ""
         self._loss_recovery_protocol: str = ""
@@ -215,6 +223,10 @@ class SentryV2Engine:
         """Check if precision logging is currently enabled."""
         return self._log_precision_tuning
 
+    def _set_pir_note(self, note: str, *, when: Optional[float] = None) -> None:
+        self._last_pir_note = str(note or "")
+        self._last_pir_time = float(time.time() if when is None else when)
+
     def export_precision_logs(self, session_id: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
         """
         Export precision logs to CSV and JSON summary files.
@@ -226,6 +238,22 @@ class SentryV2Engine:
     def print_precision_summary(self) -> None:
         """Print precision tuning summary to console."""
         self._precision_logger.print_summary()
+
+    def set_autotracking_logging_enabled(self, enabled: bool) -> None:
+        """Enable or disable autotracking and YOLO detection logging."""
+        self._log_autotracking = bool(enabled)
+
+    def is_autotracking_logging_enabled(self) -> bool:
+        """Check if autotracking logging is currently enabled."""
+        return self._log_autotracking
+
+    def export_autotracking_logs(self, session_id: Optional[str] = None) -> str:
+        """Export autotracking logs to CSV."""
+        return self._autotrack_logger.export_csv(session_id or "")
+
+    def print_autotracking_summary(self) -> None:
+        """Print autotracking summary to console."""
+        self._autotrack_logger.print_summary()
 
     # ------------------------------------------------------------------ #
     # Lifecycle
@@ -247,6 +275,7 @@ class SentryV2Engine:
         self.last_qualified = []
         self._queue_index = 0
         self.active_order = None
+        self._last_engage_time = 0.0
         self._reset_precision_state()
         self._active_target_last_center = None
         self._active_target_last_bbox = None
@@ -260,6 +289,8 @@ class SentryV2Engine:
         self._last_err_tilt_deg = 0.0
         self._last_reacquire_note = ""
         self._last_reacquire_time = 0.0
+        self._last_pir_note = ""
+        self._last_pir_time = 0.0
         self._return_start = 0.0
         self._reset_loss_recovery_state()
         self._pir_cue_mode = False
@@ -318,6 +349,10 @@ class SentryV2Engine:
         """Call once per camera frame with current detections."""
         now = timestamp or time.time()
 
+        # Increment frame counter for logging
+        if self._log_autotracking:
+            self._autotrack_logger.increment_frame()
+
         if self.state == SentryV2State.PAUSED:
             return
 
@@ -332,6 +367,33 @@ class SentryV2Engine:
         # 2. Score
         scored = self._scorer.score(qualified, now)
         self.last_targets = scored
+
+        # Log YOLO detections if autotracking logging enabled
+        if self._log_autotracking and scored:
+            for target in scored:
+                det = target.det
+                self._autotrack_logger.log_yolo_detection(
+                    target_id=target.target_id,
+                    class_name=det.class_name,
+                    confidence=det.confidence,
+                    bbox_x=det.bbox[0],
+                    bbox_y=det.bbox[1],
+                    bbox_w=det.bbox[2],
+                    bbox_h=det.bbox[3],
+                    norm_cx=det.norm_cx,
+                    norm_cy=det.norm_cy,
+                    threat_score=target.threat_score,
+                    threat_components={
+                        "proximity": target.threat_score * 0.2,  # Approximate
+                        "size": target.threat_score * 0.2,
+                        "confidence": target.threat_score * 0.2,
+                        "persistence": target.threat_score * 0.2,
+                        "speed": target.threat_score * 0.2,
+                    },
+                    meets_threshold=(target.threat_score >= self.cfg.engagement.min_threat_score),
+                    threshold_value=self.cfg.engagement.min_threat_score,
+                    notes=f"source={det.source}",
+                )
 
         # 3. State-specific logic
         if self.state == SentryV2State.GUARDING:
@@ -385,6 +447,10 @@ class SentryV2Engine:
         self._pir_scan_mode = False
         self._pir_scan_awaiting_settle = False
         self._pir_settle_start = 0.0
+        self._set_pir_note(
+            f"PIR cue S{int(cue.sensor_id) + 1} -> pan {float(cue.cue_pan):.1f} tilt {float(cue.cue_tilt):.1f}",
+            when=now,
+        )
         self._move_turret(self._pir_cue_pan, self._pir_cue_tilt)
 
     # ------------------------------------------------------------------ #
@@ -402,6 +468,17 @@ class SentryV2Engine:
             if now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown:
                 queue = self._planner.plan(targets, self.current_pan, self.current_tilt)
                 if queue:
+                    # Log engagement promotion for primary target
+                    if self._log_autotracking and queue:
+                        first_target = queue[0].target
+                        self._autotrack_logger.log_engagement_promoted(
+                            target_id=first_target.target_id,
+                            class_name=first_target.det.class_name,
+                            threat_score=first_target.threat_score,
+                            queue_position=0,
+                            notes=f"yolo_detection -> engagement, {len(queue)} in queue",
+                        )
+                    
                     self._queue = queue
                     self.last_queue = queue
                     self._queue_index = 0
@@ -431,6 +508,10 @@ class SentryV2Engine:
                 self._pir_scan_mode = False
                 self._pir_scan_awaiting_settle = False
                 self._pir_settle_start = 0.0
+                self._set_pir_note(
+                    f"PIR cue S{int(cue.sensor_id) + 1} -> pan {float(cue.cue_pan):.1f} tilt {float(cue.cue_tilt):.1f}",
+                    when=now,
+                )
                 self._move_turret(self._pir_cue_pan, self._pir_cue_tilt)
                 return
         
@@ -460,9 +541,12 @@ class SentryV2Engine:
         # Check if we found targets above threshold
         if targets:
             # Found a target — complete cue (preserve queue) and engage.
+            active_sensor_id = int(getattr(self, "_pir_cue_sensor_id", -1))
             self._pir_cue_mode = False
             self._pir_cue_sensor_id = -1
             self._pir_manager.complete_active_cue()
+            if active_sensor_id >= 0:
+                self._set_pir_note(f"PIR confirmed target S{active_sensor_id + 1} -> engage", when=now)
             # Trigger engagement
             if now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown:
                 queue = self._planner.plan(targets, self.current_pan, self.current_tilt)
@@ -489,6 +573,10 @@ class SentryV2Engine:
                 sensor_id=self._pir_cue_sensor_id,
                 search_style=getattr(self.cfg.pir_guard, "search_style", "hunting"),
             )
+            total_steps = max(1, len(getattr(self._pir_manager, "_scan_points", []) or []))
+            active_sensor_id = int(getattr(self, "_pir_cue_sensor_id", -1))
+            sensor_text = f" S{active_sensor_id + 1}" if active_sensor_id >= 0 else ""
+            self._set_pir_note(f"PIR search start{sensor_text} ({total_steps} points)", when=now)
             next_point = self._pir_manager.get_next_scan_point()
             if next_point is not None:
                 # Apply organic jitter on the very first scan move too
@@ -496,6 +584,11 @@ class SentryV2Engine:
                 scan_pan = self._clamp_pan(next_point[0] + jitter_rng.gauss(0.0, 0.40))
                 scan_tilt = self._clamp_tilt(next_point[1] + jitter_rng.gauss(0.0, 0.25))
                 self._move_turret(scan_pan, scan_tilt)
+                step_index = max(1, int(getattr(self._pir_manager, "_scan_index", 0) or 1))
+                self._set_pir_note(
+                    f"PIR search step{sensor_text} {step_index}/{total_steps} -> pan {scan_pan:.1f} tilt {scan_tilt:.1f}",
+                    when=now,
+                )
                 self._pir_scan_awaiting_settle = True
                 self._pir_settle_start = now
             else:
@@ -508,10 +601,13 @@ class SentryV2Engine:
         """Run adaptive scan grid at PIR cue location."""
         # If we found targets during scan, engage them
         if targets:
+            active_sensor_id = int(getattr(self, "_pir_cue_sensor_id", -1))
             self._pir_cue_mode = False
             self._pir_cue_sensor_id = -1
             self._pir_scan_mode = False
             self._pir_manager.complete_active_cue()
+            if active_sensor_id >= 0:
+                self._set_pir_note(f"PIR confirmed target S{active_sensor_id + 1} -> engage", when=now)
             if now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown:
                 queue = self._planner.plan(targets, self.current_pan, self.current_tilt)
                 if queue:
@@ -544,6 +640,14 @@ class SentryV2Engine:
             scan_pan = self._clamp_pan(next_point[0] + jitter_pan)
             scan_tilt = self._clamp_tilt(next_point[1] + jitter_tilt)
             self._move_turret(scan_pan, scan_tilt)
+            active_sensor_id = int(getattr(self, "_pir_cue_sensor_id", -1))
+            sensor_text = f" S{active_sensor_id + 1}" if active_sensor_id >= 0 else ""
+            step_index = max(1, int(getattr(self._pir_manager, "_scan_index", 0) or 1))
+            total_steps = max(1, len(getattr(self._pir_manager, "_scan_points", []) or []))
+            self._set_pir_note(
+                f"PIR search step{sensor_text} {step_index}/{total_steps} -> pan {scan_pan:.1f} tilt {scan_tilt:.1f}",
+                when=now,
+            )
             self._pir_scan_awaiting_settle = True
             self._pir_settle_start = now
         else:
@@ -649,6 +753,28 @@ class SentryV2Engine:
                     fired=False,
                 )
 
+            # Log autotracking correction frame
+            if self._log_autotracking and target is not None:
+                self._autotrack_logger.log_tracking_frame(
+                    target_id=target.target_id,
+                    class_name=target.det.class_name,
+                    error_pan=aim_err_pan,
+                    error_tilt=aim_err_tilt,
+                    pid_p_pan=self._last_pid_p_pan,
+                    pid_i_pan=self._last_pid_i_pan,
+                    pid_d_pan=self._last_pid_d_pan,
+                    pid_p_tilt=self._last_pid_p_tilt,
+                    pid_i_tilt=self._last_pid_i_tilt,
+                    pid_d_tilt=self._last_pid_d_tilt,
+                    move_cmd_pan=corr_pan,
+                    move_cmd_tilt=corr_tilt,
+                    aim_lock_pan=self._has_aim_lock(lock_pan, 0.0),
+                    aim_lock_tilt=self._has_aim_lock(0.0, lock_tilt),
+                    aim_lock_frames=self._aim_lock_frames,
+                    phase="precision",
+                    notes=f"lock={self._has_aim_lock(lock_pan, lock_tilt)}",
+                )
+
             if self._has_aim_lock(lock_pan, lock_tilt):
                 self._aim_lock_frames += 1
             else:
@@ -659,6 +785,10 @@ class SentryV2Engine:
             early_lock = self._aim_lock_frames >= max(1, self.cfg.engagement.aim_lock_required_frames)
             settle_met = elapsed >= settle
 
+            # =================================================================================
+            # CRITICAL AUTO-TRIGGER LOGIC - DO NOT DISABLE WITHOUT USER APPROVAL
+            # This is the primary auto-fire mechanism that MUST work when auto_trigger_enabled=True
+            # =================================================================================
             if (
                 self.cfg.engagement.auto_trigger_enabled
                 and (settle_met or early_lock)
@@ -666,9 +796,15 @@ class SentryV2Engine:
                 and target is not None
                 and self._trigger_should_fire(target, lock_pan, lock_tilt, now)
             ):
+                # AUTO-TRIGGER ACTIVATED: Primary firing condition met
+                print(f"[AUTO_TRIGGER] PRIMARY: settle_met={settle_met}, early_lock={early_lock}, ready_to_fire={self._ready_to_fire()}, trigger_should_fire={self._trigger_should_fire(target, lock_pan, lock_tilt, now)}", flush=True)
                 self._begin_fire(order, now)
                 return
 
+            # =================================================================================
+            # BACKUP AUTO-TRIGGER LOGIC - DO NOT DISABLE WITHOUT USER APPROVAL  
+            # Fallback firing mechanism for timeout scenarios
+            # =================================================================================
             if (
                 self.cfg.engagement.auto_trigger_enabled
                 and now >= self._trigger_refractory_until
@@ -679,6 +815,8 @@ class SentryV2Engine:
                 and self._has_aim_lock(lock_pan, lock_tilt)
                 and self._current_no_fire_mask() is None
             ):
+                # AUTO-TRIGGER ACTIVATED: Backup firing condition met
+                print(f"[AUTO_TRIGGER] BACKUP: refractory_ok={now >= self._trigger_refractory_until}, timeout_ok={elapsed >= float(self.cfg.engagement.aim_lock_timeout)}, ready_to_fire={self._ready_to_fire()}, target_reqs={self._target_meets_fire_requirements(target)}, aim_lock={self._has_aim_lock(lock_pan, lock_tilt)}, no_mask={self._current_no_fire_mask() is None}", flush=True)
                 self._begin_fire(order, now)
                 return
 
@@ -1016,10 +1154,20 @@ class SentryV2Engine:
         self._phase_start = now
         self._reset_precision_state()
 
+        target = self._find_active_target(order)
+        if target is not None:
+            initial_err_pan, initial_err_tilt = self._compute_tracking_angle_error(target, now, for_fire=False)
+            initial_corr_pan, initial_corr_tilt, _, _ = self._compute_visual_servo_correction(
+                initial_err_pan,
+                initial_err_tilt,
+                use_fire_limits=False,
+            )
+            if abs(initial_corr_pan) > 0.01 or abs(initial_corr_tilt) > 0.01:
+                self._move_turret(self.current_pan + initial_corr_pan, self.current_tilt + initial_corr_tilt)
+
         if not self._log_precision_tuning or self._precision_logging_faulted:
             return
 
-        target = self._find_active_target(order)
         target_id = str(target.det.track_id) if target is not None else "unknown"
         config_snapshot = {
             "precision_kp": float(self.cfg.engagement.precision_kp),
@@ -1068,7 +1216,14 @@ class SentryV2Engine:
             )
             self._ml_logger.save()
 
-        # Only actually fire if auto-trigger is enabled
+        # =================================================================================
+        # AUTO-TRIGGER FIRE GATE — DO NOT MODIFY WITHOUT OWNER APPROVAL (GMDS22)
+        # This is the sole check that gates physical firing. The conditions:
+        #   1. auto_trigger_enabled must be True (user-controlled default=OFF toggle)
+        #   2. No active no-fire mask at current turret position
+        #   3. "prompted" targets require prompted_allow_auto_fire flag
+        # DO NOT add new conditions here. DO NOT add silent disablers elsewhere.
+        # =================================================================================
         fired = (
             self.cfg.engagement.auto_trigger_enabled
             and blocked_mask is None
@@ -1076,8 +1231,11 @@ class SentryV2Engine:
         )
         if fired:
             burst = self.cfg.engagement.burst_count
+            print(f"[AUTO_TRIGGER] FIRE: burst={burst}, track_id={order.target.det.track_id}, class={order.target.det.class_name}", flush=True)
             if self._cb_fire:
                 self._cb_fire(burst)
+        else:
+            print(f"[AUTO_TRIGGER] FIRE BLOCKED: auto_trigger_enabled={self.cfg.engagement.auto_trigger_enabled}, blocked_mask={blocked_mask}, prompted_ok={prompted_auto_fire_allowed}", flush=True)
 
         self.engagement_log.append({
             "track_id": order.target.det.track_id,
@@ -1255,6 +1413,7 @@ class SentryV2Engine:
 
     def _finish_pir_no_target(self) -> None:
         """Clear the active PIR cue and explicitly command a return home."""
+        active_sensor_id = int(getattr(self, "_pir_cue_sensor_id", -1))
         self._pir_cue_mode = False
         self._pir_cue_sensor_id = -1
         self._pir_scan_mode = False
@@ -1262,6 +1421,8 @@ class SentryV2Engine:
         self._pir_settle_start = 0.0
         self._pir_manager.complete_active_cue()
         gp, gt = self._planner.get_return_position()
+        sensor_text = f" S{active_sensor_id + 1}" if active_sensor_id >= 0 else ""
+        self._set_pir_note(f"PIR no target{sensor_text} -> return home {gp:.1f}/{gt:.1f}")
         self._move_turret(gp, gt)
         self._patrol_initialized = False
         self._patrol_last_update = 0.0
@@ -1837,6 +1998,7 @@ class SentryV2Engine:
         if now < self._trigger_refractory_until:
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
+            print(f"[TRIGGER_CHECK] BLOCKED: refractory period active until {self._trigger_refractory_until}", flush=True)
             return False
 
         enter_pan = float(eng.fire_trigger_enter_pan_tolerance)
@@ -1859,20 +2021,29 @@ class SentryV2Engine:
         if self._current_no_fire_mask() is not None:
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
+            print(f"[TRIGGER_CHECK] BLOCKED: no-fire mask active: {self._current_no_fire_mask()}", flush=True)
             return False
 
         if not (centered and stable and trustworthy):
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
+            print(f"[TRIGGER_CHECK] BLOCKED: centered={centered}, stable={stable}, trustworthy={trustworthy}", flush=True)
+            print(f"[TRIGGER_CHECK]   lock_pan={lock_pan:.3f}, lock_tilt={lock_tilt:.3f}, gate_pan={gate_pan:.3f}, gate_tilt={gate_tilt:.3f}", flush=True)
+            print(f"[TRIGGER_CHECK]   pan_rate={self._err_pan_rate_deg_s:.3f}, tilt_rate={self._err_tilt_rate_deg_s:.3f}, max_pan={eng.fire_trigger_max_pan_rate}, max_tilt={eng.fire_trigger_max_tilt_rate}", flush=True)
+            print(f"[TRIGGER_CHECK]   confidence={target.det.confidence:.3f}, persistence={target.persistence:.3f}, min_conf={eng.fire_trigger_min_confidence}, min_persist={eng.fire_trigger_min_persistence}", flush=True)
             return False
 
         if self._trigger_hold_start <= 0.0:
             self._trigger_hold_start = now
             self._trigger_gate_active = True
+            print(f"[TRIGGER_CHECK] HOLD START: gate activated, hold_time={eng.fire_trigger_hold_time}s", flush=True)
             return False
 
         self._trigger_gate_active = True
-        return (now - self._trigger_hold_start) >= float(eng.fire_trigger_hold_time)
+        hold_elapsed = now - self._trigger_hold_start
+        should_fire = hold_elapsed >= float(eng.fire_trigger_hold_time)
+        print(f"[TRIGGER_CHECK] HOLD CHECK: elapsed={hold_elapsed:.3f}s, required={eng.fire_trigger_hold_time}s, should_fire={should_fire}", flush=True)
+        return should_fire
 
     def _compute_visual_servo_correction(
         self,
@@ -2174,6 +2345,13 @@ class SentryV2Engine:
             "last_err_tilt_deg": round(self._last_err_tilt_deg, 3),
             "reacquire_note": self._last_reacquire_note,
             "reacquire_recent": bool(self._last_reacquire_time and (time.time() - self._last_reacquire_time) <= 2.0),
+            "pir_note": self._last_pir_note,
+            "pir_recent": bool(self._last_pir_time and (time.time() - self._last_pir_time) <= 2.5),
+            "pir_cue_mode": bool(self._pir_cue_mode),
+            "pir_scan_mode": bool(self._pir_scan_mode),
+            "pir_sensor_id": int(self._pir_cue_sensor_id),
+            "pir_queue_length": int(self._pir_manager.peek_queue_count()),
+            "pir_status": self._pir_manager.get_status_text(),
             "loss_recovery_phase": self._loss_recovery_phase,
             "no_fire_mask": self._last_no_fire_mask_name,
             "motion_enabled": bool(self._motion_enabled),

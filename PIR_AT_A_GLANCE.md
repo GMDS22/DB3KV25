@@ -1,393 +1,181 @@
 # PIR Sensor Integration - At a Glance
 
-**Status**: ✅ COMPLETE  
-**Date**: December 2024, updated for Smart Sentry v2.3.2 on 2026-04-09
+Status: current contract audit refreshed for Smart Sentry v2.3.2 on 2026-04-10.
 
----
+## What Matches Right Now
 
-## Current Runtime Notes
+Current live app firmware path:
 
-Primary behavior-contract note: the current authoritative runtime blueprint for guard, PIR cueing, target loss, center-aim, and firing behavior is `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md`.
+`arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
 
-For the live Smart Sentry v2.3.2 runtime, keep these updates in mind:
+Current desktop runtime path:
 
-✅ Canonical settings file is now `app/config/smart_sentry_v2_3_2_settings.json`  
-✅ Current default cue layout is 45° / 135° / 225° at 35° tilt  
-✅ Current debounce default is 500 ms per sensor  
-✅ Current confirmation timeout default is 1.2 s  
-✅ Current cue hold default is 0.18 s before local PIR hunting begins  
-✅ Current shared search style default is `Hunting`  
-✅ Current shared hunt-round default is `1`  
-✅ No-detect scans now start from the first offset point after the cue center is checked  
-✅ Completed no-target PIR hunts now command the configured guard/home position instead of parking at the last hunt point  
+- `app/sentry_v2/sentry_v2_comm.py`
+- `app/sentry_v2/sentry_v2_engine.py`
+- `app/sentry_v2/sentry_v2_pir_manager.py`
+- `app/sentry_v2/sentry_v2_tab.py`
 
-This means the cue point itself acts as the center confirmation step, but it should not remain there for long. If no target is confirmed there, the search should visibly move away from center immediately and hunt the triggered PIR zone first. After that hunt completes with no target, the turret should head back to guard/home rather than sitting still at the final hunt point.
+The firmware and desktop code currently match on these points:
 
----
+- PIR events are emitted back to the app as `pir_event` over UDP in WiFi modes.
+- PIR events are also still readable as `PIR_EVENT sensor_id=... timestamp=...` on the serial path.
+- PIR enable is controlled by the app with `pir_enabled` in UDP bridge modes.
+- Serial compatibility for `P0` and `P1` is still present in USB modes.
+- PIR event LED blink is carried by the runtime config payload under `pir.event_blink`.
+- The app receives PIR events in `sentry_v2_comm.py`, forwards them into the engine, and the engine converts them into cue, confirm, hunt, and return-home behavior.
 
-## 📦 What You Got
+## Current Behavior Contract
 
-### Smart Sentry v2 (PC App)
-```
-✅ Guard Tab Extended
-   ├─ PIR Master Enable/Disable
-   ├─ 3 Sensor Configuration (pan/tilt cues)
-   ├─ Scan Behavior Settings (8 parameters)
-   └─ Live Status Display
+### PIR Motion Flow
 
-✅ Python Modules
-   ├─ sentry_v2_config.py (config dataclasses)
-   ├─ sentry_v2_pir_manager.py (motion logic, NEW)
-   ├─ sentry_v2_engine.py (guard state + cues)
-   ├─ sentry_v2_comm.py (telemetry interface)
-   └─ sentry_v2_tab.py (UI + handlers)
+1. A PIR sensor fires on the ESP32.
+2. The firmware debounces the hit and sends the sensor id back to the app.
+3. The desktop comm layer dispatches the PIR event into the sentry engine.
+4. The engine slews to that sensor's configured cue angle.
+5. The engine holds briefly at cue center.
+6. If vision confirms a target, normal engagement starts.
+7. If vision does not confirm and PIR scan is enabled, the engine runs a local hunt around that cue and then widens the search.
+8. If the PIR hunt finishes with no target, the engine explicitly returns to the configured guard/home position.
 
-✅ Documentation
-   └─ 5 comprehensive guides
-```
+### After Target Loss vs PIR
 
-### ESP32 Firmware
-```
-✅ New Sketch
-   └─ DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
+`target_loss_timeout` and `After Target Loss` are not in conflict in the current code.
 
-✅ PIR Sensor Support
-   ├─ GPIO 35 (Sensor 0 - Left-rear)
-   ├─ GPIO 34 (Sensor 1 - Front-left)
-   └─ GPIO 39 (Sensor 2 - Front-right)
+- `target_loss_timeout` is the outer time budget for trying to recover a lost tracked target.
+- Adaptive `After Target Loss` only decides which recovery protocol runs inside that time budget.
+- While a PIR cue or PIR scan is active, normal target-loss recovery is suppressed so both systems do not fight each other.
+- PIR cue hold is clamped against `confirmation_timeout`, so the center hold cannot outlive the confirmation window.
+- The shared `Search style` and `Hunt rounds` controls are written into both engagement loss-recovery settings and PIR no-detect search settings.
 
-✅ Features
-   ├─ Motion detection + debounce (200ms)
-   ├─ P token (PIR enable/disable)
-   ├─ Event telemetry (PIR_EVENT)
-   ├─ Toggleable compile-time + runtime
-   └─ 100% backward compatible
+## Firmware Pins
 
-✅ Original Kept
-   └─ DB3000_ESP32_IO_Telemetry_2026.ino (unchanged)
-```
+The current live firmware uses these PIR input pins:
 
----
+| GPIO | Sensor | Firmware Role |
+|------|--------|---------------|
+| 35 | Sensor 0 | PIR input |
+| 34 | Sensor 1 | PIR input |
+| 39 | Sensor 2 | PIR input |
 
-## 🎯 Core Behavior
+Important distinction:
 
-### PIR Motion Detection Flow
-```
-Motion at Sensor 0
-        ↓
-ESP32 Detects Rising Edge (GPIO 35)
-      ↓
-   Debounce Check (sensor debounce passed?)
-        ↓
-YES → Send: PIR_EVENT sensor_id=0 timestamp=123456789
-        ↓
-PC App Receives Event
-        ↓
-   Smart Sentry Slews to Configured Cue Angle
-        ↓
-      Brief Cue Hold At PIR Center
-        ↓
-Check Camera for Target
-        ↓
-┌─ YES: Engage Normally
-      ├─ NO + Scan Enabled: Run Local PIR Hunt from first offset point, then widen
-└─ NO + Scan Disabled: Return to configured Guard/Home position
-```
+- The firmware reports `sensor_id` values.
+- The desktop app owns the cue pan and cue tilt used for that sensor id.
+- Because of that, the physical mounting layout can differ from the default firmware comments without breaking the protocol.
 
----
+## Cue Angle Ownership
 
-## 🔌 Pin Assignments
+There are two different truths to keep separate:
 
-| GPIO | Function | Type | Location |
-|------|----------|------|----------|
-| 35 | PIR Sensor 0 | Input | Left-rear (~270°) |
-| 34 | PIR Sensor 1 | Input | Front-left (~150°) |
-| 39 | PIR Sensor 2 | Input | Front-right (~30°) |
-| 27 | MOSFET Trigger | Output | Water mode |
-| 13 | Servo Trigger | PWM | Projectile mode |
-| 32 | LED Relay | Output | Accessory |
-| 33 | Laser Relay | Output | Laser pointer |
-| 25 | Acc Relay | Output | Secondary relay |
+- Firmware transport contract: sensor ids `0`, `1`, and `2`.
+- Desktop aiming contract: cue angles stored in `app/config/smart_sentry_v2_3_2_settings.json`.
 
-**All unchanged (existing)** except for the 3 new PIR inputs above.
+Default dataclass cue layout in code:
 
-Trigger note:
+- Sensor 0 -> `45 deg`
+- Sensor 1 -> `135 deg`
+- Sensor 2 -> `225 deg`
 
-- this pin map reflects the current DB3000 ESP32 firmware contract used by the live Smart Sentry app path
-- on that path, both water and projectile trigger modes exist: GPIO27 is the MOSFET path and GPIO13 is the projectile trigger-servo path
-- archived Waveshare single-board bridge material is not the same contract and may intentionally leave projectile trigger-servo PWM unassigned
+Current saved operator profile in `app/config/smart_sentry_v2_3_2_settings.json`:
 
----
+- Sensor 0 -> `270.0 deg`, tilt `55.0 deg`
+- Sensor 1 -> `152.0 deg`, tilt `52.0 deg`
+- Sensor 2 -> `29.0 deg`, tilt `54.0 deg`
 
-## 🎮 Commands
+That saved profile is not a firmware mismatch. It is an operator-level cue map stored in the desktop config.
 
-### Original (Unchanged)
-```
-S0/S1   → Safety OFF/ON
-M0/M1   → Water / Projectile mode
-F0/F1   → Fire OFF/ON
-L0/L1   → LED OFF/ON
-R0/R1   → Laser OFF/ON
-G0/G1   → Accessory OFF/ON
+## Current Control Contract
+
+### WiFi / UDP Modes
+
+In the current live WiFi bridge path, the app does not depend on old single-letter PIR commands. It sends JSON payloads.
+
+Enable PIR:
+
+```json
+{"pir_enabled":1}
 ```
 
-`M0/M1` select trigger output semantics only. They do not change target selection, centering, or fire-gate rules in Smart Sentry.
+Disable PIR:
 
-### New (PIR)
-```
-P0/P1   → PIR Disabled / Enabled
-```
-
-### Combined Examples
-```
-S0M0F1L1     → Unsafe, water, fire, LED (original - still works!)
-P1S0M0L1     → Enable PIR, unsafe, water, LED (new)
-S1           → Safety ON (disables everything - unchanged)
+```json
+{"pir_enabled":0}
 ```
 
----
+Update PIR event blink runtime config:
 
-## 💾 Config Persistence
-
-### Saved Locations
-```
-PC App: app/config/smart_sentry_v2_3_2_settings.json
-   └─ Contains: pir_guard { enabled, sensors[], scan settings }
-   └─ Auto-saved from Guard tab UI
-   └─ Restored on app restart
-
-ESP32: Runtime only
-   └─ P token controls enable/disable
-   └─ Default: P0 (disabled)
+```json
+{
+  "action": "config",
+  "pir": {
+    "event_blink": 1
+  }
+}
 ```
 
----
+Firmware PIR event back to app:
 
-## 🧪 Testing Status
-
-✅ **Compilation**: All modules compile  
-✅ **Unit Tests**: 5/5 passing  
-✅ **Config Serialization**: JSON round-trip verified  
-✅ **Backward Compatibility**: 100% (original commands work)  
-⏳ **Hardware Validation**: Pending (need real PIR sensors)  
-⏳ **End-to-End Testing**: Pending (after telemetry parser)
-
----
-
-## 📊 Quick Stats
-
-| Metric | Value |
-|--------|-------|
-| PIR Sensors | 3 |
-| Python Modules Modified | 6 |
-| New Python Modules | 1 |
-| C++ Lines Added | ~200 |
-| Python Lines Added | ~500 |
-| ESP32 GPIO Used | 3 new + 5 existing |
-| Binary Size | 10 KB (PIR on) or 8.5 KB (PIR off) |
-| Config Parameters | 10+ tunable |
-| Documentation Files | 6 (~750 KB total) |
-| Default State | PIR Disabled (safe) |
-| Breaking Changes | 0 (fully backward compatible) |
-
----
-
-## ✅ Checklist Summary
-
-### PC Application
-- [x] UI added to Guard tab
-- [x] Config persistence working
-- [x] Tooltips for all controls
-- [x] Status display live
-- [x] Default disabled (safe)
-
-### ESP32 Firmware
-- [x] New sketch created
-- [x] PIR pins assigned
-- [x] P token integrated
-- [x] Debounce implemented
-- [x] Backward compatible
-- [x] Original available as backup
-
-### Documentation
-- [x] User guide written
-- [x] Firmware guide written
-- [x] Pinout reference created
-- [x] Tech documentation complete
-- [x] Comparison guide (original vs new)
-- [x] Index/roadmap created
-
-### Quality
-- [x] Modules compile
-- [x] Tests pass
-- [x] No syntax errors
-- [x] No breaking changes
-- [x] Safe defaults
-
----
-
-## 🚀 How to Use
-
-### To Enable PIR (PC App)
-```
-1. Open Smart Sentry v2
-2. Go to Guard tab
-3. Check "Enable PIR sensors"
-4. Configure (or use defaults: 270°, 150°, 30°)
-5. Adjust scan grid if needed
-6. Save settings
+```json
+{
+  "v": 1,
+  "t": "pir_event",
+  "p": {
+    "sensor_id": 0,
+    "timestamp_ms": 123456789
+  }
+}
 ```
 
-### To Test PIR (Firmware)
-```
-1. Flash new firmware: DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
-2. Send command: P1 (enable PIR)
-3. Wave hand at GPIO 35 (sensor 0)
-4. Should see: PIR_EVENT sensor_id=0 timestamp=...
-5. Repeat for sensors at GPIO 34 and 39
-```
+### USB / Serial Compatibility
 
-### To Deploy
-```
-Phase 1: Flash with ENABLE_PIR_SUPPORT=0 first
-         -  Verify original functionality unchanged
-Phase 2: Flash with ENABLE_PIR_SUPPORT=1
-         -  Enable PIR via P1 command
-Phase 3: Connect physical PIR sensors
-         -  Test motion detection
-Phase 4: Integrate telemetry parser (future)
-         -  Parse PIR_EVENT from UDP stream
+Serial modes still support:
+
+```text
+P0
+P1
 ```
 
----
+And PIR events can still appear as:
 
-## 🔄 Backward Compatibility
-
-✅ **Zero Breaking Changes**
-
-```
-Old Code + New Firmware = Works (ignored P field)
-Old Firmware + New Code = Works (PIR disabled)
-New Code + New Firmware = Works (full features)
-Original Firmware Available = Always (as backup)
+```text
+PIR_EVENT sensor_id=0 timestamp=123456789
 ```
 
----
+## Live Runtime Settings Seen In The Current Config
 
-## 📋 File Locations
+The current saved profile shows these relevant values:
 
-**Documentation**
-```
-PIR_INTEGRATION_SUMMARY.md           ← Full overview
-PIR_DOCUMENTATION_INDEX.md            ← This index
-PIR_GUARD_IMPLEMENTATION_COMPLETE.md  ← Technical details
-PIR_GUARD_QUICK_START.md              ← User guide
-ESP32_PIR_FIRMWARE_GUIDE.md           ← Firmware guide
-ESP32_PIN_QUICK_REFERENCE.md          ← Pinouts & wiring
-FIRMWARE_COMPARISON.md                ← Before/after code
-```
+- `pir_enabled = true`
+- `pir_event_blink_enabled = true`
+- `scan_on_no_detect = true`
+- `cue_hold_time_s = 0.18`
+- `confirmation_timeout = 1.0`
+- `cross_sensor_lockout_ms = 800`
+- `target_loss_timeout = 2.5`
+- `adaptive_loss_recovery_enabled = true`
+- `loss_search_style = fast_reacquire`
+- `loss_search_rounds = 2`
+- `pir_guard.search_style = fast_reacquire`
+- `pir_guard.search_rounds = 2`
 
-**Source Code**
-```
-app/sentry_v2/sentry_v2_config.py           (modified)
-app/sentry_v2/sentry_v2_pir_manager.py      (new)
-app/sentry_v2/sentry_v2_engine.py           (modified)
-app/sentry_v2/sentry_v2_comm.py             (modified)
-app/sentry_v2/sentry_v2_tab.py              (modified)
-app/sentry_v2/sentry_v2_tooltips.py         (modified)
+This is the expected aligned state for the shared loss/PIR hunt settings.
 
-arduino/DB3000_ESP32_IO_Telemetry_2026/DB3000_ESP32_IO_Telemetry_2026.ino
-                                            (original - kept)
+## Operator Checklist
 
-arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
-                                            (new - with PIR)
-```
+1. Flash `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` when running the live WiFi plus Debug Board path.
+2. Keep PIR enable controlled from the Smart Sentry Guard tab in normal operation.
+3. Treat `P0` and `P1` as serial compatibility controls, not the primary live WiFi control path.
+4. If PIR cues look wrong, inspect the saved cue angles in `app/config/smart_sentry_v2_3_2_settings.json` before changing firmware.
+5. If after-loss behavior looks wrong, inspect `target_loss_timeout`, adaptive recovery, and shared hunt settings together because they are intentionally coupled.
 
----
+## Source Of Truth
 
-## 🎓 Where to Start
+Use these files as the authoritative references:
 
-**Ops/User**: PIR_GUARD_QUICK_START.md  
-**Developer**: PIR_GUARD_IMPLEMENTATION_COMPLETE.md  
-**Hardware**: ESP32_PIN_QUICK_REFERENCE.md  
-**Firmware**: ESP32_PIR_FIRMWARE_GUIDE.md  
-**Executive**: PIR_INTEGRATION_SUMMARY.md  
-**Confused?**: PIR_DOCUMENTATION_INDEX.md ← Start here!
-
----
-
-## 🛠️ Next Steps
-
-1. **Review** PIR_INTEGRATION_SUMMARY.md
-2. **Choose** your role (user/dev/hardware/firmware)
-3. **Read** the recommended documentation
-4. **Wire** up ESP32 to PIR sensors (if doing hardware)
-5. **Flash** new firmware and test
-6. **Enable** in Smart Sentry UI
-7. **Verify** turret responds to motion
-8. **Deploy** with confidence
-
----
-
-## ❓ FAQ
-
-**Q: Is this safe?**  
-A: Yes. PIR is disabled by default, zero impact baseline.
-
-**Q: Will original features break?**  
-A: No. 100% backward compatible, all old commands work.
-
-**Q: Do I need PIR sensors now?**  
-A: No. You can keep using Smart Sentry without sensors.
-
-**Q: When PIR is off, any overhead?**  
-A: No. Code is stripped (ENABLE_PIR_SUPPORT=0) or disabled (P0).
-
-**Q: Can I use this with old firmware?**  
-A: Yes. Original firmware always available and untouched.
-
-**Q: How many sensors?**  
-A: Currently 3 (hardcoded). Can extend later.
-
-**Q: Any breaking changes?**  
-A: No. Fully backward compatible.
-
-**Q: What if I only connect 1-2 sensors?**  
-A: Works fine. Unused sensors reported as LOW (no motion).
-
-**Q: Can I change sensor angles?**  
-A: Yes. Adjustable in Smart Sentry Guard tab.
-
----
-
-## 📞 Support
-
-For each issue type, see the relevant guide:
-- **UI Issues** → PIR_GUARD_QUICK_START.md (FAQ section)
-- **Firmware Issues** → ESP32_PIR_FIRMWARE_GUIDE.md (Troubleshooting)
-- **Wiring Issues** → ESP32_PIN_QUICK_REFERENCE.md (Testing section)
-- **Behavior Issues** → PIR_GUARD_IMPLEMENTATION_COMPLETE.md (Architecture)
-
----
-
-## ✨ Summary
-
-You now have:
-- ✅ Fully integrated PIR sensor support in Smart Sentry v2
-- ✅ 3x motion sensors for blind-spot detection
-- ✅ Adaptive scan grid on no-detection
-- ✅ Complete documentation (5 guides + this)
-- ✅ 100% backward compatible
-- ✅ Ready to deploy
-
-**Time to deployment**: 
-- Immediate: UI testing (no hardware needed)
-- Short-term: Firmware test (verify original features)
-- Medium-term: Hardware integration (connect PIR sensors)
-- Production-ready: Deploy with confidence
-
----
-
-**Need more? See PIR_DOCUMENTATION_INDEX.md for complete roadmap.**
-
-Good luck! 🚀
+- `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+- `app/sentry_v2/sentry_v2_comm.py`
+- `app/sentry_v2/sentry_v2_engine.py`
+- `app/sentry_v2/sentry_v2_pir_manager.py`
+- `app/sentry_v2/sentry_v2_tab.py`
+- `app/config/smart_sentry_v2_3_2_settings.json`
+- `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md`

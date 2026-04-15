@@ -10,6 +10,11 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import cv2
 import numpy as np
 
+try:
+    from runtime_paths import runtime_root_path
+except ImportError:
+    from app.runtime_paths import runtime_root_path
+
 
 @dataclass
 class FaceIdentityProfile:
@@ -120,8 +125,43 @@ class FaceIdentityLibrary:
 class FaceIdentityRuntime:
     def __init__(self, library: FaceIdentityLibrary):
         self.library = library
-        cascade_path = Path(cv2.data.haarcascades) / "haarcascade_frontalface_default.xml"
-        self._cascade = cv2.CascadeClassifier(str(cascade_path))
+        cascade_path = self._resolve_cascade_path()
+        if cascade_path is None:
+            self._cascade = cv2.CascadeClassifier()
+        else:
+            self._cascade = cv2.CascadeClassifier(str(cascade_path))
+
+    @staticmethod
+    def _resolve_cascade_path() -> Optional[Path]:
+        candidate_paths: List[Path] = []
+
+        raw_haarcascades = str(getattr(cv2.data, "haarcascades", "") or "").strip()
+        if raw_haarcascades:
+            candidate_paths.append(Path(raw_haarcascades) / "haarcascade_frontalface_default.xml")
+
+        try:
+            cv2_root = Path(cv2.__file__).resolve().parent
+            candidate_paths.append(cv2_root / "data" / "haarcascade_frontalface_default.xml")
+        except Exception:
+            pass
+
+        try:
+            candidate_paths.append(runtime_root_path() / "cv2" / "data" / "haarcascade_frontalface_default.xml")
+        except Exception:
+            pass
+
+        seen: set[str] = set()
+        for candidate in candidate_paths:
+            candidate_text = str(candidate)
+            if candidate_text in seen:
+                continue
+            seen.add(candidate_text)
+            try:
+                if candidate.is_file():
+                    return candidate
+            except Exception:
+                continue
+        return None
 
     def refresh_library(self, library: FaceIdentityLibrary) -> None:
         self.library = library

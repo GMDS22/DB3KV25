@@ -102,7 +102,7 @@ class SentryV2Comm:
         self._bus_io_lock = threading.Lock()
 
         # Accessory state (tracked locally)
-        self.led_on: bool = False
+        self.led_pwm: int = 0
         self.laser_on: bool = False
         self.acc_on: bool = False          # GPIO 25 accessory relay
         self.spare_on: bool = False        # GPIO 26 spare relay
@@ -136,6 +136,9 @@ class SentryV2Comm:
         
         # PIR event callback (called when sensor data is received)
         self._on_pir_event: Optional[Callable[[int, float], None]] = None
+        self._on_transport_log: Optional[Callable[[str], None]] = None
+        self._last_udp_state_trace: str = ""
+        self._last_udp_state_trace_s: float = 0.0
 
         # Bus-servo feedback telemetry (modes 1, 2)
         self._servo_feedback: Dict[str, Any] = {
@@ -226,6 +229,97 @@ class SentryV2Comm:
     def _report_runtime_warning(self, context: str, exc: Exception) -> None:
         self._last_error = f"{context}: {exc}"
         print(f"[SENTRY_V2_COMM] {self._last_error}", flush=True)
+
+    def _emit_transport_log(self, message: str) -> None:
+        callback = self._on_transport_log
+        if callback is None:
+            return
+        try:
+            text = str(message or "").strip()
+            if not text:
+                return
+            callback(text)
+        except Exception as exc:
+            self._report_runtime_warning("Transport log callback failed", exc)
+
+    @staticmethod
+    def _payload_flag(value: Any) -> Optional[bool]:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return bool(value)
+        try:
+            return bool(int(value))
+        except Exception:
+            text = str(value or "").strip().lower()
+            if text in {"true", "on", "yes", "armed", "active"}:
+                return True
+            if text in {"false", "off", "no", "locked", "inactive"}:
+                return False
+        return None
+
+    def _summarize_runtime_payload_for_log(self, payload: Dict[str, Any]) -> str:
+        if not isinstance(payload, dict):
+            return ""
+        parts = []
+        safety_raw = payload.get("safety")
+        try:
+            safety = int(safety_raw) if safety_raw is not None else None
+        except Exception:
+            safety = None
+        if safety is not None:
+            parts.append(f"safety={'ARMED' if safety == 0 else 'LOCKED'}")
+
+        mode_raw = payload.get("mode")
+        try:
+            mode = int(mode_raw) if mode_raw is not None else None
+        except Exception:
+            mode = None
+        if mode is not None:
+            parts.append(f"mode={'PROJECTILE' if mode == 1 else 'WATER'}")
+
+        pir_enabled = self._payload_flag(payload.get("pir_enabled"))
+        if pir_enabled is not None:
+            parts.append(f"pir={'ON' if pir_enabled else 'OFF'}")
+
+        current_fault = self._payload_flag(payload.get("current_fault"))
+        if current_fault is not None:
+            parts.append(f"fault={'TRIP' if current_fault else 'CLEAR'}")
+
+        control_source = str(payload.get("control_source_active") or payload.get("control_source_mode") or "").strip()
+        if control_source:
+            parts.append(f"ctrl={control_source}")
+        return " ".join(parts)
+
+    def _summarize_caps_payload_for_log(self, payload: Dict[str, Any]) -> str:
+        if not isinstance(payload, dict):
+            return ""
+        parts = []
+        fw = str(payload.get("fw") or "").strip()
+        role = str(payload.get("role") or "").strip()
+        pir_support = self._payload_flag(payload.get("pir_support"))
+        pir_count = payload.get("pir_count")
+        if fw:
+            parts.append(f"fw={fw}")
+        if role:
+            parts.append(f"role={role}")
+        if pir_support is not None:
+            if pir_support and pir_count is not None:
+                parts.append(f"pir={int(pir_count)}")
+            else:
+                parts.append(f"pir={'ON' if pir_support else 'OFF'}")
+        return " ".join(parts)
+
+    def _emit_udp_state_trace(self, payload: Dict[str, Any], *, timestamp_ms: Any = None) -> None:
+        summary = self._summarize_runtime_payload_for_log(payload)
+        if not summary:
+            return
+        update_time = self._runtime_update_time_from_timestamp(timestamp_ms)
+        if summary == self._last_udp_state_trace and (update_time - self._last_udp_state_trace_s) < 2.0:
+            return
+        self._last_udp_state_trace = summary
+        self._last_udp_state_trace_s = update_time
+        self._emit_transport_log(f"ESP32 UDP STATE {summary}")
 
     def _reset_servo_feedback_state(self, *, active: bool, source: str, last_error: str = "") -> None:
         with self._lock:
@@ -1075,6 +1169,10 @@ class SentryV2Comm:
         """
         self._on_pir_event = callback
 
+    def set_on_transport_log(self, callback: Optional[Callable[[str], None]]) -> None:
+        """Register a callback for raw transport/log activity from the ESP32 link."""
+        self._on_transport_log = callback
+
     def inject_pir_event(self, sensor_id: int) -> None:
         """
         Manually inject a PIR sensor event (useful for testing).
@@ -1353,7 +1451,10 @@ class SentryV2Comm:
     def _handle_serial_line(self, line: str) -> None:
         if not line:
             return
+        self._emit_transport_log(f"ESP32 USB RX {line}")
         match = re.search(r"PIR_EVENT\s+sensor_id=(\d+)\s+timestamp=(\d+)", line, re.IGNORECASE)
+        if not match:
+            match = re.search(r"\[PIR\]\s*Sensor\s+(\d+)\s+triggered\b.*?\bt=(\d+)", line, re.IGNORECASE)
         if not match:
             return
         sensor_id = int(match.group(1))
@@ -1372,16 +1473,21 @@ class SentryV2Comm:
             payload = message.get("p") or {}
             if isinstance(payload, dict):
                 self._apply_io_runtime_state(payload, source="esp32-state", timestamp_ms=message.get("ts"))
+                self._emit_udp_state_trace(payload, timestamp_ms=message.get("ts"))
             return
         if message_type == "ack":
             payload = message.get("p") or message.get("state") or {}
             if isinstance(payload, dict):
                 self._apply_io_runtime_state(payload, source="esp32-ack", timestamp_ms=message.get("ts"))
+                summary = self._summarize_runtime_payload_for_log(payload)
+                self._emit_transport_log(f"ESP32 UDP ACK {summary}" if summary else "ESP32 UDP ACK")
             return
         if message_type == "cap":
             payload = message.get("p") or {}
             if isinstance(payload, dict):
                 self._apply_bridge_caps(payload, source="esp32-cap", timestamp_ms=message.get("ts"))
+                summary = self._summarize_caps_payload_for_log(payload)
+                self._emit_transport_log(f"ESP32 UDP CAPS {summary}" if summary else "ESP32 UDP CAPS")
             return
         if message_type != "pir_event":
             return
@@ -1397,6 +1503,11 @@ class SentryV2Comm:
             timestamp = float(raw_ts) / 1000.0
         except Exception:
             timestamp = time.time()
+        try:
+            trace_ts = int(float(raw_ts))
+        except Exception:
+            trace_ts = 0
+        self._emit_transport_log(f"ESP32 UDP RX PIR S{sensor_id + 1} ts={trace_ts}")
         self._dispatch_pir_event(sensor_id, timestamp)
 
     def _dispatch_pir_event(self, sensor_id: int, timestamp: float) -> None:
@@ -1468,10 +1579,15 @@ class SentryV2Comm:
                 time.sleep(delay)
 
     def set_led(self, on: bool, pan: float, tilt: float) -> bool:
+        """Backward-compat shim: maps bool on/off to PWM 255/0."""
+        return self.set_led_pwm(255 if on else 0, pan, tilt)
+
+    def set_led_pwm(self, pwm: int, pan: float, tilt: float) -> bool:
+        """Set LED brightness via 8-bit PWM value (0-255)."""
         if not self._bridge_optional_feature_supported("led_relay_assigned"):
-            self.led_on = False
+            self.led_pwm = 0
             return self._bridge_optional_feature_noop("led_relay_assigned", "LED")
-        self.led_on = on
+        self.led_pwm = int(max(0, min(255, pwm)))
         return self.send_command(pan, tilt)
 
     def set_laser(self, on: bool, pan: float, tilt: float) -> bool:
@@ -1572,7 +1688,7 @@ class SentryV2Comm:
         p = int(max(self.PAN_OUTPUT_MIN, min(self.PAN_OUTPUT_MAX, round(pan))))
         t = int(max(self.TILT_OUTPUT_MIN, min(self.TILT_OUTPUT_MAX, round(tilt))))
         f = int(bool(fire))
-        led = 1 if self.led_on else 0
+        led = int(max(0, min(255, self.led_pwm)))
         laser = 1 if self.laser_on else 0
         acc = 1 if self.acc_on else 0
         spare = 1 if self.spare_on else 0
@@ -1617,7 +1733,7 @@ class SentryV2Comm:
             "fire": int(bool(fire)),
             "safety": 0 if self.safety_armed else 1,
             "mode": 1 if self.trigger_mode_bb else 0,
-            "led": 1 if self.led_on else 0,
+            "led": int(max(0, min(255, self.led_pwm))),
             "laser": 1 if self.laser_on else 0,
             "acc": 1 if self.acc_on else 0,
             "spare": 1 if self.spare_on else 0,
@@ -1930,7 +2046,7 @@ class SentryV2Comm:
             "fire": int(bool(fire)),
             "safety": 0 if self.safety_armed else 1,
             "mode": 1 if self.trigger_mode_bb else 0,
-            "led": 1 if self.led_on else 0,
+            "led": int(max(0, min(255, self.led_pwm))),
             "laser": 1 if self.laser_on else 0,
             "acc": 1 if self.acc_on else 0,
             "spare": 1 if self.spare_on else 0,

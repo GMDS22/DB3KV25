@@ -108,6 +108,11 @@ selectors for each role.
 | `accentColor` | hex colour | Status cards |
 | `barRole` | `"pan"`, `"tilt"` | Position progress bars |
 
+Text contract:
+- All operator-visible tab text must derive from live theme tokens, either through base widget selectors, `themeRole` selectors, or helper methods such as `_compact_status_style()`.
+- Do not use hardcoded hex text colors for labels or checkboxes in tab content, because those break readability on light themes.
+- Checkbox text must remain theme-driven in every tab, including the Manual Control sound controls.
+
 ---
 
 ## 5. Persistence & Layout Restore
@@ -129,9 +134,15 @@ On app start:
 - `Shift + Mouse Wheel` adjusts `font_scale_pct` (50–280%).
 - `_apply_theme()` regenerates the entire stylesheet with new `base_font`,
   `status_font`, `button_min_h` derived from the scale.
+- `_apply_theme()` is also the canonical pass for text contrast, so label,
+  checkbox, and status text colors must follow the current theme tokens for
+  both dark and light presets.
 - Button minimum heights and grid spacings are computed from the font scale.
+- Registered responsive button grids keep multi-column layouts left-to-right,
+  but when a grid collapses to a single column its buttons are placed in a
+  centered middle track rather than hugging the left edge.
 - The layout automatically reflows as font sizes change.
 
 ---
 
-*Last updated: 2026-04-09*
+*Last updated: 2026-04-10*

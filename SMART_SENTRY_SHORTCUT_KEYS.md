@@ -16,10 +16,15 @@ Smart Sentry keyboard shortcuts are window-focused. They only fire while the Sma
 | `Ctrl+Alt+S` | Save settings | Saves config and the current face-library path |
 | `Ctrl+Alt+Left` | Previous settings tab | Moves left through the icon-tab strip |
 | `Ctrl+Alt+Right` | Next settings tab | Moves right through the icon-tab strip |
-| `Ctrl+Shift+Left` | Manual pan left | Uses the configured manual step size |
-| `Ctrl+Shift+Right` | Manual pan right | Uses the configured manual step size |
-| `Ctrl+Shift+Up` | Manual tilt up | Uses the configured manual step size |
-| `Ctrl+Shift+Down` | Manual tilt down | Uses the configured manual step size |
+| `Ctrl+Shift+Left` | Manual pan left | Only active when manual movement/fire keyboard control is enabled |
+| `Ctrl+Shift+Right` | Manual pan right | Only active when manual movement/fire keyboard control is enabled |
+| `Ctrl+Shift+Up` | Manual tilt up | Only active when manual movement/fire keyboard control is enabled |
+| `Ctrl+Shift+Down` | Manual tilt down | Only active when manual movement/fire keyboard control is enabled |
+| `A` | Manual pan left | Only active when manual movement/fire keyboard control is enabled |
+| `D` | Manual pan right | Only active when manual movement/fire keyboard control is enabled |
+| `W` | Manual tilt up | Only active when manual movement/fire keyboard control is enabled |
+| `S` | Manual tilt down | Only active when manual movement/fire keyboard control is enabled |
+| `Space` | Hold manual fire | Press to fire, release to stop; only active when manual movement/fire keyboard control is enabled |
 | `Ctrl+Alt+1` | Toggle safety | Arms or locks the safety control |
 | `Ctrl+Alt+2` | Toggle LED | Accessory output shortcut |
 | `Ctrl+Alt+3` | Toggle laser | Accessory output shortcut |
@@ -30,6 +35,8 @@ Smart Sentry keyboard shortcuts are window-focused. They only fire while the Sma
 ## Operator Notes
 
 - The shortcut system is enabled or disabled from the `Shortcut Keys` tab.
+- Manual movement and fire keyboard controls have a separate checkbox in the `Shortcut Keys` tab and default to disabled for safety.
 - The top-row `Quick Keys` button opens this document without changing the header layout.
 - Manual movement shortcuts respect the same motion limits as the on-screen controls.
+- `Space` uses the same safety and trigger path as the on-screen `FIRE` button.
 - Friendly face recognition, AI Assistant commands, and preview overlays do not require shortcuts, but this key map is intended to keep the common setup and control actions reachable without leaving the video view.

@@ -219,7 +219,9 @@ class SentryV2PIRManager:
         if now - last_fire < debounce_s:
             return  # Still in debounce period
 
-        cross_lockout_s = max(0.0, float(getattr(self.cfg, "cross_sensor_lockout_ms", 0) or 0) / 1000.0)
+        configured_cross_lockout_s = max(0.0, float(getattr(self.cfg, "cross_sensor_lockout_ms", 0) or 0) / 1000.0)
+        cross_lockout_cap_s = min(0.18, max(0.08, debounce_s * 0.35))
+        cross_lockout_s = min(configured_cross_lockout_s, cross_lockout_cap_s)
         if (
             cross_lockout_s > 0.0
             and self._last_accepted_sensor_id is not None
@@ -440,14 +442,19 @@ class SentryV2PIRManager:
         """Return human-readable status string for overlay/UI."""
         if not self.cfg.pir_enabled:
             return "PIR: disabled"
+
+        if self._scan_active:
+            sensor_label = ""
+            if self._active_cue is not None:
+                sensor_label = f" s{int(self._active_cue.sensor_id) + 1}"
+            total_points = max(1, len(self._scan_points))
+            current_index = min(total_points, max(1, int(self._scan_index) or 1))
+            return f"PIR: scanning{sensor_label} {current_index}/{total_points}"
         
         if self._active_cue is not None:
-            return f"PIR: cue {self._active_cue.sensor_id} active"
+            return f"PIR: cue s{int(self._active_cue.sensor_id) + 1} active"
         
         if len(self._cue_queue) > 0:
             return f"PIR: {len(self._cue_queue)} queued"
-        
-        if self._scan_active:
-            return f"PIR: scanning {self._scan_index}/{len(self._scan_points)}"
         
         return "PIR: idle"

@@ -1,6 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
+from pathlib import Path
+
+import cv2
 from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.utils.hooks import collect_all
+
+cv2_data_dir = Path(cv2.__file__).resolve().parent / 'data'
 
 datas = [
     ('app/sentry_v2', 'app/sentry_v2'),
@@ -11,6 +16,8 @@ datas = [
     ('SENTRY_V2_PORTABLE_INCLUDE_LIST.md', 'SENTRY_V2_PORTABLE_INCLUDE_LIST.md'),
     ('SENTRY_V2_PORTABLE_FIX_LOG_2026-03-24.md', 'SENTRY_V2_PORTABLE_FIX_LOG_2026-03-24.md'),
 ]
+if cv2_data_dir.is_dir():
+    datas.append((str(cv2_data_dir), 'cv2/data'))
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('ultralytics')

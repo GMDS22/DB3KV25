@@ -42,11 +42,11 @@ ESP32 Development Board
 | 25 | PIN_ACC_RELAY | Accessory relay | Pin 25 |
 
 ### PIR Sensor Input (Motion Detection)
-| GPIO | Name | Physical Location | Direction | Connector |
-|------|------|-------------------|-----------|-----------|
-| 35 | PIN_PIR_SENSOR_0 | Left-rear mount | ~270° | Pin 35 |
-| 34 | PIN_PIR_SENSOR_1 | Front-left mount | ~150° | Pin 34 |
-| 39 | PIN_PIR_SENSOR_2 | Front-right mount | ~30° | Pin 39 |
+| GPIO | Name | Transport Role | Cue Ownership | Connector |
+|------|------|----------------|---------------|-----------|
+| 35 | PIN_PIR_SENSOR_0 | Sensor 0 input | App-configured cue pan/tilt | Pin 35 |
+| 34 | PIN_PIR_SENSOR_1 | Sensor 1 input | App-configured cue pan/tilt | Pin 34 |
+| 39 | PIN_PIR_SENSOR_2 | Sensor 2 input | App-configured cue pan/tilt | Pin 39 |
 
 ### Serial/Debug (Reserved)
 | GPIO | Function | Purpose | Connector |
@@ -177,9 +177,14 @@ GND, 3V3, 36, 39, 34, 35, 32, 33, 25, 26, 19, 18, 17, 16, 4, 0, 2, 15, 13, 12, 1
 
 ## Firmware Configuration Checklist
 
-- Current WiFi baseline sketch: `arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino`
+- Current WiFi baseline sketch: `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
 - Current USB serial IO sketch: `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
 - GPIO4 passive buzzer is required if Smart Sentry sound cues should play on-board.
+
+Contract note:
+
+- For the live Smart Sentry app topology, the WiFi sketch above is the primary firmware path.
+- The DB3000 sketch remains the current reference for direct serial IO and dual-port validation.
 
 ### Before Flashing
 - [ ] Arduino IDE or PlatformIO installed
@@ -190,7 +195,9 @@ GND, 3V3, 36, 39, 34, 35, 32, 33, 25, 26, 19, 18, 17, 16, 4, 0, 2, 15, 13, 12, 1
 - [ ] Baud rate set to 115200
 
 ### Firmware File
-- [ ] Using: `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
+- [ ] Using the correct sketch for the topology being tested
+- [ ] WiFi app path: `SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+- [ ] Direct serial IO path: `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
 - [ ] Original file `DB3000_ESP32_IO_Telemetry_2026.ino` backed up
 - [ ] `#define ENABLE_PIR_SUPPORT 1` (or 0 if PIR not needed)
 
@@ -207,6 +214,13 @@ GND, 3V3, 36, 39, 34, 35, 32, 33, 25, 26, 19, 18, 17, 16, 4, 0, 2, 15, 13, 12, 1
 - [ ] Responds to test command: `S0` → ACK message
 - [ ] LED/Laser/Acc relays engage on command
 - [ ] Trigger (water/projectile) responds to F token
+
+For the live WiFi baseline instead:
+
+- [ ] App connects to `SMART-SENTRY-V2.3`
+- [ ] UDP state packets are visible
+- [ ] `pir_enabled` can be toggled from the Guard tab
+- [ ] PIR events return as UDP `pir_event` packets when sensors fire
 
 ## Testing Commands (Serial Terminal)
 
@@ -252,7 +266,7 @@ Response: ACK S=1 M=0 F=0 L=0 R=0 G=0 P=0
 
 ---
 
-**Pin Map Version**: 2.0 (PIR Support)  
-**Last Updated**: December 2024  
+**Pin Map Version**: 2.1 (Current Smart Sentry PIR contract)  
+**Last Updated**: April 2026  
 **Hardware**: ESP32 Dev Module (30-pin variant)  
-**Firmware**: DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
+**Firmware**: WiFi baseline `SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`; direct serial IO `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`

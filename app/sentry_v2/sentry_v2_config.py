@@ -12,6 +12,11 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+try:
+    from smart_sentry_meta import get_version
+except ImportError:
+    from app.smart_sentry_meta import get_version
+
 
 SENTRY_PAN_MIN = 0.0
 SENTRY_PAN_MAX = 270.0
@@ -25,6 +30,11 @@ SENTRY_RANDOM_PAN_MIN = SENTRY_PAN_MIN
 SENTRY_RANDOM_PAN_MAX = SENTRY_PAN_MAX
 SENTRY_RANDOM_TILT_MIN = SENTRY_TILT_MIN
 SENTRY_RANDOM_TILT_MAX = SENTRY_TILT_MAX
+SMART_SENTRY_RELEASE_VERSION = get_version()
+SMART_SENTRY_RELEASE_VERSION_TOKEN = SMART_SENTRY_RELEASE_VERSION.replace(".", "_")
+CANONICAL_FACE_LIBRARY_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_faces.json"
+CANONICAL_PROMPTED_TARGETS_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_prompted_targets.json"
+CANONICAL_SETTINGS_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_settings.json"
 
 
 # Full COCO class list (80 classes) — same order as YOLOv8 default
@@ -177,7 +187,7 @@ class EngagementConfig:
     # PID gains for precision refinement
     precision_kp: float = 0.035
     precision_ki: float = 0.0
-    precision_kd: float = 0.01
+    precision_kd: float = 0.015
     # Max correction step per frame (degrees)
     precision_max_step: float = 0.85
     precision_deadzone_pan_deg: float = 0.18
@@ -205,7 +215,7 @@ class EngagementConfig:
     fire_requires_lock: bool = True
     aim_lock_pan_tolerance: float = 0.65
     aim_lock_tilt_tolerance: float = 0.55
-    aim_lock_required_frames: int = 5
+    aim_lock_required_frames: int = 3
     aim_lock_timeout: float = 1.3
     target_loss_timeout: float = 0.55
     # Keep engaging/holding last known target area when target is temporarily lost
@@ -225,13 +235,13 @@ class EngagementConfig:
     loss_direction_pursuit_enabled: bool = True
     loss_direction_pursuit_s: float = 0.28
     loss_local_search_enabled: bool = True
-    loss_local_search_pan_deg: float = 45.0
-    loss_local_search_tilt_deg: float = 45.0
+    loss_local_search_pan_deg: float = 6.0
+    loss_local_search_tilt_deg: float = 4.0
     loss_expanding_search_enabled: bool = True
     loss_expanding_search_rings: int = 2
     loss_expanding_search_pan_step_deg: float = 3.0
     loss_expanding_search_tilt_step_deg: float = 1.5
-    loss_search_step_interval_s: float = 0.18
+    loss_search_step_interval_s: float = 0.25
     # Adaptive after-loss search protocols.
     adaptive_loss_recovery_enabled: bool = True
     loss_recovery_protocol_new_target: str = "rapid_handoff_search"
@@ -383,11 +393,22 @@ class PIRGuardConfig:
     data_timeout_ms: int = 5000
     # Ignore near-simultaneous events from different PIR sensors so one target
     # crossing overlapping sensor cones is treated as a single zone hit.
-    cross_sensor_lockout_ms: int = 800
+    cross_sensor_lockout_ms: int = 120
     # Shared hunting style for PIR no-detect search.
     search_style: str = "hunting"
     # Shared hunt pass count for target-loss and PIR no-detect searches.
     search_rounds: int = 1
+
+
+@dataclass
+class LightingConfig:
+    """Automated LED brightness control settings."""
+    auto_lighting_enabled: bool = False
+    led_pwm_value: int = 255
+    auto_brightness_threshold: int = 80
+    auto_pwm_min: int = 60
+    auto_pwm_max: int = 255
+    auto_sample_interval_frames: int = 8
 
 
 @dataclass
@@ -413,7 +434,7 @@ class SoundConfig:
 class FaceRecognitionConfig:
     """Known-face identification and friendly-recognition behavior."""
     enabled: bool = False
-    library_path: str = "app/config/smart_sentry_v2_3_2_faces.json"
+    library_path: str = CANONICAL_FACE_LIBRARY_PATH
     recognition_threshold: float = 0.82
     min_face_size_px: int = 56
     suppress_known_faces_from_engagement: bool = True
@@ -446,6 +467,7 @@ class AIAssistantConfig:
 class ShortcutConfig:
     """Global keyboard shortcut preferences."""
     enabled: bool = True
+    manual_controls_enabled: bool = False
     quick_view_doc_path: str = "SMART_SENTRY_SHORTCUT_KEYS.md"
 
 
@@ -512,6 +534,7 @@ class SentryV2Config:
     guard: GuardConfig = field(default_factory=GuardConfig)
     no_fire_masks: List[NoFireMaskConfig] = field(default_factory=list)
     pir_guard: PIRGuardConfig = field(default_factory=PIRGuardConfig)
+    lighting: LightingConfig = field(default_factory=LightingConfig)
     sound: SoundConfig = field(default_factory=SoundConfig)
     face_recognition: FaceRecognitionConfig = field(default_factory=FaceRecognitionConfig)
     ai_assistant: AIAssistantConfig = field(default_factory=AIAssistantConfig)
@@ -541,11 +564,11 @@ class SentryV2Config:
     window_maximized: bool = False
     prompted_targets_enabled: bool = False
     prompted_allow_auto_fire: bool = False
-    prompted_library_path: str = "app/config/smart_sentry_v2_3_2_prompted_targets.json"
+    prompted_library_path: str = CANONICAL_PROMPTED_TARGETS_PATH
     quick_startup_enabled: bool = True
 
     # --- Persistence ---
-    config_path: str = "app/config/smart_sentry_v2_3_2_settings.json"
+    config_path: str = CANONICAL_SETTINGS_PATH
 
     # ------------------------------------------------------------------ #
     # Serialization helpers
@@ -640,6 +663,7 @@ class SentryV2Config:
             if isinstance(sensor_data, dict):
                 sensors.append(PIRSensorConfig(**sensor_data))
         pir_cfg = PIRGuardConfig(sensors=sensors, **pir_raw)
+        lighting_cfg = LightingConfig(**dict(d.get("lighting", {})))
         sound_cfg = SoundConfig(**dict(d.get("sound", {})))
         face_cfg = FaceRecognitionConfig(**dict(d.get("face_recognition", {})))
         ai_cfg = AIAssistantConfig(**dict(d.get("ai_assistant", {})))
@@ -655,6 +679,7 @@ class SentryV2Config:
             guard=gd,
             no_fire_masks=masks,
             pir_guard=pir_cfg,
+            lighting=lighting_cfg,
             sound=sound_cfg,
             face_recognition=face_cfg,
             ai_assistant=ai_cfg,
@@ -682,9 +707,9 @@ class SentryV2Config:
             window_maximized=bool(d.get("window_maximized", False)),
             prompted_targets_enabled=d.get("prompted_targets_enabled", False),
             prompted_allow_auto_fire=d.get("prompted_allow_auto_fire", False),
-            prompted_library_path=d.get("prompted_library_path", "app/config/smart_sentry_v2_3_2_prompted_targets.json"),
+            prompted_library_path=d.get("prompted_library_path", CANONICAL_PROMPTED_TARGETS_PATH),
             quick_startup_enabled=d.get("quick_startup_enabled", True),
-            config_path=d.get("config_path", "app/config/smart_sentry_v2_3_2_settings.json"),
+            config_path=d.get("config_path", CANONICAL_SETTINGS_PATH),
         )
 
     def save(self, path: Optional[str] = None) -> None:

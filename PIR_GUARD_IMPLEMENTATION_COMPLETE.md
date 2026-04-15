@@ -146,9 +146,9 @@ Methods Added:
   - set_on_pir_event(callback): Register callback for PIR events
   - inject_pir_event(sensor_id): Testing/manual PIR trigger
 
-Ready for ESP32 Integration:
-  - Callback will be invoked when UDP message parses PIR telemetry
-  - Currently has testing hook for manual verification
+Current Integration:
+  - Callback is invoked from parsed serial `PIR_EVENT` lines and live WiFi UDP `pir_event` packets
+  - Manual injection remains useful for bench verification
 ```
 
 #### 5. **sentry_v2_tab.py** (UI Integration)
@@ -186,11 +186,11 @@ Help text for all PIR controls:
 
 | Sensor | Pan | Tilt | Notes |
 |--------|-----|------|-------|
-| Sensor 1 | 270° | 15° | Left-rear (~9 o'clock) |
-| Sensor 2 | 150° | 15° | Front-left (~10 o'clock) |
-| Sensor 3 | 30° | 15° | Front-right (~2 o'clock) |
+| Sensor 1 | 45° | 35° | Code default transport-zone cue |
+| Sensor 2 | 135° | 35° | Code default transport-zone cue |
+| Sensor 3 | 225° | 35° | Code default transport-zone cue |
 
-Covers ~270° arc around turret base. All disabled by default. User can adjust angles via UI or config file.
+All disabled by default. User can adjust angles via UI or config file. The current saved operator profile may differ from these defaults and should be treated as deployment-specific, not a firmware mismatch.
 
 ## Testing & Verification
 
@@ -227,7 +227,6 @@ python test_pir_ui_config.py
 ## Known Limitations & Future Work
 
 ### Immediate TODOs
-- ⏳ **ESP32 Telemetry Parser**: Extend `sentry_v2_comm.py` to parse PIR sensor bitmask from UDP messages
 - ⏳ **Integration Testing**: Verify end-to-end PIR → slew → scan → engagement behavior
 - ⏳ **Documentation**: Update SMART_SENTRY_MANUAL.md with PIR setup guide
 
@@ -246,7 +245,7 @@ python test_pir_ui_config.py
 
 ## Configuration Persistence
 
-Settings saved in `app/config/sentry_v2_settings.json`:
+Settings saved in `app/config/smart_sentry_v2_3_2_settings.json`:
 ```json
 {
   "pir_guard": {
@@ -255,8 +254,8 @@ Settings saved in `app/config/sentry_v2_settings.json`:
       {
         "pin_id": 0,
         "cue_pan": 270.0,
-        "cue_tilt": 15.0,
-        "debounce_ms": 200,
+        "cue_tilt": 55.0,
+        "debounce_ms": 500,
         "enabled": true
       },
       { /* sensor 2 */ },

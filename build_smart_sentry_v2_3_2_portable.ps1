@@ -116,7 +116,7 @@ function Test-DriveRootAvailable([string]$driveRoot) {
     return ($LASTEXITCODE -eq 0)
 }
 
-function Assert-RequiredReleaseArtifacts([string]$buildRoot, [string]$exeName, [string]$contentsDirName, [string]$pythonRuntimeDllName) {
+function Assert-RequiredReleaseArtifacts([string]$buildRoot, [string]$exeName, [string]$contentsDirName, [string]$pythonRuntimeDllName, [string[]]$requiredContentRelativePaths = @()) {
     $contentsDirPath = Join-Path $buildRoot $contentsDirName
     $requiredPaths = @(
         (Join-Path $buildRoot $exeName),
@@ -125,6 +125,13 @@ function Assert-RequiredReleaseArtifacts([string]$buildRoot, [string]$exeName, [
         (Join-Path $contentsDirPath 'python3.dll'),
         (Join-Path $contentsDirPath $pythonRuntimeDllName)
     )
+
+    foreach ($relativePath in $requiredContentRelativePaths) {
+        if ([string]::IsNullOrWhiteSpace($relativePath)) {
+            continue
+        }
+        $requiredPaths += (Join-Path $contentsDirPath $relativePath)
+    }
 
     $missingPaths = @($requiredPaths | Where-Object { -not (Test-Path $_) })
     if ($missingPaths.Count -gt 0) {
@@ -154,6 +161,68 @@ function Set-PackagedYoloConfig([string]$configPath, [string]$modelDir) {
     $configData | ConvertTo-Json -Depth 100 | Set-Content -Path $configPath -Encoding UTF8
 }
 
+function Set-PackagedConfigSurface([string]$configPath, [string]$settingsRelativePath, [string]$promptedRelativePath, [string]$faceRelativePath, [string]$modelDir, [string]$udpHost, [int]$udpPort) {
+    if (-not (Test-Path $configPath)) {
+        return
+    }
+
+    $configData = Get-Content $configPath -Raw | ConvertFrom-Json
+
+    if ($null -ne $configData.detection_mode) {
+        $configData.detection_mode.yolo_model_dir = $modelDir
+    }
+    if ($null -ne $configData.connection) {
+        $configData.connection.udp_host = $udpHost
+        $configData.connection.udp_port = $udpPort
+    }
+    if ($null -eq $configData.face_recognition) {
+        $configData | Add-Member -NotePropertyName face_recognition -NotePropertyValue ([pscustomobject]@{})
+    }
+    if ($configData.face_recognition -isnot [psobject]) {
+        $configData.face_recognition = [pscustomobject]@{}
+    }
+    $faceLibraryProperty = $configData.face_recognition.PSObject.Properties.Match('library_path')
+    if ($null -eq $faceLibraryProperty -or $faceLibraryProperty.Count -eq 0) {
+        $configData.face_recognition | Add-Member -NotePropertyName library_path -NotePropertyValue $faceRelativePath -Force
+    } else {
+        $configData.face_recognition.library_path = $faceRelativePath
+    }
+
+    $configData.prompted_library_path = $promptedRelativePath
+    $configData.config_path = $settingsRelativePath
+    $configData | ConvertTo-Json -Depth 100 | Set-Content -Path $configPath -Encoding UTF8
+}
+
+function Patch-BundledUltralyticsGit([string]$contentsDirPath) {
+    $gitPyPath = Join-Path $contentsDirPath 'ultralytics\utils\git.py'
+    if (-not (Test-Path $gitPyPath)) {
+        throw "Expected bundled ultralytics git module was not found: $gitPyPath"
+    }
+
+    $riskyToken = 'path: Path = Path(__file__).resolve()'
+    $safeToken = 'path: Path = Path(".")'
+    $raw = Get-Content $gitPyPath -Raw
+
+    if ($raw.Contains($safeToken) -and -not $raw.Contains($riskyToken)) {
+        Write-Host "Bundled ultralytics git.py already hardened: $gitPyPath"
+        return
+    }
+
+    if (-not $raw.Contains($riskyToken)) {
+        throw "Unable to apply ultralytics hardening patch; expected token was not found in: $gitPyPath"
+    }
+
+    $patched = $raw.Replace($riskyToken, $safeToken)
+    Set-Content -Path $gitPyPath -Value $patched -Encoding UTF8
+
+    $verify = Get-Content $gitPyPath -Raw
+    if ($verify.Contains($riskyToken) -or -not $verify.Contains($safeToken)) {
+        throw "Bundled ultralytics hardening patch verification failed: $gitPyPath"
+    }
+
+    Write-Host "Applied bundled ultralytics hardening patch: $gitPyPath"
+}
+
 function Copy-ReleaseConfigAlias([string]$sourcePath, [string]$targetPath) {
     if (-not (Test-Path $sourcePath)) {
         return
@@ -169,6 +238,44 @@ function Remove-ReleaseConfigAlias([string]$targetPath) {
     if (Test-Path $targetPath) {
         Remove-Item $targetPath -Force -ErrorAction SilentlyContinue
     }
+}
+
+function Sync-QtVcRuntimeDllsAtPath([string]$qtBinDir) {
+    if (-not (Test-Path $qtBinDir)) {
+        return
+    }
+
+    $runtimeNames = @(
+        'msvcp140.dll',
+        'msvcp140_1.dll',
+        'msvcp140_2.dll',
+        'vcruntime140.dll',
+        'vcruntime140_1.dll'
+    )
+
+    foreach ($runtimeName in $runtimeNames) {
+        $systemRuntimePath = Join-Path $env:WINDIR "System32\$runtimeName"
+        if (-not (Test-Path $systemRuntimePath)) {
+            continue
+        }
+        Copy-Item -Path $systemRuntimePath -Destination (Join-Path $qtBinDir $runtimeName) -Force
+    }
+}
+
+function Sync-BuildQtVcRuntimeDlls([string]$pythonExePath) {
+    if ([string]::IsNullOrWhiteSpace($pythonExePath) -or -not (Test-Path $pythonExePath)) {
+        return
+    }
+
+    $pythonDir = Split-Path $pythonExePath -Parent
+    $pythonRoot = Split-Path $pythonDir -Parent
+    $qtBinDir = Join-Path $pythonRoot 'Lib\site-packages\PyQt5\Qt5\bin'
+    Sync-QtVcRuntimeDllsAtPath $qtBinDir
+}
+
+function Sync-QtVcRuntimeDlls([string]$releaseRoot, [string]$contentsDirName) {
+    $qtBinDir = Join-Path $releaseRoot "$contentsDirName\PyQt5\Qt5\bin"
+    Sync-QtVcRuntimeDllsAtPath $qtBinDir
 }
 
 function Invoke-NativeProcess([string]$filePath, [string[]]$arguments, [string]$workingDirectory) {
@@ -190,6 +297,10 @@ $activeVersionToken = $activeVersion -replace '\.', '_'
 $activeLauncherBaseName = "run_smart_sentry_v$activeVersionToken"
 $activeLauncherModule = "app.$activeLauncherBaseName"
 $activeLauncherPath = Join-Path $repoRoot "app\$activeLauncherBaseName.py"
+$launcherScriptFiles = @(Get-ChildItem (Join-Path $repoRoot 'app') -Filter 'run_smart_sentry_v*.py' -File | ForEach-Object { $_.FullName })
+$launcherScriptRelativePaths = @($launcherScriptFiles | ForEach-Object { "app\$([System.IO.Path]::GetFileName($_))" })
+$launcherModulesToBundle = @($launcherScriptFiles | ForEach-Object { "app.$([System.IO.Path]::GetFileNameWithoutExtension($_))" })
+$launcherModulesToBundle = @($launcherModulesToBundle | Sort-Object -Unique)
 $releaseDir = Join-Path $OutputDrive "SMART SENTRY V$activeVersion"
 $releaseExeBase = "SMART_SENTRY_V$activeVersion"
 $releaseExeName = "$releaseExeBase.exe"
@@ -223,10 +334,14 @@ if (-not (Test-Path $pythonExe)) {
     $pythonExe = 'python'
 }
 
+Sync-BuildQtVcRuntimeDlls -pythonExePath $pythonExe
+
 $pythonRuntimeDllName = (& $pythonExe -c "import sys; print(f'python{sys.version_info.major}{sys.version_info.minor}.dll')").Trim()
 if (-not $pythonRuntimeDllName) {
     throw 'Unable to determine the Python runtime DLL name for the selected interpreter.'
 }
+
+$cv2DataPath = (& $pythonExe -c "import cv2, pathlib; print(pathlib.Path(cv2.__file__).resolve().parent / 'data')").Trim()
 
 $bundleModels = -not $ExcludeModels
 $bundleSklearn = $IncludeSklearn -and -not $ExcludeSklearn
@@ -234,12 +349,23 @@ $bundleYtDlp = $IncludeYtDlp -and -not $ExcludeYtDlp
 $canonicalSettingsName = "smart_sentry_v${activeVersionToken}_settings.json"
 $canonicalPresetsName = "smart_sentry_v${activeVersionToken}_custom_presets.json"
 $canonicalPromptedTargetsName = "smart_sentry_v${activeVersionToken}_prompted_targets.json"
+$canonicalFacesName = "smart_sentry_v${activeVersionToken}_faces.json"
+$canonicalSettingsRelativePath = "app/config/$canonicalSettingsName"
+$canonicalPromptedTargetsRelativePath = "app/config/$canonicalPromptedTargetsName"
+$canonicalFacesRelativePath = "app/config/$canonicalFacesName"
+$canonicalUdpHost = '192.168.4.1'
+$canonicalUdpPort = 9000
 $legacyV3SettingsName = 'smart_sentry_v3_settings.json'
 $legacyV3PresetsName = 'smart_sentry_v3_custom_presets.json'
 $legacyV3PromptedTargetsName = 'smart_sentry_v3_prompted_targets.json'
+$legacyV3FacesName = 'smart_sentry_v3_faces.json'
+$legacyActiveSettingsName = 'smart_sentry_v2_3_2_settings.json'
+$legacyActivePromptedTargetsName = 'smart_sentry_v2_3_2_prompted_targets.json'
+$legacyActiveFacesName = 'smart_sentry_v2_3_2_faces.json'
 $legacyV2SettingsName = 'sentry_v2_settings.json'
 $legacyV2PresetsName = 'sentry_v2_custom_presets.json'
 $legacyV2PromptedTargetsName = 'sentry_v2_prompted_targets.json'
+$legacyV2FacesName = 'sentry_v2_faces.json'
 
 if (-not (Test-DriveRootAvailable $OutputDrive)) {
     throw "Compilation protocol requires output on $OutputDrive, but that drive is not available."
@@ -280,6 +406,9 @@ $rootModelsPath = Join-Path $repoRoot 'YOLO_MODELS'
 if (-not (Test-Path $activeLauncherPath)) {
     throw "Active launcher for version $activeVersion was not found: $activeLauncherPath"
 }
+if ($launcherScriptFiles.Count -eq 0) {
+    throw "No app launcher scripts were discovered under app\\run_smart_sentry_v*.py"
+}
 
 $requiredModules = @('PyInstaller', 'PyQt5', 'cv2', 'numpy', 'serial', 'torch', 'ultralytics')
 if ($bundleSklearn) {
@@ -306,6 +435,8 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Packaging preflight failed. Resolve missing launcher/module imports before packaging.'
 }
 
+$pyInstallerHooksDir = Join-Path $repoRoot 'pyinstaller_hooks'
+
 $pyInstallerArgs = @(
     '-m', 'PyInstaller',
     '--noconfirm',
@@ -315,12 +446,12 @@ $pyInstallerArgs = @(
     '--name', $releaseExeBase,
     '--contents-directory', $releaseContentsDirName,
     '--icon', $iconPath,
+    '--additional-hooks-dir', $pyInstallerHooksDir,
     '--paths', $repoRoot,
     '--paths', (Join-Path $repoRoot 'app'),
     '--distpath', $distRoot,
     '--workpath', $workRoot,
     '--specpath', $specRoot,
-    '--collect-all', 'torch',
     '--collect-all', 'torchvision',
     '--collect-all', 'ultralytics',
     '--exclude-module', 'onnxscript',
@@ -350,6 +481,30 @@ $pyInstallerArgs = @(
     $runScriptPath
 )
 
+$torchRuntimeExcludes = @(
+    'torch.testing',
+    'torch.testing._internal',
+    'torch.distributed._shard',
+    'torch.distributed._sharded_tensor',
+    'torch.distributed._sharding_spec',
+    'torch.onnx._internal.exporter._testing',
+    'torch.onnx.testing',
+    'torch.onnx.verification',
+    'torch.utils.benchmark'
+)
+
+foreach ($excludedTorchModule in $torchRuntimeExcludes) {
+    $pyInstallerArgs += @('--exclude-module', $excludedTorchModule)
+}
+
+foreach ($launcherModule in $launcherModulesToBundle) {
+    $pyInstallerArgs += @('--hidden-import', $launcherModule)
+}
+
+foreach ($launcherScriptPath in $launcherScriptFiles) {
+    $pyInstallerArgs += @('--add-data', "$launcherScriptPath;app")
+}
+
 if (-not $bundleSklearn) {
     $pyInstallerArgs += @(
         '--exclude-module', 'sklearn',
@@ -370,6 +525,10 @@ if ($bundleSklearn) {
         '--hidden-import', 'sklearn.neural_network',
         '--hidden-import', 'sklearn.neural_network._multilayer_perceptron'
     )
+}
+
+if ($cv2DataPath -and (Test-Path $cv2DataPath)) {
+    $pyInstallerArgs += @('--add-data', "$cv2DataPath;cv2/data")
 }
 if ($bundleYtDlp) {
     $pyInstallerArgs += @('--collect-all', 'yt_dlp')
@@ -393,7 +552,10 @@ if (-not (Test-Path $releaseContentsDir)) {
     throw "Expected versioned support folder was not created: $releaseContentsDir"
 }
 
-Assert-RequiredReleaseArtifacts -buildRoot $outputDir -exeName $releaseExeName -contentsDirName $releaseContentsDirName -pythonRuntimeDllName $pythonRuntimeDllName
+Patch-BundledUltralyticsGit -contentsDirPath $releaseContentsDir
+
+Assert-RequiredReleaseArtifacts -buildRoot $outputDir -exeName $releaseExeName -contentsDirName $releaseContentsDirName -pythonRuntimeDllName $pythonRuntimeDllName -requiredContentRelativePaths $launcherScriptRelativePaths
+Sync-QtVcRuntimeDlls -releaseRoot $outputDir -contentsDirName $releaseContentsDirName
 
 $yoloDir = Join-Path $releaseContentsDir 'YOLO_MODELS'
 $publicYoloDir = Join-Path $outputDir 'YOLO_MODELS'
@@ -411,12 +573,42 @@ $publicReadmePath = Join-Path $publicYoloDir 'README.txt'
 New-Item -ItemType Directory -Force -Path $yoloDir | Out-Null
 
 $stagingConfigDir = Join-Path $releaseContentsDir 'app\config'
-Copy-ReleaseConfigAlias -sourcePath (Join-Path $stagingConfigDir $legacyV3SettingsName) -targetPath (Join-Path $stagingConfigDir $canonicalSettingsName)
-Copy-ReleaseConfigAlias -sourcePath (Join-Path $stagingConfigDir $legacyV3PresetsName) -targetPath (Join-Path $stagingConfigDir $canonicalPresetsName)
-Copy-ReleaseConfigAlias -sourcePath (Join-Path $stagingConfigDir $legacyV3PromptedTargetsName) -targetPath (Join-Path $stagingConfigDir $canonicalPromptedTargetsName)
-Copy-ReleaseConfigAlias -sourcePath (Join-Path $stagingConfigDir $legacyV2SettingsName) -targetPath (Join-Path $stagingConfigDir $canonicalSettingsName)
-Copy-ReleaseConfigAlias -sourcePath (Join-Path $stagingConfigDir $legacyV2PresetsName) -targetPath (Join-Path $stagingConfigDir $canonicalPresetsName)
-Copy-ReleaseConfigAlias -sourcePath (Join-Path $stagingConfigDir $legacyV2PromptedTargetsName) -targetPath (Join-Path $stagingConfigDir $canonicalPromptedTargetsName)
+if (-not (Test-Path (Join-Path $stagingConfigDir $canonicalSettingsName))) {
+    foreach ($fallbackName in @($legacyV3SettingsName, $legacyV2SettingsName, $legacyActiveSettingsName)) {
+        $fallbackPath = Join-Path $stagingConfigDir $fallbackName
+        if (Test-Path $fallbackPath) {
+            Copy-ReleaseConfigAlias -sourcePath $fallbackPath -targetPath (Join-Path $stagingConfigDir $canonicalSettingsName)
+            break
+        }
+    }
+}
+if (-not (Test-Path (Join-Path $stagingConfigDir $canonicalPresetsName))) {
+    foreach ($fallbackName in @($legacyV3PresetsName, $legacyV2PresetsName)) {
+        $fallbackPath = Join-Path $stagingConfigDir $fallbackName
+        if (Test-Path $fallbackPath) {
+            Copy-ReleaseConfigAlias -sourcePath $fallbackPath -targetPath (Join-Path $stagingConfigDir $canonicalPresetsName)
+            break
+        }
+    }
+}
+if (-not (Test-Path (Join-Path $stagingConfigDir $canonicalPromptedTargetsName))) {
+    foreach ($fallbackName in @($legacyV3PromptedTargetsName, $legacyV2PromptedTargetsName, $legacyActivePromptedTargetsName)) {
+        $fallbackPath = Join-Path $stagingConfigDir $fallbackName
+        if (Test-Path $fallbackPath) {
+            Copy-ReleaseConfigAlias -sourcePath $fallbackPath -targetPath (Join-Path $stagingConfigDir $canonicalPromptedTargetsName)
+            break
+        }
+    }
+}
+if (-not (Test-Path (Join-Path $stagingConfigDir $canonicalFacesName))) {
+    foreach ($fallbackName in @($legacyV3FacesName, $legacyV2FacesName, $legacyActiveFacesName)) {
+        $fallbackPath = Join-Path $stagingConfigDir $fallbackName
+        if (Test-Path $fallbackPath) {
+            Copy-ReleaseConfigAlias -sourcePath $fallbackPath -targetPath (Join-Path $stagingConfigDir $canonicalFacesName)
+            break
+        }
+    }
+}
 
 Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV3SettingsName)
 Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV3PresetsName)
@@ -424,11 +616,15 @@ Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV3Prom
 Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV2SettingsName)
 Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV2PresetsName)
 Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV2PromptedTargetsName)
+Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV3FacesName)
+Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV2FacesName)
 
 if ($bundleModels) {
     Copy-Item -Path (Join-Path $rootModelsPath '*') -Destination $yoloDir -Recurse -Force
     Copy-Item -Path (Join-Path $rootModelsPath '*') -Destination $publicYoloDir -Recurse -Force
-    Set-PackagedYoloConfig -configPath (Join-Path $releaseContentsDir "app\config\$canonicalSettingsName") -modelDir $publicYoloDir
+    foreach ($configName in @($canonicalSettingsName, 'smart_sentry_v2_3_2_settings.json')) {
+        Set-PackagedConfigSurface -configPath (Join-Path $releaseContentsDir "app\config\$configName") -settingsRelativePath $canonicalSettingsRelativePath -promptedRelativePath $canonicalPromptedTargetsRelativePath -faceRelativePath $canonicalFacesRelativePath -modelDir $publicYoloDir -udpHost $canonicalUdpHost -udpPort $canonicalUdpPort
+    }
 } else {
     New-Item -ItemType Directory -Force -Path $yoloDir | Out-Null
 
@@ -461,12 +657,16 @@ Get-ChildItem $releaseDir -Force -ErrorAction SilentlyContinue | ForEach-Object 
     Remove-DirectoryRobust $_.FullName
 }
 Copy-Item -Path (Join-Path $outputDir '*') -Destination $releaseDir -Recurse -Force
+Sync-QtVcRuntimeDlls -releaseRoot $releaseDir -contentsDirName $releaseContentsDirName
 
 $releaseExePath = Join-Path $releaseDir $releaseExeName
 Assert-RequiredReleaseArtifacts -buildRoot $releaseDir -exeName $releaseExeName -contentsDirName $releaseContentsDirName -pythonRuntimeDllName $pythonRuntimeDllName
+Patch-BundledUltralyticsGit -contentsDirPath (Join-Path $releaseDir $releaseContentsDirName)
 
 if ($bundleModels) {
-    Set-PackagedYoloConfig -configPath (Join-Path $releaseDir "$releaseContentsDirName\app\config\$canonicalSettingsName") -modelDir (Join-Path $releaseDir 'YOLO_MODELS')
+    foreach ($configName in @($canonicalSettingsName, 'smart_sentry_v2_3_2_settings.json')) {
+        Set-PackagedConfigSurface -configPath (Join-Path $releaseDir "$releaseContentsDirName\app\config\$configName") -settingsRelativePath $canonicalSettingsRelativePath -promptedRelativePath $canonicalPromptedTargetsRelativePath -faceRelativePath $canonicalFacesRelativePath -modelDir (Join-Path $releaseDir 'YOLO_MODELS') -udpHost $canonicalUdpHost -udpPort $canonicalUdpPort
+    }
 }
 
 $releaseConfigDir = Join-Path $releaseDir "$releaseContentsDirName\app\config"
@@ -476,6 +676,8 @@ Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV3Prom
 Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV2SettingsName)
 Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV2PresetsName)
 Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV2PromptedTargetsName)
+Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV3FacesName)
+Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV2FacesName)
 
 foreach ($path in @($distRoot, $workRoot, $specRoot, $legacyBuildRoot)) {
     if (Test-Path $path) {

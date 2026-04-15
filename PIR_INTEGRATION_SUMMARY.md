@@ -11,11 +11,15 @@
 The original PIR integration remains valid, but the live runtime contract now includes these documented updates:
 
 - Smart Sentry v2 is operated as a standalone app workflow.
+- The current live app firmware path is `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` for the WiFi + Debug Board path.
+- `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino` remains the current DB3000 serial IO + PIR reference, not the primary live WiFi runtime.
 - The canonical current settings file is `app/config/smart_sentry_v2_3_2_settings.json`.
 - The current default three-zone layout is 45°, 135°, and 225° pan with 35° tilt.
+- The current saved operator profile maps those sensor ids to 270.0°, 152.0°, and 29.0° cue pans with 55.0°, 52.0°, and 54.0° tilt.
 - Current per-sensor debounce default is 500 ms.
 - Current `confirmation_timeout` default is 1.2 s.
 - The cue point is now the confirmation center, and multi-point no-detect scans intentionally begin from the first offset point instead of re-visiting the center again.
+- `target_loss_timeout` is the outer after-loss recovery window, while adaptive after-loss selects the protocol inside that window; PIR cue/scan suppresses normal target-loss recovery while active.
 
 When documenting or validating PIR behavior, describe the live cue-confirm-offset-search sequence rather than the older center-revisit interpretation.
 
@@ -32,11 +36,12 @@ When documenting or validating PIR behavior, describe the live cue-confirm-offse
 ✅ **sentry_v2_tooltips.py**: Context help for all PIR controls  
 
 ### 2. ESP32 Firmware (This Session)
-✅ **DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino**: New sketch with PIR support  
+✅ **SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino**: Current live WiFi + Debug Board app firmware  
+✅ **DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino**: Current DB3000 direct-serial IO + PIR reference  
 ✅ **Pin Assignments**: GPIO 35, 34, 39 (3 PIR sensors)  
-✅ **Toggle**: Compile-time (`ENABLE_PIR_SUPPORT`) + Runtime (`P` token)  
-✅ **Backward Compatible**: All original commands work unchanged  
-✅ **Documentation**: 3 comprehensive guides (500+ KB total)
+✅ **Toggle**: Runtime `pir_enabled` on WiFi path, `P` token on DB3000 serial path  
+✅ **Backward Compatible**: All original DB3000 serial commands work unchanged  
+✅ **Documentation**: PIR docs now distinguish live WiFi and DB3000 serial contracts
 
 ### 3. Documentation
 ✅ **PIR_GUARD_IMPLEMENTATION_COMPLETE.md**: Technical deep-dive (2000+ lines)  
@@ -94,9 +99,10 @@ When documenting or validating PIR behavior, describe the live cue-confirm-offse
 │  ├─ reportPIREvent() - Send telemetry to host              │
 │  └─ Debounce: runtime-configurable per sensor              │
 │                                                              │
-│  Command Parsing:                                           │
-│  ├─ Original: S, M, F, L, R, G (unchanged)                 │
-│  └─ NEW: P (PIR enable/disable)                            │
+│  Transport Contracts:                                       │
+│  ├─ DB3000 serial IO: S, M, F, L, R, G + P tokens         │
+│  └─ Live WiFi app path: UDP JSON with `pir_enabled` /      │
+│     `pir_event` plus runtime config payloads               │
 │                                                              │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -207,11 +213,12 @@ app/sentry_v2/
 ### ESP32 Firmware
 ```
 arduino/
+├── SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/
+│   └── SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino        (CURRENT live WiFi app path)
 ├── DB3000_ESP32_IO_Telemetry_2026/
 │   └── DB3000_ESP32_IO_Telemetry_2026.ino           (ORIGINAL, untouched)
-│
 └── DB3000_ESP32_IO_Telemetry_2026_w_PIR/
-    └── DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino    (NEW with PIR)
+        └── DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino    (Current serial IO + PIR path)
 ```
 
 ### Documentation
@@ -285,7 +292,6 @@ DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
 - [x] Comparison guide (original vs new)
 
 ### Remaining (Future)
-- [ ] ESP32 UDP telemetry parser in sentry_v2_comm.py
 - [ ] End-to-end integration testing
 - [ ] Real hardware validation (actual PIR sensors)
 - [ ] Engagement statistics collection
@@ -334,15 +340,28 @@ DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
 pir_guard:
   pir_enabled: false                 # Master disabled
   sensors:
-    0: {cue_pan: 270°, cue_tilt: 15°, enabled: false}   # Left-rear
-    1: {cue_pan: 150°, cue_tilt: 15°, enabled: false}   # Front-left
-    2: {cue_pan: 30°, cue_tilt: 15°, enabled: false}    # Front-right
+                0: {cue_pan: 45°, cue_tilt: 35°, enabled: false}
+                1: {cue_pan: 135°, cue_tilt: 35°, enabled: false}
+                2: {cue_pan: 225°, cue_tilt: 35°, enabled: false}
   scan_on_no_detect: true
   scan_pan_range: 25°
   scan_tilt_range: 15°
   scan_grid_resolution: 3
   scan_speed: 12°/s
-  confirmation_timeout: 1.0s
+        confirmation_timeout: 1.2s
+```
+
+Current saved operator profile in `app/config/smart_sentry_v2_3_2_settings.json`:
+
+```yaml
+pir_guard:
+        pir_enabled: true
+        sensors:
+                0: {cue_pan: 270.0°, cue_tilt: 55.0°, debounce_ms: 500, enabled: true}
+                1: {cue_pan: 152.0°, cue_tilt: 52.0°, debounce_ms: 500, enabled: true}
+                2: {cue_pan: 29.0°, cue_tilt: 54.0°, debounce_ms: 500, enabled: true}
+        cue_hold_time_s: 0.18
+        confirmation_timeout: 1.0s
 ```
 
 ### ESP32 Defaults
@@ -371,8 +390,8 @@ Response: ACK includes "P=" field only if PIR compiled in
 
 ### Medium-Term (1 month)
 1. Connect 3 physical PIR sensors to ESP32 (GPIO 35, 34, 39)
-2. Extend sentry_v2_comm.py to parse `PIR_EVENT` telemetry
-3. Test PIR event → turret slew → search behavior
+2. Test PIR event → turret slew → search behavior on the current live topology
+3. Verify after-loss and PIR cue/scan do not compete on hardware
 4. Collect engagement statistics
 
 ### Long-Term

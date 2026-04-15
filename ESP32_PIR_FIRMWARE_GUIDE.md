@@ -5,6 +5,11 @@ Updated ESP32 firmware that adds 3 PIR motion sensor inputs while maintaining 10
 
 This guide describes the DB3000 ESP32 IO firmware family, not the archived Waveshare single-board bridge path.
 
+Current live Smart Sentry app topology note:
+
+- Current live WiFi + Debug Board app firmware: `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+- Current DB3000 USB serial IO firmware covered by this guide: `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
+
 **Original File**: `DB3000_ESP32_IO_Telemetry_2026.ino`  
 **New File**: `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`  
 **Status**: Original remains unchanged; new version is fully independent
@@ -47,13 +52,19 @@ Scope note:
 | GPIO 25 | PIN_ACC_RELAY | Secondary accessory relay |
 
 ### PIR Sensor Inputs (New)
-| Pin | Constant | Physical Location | Panel Angle |
-|-----|----------|-------------------|-------------|
-| GPIO 35 | PIN_PIR_SENSOR_0 | Left-rear mount | ~270° |
-| GPIO 34 | PIN_PIR_SENSOR_1 | Front-left mount | ~150° |
-| GPIO 39 | PIN_PIR_SENSOR_2 | Front-right mount | ~30° |
+| Pin | Constant | Transport Role | Cue Ownership |
+|-----|----------|----------------|---------------|
+| GPIO 35 | PIN_PIR_SENSOR_0 | Sensor 0 input | App-configured cue angles |
+| GPIO 34 | PIN_PIR_SENSOR_1 | Sensor 1 input | App-configured cue angles |
+| GPIO 39 | PIN_PIR_SENSOR_2 | Sensor 2 input | App-configured cue angles |
 
 **Note**: All PIR pins use active-HIGH inputs with internal GPIO pull-down (ESP32 default).
+
+Cue-angle note:
+
+- The firmware only reports `sensor_id` values.
+- Cue pan/tilt angles live in the Smart Sentry desktop config, not in the ESP32 transport contract.
+- Older docs that tied sensor ids directly to 270° / 150° / 30° should now be treated as one example mounting layout, not a fixed protocol requirement.
 
 ## Command Protocol
 
@@ -209,22 +220,23 @@ updatePIRSensors()
 ## Integration with Smart Sentry v2
 
 ### Python Side (sentry_v2_comm.py)
-Currently has placeholder:
-```python
-def inject_pir_event(sensor_id: int):
-    """Manual PIR test trigger (will be replaced by UDP parser)"""
-    callback(sensor_id, time.time())
-```
+Current status:
 
-**To integrate real PIR telemetry**:
-1. Parse UDP messages from ESP32
-2. Look for messages starting with `PIR_EVENT`
-3. Extract `sensor_id` and `timestamp`
-4. Call `self._on_pir_event(sensor_id, timestamp)`
+- `sentry_v2_comm.py` already supports PIR event callbacks.
+- The serial path parses `PIR_EVENT sensor_id=... timestamp=...` lines.
+- The live WiFi path parses UDP JSON `pir_event` packets from `SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`.
+- The app can still inject a manual PIR event for bench testing, but real parser support is no longer future work.
 
-Example UDP message from ESP32:
-```
-{"type": "PIR_EVENT", "sensor_id": 0, "timestamp": 123456789}
+Current live WiFi event example:
+```json
+{
+  "v": 1,
+  "t": "pir_event",
+  "p": {
+    "sensor_id": 0,
+    "timestamp_ms": 123456789
+  }
+}
 ```
 
 ### Configuration Mapping
@@ -237,6 +249,11 @@ Example UDP message from ESP32:
 | debounce_ms | Fixed 200ms in sketch |
 
 **Note**: Pan/tilt look angles and scanning logic live in the **Smart Sentry v2 Python engine** (sentry_v2_engine.py), not the ESP32. The ESP32 simply detects and reports motion; the PC app decides what to do with it.
+
+Current contract split:
+
+- Use this DB3000 sketch when validating direct serial IO / dual-port ESP32 behavior.
+- Use `SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` when validating the current live WiFi + Debug Board desktop app path.
 
 ## Testing & Validation
 
@@ -371,7 +388,7 @@ build_flags = -DENABLE_PIR_SUPPORT=1
 
 ---
 
-**Last Updated**: December 2024  
+**Last Updated**: April 2026  
 **Compile Status**: ✓ Verified (Arduino IDE 2.x + ESP32-IDF 2.0.x+)  
 **Test Status**: ✓ Ready for hardware validation  
-**Integration**: ⏳ Pending UDP parser in sentry_v2_comm.py
+**Integration**: ✓ Serial `PIR_EVENT` and live WiFi `pir_event` paths are documented and supported in `sentry_v2_comm.py`

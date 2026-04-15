@@ -56,6 +56,9 @@ static const IPAddress AP_IP(192, 168, 4, 1);
 static const IPAddress AP_GW(192, 168, 4, 1);
 static const IPAddress AP_MASK(255, 255, 255, 0);
 static const uint16_t  UDP_PORT  = 9000;
+static const int       AP_CHANNEL = 6;
+static const bool      AP_SSID_HIDDEN = false;
+static const int       AP_MAX_CONNECTIONS = 4;
 
 WiFiUDP  Udp;
 IPAddress last_remote_ip;
@@ -77,6 +80,15 @@ static const int PIN_SPARE_RELAY    = 26;   // Spare relay
 static const int PIN_BUZZER         = 4;    // Passive buzzer / tone output
 static const int BUZZER_PWM_RES_BITS = 10;
 static const int PIN_BOOT_BUTTON    = 0;    // DevKit BOOT button (reserved for boot strapping)
+
+// ---- Accessory PWM via LEDC (optional MOSFET dimming) --------------------------------
+// 0 = standard ON/OFF via digitalWrite – factory default, safe for relay hardware.
+// 1 = 8-bit LEDC PWM for LED, Laser, ACC, and Spare outputs via MOSFET driver.
+// NOTE: only flip to 1 after MOSFET driver hardware is installed on every output channel.
+//       The app sends 0-255 for each channel: 0=off, 1=full-on compat, 2-255=literal duty.
+#define ACCESSORY_PWM_ENABLED  0
+#define ACCESSORY_PWM_FREQ_HZ  5000u
+#define ACCESSORY_PWM_BITS     8
 
 // ADC current sensing (input-only, GPIO 34-39)
 static const int PIN_CURR_PAN   = 36;   // No PIR conflict
@@ -141,6 +153,11 @@ static const uint16_t MOVE_TIME_BIG_MS   = 10;
 static const uint16_t MOVE_TIME_MED_MS   = 14;
 static const uint16_t MOVE_TIME_SMALL_MS = 18;
 static const uint16_t MOVE_TIME_TINY_MS  = 22;
+static const uint16_t MOTION_PLAN_MIN_MS = 40;
+static const uint16_t MOTION_UPDATE_INTERVAL_MS = 15;
+static const float    MOTION_SETTLE_DEADBAND_DEG = 0.35f;
+static const float    MOTION_MIN_STEP_DEG = 0.18f;
+static const float    MOTION_MAX_STEP_DEG = 6.0f;
 
 HardwareSerial busSerial(2);
 static uint32_t bus_baud_active = BUS_BAUD;
@@ -227,9 +244,14 @@ static uint32_t trigger_servo_last_step_ms = 0;
 static bool     pir_event_blink_enabled = false;
 static bool     buzzer_pwm_ready = false;
 static bool     sound_active = false;
+static uint8_t  sound_owner = 0;
 static uint32_t sound_end_ms = 0;
 static int      sound_freq_hz = 0;
 static int      sound_volume_pct = 100;
+static uint8_t  motion_cue_mode = 0;
+static uint8_t  motion_cue_step = 0;
+static uint32_t motion_cue_next_ms = 0;
+static uint32_t motion_cue_keepalive_until_ms = 0;
 
 static uint32_t trip_start_ms  = 0;
 static bool     current_fault  = false;
@@ -240,6 +262,14 @@ static int      latest_total_mA = 0;
 static int      last_sent_pan  = -1;
 static int      last_sent_tilt = -1;
 static uint32_t last_bus_send_ms = 0;
+static float    current_output_pan_deg = 90.0f;
+static float    current_output_tilt_deg = 40.0f;
+static int      motion_plan_pan = 90;
+static int      motion_plan_tilt = 40;
+static uint16_t motion_plan_time_ms = MOTION_PLAN_MIN_MS;
+static uint32_t motion_plan_started_ms = 0;
+static uint32_t last_motion_update_ms = 0;
+static bool     motion_output_initialized = false;
 
 static uint16_t move_time_override_ms       = 0;
 static uint32_t move_time_override_until_ms = 0;
@@ -258,6 +288,17 @@ static uint32_t wifi_recover_count = 0;
 static bool     link_safe_mode_active = true;
 
 static const uint32_t LINK_IDLE_SAFE_TIMEOUT_MS = 1500;
+static const uint8_t  SOUND_OWNER_NONE = 0;
+static const uint8_t  SOUND_OWNER_COMMAND = 1;
+static const uint8_t  SOUND_OWNER_MANEUVER = 2;
+static const uint8_t  MOTION_CUE_NONE = 0;
+static const uint8_t  MOTION_CUE_WAKE = 1;
+static const uint8_t  MOTION_CUE_REST = 2;
+static const float    MOTION_CUE_START_MIN_DELTA_DEG = 1.4f;
+static const float    MOTION_CUE_REST_NEAR_DEG = 8.0f;
+static const float    MOTION_CUE_SETTLE_DEG = 0.9f;
+static const uint32_t MOTION_CUE_REFRESH_MS = 320;
+static const uint8_t  MOTION_CUE_VOLUME_PCT = 48;
 
 // ─────────────────────────────────────────────────────────────
 // Command sweep
@@ -397,6 +438,19 @@ static uint16_t compute_move_time_ms(int delta) {
   if (delta >=  7) return MOVE_TIME_SMALL_MS;
   return MOVE_TIME_TINY_MS;
 }
+static float step_toward_target(float current_deg, float target_deg,
+                                uint32_t elapsed_ms, uint16_t plan_time_ms) {
+  float delta = target_deg - current_deg;
+  float abs_delta = fabsf(delta);
+  if (abs_delta <= MOTION_SETTLE_DEADBAND_DEG) return target_deg;
+
+  float duration_ms = (plan_time_ms > 0) ? (float)plan_time_ms : (float)MOTION_PLAN_MIN_MS;
+  float step = abs_delta * ((float)elapsed_ms / duration_ms);
+  if (step < MOTION_MIN_STEP_DEG) step = MOTION_MIN_STEP_DEG;
+  if (step > MOTION_MAX_STEP_DEG) step = MOTION_MAX_STEP_DEG;
+  if (step >= abs_delta) return target_deg;
+  return current_deg + ((delta > 0.0f) ? step : -step);
+}
 static uint16_t map_deg_to_ticks(int deg, int minDeg, int maxDeg,
                                  uint16_t ticksMin, uint16_t ticksMax) {
   deg = clamp_int(deg, minDeg, maxDeg);
@@ -437,10 +491,43 @@ static void stop_sound_tone() {
     ledcWrite(PIN_BUZZER, 0);
   }
   sound_active = false;
+  sound_owner = SOUND_OWNER_NONE;
   sound_end_ms = 0;
   sound_freq_hz = 0;
 }
-static void start_sound_tone(int freq_hz, int duration_ms, int volume_pct = 100) {
+static float max_angle_delta_deg(float pan_a, float tilt_a, float pan_b, float tilt_b) {
+  return max(fabsf(pan_a - pan_b), fabsf(tilt_a - tilt_b));
+}
+static void stop_motion_cue(bool silence = true) {
+  motion_cue_mode = MOTION_CUE_NONE;
+  motion_cue_step = 0;
+  motion_cue_next_ms = 0;
+  motion_cue_keepalive_until_ms = 0;
+  if (silence && sound_active && sound_owner == SOUND_OWNER_MANEUVER) {
+    stop_sound_tone();
+  }
+}
+static void refresh_motion_cue(uint32_t now_val) {
+  if (motion_cue_mode == MOTION_CUE_NONE) return;
+  uint32_t keepalive = now_val + MOTION_CUE_REFRESH_MS;
+  if ((int32_t)(keepalive - motion_cue_keepalive_until_ms) > 0) {
+    motion_cue_keepalive_until_ms = keepalive;
+  }
+}
+static void start_motion_cue(uint8_t mode, uint32_t now_val, bool restart_pattern = true) {
+  if (mode == MOTION_CUE_NONE) return;
+  bool mode_changed = motion_cue_mode != mode;
+  if (mode_changed || restart_pattern) {
+    motion_cue_step = 0;
+    motion_cue_next_ms = now_val;
+  }
+  if (mode_changed && sound_active && sound_owner == SOUND_OWNER_MANEUVER) {
+    stop_sound_tone();
+  }
+  motion_cue_mode = mode;
+  refresh_motion_cue(now_val);
+}
+static void start_sound_tone(int freq_hz, int duration_ms, int volume_pct = 100, uint8_t owner = SOUND_OWNER_COMMAND) {
   if (!ensure_buzzer_pwm_ready()) {
     Serial.println("[SOUND] Buzzer PWM init failed");
     return;
@@ -463,6 +550,7 @@ static void start_sound_tone(int freq_hz, int duration_ms, int volume_pct = 100)
   ledcWriteTone(PIN_BUZZER, (uint32_t)freq);
   ledcWrite(PIN_BUZZER, duty);
   sound_active = true;
+  sound_owner = owner;
   sound_freq_hz = freq;
   sound_volume_pct = volume;
   sound_end_ms = now_ms() + (uint32_t)duration;
@@ -473,6 +561,60 @@ static void update_sound_output(uint32_t now_val) {
     stop_sound_tone();
   }
 }
+static void update_motion_cue(uint32_t now_val) {
+  if (motion_cue_mode == MOTION_CUE_NONE) return;
+
+  float remaining_deg = max_angle_delta_deg(
+    (float)target_pan,
+    (float)target_tilt,
+    current_output_pan_deg,
+    current_output_tilt_deg
+  );
+  if (remaining_deg > MOTION_CUE_SETTLE_DEG) {
+    refresh_motion_cue(now_val);
+  } else if ((int32_t)(now_val - motion_cue_keepalive_until_ms) >= 0) {
+    stop_motion_cue(true);
+    return;
+  }
+
+  if (sound_active) {
+    return;
+  }
+  if ((int32_t)(now_val - motion_cue_next_ms) < 0) {
+    return;
+  }
+
+  int freq = 0;
+  int duration = 0;
+  int gap = 0;
+  if (motion_cue_mode == MOTION_CUE_WAKE) {
+    static const int WAKE_FREQS[] = {760, 930, 1110, 1280};
+    static const int WAKE_DURATIONS[] = {54, 60, 68, 84};
+    static const int WAKE_GAPS[] = {28, 30, 34, 52};
+    const uint8_t count = (uint8_t)(sizeof(WAKE_FREQS) / sizeof(WAKE_FREQS[0]));
+    uint8_t idx = motion_cue_step % count;
+    freq = WAKE_FREQS[idx];
+    duration = WAKE_DURATIONS[idx];
+    gap = WAKE_GAPS[idx];
+    motion_cue_step = (uint8_t)((idx + 1U) % count);
+  } else if (motion_cue_mode == MOTION_CUE_REST) {
+    static const int REST_FREQS[] = {1240, 1040, 860, 690};
+    static const int REST_DURATIONS[] = {62, 72, 84, 112};
+    static const int REST_GAPS[] = {34, 38, 42, 64};
+    const uint8_t count = (uint8_t)(sizeof(REST_FREQS) / sizeof(REST_FREQS[0]));
+    uint8_t idx = motion_cue_step % count;
+    freq = REST_FREQS[idx];
+    duration = REST_DURATIONS[idx];
+    gap = REST_GAPS[idx];
+    motion_cue_step = (uint8_t)((idx + 1U) % count);
+  } else {
+    stop_motion_cue(false);
+    return;
+  }
+
+  start_sound_tone(freq, duration, MOTION_CUE_VOLUME_PCT, SOUND_OWNER_MANEUVER);
+  motion_cue_next_ms = now_val + (uint32_t)(duration + gap);
+}
 
 static bool start_wifi_ap() {
   WiFi.persistent(false);
@@ -481,12 +623,17 @@ static bool start_wifi_ap() {
   WiFi.softAPdisconnect(true);
   delay(20);
   WiFi.softAPConfig(AP_IP, AP_GW, AP_MASK);
-  bool wifi_ok = WiFi.softAP(WIFI_SSID, WIFI_PASS);
-  Serial.printf("[WIFI] AP '%s': %s IP=%s clients=%d\n",
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  bool wifi_ok = WiFi.softAP(WIFI_SSID, WIFI_PASS, AP_CHANNEL, AP_SSID_HIDDEN ? 1 : 0, AP_MAX_CONNECTIONS);
+  delay(120);
+  Serial.printf("[WIFI] AP '%s': %s IP=%s channel=%d hidden=%d clients=%d mac=%s\n",
                 WIFI_SSID,
                 wifi_ok ? "OK" : "FAILED",
                 WiFi.softAPIP().toString().c_str(),
-                WiFi.softAPgetStationNum());
+                WiFi.channel(),
+                AP_SSID_HIDDEN ? 1 : 0,
+                WiFi.softAPgetStationNum(),
+                WiFi.softAPmacAddress().c_str());
   return wifi_ok;
 }
 
@@ -536,6 +683,7 @@ static void enter_link_safe_mode(const char *reason) {
   if (link_safe_mode_active) return;
 
   link_safe_mode_active = true;
+  stop_motion_cue(false);
   allow_rest_tilt_motion = false;
   safety_state = 1;
   fire_request = 0;
@@ -768,35 +916,81 @@ static void update_motion_outputs(bool blocked) {
   int pan  = apply_invert_and_clamp(target_pan,  limits_cfg.pan_min,  limits_cfg.pan_max,  INVERT_PAN);
   int tilt = apply_invert_and_clamp(target_tilt, allow_rest_tilt_motion ? 0 : limits_cfg.tilt_min, limits_cfg.tilt_max, INVERT_TILT);
   uint32_t now    = now_ms();
-  bool changed    = (pan != last_sent_pan) || (tilt != last_sent_tilt);
-  if (!changed && sweep_active) return;
-  if (!changed && (now - last_bus_send_ms) < 250) return;
-
-  int pan_delta  = (last_sent_pan  < 0) ? 0 : (pan  - last_sent_pan);
-  int tilt_delta = (last_sent_tilt < 0) ? 0 : (tilt - last_sent_tilt);
-  uint16_t pan_time  = compute_move_time_ms(pan_delta);
-  uint16_t tilt_time = compute_move_time_ms(tilt_delta);
-
-  if (sweep_active) {
-    pan_time = tilt_time = SWEEP_MOVE_TIME_MS;
-  } else if (move_time_override_ms > 0 && now <= move_time_override_until_ms) {
-    pan_time = tilt_time = move_time_override_ms;
+  if (!motion_output_initialized) {
+    current_output_pan_deg = (float)pan;
+    current_output_tilt_deg = (float)tilt;
+    motion_plan_pan = pan;
+    motion_plan_tilt = tilt;
+    motion_plan_time_ms = MOTION_PLAN_MIN_MS;
+    motion_plan_started_ms = now;
+    last_motion_update_ms = now;
+    servo_write_deg(PIN_PAN_SERVO, pan);
+    servo_write_deg(PIN_TILT_SERVO, tilt);
+    last_sent_pan = pan;
+    last_sent_tilt = tilt;
+    last_bus_send_ms = now;
+    motion_output_initialized = true;
+    return;
   }
-  if (changed)
-    Serial.printf("[MOTION] Pan %d->%d (%ums)  Tilt %d->%d (%ums)\n",
-                  last_sent_pan, pan, pan_time, last_sent_tilt, tilt, tilt_time);
-  // Use PWM servos instead of serial bus
-  servo_write_deg(PIN_PAN_SERVO,  pan);
-  servo_write_deg(PIN_TILT_SERVO, tilt);
-  last_sent_pan    = pan;
-  last_sent_tilt   = tilt;
+
+  bool target_changed = (pan != motion_plan_pan) || (tilt != motion_plan_tilt);
+  if (target_changed) {
+    int pan_delta = (int)lroundf((float)pan - current_output_pan_deg);
+    int tilt_delta = (int)lroundf((float)tilt - current_output_tilt_deg);
+    uint16_t pan_time = compute_move_time_ms(pan_delta);
+    uint16_t tilt_time = compute_move_time_ms(tilt_delta);
+    uint16_t sync_time = (pan_time > tilt_time) ? pan_time : tilt_time;
+    if (sweep_active) {
+      sync_time = SWEEP_MOVE_TIME_MS;
+    } else if (move_time_override_ms > 0 && now <= move_time_override_until_ms) {
+      sync_time = move_time_override_ms;
+    }
+    if (sync_time < MOTION_PLAN_MIN_MS) sync_time = MOTION_PLAN_MIN_MS;
+    motion_plan_pan = pan;
+    motion_plan_tilt = tilt;
+    motion_plan_time_ms = sync_time;
+    motion_plan_started_ms = now;
+    Serial.printf("[MOTION] Plan pan %d->%d  tilt %d->%d  sync=%ums\n",
+                  last_sent_pan, pan, last_sent_tilt, tilt, sync_time);
+  } else if ((now - last_motion_update_ms) < MOTION_UPDATE_INTERVAL_MS) {
+    return;
+  }
+
+  uint32_t elapsed_ms = now - last_motion_update_ms;
+  if (elapsed_ms == 0) elapsed_ms = 1;
+  last_motion_update_ms = now;
+
+  current_output_pan_deg = step_toward_target(current_output_pan_deg, (float)motion_plan_pan, elapsed_ms, motion_plan_time_ms);
+  current_output_tilt_deg = step_toward_target(current_output_tilt_deg, (float)motion_plan_tilt, elapsed_ms, motion_plan_time_ms);
+
+  int out_pan = clamp_int((int)lroundf(current_output_pan_deg), limits_cfg.pan_min, limits_cfg.pan_max);
+  int out_tilt = clamp_int((int)lroundf(current_output_tilt_deg), allow_rest_tilt_motion ? 0 : limits_cfg.tilt_min, limits_cfg.tilt_max);
+  bool changed = (out_pan != last_sent_pan) || (out_tilt != last_sent_tilt);
+  if (!changed) return;
+
+  servo_write_deg(PIN_PAN_SERVO, out_pan);
+  servo_write_deg(PIN_TILT_SERVO, out_tilt);
+  last_sent_pan = out_pan;
+  last_sent_tilt = out_tilt;
   last_bus_send_ms = now;
 }
 static void update_accessories() {
-  digitalWrite(PIN_LED_RELAY,    led_state   ? HIGH : LOW);
-  digitalWrite(PIN_LASER_RELAY,  laser_state ? HIGH : LOW);
-  digitalWrite(PIN_ACC_RELAY,    acc_state   ? HIGH : LOW);
-  digitalWrite(PIN_SPARE_RELAY,  spare_state ? HIGH : LOW);
+#if ACCESSORY_PWM_ENABLED
+  // PWM path: maps 0=off, 1=full-on compat, 2-255=literal duty cycle.
+  auto acc_pwm_duty = [](int s) -> uint8_t {
+    return (s <= 0) ? 0 : (s == 1) ? 255 : (uint8_t)s;
+  };
+  ledcWrite(PIN_LED_RELAY,   acc_pwm_duty(led_state));
+  ledcWrite(PIN_LASER_RELAY, acc_pwm_duty(laser_state));
+  ledcWrite(PIN_ACC_RELAY,   acc_pwm_duty(acc_state));
+  ledcWrite(PIN_SPARE_RELAY, acc_pwm_duty(spare_state));
+#else
+  // Standard ON/OFF relay path (default).
+  digitalWrite(PIN_LED_RELAY,   led_state   ? HIGH : LOW);
+  digitalWrite(PIN_LASER_RELAY, laser_state ? HIGH : LOW);
+  digitalWrite(PIN_ACC_RELAY,   acc_state   ? HIGH : LOW);
+  digitalWrite(PIN_SPARE_RELAY, spare_state ? HIGH : LOW);
+#endif
 }
 static void set_mosfet(bool on) { digitalWrite(PIN_TRIGGER_MOSFET, on ? HIGH : LOW); }
 static void set_trigger_servo_target(bool fire_state) {
@@ -1202,6 +1396,44 @@ static void apply_command(JsonObject payload) {
     move_time_override_ms       = (uint16_t)mt;
     move_time_override_until_ms = now_ms() + 5000;
   }
+  float output_pan = motion_output_initialized ? current_output_pan_deg : (float)prev_pan;
+  float output_tilt = motion_output_initialized ? current_output_tilt_deg : (float)prev_tilt;
+  float current_to_rest = max_angle_delta_deg(
+    output_pan,
+    output_tilt,
+    (float)clamped_rest_pan(),
+    (float)clamped_rest_tilt()
+  );
+  float target_to_rest = max_angle_delta_deg(
+    (float)target_pan,
+    (float)target_tilt,
+    (float)clamped_rest_pan(),
+    (float)clamped_rest_tilt()
+  );
+  float command_delta = max_angle_delta_deg(
+    (float)prev_pan,
+    (float)prev_tilt,
+    (float)target_pan,
+    (float)target_tilt
+  );
+  uint32_t command_now = now_ms();
+  bool rest_like_move =
+    allow_rest_tilt_motion &&
+    current_to_rest > MOTION_CUE_REST_NEAR_DEG &&
+    (target_to_rest + 0.75f) < current_to_rest &&
+    command_delta >= MOTION_CUE_START_MIN_DELTA_DEG;
+  bool wake_like_move =
+    !allow_rest_tilt_motion &&
+    current_to_rest <= MOTION_CUE_REST_NEAR_DEG &&
+    target_to_rest >= (current_to_rest + 1.0f) &&
+    command_delta >= MOTION_CUE_START_MIN_DELTA_DEG;
+  if (rest_like_move) {
+    start_motion_cue(MOTION_CUE_REST, command_now, motion_cue_mode != MOTION_CUE_REST);
+  } else if (wake_like_move) {
+    start_motion_cue(MOTION_CUE_WAKE, command_now, motion_cue_mode != MOTION_CUE_WAKE);
+  } else if (motion_cue_mode != MOTION_CUE_NONE && command_delta >= 0.25f) {
+    refresh_motion_cue(command_now);
+  }
   if (target_pan != prev_pan || target_tilt != prev_tilt) {
     blink_motion = true;
     Serial.printf("[CMD] pos: pan %d->%d  tilt %d->%d\n",
@@ -1284,12 +1516,13 @@ static void process_packet(char *buffer, size_t len, IPAddress ip, uint16_t port
         int freq_hz = payload["freq_hz"] | payload["freq"] | 1200;
         int duration_ms = payload["duration_ms"] | 60;
         int volume_pct = payload["volume_pct"] | 100;
-        start_sound_tone(freq_hz, duration_ms, volume_pct);
+        start_sound_tone(freq_hz, duration_ms, volume_pct, SOUND_OWNER_COMMAND);
         send_ack(seq, true, ip, port);
       } else if (strcmp(action, "rest") == 0) {
         allow_rest_tilt_motion = true;
         target_pan = clamped_rest_pan();
         target_tilt = clamped_rest_tilt();
+        start_motion_cue(MOTION_CUE_REST, now_ms(), true);
         send_ack(seq, true, ip, port);
       } else if (strcmp(action, "sweep") == 0) {
         start_sweep_sequence(now_ms());
@@ -1450,6 +1683,13 @@ void setup() {
   pinMode(PIN_LASER_RELAY,    OUTPUT); digitalWrite(PIN_LASER_RELAY,    LOW);
   pinMode(PIN_ACC_RELAY,      OUTPUT); digitalWrite(PIN_ACC_RELAY,      LOW);
   pinMode(PIN_SPARE_RELAY,    OUTPUT); digitalWrite(PIN_SPARE_RELAY,    LOW);
+#if ACCESSORY_PWM_ENABLED
+  // Attach LEDC PWM channels for all four accessory outputs.
+  ledcAttach(PIN_LED_RELAY,   ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+  ledcAttach(PIN_LASER_RELAY, ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+  ledcAttach(PIN_ACC_RELAY,   ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+  ledcAttach(PIN_SPARE_RELAY, ACCESSORY_PWM_FREQ_HZ, ACCESSORY_PWM_BITS);
+#endif
   pinMode(PIN_BUZZER,         OUTPUT); digitalWrite(PIN_BUZZER,         LOW);
   pinMode(PIN_STATUS_LED,     OUTPUT); set_status_led(false);
   trigger_servo_current_deg = (float)TRIGGER_SERVO_REST_DEG_DEFAULT;
@@ -1485,6 +1725,14 @@ void setup() {
   if (wifi_ok) {
     start_sound_tone(1560, 90, 70);
   }
+
+  current_output_pan_deg = (float)target_pan;
+  current_output_tilt_deg = (float)target_tilt;
+  motion_plan_pan = target_pan;
+  motion_plan_tilt = target_tilt;
+  motion_plan_time_ms = MOTION_PLAN_MIN_MS;
+  motion_plan_started_ms = now_ms();
+  last_motion_update_ms = motion_plan_started_ms;
 
   last_cmd_ms = now_ms();
   link_safe_mode_active = false;
@@ -1557,6 +1805,7 @@ void loop() {
   update_fire_outputs(now, fire_blocked);
   update_trigger_servo_motion(now);
   update_sound_output(now);
+  update_motion_cue(now);
   ensure_wifi_ap_ready(now);
 
 #if ENABLE_PIR_SUPPORT

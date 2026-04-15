@@ -1046,6 +1046,7 @@ For the v3.0.0 release target, the Facial Recognition tab is intentionally hidde
 The Shortcut Keys tab is now the runtime status page for operator hotkeys.
 
 - It exposes one master enable toggle for window-focused shortcuts.
+- It also exposes a separate manual movement/fire keyboard toggle for `W`, `A`, `S`, `D`, `Space`, and the manual arrow-key bindings, and that safety-sensitive toggle defaults to off.
 - It shows the assigned key list inside the app.
 - It mirrors the same quick-reference document opened by the top-row `Quick Keys` button.
 
@@ -1531,7 +1532,7 @@ Before changing Smart Sentry v2, review these Smart Sentry-specific references:
 - Add or update an entry in `SMART_SENTRY_ISSUE_LOG.md` for each Smart Sentry issue investigated
 - Record every Smart Sentry fix attempt in the issue log, including attempts that failed
 - Mark each issue-log attempt as `Worked`, `Did Not Work`, or `Partial`
-- Keep issue-log entries short: date, issue, fix tried, result
+- Include symptoms, root cause, fix/solution, and files modified in each issue-log entry
 - Keep Smart Sentry documentation separate from main-app issue history
 
 ## 17. DOCUMENTATION WORKFLOW
@@ -1547,12 +1548,16 @@ Smart Sentry documentation is intentionally split into three layers so future ch
 ### Issue Log
 
 - File: `SMART_SENTRY_ISSUE_LOG.md`
-- Purpose: compact issue history for Smart Sentry only
-- Each row should include:
-   - Date
-   - Issue summary
-   - Fix tried
+- Purpose: comprehensive issue tracker and troubleshooting reference for Smart Sentry only
+- Each entry should include:
+   - Date, app version, category (`Camera`, `Engine`, `UI`, `Firmware`, `Detection`, `Build`, `Config`)
    - Result: `Worked`, `Did Not Work`, or `Partial`
+   - Symptoms: what the operator sees
+   - Root cause: technical reason for the failure
+   - Fix/solution: exact change made
+   - Files modified: source files changed
+   - Notes: diagnostic tips, related issues, recurrence risk (optional)
+- The file includes a **Quick Troubleshooting Reference** section for fast symptom-to-fix lookup
 - Do not add main-app issues to this file
 
 ### Tooltip Source

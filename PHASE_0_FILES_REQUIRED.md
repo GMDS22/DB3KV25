@@ -28,10 +28,10 @@
 
 ### 2. PC Application (Python GUI)
 **File**: [run.py](run.py)
-- **Entry point**: Launches Smart Sentry v2 application
-- **Purpose**: Launch the current Smart Sentry app, which now targets the ESP32 WiFi + Debug Board USB path rather than the archived Waveshare bridge path
-- **Startup**: `python run.py` (from DB3000V4.1-main directory)
-- **Phase 0 Role**: Use this to send pan/tilt commands to Waveshare
+- **Entry point**: Launches the current Smart Sentry desktop application
+- **Purpose**: Launch the current Smart Sentry app. For historical Phase 0 work, this was used as the desktop-side sender while the archived Waveshare bridge was on the bench.
+- **Startup**: `python run.py` (from repository root)
+- **Phase 0 Role**: Historical bench controller for pan/tilt command tests against the archived Waveshare bridge
 
 ---
 
@@ -50,7 +50,7 @@
 ### 4. Smart Sentry v2 Configuration
 **File**: [app/sentry_v2/sentry_v2_config.py](app/sentry_v2/sentry_v2_config.py)
 - **Purpose**: Configuration storage and defaults
-- **Saved Location**: `app/config/sentry_v2_settings.json`
+- **Saved Location**: `app/config/smart_sentry_v2_3_2_settings.json`
 - **Key Settings for Phase 0**:
   - `connection_type: int` - Set to 3 (MODE_WIFI_FULL)
   - `udp_host: str` - Should be "192.168.4.1"
@@ -70,11 +70,11 @@
   - Watch for WiFi connection status
   - Capture any error messages during servo control
 - **Output To Capture**:
-  - `[BOOT] DB3000_ESP32_UDP_PIR  v1`
-  - `[BOOT] ap=OK ip=192.168.4.1`
-  - `[BOOT] bus uart baud=1000000 rx=18 tx=19`
-  - `[BOOT] switch input gpio=21 active_low=1 state=...`
-  - `[BOOT] UDP port 9000 ready`
+  - `[BOOT] bus uart baud=250000 rx=18 tx=19`
+  - `[BOOT] wifi_stability_test_mode=ON normal_bus_baud=1000000`
+  - `[BOOT] ap=OK ip=192.168.4.1 expected_ip=192.168.4.1 stations=0`
+  - `[BOOT] udp begin=OK port=9000`
+  - `[BOOT] hardware switch input disabled in current firmware`
 
 ---
 
@@ -83,7 +83,7 @@
 - **Purpose**: Command-line tool to flash firmware to ESP32
 - **Phase 0 Usage**:
   ```bash
-  tools\arduino-cli\arduino-cli.exe upload -p COM31 --fqbn esp32:esp32:esp32 arduino\SMART_SENTRY_V2_0_ESP32_UDP_PIR\SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino
+  tools\arduino-cli\arduino-cli.exe upload -p COM31 --fqbn esp32:esp32:esp32 arduino\SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE\SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino
   ```
 - **Note**: Replace `COM31` with actual COM port of Waveshare board
 
@@ -136,7 +136,7 @@
 ## Configuration Files - Auto-Created on First Run
 
 ### 11. Smart Sentry v2 Settings
-**File**: `app/config/sentry_v2_settings.json` (auto-created)
+**File**: `app/config/smart_sentry_v2_3_2_settings.json` (auto-created)
 - **Purpose**: Persistent configuration storage
 - **Will Be Created**: Automatically on first `run.py` launch
 - **Important for Phase 0**:
@@ -165,10 +165,10 @@
   3. Copy all output to `PHASE_0_BOOT_LOG.txt`
 - **Expected Content**:
   ```
-  [BOOT] ap=OK ip=192.168.4.1
-  [BOOT] bus uart baud=1000000 rx=18 tx=19
-  [BOOT] switch input gpio=21 active_low=1 state=...
-  [BOOT] udp port=9000
+  [BOOT] bus uart baud=250000 rx=18 tx=19
+  [BOOT] wifi_stability_test_mode=ON normal_bus_baud=1000000
+  [BOOT] ap=OK ip=192.168.4.1 expected_ip=192.168.4.1 stations=0
+  [BOOT] udp begin=OK port=9000
   ```
 
 ---
@@ -196,7 +196,7 @@
 - **Location**: `.venv` (virtual environment)
 - **Activation**: 
   ```powershell
-  & "f:\DB3000V5.0 - ESP32\.venv\Scripts\Activate.ps1"
+  & ".\.venv\Scripts\Activate.ps1"
   ```
 - **Verify Installation**:
   ```bash
@@ -218,11 +218,11 @@
 
 | Category | File | Status | Phase 0 Role |
 |----------|------|--------|-------------|
-| **Firmware** | `arduino/SMART_SENTRY_V2_0_ESP32_UDP_PIR/SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino` | ✅ Exists | Flash to Waveshare |
+| **Firmware** | `arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino` | ✅ Exists | Flash to Waveshare |
 | **GUI** | `run.py` | ✅ Exists | Launch application |
 | **Comm** | `app/sentry_v2/sentry_v2_comm.py` | ✅ Exists | Send pan/tilt commands |
 | **Config** | `app/sentry_v2/sentry_v2_config.py` | ✅ Exists | Manage settings |
-| **Config** | `app/config/sentry_v2_settings.json` | 🔄 Auto-created | Store connection params |
+| **Config** | `app/config/smart_sentry_v2_3_2_settings.json` | 🔄 Auto-created | Store connection params |
 | **Monitor** | `read_serial.py` | ✅ Exists | Capture boot logs |
 | **UI** | `app/sentry_v2/sentry_v2_tab.py` | ✅ Exists | Control pan/tilt |
 | **Tool** | `tools/arduino-cli/arduino-cli.exe` | ✅ Exists | Flash firmware |
@@ -245,9 +245,9 @@
 
 ### Execution Steps
 1. [ ] Identify ESP32 COM port (Device Manager or `python -m serial.tools.list_ports`)
-2. [ ] Flash firmware: `arduino-cli upload -p COMXX --fqbn esp32:esp32:esp32 arduino\SMART_SENTRY_V2_0_ESP32_UDP_PIR\SMART_SENTRY_V2_0_ESP32_UDP_PIR.ino`
+2. [ ] Flash firmware: `arduino-cli upload -p COMXX --fqbn esp32:esp32:esp32 arduino\SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE\SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino`
 3. [ ] Monitor boot messages: `python read_serial.py` (verify UART2 message appears)
-4. [ ] Connect PC to WiFi "DB3000-Turret" or ensure network routing works
+4. [ ] Connect PC to WiFi "WAVESHARE-ESP32" or ensure network routing works
 5. [ ] Launch application: `python run.py`
 6. [ ] Set connection mode to "WiFi Full" (mode 3)
 7. [ ] Send pan command: 0° (home), 45°, 90° (verify servo response)
