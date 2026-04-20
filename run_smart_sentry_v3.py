@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-from app.run_smart_sentry_v2_3_2 import SmartSentryV2_3_2StandaloneWindow, SmartSentryV3StandaloneWindow
 from run import main
 
 

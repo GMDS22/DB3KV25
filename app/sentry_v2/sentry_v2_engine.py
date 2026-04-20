@@ -17,35 +17,19 @@ on every camera frame and the engine emits callbacks for turret/fire actions.
 from __future__ import annotations
 
 import random
-import sys
 import time
 from enum import Enum, auto
-from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-if __package__ in (None, ""):
-    app_dir = Path(__file__).resolve().parents[1]
-    if str(app_dir) not in sys.path:
-        sys.path.insert(0, str(app_dir))
-    from sentry_v2.sentry_v2_config import SentryV2Config
-    from sentry_v2.sentry_v2_no_fire_masks import find_blocking_mask
-    from sentry_v2.target_filter import DetectedObject, FilterDecision, TargetFilter
-    from sentry_v2.threat_scorer import ThreatScorer, TrackedTarget
-    from sentry_v2.engagement_planner import EngagementPlanner, EngagementOrder
-    from sentry_v2.ml_training_logger import MLTrainingLogger
-    from sentry_v2.sentry_v2_pir_manager import SentryV2PIRManager
-    from sentry_v2.precision_tuning_logger import PrecisionTuningLogger
-    from sentry_v2.autotracking_logger import AutotrackingLogger
-else:
-    from .sentry_v2_config import SentryV2Config
-    from .sentry_v2_no_fire_masks import find_blocking_mask
-    from .target_filter import DetectedObject, FilterDecision, TargetFilter
-    from .threat_scorer import ThreatScorer, TrackedTarget
-    from .engagement_planner import EngagementPlanner, EngagementOrder
-    from .ml_training_logger import MLTrainingLogger
-    from .sentry_v2_pir_manager import SentryV2PIRManager
-    from .precision_tuning_logger import PrecisionTuningLogger
-    from .autotracking_logger import AutotrackingLogger
+from .sentry_v2_config import SentryV2Config
+from .sentry_v2_no_fire_masks import find_blocking_mask
+from .target_filter import DetectedObject, FilterDecision, TargetFilter
+from .threat_scorer import ThreatScorer, TrackedTarget
+from .engagement_planner import EngagementPlanner, EngagementOrder
+from .ml_training_logger import MLTrainingLogger
+from .sentry_v2_pir_manager import SentryV2PIRManager
+from .precision_tuning_logger import PrecisionTuningLogger
+from .autotracking_logger import AutotrackingLogger
 
 
 NON_SEMANTIC_REACQUIRE_CLASSES = {"moving_object", "motion", "foreground", "color", "unknown"}
@@ -796,8 +780,6 @@ class SentryV2Engine:
                 and target is not None
                 and self._trigger_should_fire(target, lock_pan, lock_tilt, now)
             ):
-                # AUTO-TRIGGER ACTIVATED: Primary firing condition met
-                print(f"[AUTO_TRIGGER] PRIMARY: settle_met={settle_met}, early_lock={early_lock}, ready_to_fire={self._ready_to_fire()}, trigger_should_fire={self._trigger_should_fire(target, lock_pan, lock_tilt, now)}", flush=True)
                 self._begin_fire(order, now)
                 return
 
@@ -815,8 +797,6 @@ class SentryV2Engine:
                 and self._has_aim_lock(lock_pan, lock_tilt)
                 and self._current_no_fire_mask() is None
             ):
-                # AUTO-TRIGGER ACTIVATED: Backup firing condition met
-                print(f"[AUTO_TRIGGER] BACKUP: refractory_ok={now >= self._trigger_refractory_until}, timeout_ok={elapsed >= float(self.cfg.engagement.aim_lock_timeout)}, ready_to_fire={self._ready_to_fire()}, target_reqs={self._target_meets_fire_requirements(target)}, aim_lock={self._has_aim_lock(lock_pan, lock_tilt)}, no_mask={self._current_no_fire_mask() is None}", flush=True)
                 self._begin_fire(order, now)
                 return
 
@@ -1231,13 +1211,9 @@ class SentryV2Engine:
         )
         if fired:
             burst = self.cfg.engagement.burst_count
-            print(f"[AUTO_TRIGGER] FIRE: burst={burst}, track_id={order.target.det.track_id}, class={order.target.det.class_name}", flush=True)
             if self._cb_fire:
                 self._cb_fire(burst)
-        else:
-            print(f"[AUTO_TRIGGER] FIRE BLOCKED: auto_trigger_enabled={self.cfg.engagement.auto_trigger_enabled}, blocked_mask={blocked_mask}, prompted_ok={prompted_auto_fire_allowed}", flush=True)
-
-        self.engagement_log.append({
+                self.engagement_log.append({
             "track_id": order.target.det.track_id,
             "class": order.target.det.class_name,
             "threat": round(order.target.threat_score, 2),
@@ -1998,7 +1974,6 @@ class SentryV2Engine:
         if now < self._trigger_refractory_until:
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
-            print(f"[TRIGGER_CHECK] BLOCKED: refractory period active until {self._trigger_refractory_until}", flush=True)
             return False
 
         enter_pan = float(eng.fire_trigger_enter_pan_tolerance)
@@ -2021,29 +1996,21 @@ class SentryV2Engine:
         if self._current_no_fire_mask() is not None:
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
-            print(f"[TRIGGER_CHECK] BLOCKED: no-fire mask active: {self._current_no_fire_mask()}", flush=True)
             return False
 
         if not (centered and stable and trustworthy):
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
-            print(f"[TRIGGER_CHECK] BLOCKED: centered={centered}, stable={stable}, trustworthy={trustworthy}", flush=True)
-            print(f"[TRIGGER_CHECK]   lock_pan={lock_pan:.3f}, lock_tilt={lock_tilt:.3f}, gate_pan={gate_pan:.3f}, gate_tilt={gate_tilt:.3f}", flush=True)
-            print(f"[TRIGGER_CHECK]   pan_rate={self._err_pan_rate_deg_s:.3f}, tilt_rate={self._err_tilt_rate_deg_s:.3f}, max_pan={eng.fire_trigger_max_pan_rate}, max_tilt={eng.fire_trigger_max_tilt_rate}", flush=True)
-            print(f"[TRIGGER_CHECK]   confidence={target.det.confidence:.3f}, persistence={target.persistence:.3f}, min_conf={eng.fire_trigger_min_confidence}, min_persist={eng.fire_trigger_min_persistence}", flush=True)
             return False
 
         if self._trigger_hold_start <= 0.0:
             self._trigger_hold_start = now
             self._trigger_gate_active = True
-            print(f"[TRIGGER_CHECK] HOLD START: gate activated, hold_time={eng.fire_trigger_hold_time}s", flush=True)
             return False
 
         self._trigger_gate_active = True
         hold_elapsed = now - self._trigger_hold_start
-        should_fire = hold_elapsed >= float(eng.fire_trigger_hold_time)
-        print(f"[TRIGGER_CHECK] HOLD CHECK: elapsed={hold_elapsed:.3f}s, required={eng.fire_trigger_hold_time}s, should_fire={should_fire}", flush=True)
-        return should_fire
+        return hold_elapsed >= float(eng.fire_trigger_hold_time)
 
     def _compute_visual_servo_correction(
         self,

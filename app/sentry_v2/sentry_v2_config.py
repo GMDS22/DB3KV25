@@ -12,10 +12,7 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-try:
-    from smart_sentry_meta import get_version
-except ImportError:
-    from app.smart_sentry_meta import get_version
+from app.smart_sentry_meta import get_version
 
 
 SENTRY_PAN_MIN = 0.0

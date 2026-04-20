@@ -10,10 +10,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import cv2
 import numpy as np
 
-try:
-    from runtime_paths import runtime_root_path
-except ImportError:
-    from app.runtime_paths import runtime_root_path
+from app.runtime_paths import runtime_root_path
 
 
 @dataclass

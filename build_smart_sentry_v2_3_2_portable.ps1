@@ -294,13 +294,13 @@ function Invoke-NativeProcess([string]$filePath, [string[]]$arguments, [string]$
 $activeVersionMetadata = Get-ActiveVersionMetadata
 $activeVersion = $activeVersionMetadata.Version
 $activeVersionToken = $activeVersion -replace '\.', '_'
-$activeLauncherBaseName = "run_smart_sentry_v$activeVersionToken"
-$activeLauncherModule = "app.$activeLauncherBaseName"
-$activeLauncherPath = Join-Path $repoRoot "app\$activeLauncherBaseName.py"
-$launcherScriptFiles = @(Get-ChildItem (Join-Path $repoRoot 'app') -Filter 'run_smart_sentry_v*.py' -File | ForEach-Object { $_.FullName })
-$launcherScriptRelativePaths = @($launcherScriptFiles | ForEach-Object { "app\$([System.IO.Path]::GetFileName($_))" })
-$launcherModulesToBundle = @($launcherScriptFiles | ForEach-Object { "app.$([System.IO.Path]::GetFileNameWithoutExtension($_))" })
-$launcherModulesToBundle = @($launcherModulesToBundle | Sort-Object -Unique)
+$canonicalLauncherBaseName = "run_smart_sentry_v2_3_2"
+$activeLauncherBaseName = $canonicalLauncherBaseName
+$activeLauncherModule = "app.$canonicalLauncherBaseName"
+$activeLauncherPath = Join-Path $repoRoot "app\$canonicalLauncherBaseName.py"
+$launcherScriptFiles = @($activeLauncherPath)
+$launcherScriptRelativePaths = @("app\$canonicalLauncherBaseName.py")
+$launcherModulesToBundle = @("app.$canonicalLauncherBaseName")
 $releaseDir = Join-Path $OutputDrive "SMART SENTRY V$activeVersion"
 $releaseExeBase = "SMART_SENTRY_V$activeVersion"
 $releaseExeName = "$releaseExeBase.exe"
@@ -355,17 +355,6 @@ $canonicalPromptedTargetsRelativePath = "app/config/$canonicalPromptedTargetsNam
 $canonicalFacesRelativePath = "app/config/$canonicalFacesName"
 $canonicalUdpHost = '192.168.4.1'
 $canonicalUdpPort = 9000
-$legacyV3SettingsName = 'smart_sentry_v3_settings.json'
-$legacyV3PresetsName = 'smart_sentry_v3_custom_presets.json'
-$legacyV3PromptedTargetsName = 'smart_sentry_v3_prompted_targets.json'
-$legacyV3FacesName = 'smart_sentry_v3_faces.json'
-$legacyActiveSettingsName = 'smart_sentry_v2_3_2_settings.json'
-$legacyActivePromptedTargetsName = 'smart_sentry_v2_3_2_prompted_targets.json'
-$legacyActiveFacesName = 'smart_sentry_v2_3_2_faces.json'
-$legacyV2SettingsName = 'sentry_v2_settings.json'
-$legacyV2PresetsName = 'sentry_v2_custom_presets.json'
-$legacyV2PromptedTargetsName = 'sentry_v2_prompted_targets.json'
-$legacyV2FacesName = 'sentry_v2_faces.json'
 
 if (-not (Test-DriveRootAvailable $OutputDrive)) {
     throw "Compilation protocol requires output on $OutputDrive, but that drive is not available."
@@ -552,10 +541,7 @@ if (-not (Test-Path $releaseContentsDir)) {
     throw "Expected versioned support folder was not created: $releaseContentsDir"
 }
 
-Patch-BundledUltralyticsGit -contentsDirPath $releaseContentsDir
-
 Assert-RequiredReleaseArtifacts -buildRoot $outputDir -exeName $releaseExeName -contentsDirName $releaseContentsDirName -pythonRuntimeDllName $pythonRuntimeDllName -requiredContentRelativePaths $launcherScriptRelativePaths
-Sync-QtVcRuntimeDlls -releaseRoot $outputDir -contentsDirName $releaseContentsDirName
 
 $yoloDir = Join-Path $releaseContentsDir 'YOLO_MODELS'
 $publicYoloDir = Join-Path $outputDir 'YOLO_MODELS'
@@ -572,59 +558,10 @@ $publicReadmePath = Join-Path $publicYoloDir 'README.txt'
 
 New-Item -ItemType Directory -Force -Path $yoloDir | Out-Null
 
-$stagingConfigDir = Join-Path $releaseContentsDir 'app\config'
-if (-not (Test-Path (Join-Path $stagingConfigDir $canonicalSettingsName))) {
-    foreach ($fallbackName in @($legacyV3SettingsName, $legacyV2SettingsName, $legacyActiveSettingsName)) {
-        $fallbackPath = Join-Path $stagingConfigDir $fallbackName
-        if (Test-Path $fallbackPath) {
-            Copy-ReleaseConfigAlias -sourcePath $fallbackPath -targetPath (Join-Path $stagingConfigDir $canonicalSettingsName)
-            break
-        }
-    }
-}
-if (-not (Test-Path (Join-Path $stagingConfigDir $canonicalPresetsName))) {
-    foreach ($fallbackName in @($legacyV3PresetsName, $legacyV2PresetsName)) {
-        $fallbackPath = Join-Path $stagingConfigDir $fallbackName
-        if (Test-Path $fallbackPath) {
-            Copy-ReleaseConfigAlias -sourcePath $fallbackPath -targetPath (Join-Path $stagingConfigDir $canonicalPresetsName)
-            break
-        }
-    }
-}
-if (-not (Test-Path (Join-Path $stagingConfigDir $canonicalPromptedTargetsName))) {
-    foreach ($fallbackName in @($legacyV3PromptedTargetsName, $legacyV2PromptedTargetsName, $legacyActivePromptedTargetsName)) {
-        $fallbackPath = Join-Path $stagingConfigDir $fallbackName
-        if (Test-Path $fallbackPath) {
-            Copy-ReleaseConfigAlias -sourcePath $fallbackPath -targetPath (Join-Path $stagingConfigDir $canonicalPromptedTargetsName)
-            break
-        }
-    }
-}
-if (-not (Test-Path (Join-Path $stagingConfigDir $canonicalFacesName))) {
-    foreach ($fallbackName in @($legacyV3FacesName, $legacyV2FacesName, $legacyActiveFacesName)) {
-        $fallbackPath = Join-Path $stagingConfigDir $fallbackName
-        if (Test-Path $fallbackPath) {
-            Copy-ReleaseConfigAlias -sourcePath $fallbackPath -targetPath (Join-Path $stagingConfigDir $canonicalFacesName)
-            break
-        }
-    }
-}
-
-Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV3SettingsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV3PresetsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV3PromptedTargetsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV2SettingsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV2PresetsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV2PromptedTargetsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV3FacesName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $stagingConfigDir $legacyV2FacesName)
-
 if ($bundleModels) {
     Copy-Item -Path (Join-Path $rootModelsPath '*') -Destination $yoloDir -Recurse -Force
     Copy-Item -Path (Join-Path $rootModelsPath '*') -Destination $publicYoloDir -Recurse -Force
-    foreach ($configName in @($canonicalSettingsName, 'smart_sentry_v2_3_2_settings.json')) {
-        Set-PackagedConfigSurface -configPath (Join-Path $releaseContentsDir "app\config\$configName") -settingsRelativePath $canonicalSettingsRelativePath -promptedRelativePath $canonicalPromptedTargetsRelativePath -faceRelativePath $canonicalFacesRelativePath -modelDir $publicYoloDir -udpHost $canonicalUdpHost -udpPort $canonicalUdpPort
-    }
+    Set-PackagedConfigSurface -configPath (Join-Path $releaseContentsDir "app\config\$canonicalSettingsName") -settingsRelativePath $canonicalSettingsRelativePath -promptedRelativePath $canonicalPromptedTargetsRelativePath -faceRelativePath $canonicalFacesRelativePath -modelDir $publicYoloDir -udpHost $canonicalUdpHost -udpPort $canonicalUdpPort
 } else {
     New-Item -ItemType Directory -Force -Path $yoloDir | Out-Null
 
@@ -664,20 +601,8 @@ Assert-RequiredReleaseArtifacts -buildRoot $releaseDir -exeName $releaseExeName 
 Patch-BundledUltralyticsGit -contentsDirPath (Join-Path $releaseDir $releaseContentsDirName)
 
 if ($bundleModels) {
-    foreach ($configName in @($canonicalSettingsName, 'smart_sentry_v2_3_2_settings.json')) {
-        Set-PackagedConfigSurface -configPath (Join-Path $releaseDir "$releaseContentsDirName\app\config\$configName") -settingsRelativePath $canonicalSettingsRelativePath -promptedRelativePath $canonicalPromptedTargetsRelativePath -faceRelativePath $canonicalFacesRelativePath -modelDir (Join-Path $releaseDir 'YOLO_MODELS') -udpHost $canonicalUdpHost -udpPort $canonicalUdpPort
-    }
+    Set-PackagedConfigSurface -configPath (Join-Path $releaseDir "$releaseContentsDirName\app\config\$canonicalSettingsName") -settingsRelativePath $canonicalSettingsRelativePath -promptedRelativePath $canonicalPromptedTargetsRelativePath -faceRelativePath $canonicalFacesRelativePath -modelDir (Join-Path $releaseDir 'YOLO_MODELS') -udpHost $canonicalUdpHost -udpPort $canonicalUdpPort
 }
-
-$releaseConfigDir = Join-Path $releaseDir "$releaseContentsDirName\app\config"
-Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV3SettingsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV3PresetsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV3PromptedTargetsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV2SettingsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV2PresetsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV2PromptedTargetsName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV3FacesName)
-Remove-ReleaseConfigAlias -targetPath (Join-Path $releaseConfigDir $legacyV2FacesName)
 
 foreach ($path in @($distRoot, $workRoot, $specRoot, $legacyBuildRoot)) {
     if (Test-Path $path) {

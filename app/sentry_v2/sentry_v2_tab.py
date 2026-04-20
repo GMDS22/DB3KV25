@@ -56,14 +56,8 @@ try:
     from PyQt5.QtTextToSpeech import QTextToSpeech
 except Exception:
     QTextToSpeech = None
-try:
-    from runtime_paths import app_root_path, runtime_root_path
-except ImportError:
-    from app.runtime_paths import app_root_path, runtime_root_path
-try:
-    from smart_sentry_meta import get_app_title, get_version
-except ImportError:
-    from app.smart_sentry_meta import get_app_title, get_version
+from app.runtime_paths import app_root_path, runtime_root_path
+from app.smart_sentry_meta import get_app_title, get_version
 
 
 def _windows_hidden_subprocess_kwargs() -> dict:

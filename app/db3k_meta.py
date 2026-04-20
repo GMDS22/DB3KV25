@@ -5,10 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-try:
-    from runtime_paths import runtime_root_path
-except ImportError:
-    from app.runtime_paths import runtime_root_path
+from app.runtime_paths import runtime_root_path
 
 DEFAULT_VERSION = "4.1"
 DEFAULT_TITLE_PREFIX = "Multi-Detection Auto Tracker"
