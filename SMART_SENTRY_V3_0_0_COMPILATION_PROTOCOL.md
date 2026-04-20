@@ -65,6 +65,16 @@ The following failures already occurred on the v3.0.0 path and must be treated a
 	- Root cause class: the packaged runtime can load the wrong saved settings surface or carry connection/sound values that do not match the live WiFi firmware path.
 	- Required prevention: verify the packaged active settings file still targets the live WiFi endpoint and preserves the intended sound settings before sign-off.
 
+4. **Frozen exe crashes with `cannot load module more than once per process` on numpy**
+	- Symptom: `SMART_SENTRY_V3.0.0.exe` crashes immediately at startup with a PyInstaller `cannot load module more than once per process` error pointing at `numpy._core.__init__`.
+	- Root cause: any module-level torch or numpy import in `app/main.py` executes when `run.py` does `from app.main import main`. `sentry_v2_detector` then tries to import numpy again via cv2. PyInstaller's frozen importer raises on the second exec of the same module. See ISS-075.
+	- Required prevention: do not call `_preload_torch_runtime()` or any torch-importing helper at module scope in `app/main.py`. All torch/numpy imports must occur inside functions called after the full frozen import graph is resolved.
+
+5. **Frozen exe crashes with `ModuleNotFoundError: No module named 'numpy._core._exceptions'`**
+	- Symptom: `SMART_SENTRY_V3.0.0.exe` crashes at startup with `ModuleNotFoundError: No module named 'numpy._core._exceptions'` in the cv2→numpy import chain.
+	- Root cause: NumPy 2.x restructured C extensions into `numpy._core.*` submodules that PyInstaller's standard hook does not enumerate. They are absent from the bundle unless explicitly collected. See ISS-076.
+	- Required prevention: `--collect-submodules numpy` must remain in the `$pyInstallerArgs` array in `build_smart_sentry_v2_3_2_portable.ps1`. Do not remove it. If numpy is upgraded and a new submodule is missing, this flag will already cover it.
+
 ## 3. Release-Hold Validation
 
 Before packaging v3.0.0, confirm the unfinished operator tabs stay on release hold:
@@ -91,7 +101,7 @@ Sync these files before sign-off:
 
 1. Confirm `SMART_SENTRY_V3_0_VERSION.txt` contains `3.0.0`.
 2. Confirm the app title resolves to Smart Sentry v3.0.0 at runtime.
-3. Confirm `run.py` keeps frozen dispatch on the canonical packaged launcher identity `app.run_smart_sentry_v2_3_2` for the `3.0.0` token while the versioned v3 wrapper launchers import through `app.*` only.
+3. Confirm `run.py` uses a direct `from app.main import main` import with no version-dispatch logic. The versioned launcher chain (`run_smart_sentry_v2_3_2.py`, `run_smart_sentry_v3_0_0.py`) has been deleted. `app/main.py` is now the single canonical entry point for both source-run and packaged modes.
 4. Confirm the packaging preflight resolves the active launcher module for v3.0.0.
 5. Run file diagnostics on `app/sentry_v2/sentry_v2_tab.py`, `run.py`, `app/smart_sentry_meta.py`, and the build helper path before packaging.
 6. From repository root, run `& ".\.venv\Scripts\python.exe" .\tools\camera_open_smoke_test.py` and confirm the result reports `ok: true`, `actual: [1280, 720]`, and `recovery_attempts: 0`.

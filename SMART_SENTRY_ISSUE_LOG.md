@@ -130,6 +130,28 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
+### ISS-076 | 2026-04-20 | v3.0.0 | Build | Worked
+**Frozen Exe Crashed With `ModuleNotFoundError: No module named 'numpy._core._exceptions'`**
+
+- **Symptoms**: `SMART_SENTRY_V3.0.0.exe` launched and immediately crashed with a full traceback ending in `ModuleNotFoundError: No module named 'numpy._core._exceptions'`. The crash happened before the app window appeared. Error surfaced through `cv2 → numpy → numpy._core → numpy._core._exceptions` import chain at startup.
+- **Root Cause**: NumPy 2.x restructured its C extensions so that `numpy._core._exceptions` and other `numpy._core.*` submodules exist as separate importable modules. PyInstaller's standard `hook-numpy.py` (shipped with the installed `numpy._pyinstaller` package) does not enumerate all of these submodules, so they were silently absent from the frozen bundle even though the numpy package itself was included.
+- **Fix/Solution**: Added `'--collect-submodules', 'numpy'` to the `$pyInstallerArgs` array in `build_smart_sentry_v2_3_2_portable.ps1`, placed immediately after the torchvision/sentry_v2_tab hidden-imports. This forces PyInstaller to walk and bundle every numpy submodule (including the `numpy._core.*` family). The `numpy.f2py.tests` collection emits a harmless `pytest` not-found warning at build time; this is expected and does not affect the runtime.
+- **Files Modified**: `build_smart_sentry_v2_3_2_portable.ps1`
+- **Notes**: This failure is specific to NumPy 2.x. NumPy 1.x packaged without this flag because the old `numpy.core` layout was picked up by the hook. Any upgrade to NumPy 2.x in the build venv requires this flag to remain. Related to ISS-075 (torch double-import in same session).
+
+---
+
+### ISS-075 | 2026-04-20 | v3.0.0 | Build | Worked
+**Frozen Exe Crashed With `cannot load module more than once per process` on numpy**
+
+- **Symptoms**: `SMART_SENTRY_V3.0.0.exe` crashed at startup with PyInstaller's internal error `cannot load module more than once per process`. Traceback showed `run.py → app/main.py → sentry_v2/__init__.py → sentry_v2_detector.py → cv2/__init__.py → import numpy` as the failing chain. The error was `numpy._core.__init__` failing the module-uniqueness guard inside PyInstaller's `pyimod02_importers.py`.
+- **Root Cause**: `app/main.py` had two module-level calls — `_configure_ml_runtime_env()` and `_preload_torch_runtime()` — executed at import time (not inside `if __name__ == "__main__"`). `_preload_torch_runtime()` imported `torch`, which in turn imported `numpy`. Then `run.py`'s `from app.main import main` triggered that torch+numpy load. Immediately after, the frozen importer tried to load `sentry_v2_detector.py` which imports `cv2`, which imports `numpy` again. PyInstaller's frozen importer tracks module identity and raises `cannot load module more than once per process` on the second attempt to exec `numpy._core.__init__`.
+- **Fix/Solution**: Removed the two bare module-level calls `_configure_ml_runtime_env()` and `_preload_torch_runtime()` from `app/main.py`. The function definitions were left in place but are no longer invoked at module scope. The environment variables they set (e.g. `KMP_DUPLICATE_LIB_OK`, `OMP_NUM_THREADS`) are already set unconditionally in `run.py` before any import, so they remain effective in both source-run and frozen modes without needing a preload call.
+- **Files Modified**: `app/main.py`
+- **Notes**: In a frozen PyInstaller exe, any import that happens at the top level of `app/main.py` executes the moment `run.py` does `from app.main import main`. Torch and numpy must not be imported before the frozen importer has finished resolving the sentry_v2 package tree. This is specific to the one-file-per-module frozen import model — source-run is unaffected. Commit `0de3912`.
+
+---
+
 ### ISS-074 | 2026-04-16 | v3.0.0 | Config/UI | Worked
 **Auto-Trigger Toggle Left Stale Fire-Gate Values Active**
 
