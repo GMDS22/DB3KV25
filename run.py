@@ -19,6 +19,15 @@ os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 # fully initialized in sys.modules before torch is ever touched.
 import asyncio  # noqa: E402
 
+# Pre-initialize unittest before any torch import occurs.
+# torch.utils._config_module imports unittest, which triggers unittest/__init__.py
+# (via exec_module) while torch is still mid-import. unittest/__init__.py line 60
+# does `from .result import *` — if unittest.__path__ is not yet established in the
+# frozen importer context, this fails with ModuleNotFoundError: No module named
+# 'unittest.result'. Importing unittest here pre-populates sys.modules so torch's
+# import chain finds unittest already initialized and skips re-execution.
+import unittest  # noqa: E402
+
 if not getattr(sys, "frozen", False):
     _app_dir = str(Path(__file__).resolve().parent / "app")
     if _app_dir not in sys.path:

@@ -4,7 +4,7 @@
   "items": [
     {
       "date": "2026-04-20",
-      "title": "Frozen exe YOLO prepare unittest fix (ISS-078): added --collect-submodules unittest to PyInstaller build args in build_smart_sentry_v2_3_2_portable.ps1. After ISS-077 asyncio fix, YOLO still failed — torch.utils._config_module imports unittest which requires unittest.result and other submodules not collected by default. Third stdlib submodule collection gap in v3.0.0 (after numpy._core ISS-076 and asyncio timing ISS-077). SMART_SENTRY_ISSUE_LOG.md updated."
+      "title": "Frozen exe YOLO prepare unittest fix (ISS-078): added 'import unittest' to run.py (same timing fix as ISS-077 asyncio). torch.utils._config_module triggers import unittest mid-exec_module while torch is still loading; unittest.__path__ is not yet established so unittest.result cannot be resolved even though it is present in PYZ. Pre-importing unittest in run.py ensures it is fully in sys.modules before torch runs. --collect-submodules unittest in build script retained. SMART_SENTRY_ISSUE_LOG.md and COMPILATION_PROTOCOL.md updated."
     },
     {
       "date": "2026-04-20",

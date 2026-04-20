@@ -82,8 +82,8 @@ The following failures already occurred on the v3.0.0 path and must be treated a
 
 7. **Frozen exe YOLO prepare fails with `ModuleNotFoundError: No module named 'unittest.result'`**
 	- Symptom: after ISS-077 asyncio fix, YOLO still fails. `yolo_runtime_diag.log` shows `prepare-failed` with `ModuleNotFoundError: No module named 'unittest.result'`. Import chain: `torch.utils._config_module` → `import unittest` → `unittest/__init__.py:60` relative import fails.
-	- Root cause: PyInstaller does not auto-collect `unittest` stdlib submodules. `unittest/__init__.py` requires `unittest.result`, `unittest.case`, `unittest.suite`, etc. which are absent without explicit collection. Same class of problem as ISS-076 (numpy._core).
-	- Required prevention: `--collect-submodules unittest` must remain in the `$pyInstallerArgs` array in `build_smart_sentry_v2_3_2_portable.ps1`. See ISS-078.
+	- Root cause: Same initialization timing problem as ISS-077. `torch.utils._config_module` triggers `import unittest` mid-exec_module (while torch is still loading), before `unittest.__path__` is established in the frozen importer. The modules ARE in the PYZ; they just cannot be resolved during mid-exec_module initialization.
+	- Required prevention: `import unittest` must remain as an explicit early import in `run.py` (after `import asyncio`, before `from app.main import main`). The `--collect-submodules unittest` build flag is also retained. See ISS-078.
 
 
 

@@ -134,10 +134,10 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 **Frozen Exe YOLO Prepare Failed With `ModuleNotFoundError: No module named 'unittest.result'`**
 
 - **Symptoms**: After ISS-077 was fixed (asyncio preload), YOLO still failed to load. `yolo_runtime_diag.log` showed `prepare-failed` with `ModuleNotFoundError: No module named 'unittest.result'`. Import chain: `import torch` → `torch.utils._config_module` → `import unittest` → `unittest/__init__.py:60` → `from .result import *` → failure.
-- **Root Cause**: Same class of problem as ISS-076 and ISS-077. PyInstaller does not automatically collect all Python stdlib submodules. `unittest/__init__.py` does `from .result import *` and similar relative imports requiring submodules (`unittest.result`, `unittest.case`, `unittest.suite`, etc.) to be present in the frozen bundle. These submodules were absent from the PYZ.
-- **Fix/Solution**: Added `'--collect-submodules', 'unittest'` to the `$pyInstallerArgs` array in `build_smart_sentry_v2_3_2_portable.ps1`, placed after the existing `--collect-submodules asyncio` line.
-- **Files Modified**: `build_smart_sentry_v2_3_2_portable.ps1`
-- **Notes**: This is the third stdlib submodule collection gap discovered in the v3.0.0 build (`numpy._core` → ISS-076, `asyncio` fixed via `run.py` preload → ISS-077, `unittest` → ISS-078). All three are triggered by torch's import chain. Commit paired with ISS-078 documentation.
+- **Root Cause**: Same initialization timing problem as ISS-077. `torch.utils._config_module` triggers `import unittest` for the first time **while torch is still mid-`exec_module`**. When `unittest/__init__.py` line 60 runs `from .result import *`, `unittest.__path__` is not yet established in the frozen importer context, so `unittest.result` cannot be resolved even though the module is present in the PYZ. `--collect-submodules unittest` was added to the build script but only collected `unittest.test.*` subpackages — `unittest.result`, `unittest.case` etc. are stdlib top-level modules within unittest and are already present in PYZ but cannot be loaded during mid-exec_module initialization.
+- **Fix/Solution**: Added `import unittest` to `run.py` immediately after `import asyncio`, before `from app.main import main`. This pre-initializes unittest (and all its submodules including `unittest.result`) into `sys.modules` before any torch import occurs. The `--collect-submodules unittest` build flag was retained.
+- **Files Modified**: `run.py`
+- **Notes**: Third stdlib package initialization timing issue in v3.0.0 frozen bundle (asyncio → ISS-077, unittest → ISS-078). All follow the same pattern: torch's import chain triggers a stdlib `__init__.py` mid-exec_module, before `__path__` is established in the frozen importer. The consistent fix is to pre-import the affected stdlib package in `run.py`.
 
 ---
 
