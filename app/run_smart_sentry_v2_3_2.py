@@ -33,9 +33,10 @@ _configure_ml_runtime_env()
 _preload_torch_runtime()
 
 APP_DIR = Path(__file__).resolve().parent
-app_dir_str = str(APP_DIR)
-if app_dir_str not in sys.path:
-    sys.path.insert(0, app_dir_str)
+if not getattr(sys, "frozen", False):
+    app_dir_str = str(APP_DIR)
+    if app_dir_str not in sys.path:
+        sys.path.insert(0, app_dir_str)
 
 from PyQt5.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QCloseEvent, QIcon, QMouseEvent, QPixmap

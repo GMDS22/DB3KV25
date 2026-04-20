@@ -70,61 +70,37 @@ def main() -> int:
     _preload_torch_runtime()
 
     root_dir = Path(__file__).resolve().parent
-    runtime_roots: list[Path] = [root_dir]
     frozen = bool(getattr(sys, "frozen", False))
     meipass = getattr(sys, "_MEIPASS", "")
-    if frozen and meipass:
-        runtime_roots.insert(0, Path(meipass))
-
-    runtime_roots = list(dict.fromkeys(runtime_roots))
-    app_dir = root_dir / "app"
-    for candidate_root in runtime_roots:
-        candidate_app_dir = candidate_root / "app"
-        if candidate_app_dir.is_dir():
-            app_dir = candidate_app_dir
-            break
-
-    app_dir_str = str(app_dir)
-    if not frozen and app_dir.is_dir() and app_dir_str not in sys.path:
-        sys.path.insert(0, app_dir_str)
-
-    import_errors: list[str] = []
-    launcher_basename = CANONICAL_LAUNCHER_BASENAME
-    app_launcher = app_dir / f"{launcher_basename}.py"
 
     if frozen:
-        frozen_import_errors: list[str] = []
-
-        for module_name in (CANONICAL_FROZEN_LAUNCHER_MODULE, launcher_basename, f"smart_sentry_frozen_launcher_{launcher_basename}"):
-            module = sys.modules.get(module_name)
-            if module is not None:
-                try:
-                    return _invoke_launcher_main(getattr(module, "main", None))
-                except Exception as exc:
-                    frozen_import_errors.append(f"{module_name}: {exc}")
-
-        if app_launcher.is_file():
+        # In frozen mode the canonical launcher is embedded in PYZ via --hidden-import.
+        # Never use spec_from_file_location on a frozen module — PyInstaller's importer
+        # intercepts exec_module and corrupts its internal loading state, causing every
+        # subsequent importlib.import_module call to also fail with
+        # "cannot load module more than once per process".
+        module = sys.modules.get(CANONICAL_FROZEN_LAUNCHER_MODULE)
+        if module is None:
             try:
-                return _run_launcher_path(
-                    app_launcher,
-                    f"smart_sentry_frozen_launcher_{launcher_basename}",
-                )
+                module = importlib.import_module(CANONICAL_FROZEN_LAUNCHER_MODULE)
             except Exception as exc:
-                frozen_import_errors.append(f"{app_launcher}: {exc}")
+                raise ImportError(
+                    f"Unable to import frozen launcher {CANONICAL_FROZEN_LAUNCHER_MODULE}. "
+                    f"Ensure --hidden-import {CANONICAL_FROZEN_LAUNCHER_MODULE} is present "
+                    f"in the build spec. _MEIPASS={meipass!r}. Error: {exc}"
+                ) from exc
+        return _invoke_launcher_main(getattr(module, "main", None))
 
-        try:
-            module = importlib.import_module(CANONICAL_FROZEN_LAUNCHER_MODULE)
-            return _invoke_launcher_main(getattr(module, "main", None))
-        except Exception as exc:
-            frozen_import_errors.append(f"{CANONICAL_FROZEN_LAUNCHER_MODULE}: {exc}")
+    # Source run: locate app dir and execute launcher file directly.
+    app_dir = root_dir / "app"
+    app_dir_str = str(app_dir)
+    if app_dir.is_dir() and app_dir_str not in sys.path:
+        sys.path.insert(0, app_dir_str)
 
-        frozen_error_text = "; ".join(frozen_import_errors) if frozen_import_errors else "no frozen launcher import attempts succeeded"
-        raise ImportError(
-            f"Unable to import Smart Sentry launcher for frozen runtime from {app_dir}. "
-            f"Launcher: {CANONICAL_FROZEN_LAUNCHER_MODULE}. Attempts: {frozen_error_text}"
-        )
+    launcher_basename = CANONICAL_LAUNCHER_BASENAME
+    app_launcher = app_dir / f"{launcher_basename}.py"
+    import_errors: list[str] = []
 
-    # Source run: execute launcher file directly.
     if app_launcher.is_file():
         try:
             return _run_launcher_path(
@@ -139,16 +115,12 @@ def main() -> int:
         module = importlib.import_module(CANONICAL_FROZEN_LAUNCHER_MODULE)
         return _invoke_launcher_main(getattr(module, "main", None))
     except Exception as exc:
-        if "cannot load module more than once per process" in str(exc).lower():
-            preloaded = sys.modules.get(CANONICAL_FROZEN_LAUNCHER_MODULE)
-            if preloaded is not None:
-                return _invoke_launcher_main(getattr(preloaded, "main", None))
         import_errors.append(f"{CANONICAL_FROZEN_LAUNCHER_MODULE}: {exc}")
 
     error_text = "; ".join(import_errors) if import_errors else "no launcher import attempts succeeded"
     raise ImportError(
-        f"Unable to import Smart Sentry launcher. Expected {app_launcher} or packaged module {CANONICAL_FROZEN_LAUNCHER_MODULE}. "
-        f"Attempts: {error_text}"
+        f"Unable to import Smart Sentry launcher. Expected {app_launcher} or "
+        f"packaged module {CANONICAL_FROZEN_LAUNCHER_MODULE}. Attempts: {error_text}"
     )
 
 

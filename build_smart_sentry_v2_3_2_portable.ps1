@@ -490,10 +490,6 @@ foreach ($launcherModule in $launcherModulesToBundle) {
     $pyInstallerArgs += @('--hidden-import', $launcherModule)
 }
 
-foreach ($launcherScriptPath in $launcherScriptFiles) {
-    $pyInstallerArgs += @('--add-data', "$launcherScriptPath;app")
-}
-
 if (-not $bundleSklearn) {
     $pyInstallerArgs += @(
         '--exclude-module', 'sklearn',
@@ -541,7 +537,7 @@ if (-not (Test-Path $releaseContentsDir)) {
     throw "Expected versioned support folder was not created: $releaseContentsDir"
 }
 
-Assert-RequiredReleaseArtifacts -buildRoot $outputDir -exeName $releaseExeName -contentsDirName $releaseContentsDirName -pythonRuntimeDllName $pythonRuntimeDllName -requiredContentRelativePaths $launcherScriptRelativePaths
+Assert-RequiredReleaseArtifacts -buildRoot $outputDir -exeName $releaseExeName -contentsDirName $releaseContentsDirName -pythonRuntimeDllName $pythonRuntimeDllName
 
 $yoloDir = Join-Path $releaseContentsDir 'YOLO_MODELS'
 $publicYoloDir = Join-Path $outputDir 'YOLO_MODELS'
