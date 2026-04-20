@@ -99,6 +99,7 @@
 | Early fire vs settle timer | [ISS-015](#iss-015) |
 | Burst fire blocking UI thread | [ISS-037](#iss-037) |
 | `fire_trigger_enter_pan/tilt_tolerance` tighter than YOLO natural jitter (auto-fire never fires) | [ISS-071](#iss-071) |
+| Auto-trigger toggle enabled but stale fire-gate settings stayed loaded in memory | [ISS-074](#iss-074) |
 
 ### Detection Stalls After Changes
 | Check | Reference |
@@ -126,6 +127,17 @@
 ## Issue Log
 
 Issues numbered newest-first. Search by symptom, file name, or category with `Ctrl+F`.
+
+---
+
+### ISS-074 | 2026-04-16 | v3.0.0 | Config/UI | Worked
+**Auto-Trigger Toggle Left Stale Fire-Gate Values Active**
+
+- **Symptoms**: Operator enables auto-trigger and tracking looks active, but auto-fire still never happens even though the corrected fire-gate values exist on disk. Behavior still matches the old impossible sub-degree gate profile until the values are manually edited or reloaded.
+- **Root Cause**: The auto-trigger checkbox only flipped `auto_trigger_enabled`; it did not normalize stale in-memory engagement settings already loaded from older configs or presets. Legacy sub-degree fire and aim-lock tolerances could therefore stay active in the engine even after the newer fix existed in the settings files.
+- **Fix/Solution**: Added `normalize_auto_trigger_engagement()` in `app/sentry_v2/sentry_v2_config.py`, invoked it from `EngagementConfig.__post_init__`, from `_on_engagement_changed()`, and immediately when `_on_auto_trigger_toggled()` turns auto-trigger on. Also synced the active `smart_sentry_v3_0_0_settings.json` and legacy `smart_sentry_v2_3_2_settings.json` profiles to the fireable aim-lock / fire-gate values and added regression coverage in `tests/test_sentry_v2_engagement_config.py`.
+- **Files Modified**: `app/sentry_v2/sentry_v2_config.py`, `app/sentry_v2/sentry_v2_tab.py`, `app/config/smart_sentry_v3_0_0_settings.json`, `app/config/smart_sentry_v2_3_2_settings.json`, `tests/test_sentry_v2_engagement_config.py`
+- **Notes**: Related to ISS-071. This closes the stale-profile path where the UI could show auto-trigger ON while the engine still ran the old impossible gate values.
 
 ---
 
@@ -881,6 +893,7 @@ Issues investigated but **not fixed**. Check before re-attempting the same appro
 - **Issue**: Smart Sentry did not run its own detector in shared-feed mode.
 - **Fix Tried**: Investigated only.
 - **Resolution**: Later fixed by [ISS-039](#iss-039) (internal detector flag).
+| 2026-04-16 | Auto-trigger could still stay effectively broken after the earlier tolerance fix because enabling the UI toggle did not normalize stale fire-gate settings already loaded from older profiles. | Added `normalize_auto_trigger_engagement()` in `app/sentry_v2/sentry_v2_config.py`, applied it on config construction, live engagement edits, and the auto-trigger toggle path in `app/sentry_v2/sentry_v2_tab.py`, synced the active and legacy settings JSON files to the fireable gate values, and added a regression test in `tests/test_sentry_v2_engagement_config.py`. | Worked |
 | 2026-04-09 | PIR no-target completion could clear cue state without issuing an explicit return-home move, which let static guard setups stay parked at the final PIR hunt point and made operators think there was a hidden post-hunt dwell timer. | Updated `app/sentry_v2/sentry_v2_engine.py` so PIR no-target paths explicitly command the configured guard/home position, filled in missing tooltip coverage for the newer loss-recovery and guard/rest controls in `app/sentry_v2/sentry_v2_tab.py` plus `app/sentry_v2/sentry_v2_tooltips.py`, extended `test_pir_ui_config.py`, and corrected the PIR docs to state that `Cue Hold` is the pre-hunt dwell while a post-hunt stall is a bug, not a feature. | Worked |
 | 2026-04-09 | Human voice playback could overlap with the ESP32 buzzer path, and operators still lacked a focused in-app voice diagnostics surface while investigating why Windows speech might be inaudible on some setups. | Added a persisted `mute_buzzer_when_human_voice_enabled` guard in `app/sentry_v2/sentry_v2_config.py`, suppressed firmware buzzer cues from `app/sentry_v2/sentry_v2_tab.py` while human voice mode is enabled, added a dedicated Voice Diagnostics group with backend, selected voice, speech-state, route note, fallback phrase, stop, refresh, and `Validate Voices` actions, filled in explicit tooltip coverage for the newer human-voice and assistant speech controls via `app/sentry_v2/sentry_v2_tooltips.py`, and verified in `.venv311` that both `Microsoft Zira Desktop` and `Microsoft David Desktop` are accepted by Qt and enter a valid speech state under the real validation path. | Worked |
 | 2026-04-09 | PIR no-detect behavior could still feel too static at the cue point, and after-target-loss recovery still did not feel like a careful local hunt around the loss area. | Added a shared `Hunting` vs `Fast Reacquire` search-style control, introduced explicit PIR `Cue Hold` timing in `app/sentry_v2/sentry_v2_config.py` and `app/sentry_v2/sentry_v2_tab.py`, updated `app/sentry_v2/sentry_v2_engine.py` so PIR confirmation now leaves the cue sooner and target-loss recovery uses a denser directional local hunt with shorter step cadence, updated `app/sentry_v2/sentry_v2_pir_manager.py` so PIR scans start with a zone-biased local hunt before wider coverage, and synced the PIR/manual docs to the new contract. | Worked |

@@ -36,6 +36,15 @@ CANONICAL_FACE_LIBRARY_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_V
 CANONICAL_PROMPTED_TARGETS_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_prompted_targets.json"
 CANONICAL_SETTINGS_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_settings.json"
 
+# Older shipped auto-trigger profiles used sub-2 degree gates that do not
+# converge reliably enough for live firing.
+AUTO_TRIGGER_MIN_AIM_LOCK_PAN_DEG = 2.0
+AUTO_TRIGGER_MIN_AIM_LOCK_TILT_DEG = 2.0
+AUTO_TRIGGER_MIN_FIRE_ENTER_PAN_DEG = 2.0
+AUTO_TRIGGER_MIN_FIRE_ENTER_TILT_DEG = 2.0
+AUTO_TRIGGER_MIN_FIRE_EXIT_PAN_DEG = 2.8
+AUTO_TRIGGER_MIN_FIRE_EXIT_TILT_DEG = 2.4
+
 
 # Full COCO class list (80 classes) — same order as YOLOv8 default
 YOLO_COCO_CLASSES: List[str] = [
@@ -265,6 +274,56 @@ class EngagementConfig:
     loss_search_style: str = "hunting"
     # Shared hunt pass count for target-loss and PIR no-detect searches.
     loss_search_rounds: int = 1
+
+    def __post_init__(self) -> None:
+        normalize_auto_trigger_engagement(self)
+
+
+def normalize_auto_trigger_engagement(engagement: "EngagementConfig") -> List[str]:
+    """Clamp stale auto-trigger settings to values that can actually fire."""
+    if not bool(getattr(engagement, "auto_trigger_enabled", False)):
+        return []
+
+    adjustments: List[str] = []
+
+    def enforce_min(attr: str, minimum: float) -> None:
+        current = float(getattr(engagement, attr, minimum))
+        if current >= minimum:
+            return
+        setattr(engagement, attr, minimum)
+        adjustments.append(f"{attr}={current:.2f}->{minimum:.2f}")
+
+    enforce_min("aim_lock_pan_tolerance", AUTO_TRIGGER_MIN_AIM_LOCK_PAN_DEG)
+    enforce_min("aim_lock_tilt_tolerance", AUTO_TRIGGER_MIN_AIM_LOCK_TILT_DEG)
+    enforce_min("fire_trigger_enter_pan_tolerance", AUTO_TRIGGER_MIN_FIRE_ENTER_PAN_DEG)
+    enforce_min("fire_trigger_enter_tilt_tolerance", AUTO_TRIGGER_MIN_FIRE_ENTER_TILT_DEG)
+    enforce_min("fire_trigger_exit_pan_tolerance", AUTO_TRIGGER_MIN_FIRE_EXIT_PAN_DEG)
+    enforce_min("fire_trigger_exit_tilt_tolerance", AUTO_TRIGGER_MIN_FIRE_EXIT_TILT_DEG)
+
+    enter_pan = float(getattr(engagement, "fire_trigger_enter_pan_tolerance", AUTO_TRIGGER_MIN_FIRE_ENTER_PAN_DEG))
+    enter_tilt = float(getattr(engagement, "fire_trigger_enter_tilt_tolerance", AUTO_TRIGGER_MIN_FIRE_ENTER_TILT_DEG))
+    exit_pan = float(getattr(engagement, "fire_trigger_exit_pan_tolerance", AUTO_TRIGGER_MIN_FIRE_EXIT_PAN_DEG))
+    exit_tilt = float(getattr(engagement, "fire_trigger_exit_tilt_tolerance", AUTO_TRIGGER_MIN_FIRE_EXIT_TILT_DEG))
+
+    if exit_pan < enter_pan:
+        setattr(engagement, "fire_trigger_exit_pan_tolerance", enter_pan)
+        adjustments.append(f"fire_trigger_exit_pan_tolerance={exit_pan:.2f}->{enter_pan:.2f}")
+        exit_pan = enter_pan
+    if exit_tilt < enter_tilt:
+        setattr(engagement, "fire_trigger_exit_tilt_tolerance", enter_tilt)
+        adjustments.append(f"fire_trigger_exit_tilt_tolerance={exit_tilt:.2f}->{enter_tilt:.2f}")
+        exit_tilt = enter_tilt
+
+    recenter_pan = float(getattr(engagement, "fire_recenter_pan_tolerance", exit_pan))
+    recenter_tilt = float(getattr(engagement, "fire_recenter_tilt_tolerance", exit_tilt))
+    if recenter_pan < exit_pan:
+        setattr(engagement, "fire_recenter_pan_tolerance", exit_pan)
+        adjustments.append(f"fire_recenter_pan_tolerance={recenter_pan:.2f}->{exit_pan:.2f}")
+    if recenter_tilt < exit_tilt:
+        setattr(engagement, "fire_recenter_tilt_tolerance", exit_tilt)
+        adjustments.append(f"fire_recenter_tilt_tolerance={recenter_tilt:.2f}->{exit_tilt:.2f}")
+
+    return adjustments
 
 
 @dataclass

@@ -135,6 +135,16 @@ def main() -> int:
                     frozen_import_errors.append(f"{module_name}: {exc}")
                     continue
 
+        launcher_path = app_dir / f"{canonical_basename}.py"
+        if launcher_path.is_file():
+            try:
+                return _run_launcher_path(
+                    launcher_path,
+                    f"smart_sentry_frozen_launcher_{canonical_basename}",
+                )
+            except Exception as exc:
+                frozen_import_errors.append(f"{launcher_path}: {exc}")
+
         try:
             module = importlib.import_module(frozen_launcher_module)
             return _invoke_launcher_main(getattr(module, "main", None))

@@ -14,14 +14,14 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 
 ### App identity
 
-- Active desktop app family: Smart Sentry v2.x
+- Active desktop app family: Smart Sentry v3.0.0 release target with legacy compatibility launchers retained
 - Current documented desktop release target: Smart Sentry v3.0.0
 - Main launcher from this repo: `run.py`
 
 ### Canonical settings path
 
-- Canonical runtime settings file: `app/config/smart_sentry_v2_3_2_settings.json`
-- Legacy compatibility fallbacks: `app/config/smart_sentry_v2_3_1_settings.json`, `app/config/smart_sentry_v3_settings.json`, `app/config/sentry_v2_settings.json`
+- Canonical runtime settings file: `app/config/smart_sentry_v3_0_0_settings.json`
+- Legacy compatibility fallbacks: `app/config/smart_sentry_v2_3_2_settings.json`, `app/config/smart_sentry_v2_3_1_settings.json`, `app/config/smart_sentry_v3_settings.json`, `app/config/sentry_v2_settings.json`
 - Rule: make runtime-setting changes against the canonical file only; if load/save sync logic changes, review the fallback chain in the same change.
 
 ### Transport authority
@@ -105,6 +105,7 @@ When changing any one of the areas below, review the whole grouped set before co
 
 ### Runtime settings schema changes
 
+- `app/config/smart_sentry_v3_0_0_settings.json`
 - `app/config/smart_sentry_v2_3_2_settings.json`
 - `app/config/smart_sentry_v2_3_1_settings.json`
 - `app/config/smart_sentry_v3_settings.json`
@@ -131,6 +132,7 @@ Rule: do not change after-target-loss behavior in only one of these places. Engi
 - `app/sentry_v2/sentry_v2_tab.py`
 - `app/sentry_v2/sentry_v2_overlay.py`
 - `app/sentry_v2/sound_engine.py`
+- `app/config/smart_sentry_v3_0_0_settings.json`
 - `app/config/smart_sentry_v2_3_2_settings.json`
 - `app/config/smart_sentry_v2_3_2_faces.json`
 - `SMART_SENTRY_MANUAL.md`
@@ -211,7 +213,7 @@ Before calling a firmware or runtime change complete, verify all of the followin
 
 - The active sketch path is correct in `ESP32_CURRENT_SKETCH.md`.
 - Flash examples in `ESP32_UDP_FLASH.md` still match the active firmware.
-- Runtime settings still load from `app/config/smart_sentry_v2_3_2_settings.json`.
+- Runtime settings still load from `app/config/smart_sentry_v3_0_0_settings.json` with older aliases accepted only as migration fallbacks.
 - UI wording matches the real connection topology.
 - Version marker files and launcher text match the intended release.
 - `RECENT_UPDATES.json` includes a concise summary entry when behavior or release identity changed.
@@ -238,7 +240,7 @@ Before calling a firmware or runtime change complete, verify all of the followin
 - App-side Smart Sentry Python should be treated as compile-ready only after `app/sentry_v2/sentry_v2_engine.py`, `app/sentry_v2/sentry_v2_overlay.py`, and `app/sentry_v2/sentry_v2_tab.py` pass diagnostics together.
 - Release packaging should ignore generated bench churn under `platformio/**/.pio/**` and runtime exports under `snapshots/`; those are not desktop app release-source inputs.
 - In frozen builds, treat the release-root `YOLO_MODELS/` folder as the public operator drop location and the versioned support-folder `YOLO_MODELS/` copy as bundled defaults only.
-- Quick startup now defers camera open and auto-connect, but still schedules a later lazy YOLO auto-load so the packaged app can come up fast without staying permanently unloaded.
+- Quick startup now begins the background camera-open path shortly after launch while still deferring auto-connect and still scheduling a later lazy YOLO auto-load so the packaged app stays responsive and reaches live detection sooner.
 - Before a v3.0.0 package is signed off, verify one fixed-guard loss-recovery pass in Frame Difference mode so the turret returns to the configured guard position after its bounded recovery scan.
 - Before an adaptive-loss-recovery change is signed off, verify both operator-visible branches: a quick handoff to a stronger visible target and a bounded persistent search when no such target appears.
 - Before a v3.0.0 package is signed off, verify `Facial Recognition` and `AI Assistant` remain hidden by the release-hold convention and can be restored by removing their hold entries.

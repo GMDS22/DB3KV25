@@ -178,11 +178,12 @@ class SentryV2Overlay:
         y2 = min(h - 1, cy + half_h)
 
         accent = _COL_RETICLE_RED if eng.auto_trigger_enabled else _COL_RETICLE_YELLOW
+        axes = (max(4, (x2 - x1) // 2), max(4, (y2 - y1) // 2))
         overlay = frame.copy()
-        cv2.rectangle(overlay, (x1, y1), (x2, y2), accent, -1)
+        cv2.ellipse(overlay, (cx, cy), axes, 0, 0, 360, accent, -1, cv2.LINE_AA)
         cv2.addWeighted(overlay, 0.10, frame, 0.90, 0.0, dst=frame)
-        cv2.rectangle(frame, (x1, y1), (x2, y2), _COL_BLACK, 3, cv2.LINE_AA)
-        cv2.rectangle(frame, (x1, y1), (x2, y2), accent, 1, cv2.LINE_AA)
+        cv2.ellipse(frame, (cx, cy), axes, 0, 0, 360, _COL_BLACK, 3, cv2.LINE_AA)
+        cv2.ellipse(frame, (cx, cy), axes, 0, 0, 360, accent, 1, cv2.LINE_AA)
 
     def apply_scope_view(self, frame: np.ndarray, engine: SentryV2Engine) -> np.ndarray:
         """Apply a display-only round scope view during engaging mode."""

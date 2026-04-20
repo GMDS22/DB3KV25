@@ -89,6 +89,7 @@ from .sentry_v2_config import (
     NoFireMaskConfig,
     NoFireMaskVertex,
     PIRSensorConfig,
+    normalize_auto_trigger_engagement,
 )
 from .sentry_v2_engine import SentryV2Engine, SentryV2State
 from .sentry_v2_overlay import SentryV2Overlay
@@ -3412,7 +3413,8 @@ class SentryV2TabWidget(QWidget):
     def _schedule_startup_tasks(self) -> None:
         """CHANGE WARNING: Startup work here couples camera bring-up, transport auto-connect, and YOLO warmup; keep expensive work deferred when quick startup is enabled."""
         if bool(getattr(self.config, "quick_startup_enabled", True)):
-            self._log("Quick startup enabled: deferring auto camera open and auto-connect; scheduling lazy YOLO model load.")
+            self._log("Quick startup enabled: starting background camera open, deferring auto-connect, and scheduling lazy YOLO model load.")
+            QTimer.singleShot(800, self._auto_open_camera_on_startup)
             self._schedule_auto_yolo_load(2500)
             QTimer.singleShot(0, self._schedule_startup_rest_move)
             return
@@ -5239,6 +5241,12 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._chk_overlay: "show_overlay",
             self._chk_scores: "show_scores",
             self._chk_zone: "show_zone",
+            self._chk_auto_lighting_qa: "auto_lighting_enabled",
+            self._chk_auto_lighting: "auto_lighting_enabled",
+            self._slider_led_pwm: "led_pwm_value",
+            self._spin_auto_brightness_threshold: "auto_brightness_threshold",
+            self._spin_auto_pwm_min: "auto_pwm_min",
+            self._spin_auto_pwm_max: "auto_pwm_max",
             self._spin_step: "manual_step",
             self._btn_led: "led_toggle",
             self._btn_laser: "laser_toggle",
@@ -5284,6 +5292,20 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
         for widget, key in getattr(self, "_extra_tooltip_widgets", []):
             self._apply_tooltip(widget, key)
+
+        log_filter_tooltip_keys = {
+            "all": "serial_log_filter_all",
+            "system": "serial_log_filter_system",
+            "pir": "serial_log_filter_pir",
+            "movement": "serial_log_filter_movement",
+            "camera": "serial_log_filter_camera",
+            "safety": "serial_log_filter_safety",
+            "accessory": "serial_log_filter_accessory",
+        }
+        for key, button in getattr(self, "_log_filter_buttons", {}).items():
+            tooltip_key = log_filter_tooltip_keys.get(str(key))
+            if tooltip_key:
+                self._apply_tooltip(button, tooltip_key)
 
         self._apply_missing_button_tooltips()
 
@@ -12517,6 +12539,8 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         eg.loss_scene_crowding_threshold = self._spin_loss_crowd_threshold.value()
         eg.loss_personality_intensity = self._spin_loss_personality.value()
         eg.loss_personality_velocity_bias = self._spin_loss_velocity_bias.value()
+        if normalize_auto_trigger_engagement(eg):
+            self._sync_auto_trigger_gate_widgets_from_config()
         self.config.pir_guard.search_style = eg.loss_search_style
         self.config.pir_guard.search_rounds = eg.loss_search_rounds
         self._update_center_fire_radius_hint()
@@ -12545,6 +12569,25 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         self._chk_optimize.setEnabled(not single_target_only)
         if hasattr(self, "_lbl_max_queue"):
             self._lbl_max_queue.setEnabled(True)
+
+    def _sync_auto_trigger_gate_widgets_from_config(self) -> None:
+        widgets = [
+            ("_spin_aim_lock_pan", self.config.engagement.aim_lock_pan_tolerance),
+            ("_spin_aim_lock_tilt", self.config.engagement.aim_lock_tilt_tolerance),
+            ("_spin_fire_enter_pan", self.config.engagement.fire_trigger_enter_pan_tolerance),
+            ("_spin_fire_enter_tilt", self.config.engagement.fire_trigger_enter_tilt_tolerance),
+            ("_spin_fire_exit_pan", self.config.engagement.fire_trigger_exit_pan_tolerance),
+            ("_spin_fire_exit_tilt", self.config.engagement.fire_trigger_exit_tilt_tolerance),
+            ("_spin_recenter_pan", self.config.engagement.fire_recenter_pan_tolerance),
+            ("_spin_recenter_tilt", self.config.engagement.fire_recenter_tilt_tolerance),
+        ]
+        for attr_name, value in widgets:
+            widget = getattr(self, attr_name, None)
+            if widget is None:
+                continue
+            widget.blockSignals(True)
+            widget.setValue(float(value))
+            widget.blockSignals(False)
 
     def _update_center_fire_radius_hint(self) -> None:
         if not hasattr(self, "_lbl_center_fire_radius_hint"):
@@ -13094,6 +13137,9 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
     def _on_auto_trigger_toggled(self, checked: bool) -> None:
         self.config.engagement.auto_trigger_enabled = checked
+        if checked and normalize_auto_trigger_engagement(self.config.engagement):
+            self._sync_auto_trigger_gate_widgets_from_config()
+            self._update_center_fire_radius_hint()
         self._sync_auto_trigger_checkbox_style()
         if not self._applying_master_preset:
             self._set_master_profile_label(self._match_master_profile_name())
@@ -13391,8 +13437,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             if checked:
                 auto_enabled = bool(getattr(self.config.lighting, "auto_lighting_enabled", False))
                 if auto_enabled:
-                    # Auto-lighting drives PWM; let next brightness sample set it
-                    self._queue_comm_task("set_led_pwm", self._auto_led_pwm or 1, self.engine.current_pan, self.engine.current_tilt)
+                    self._apply_auto_lighting_from_cached_frame(force_dispatch=True)
                 else:
                     pwm = int(max(0, min(255, getattr(self.config.lighting, "led_pwm_value", 255))))
                     self._queue_comm_task("set_led_pwm", pwm, self.engine.current_pan, self.engine.current_tilt)
@@ -17647,7 +17692,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         if bool(getattr(self.config.sound, "enabled", True)):
             self._sound_engine.note_settings_changed()
 
-    def _update_auto_lighting(self, frame: "np.ndarray") -> None:
+    def _update_auto_lighting(self, frame: "np.ndarray", *, force_dispatch: bool = False) -> None:
         """Sample frame luminance and adjust LED PWM when auto-lighting is enabled."""
         if not bool(getattr(self.config.lighting, "auto_lighting_enabled", False)):
             return
@@ -17669,20 +17714,49 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             new_pwm = int(pwm_min + dark_ratio * (pwm_max - pwm_min))
         else:
             new_pwm = 0
-        if new_pwm != self._auto_led_pwm:
-            self._auto_led_pwm = new_pwm
-            luma_text = f"luma:{luma:.0f} pwm:{new_pwm}"
-            if hasattr(self, "_lbl_auto_luma"):
-                self._lbl_auto_luma.setText(f"Scene luma: {luma:.0f}  PWM: {new_pwm}")
-            if hasattr(self, "_lbl_auto_luma_qa"):
-                self._lbl_auto_luma_qa.setText(luma_text)
-            if not self._host_controls_hardware():
-                self._queue_comm_task(
-                    "set_led_pwm",
-                    new_pwm,
-                    self.engine.current_pan,
-                    self.engine.current_tilt,
-                )
+        pwm_changed = new_pwm != self._auto_led_pwm
+        self._auto_led_pwm = new_pwm
+        luma_text = f"luma:{luma:.0f} pwm:{new_pwm}"
+        if hasattr(self, "_lbl_auto_luma"):
+            self._lbl_auto_luma.setText(f"Scene luma: {luma:.0f}  PWM: {new_pwm}")
+        if hasattr(self, "_lbl_auto_luma_qa"):
+            self._lbl_auto_luma_qa.setText(luma_text)
+        if (force_dispatch or pwm_changed) and not self._host_controls_hardware():
+            self._queue_comm_task(
+                "set_led_pwm",
+                new_pwm,
+                self.engine.current_pan,
+                self.engine.current_tilt,
+            )
+
+    def _apply_auto_lighting_from_cached_frame(self, *, force_dispatch: bool = False) -> None:
+        if not bool(getattr(self.config.lighting, "auto_lighting_enabled", False)):
+            return
+        if not self._led_on:
+            return
+        frame = getattr(self, "_last_raw_frame", None)
+        if frame is not None:
+            self._update_auto_lighting(frame, force_dispatch=force_dispatch)
+            return
+        self._auto_led_pwm = 0
+        if force_dispatch and not self._host_controls_hardware():
+            self._queue_comm_task(
+                "set_led_pwm",
+                0,
+                self.engine.current_pan,
+                self.engine.current_tilt,
+            )
+
+    def _sync_auto_lighting_toggle_widgets(self, checked: bool) -> None:
+        if hasattr(self, "_chk_auto_lighting"):
+            self._chk_auto_lighting.blockSignals(True)
+            self._chk_auto_lighting.setChecked(bool(checked))
+            self._chk_auto_lighting.setText(f"Auto Lighting: {'ON' if checked else 'OFF'}")
+            self._chk_auto_lighting.blockSignals(False)
+        if hasattr(self, "_chk_auto_lighting_qa"):
+            self._chk_auto_lighting_qa.blockSignals(True)
+            self._chk_auto_lighting_qa.setChecked(bool(checked))
+            self._chk_auto_lighting_qa.blockSignals(False)
 
     def _sound_volume_pct(self) -> int:
         return int(max(0, min(100, int(getattr(self.config.sound, "volume_pct", 100) or 100))))
@@ -17919,12 +17993,13 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
 
     def _on_auto_lighting_toggled(self, checked: bool) -> None:
         self.config.lighting.auto_lighting_enabled = bool(checked)
-        if hasattr(self, "_chk_auto_lighting"):
-            self._chk_auto_lighting.setText(f"Auto Lighting: {'ON' if checked else 'OFF'}")
-        if hasattr(self, "_chk_auto_lighting_qa"):
-            self._chk_auto_lighting_qa.blockSignals(True)
-            self._chk_auto_lighting_qa.setChecked(checked)
-            self._chk_auto_lighting_qa.blockSignals(False)
+        self._sync_auto_lighting_toggle_widgets(bool(checked))
+        if self._led_on and not self._host_controls_hardware():
+            if checked:
+                self._apply_auto_lighting_from_cached_frame(force_dispatch=True)
+            else:
+                pwm = int(max(0, min(255, getattr(self.config.lighting, "led_pwm_value", 255))))
+                self._queue_comm_task("set_led_pwm", pwm, self.engine.current_pan, self.engine.current_tilt)
         self._save_config_quietly()
 
     def _on_led_pwm_slider_changed(self, value: int) -> None:

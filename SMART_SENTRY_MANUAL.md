@@ -3,7 +3,7 @@
 > **Version:** 3.0.0  
 > **Module Path:** `app/sentry_v2/`  
 > **Last Updated:** 2026-04-09  
-> **Status:** Verified against the current standalone Smart Sentry release candidate for v3.0.0. The canonical runtime settings file remains `app/config/smart_sentry_v2_3_2_settings.json`; older settings paths remain compatibility fallbacks only. The full settings system still defines 13 tabs, but `Facial Recognition` and `AI Assistant` are temporarily hidden by release hold for v3.0.0 and can be restored quickly by removing their hold entries.
+> **Status:** Verified against the current standalone Smart Sentry release candidate for v3.0.0. The canonical runtime settings file is `app/config/smart_sentry_v3_0_0_settings.json`; older settings paths remain compatibility fallbacks only. The full settings system still defines 13 tabs, but `Facial Recognition` and `AI Assistant` are temporarily hidden by release hold for v3.0.0 and can be restored quickly by removing their hold entries.
 
 Primary behavior-contract note: for the current authoritative tracking, PIR, target-loss, center-aim, and fire-gating blueprint, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md` first before changing engine or preset behavior.
 
@@ -38,7 +38,7 @@ Smart Sentry v2 is a standalone turret control application launched from the DB3
 Pinned firmware note: the current live app contract uses the ESP32 WiFi + Debug Board USB path with `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` as the active WiFi firmware. Waveshare single-board firmware files remain in the repo for archived bench work only and are not part of the current app.
 
 - **Standalone camera ownership:** Smart Sentry opens and owns its own camera or stream source
-- **Separate runtime settings:** Smart Sentry persists to `app/config/smart_sentry_v2_3_2_settings.json` and mirrors older files only for compatibility
+- **Separate runtime settings:** Smart Sentry persists to `app/config/smart_sentry_v3_0_0_settings.json` and accepts older files only as migration fallbacks
 - **One-app-at-a-time workflow:** Smart Sentry and the main app may use the same COM values, but never at the same time
 
 On single-camera systems, Smart Sentry should normally use camera index `0` unless the operator explicitly selects another camera or stream source.
@@ -46,7 +46,7 @@ On single-camera systems, Smart Sentry should normally use camera index `0` unle
 ### Recent Verified Standalone Upgrades
 
 - **Quick access control deck:** the left pane now includes a retractable quick-access panel between the video feed and the serial/status area, with pin-to-persist behavior, mirrored runtime controls for enable/video/link/camera/auto motion, a compact manual movement pad, and direct safety/fire/accessory toggles that reuse the same handlers as the Controls tab
-- **Quick startup policy:** launch defers auto camera open and auto-connect, then performs a later lazy YOLO auto-load so startup stays responsive without leaving YOLO permanently unloaded
+- **Quick startup policy:** launch starts background camera open shortly after startup while still deferring auto-connect and using a later lazy YOLO auto-load, so detection readiness improves without blocking the UI thread
 - **Sound system:** procedural non-blocking buzzer cues now route through `sound_engine.py` and `SentryV2Comm` with transport-aware status and persisted volume
 - **Voice output modes:** Smart Sentry now supports both robot buzzer cues and optional human-like local speech through Qt text-to-speech, so identity alerts and assistant replies can use either path or both together
 - **Runtime diagnostics:** the status area now includes pinned hardware-monitor cards plus a live sound-link readout
@@ -150,7 +150,7 @@ All configuration in `@dataclass` structures with JSON save/load.
 | `ConnectionConfig` | Hardware topology | `connection_type`, ports/bauds, UDP host/port, `wifi_interface` (dedicated Windows WiFi adapter), servo IDs, camera, inversions |
 | `SentryV2Config` | Top-level container | All sub-configs + overlay flags + `save()`/`load()` |
 
-**Persistence:** `app/config/smart_sentry_v2_3_2_settings.json` (canonical runtime file, auto-created). Compatibility fallbacks and mirrors may also exist at `app/config/smart_sentry_v2_3_1_settings.json`, `app/config/smart_sentry_v3_settings.json`, and `app/config/sentry_v2_settings.json`, but those are not the authoritative live file.
+**Persistence:** `app/config/smart_sentry_v3_0_0_settings.json` (canonical runtime file, auto-created). Compatibility fallbacks may also exist at `app/config/smart_sentry_v2_3_2_settings.json`, `app/config/smart_sentry_v2_3_1_settings.json`, `app/config/smart_sentry_v3_settings.json`, and `app/config/sentry_v2_settings.json`, but those are not the authoritative live file.
 
 ---
 

@@ -410,7 +410,7 @@ if ($launcherScriptFiles.Count -eq 0) {
     throw "No app launcher scripts were discovered under app\\run_smart_sentry_v*.py"
 }
 
-$requiredModules = @('PyInstaller', 'PyQt5', 'cv2', 'numpy', 'serial', 'torch', 'ultralytics')
+$requiredModules = @('PyInstaller', 'PyQt5', 'cv2', 'numpy', 'serial', 'torch', 'ultralytics', 'lap')
 if ($bundleSklearn) {
     $requiredModules += 'sklearn'
 }

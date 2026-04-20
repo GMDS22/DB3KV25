@@ -13,20 +13,20 @@ This document is the active release-prep checklist for the Smart Sentry v3.0.0 r
 - Compiled app output drive: `F:`
 - Compiled app output folder: `F:\SMART SENTRY V3.0.0`
 - Final packaged executable: `F:\SMART SENTRY V3.0.0\SMART_SENTRY_V3.0.0.exe`
-- Validated runtime interpreter: `F:\SMART SENTRY V2\SMART SENTRY\.venv\Scripts\python.exe`
+- Validated runtime interpreter: prefer `F:\SMART SENTRY V2\.venv311\Scripts\python.exe` when present; otherwise use the active repo/workspace `.venv` selected by the build helper
 - Build-helper interpreter resolution order: `SMART_SENTRY_PYTHON_EXE` override, parent `.venv311`, repo `.venv311`, parent `.venv`, repo `.venv`
 
 Pinned firmware note: the current release does not use the Waveshare single-board bridge files. Treat all Waveshare firmware and bridge docs as on hold unless this protocol is explicitly revised.
 
 ## 1A. Current Release Gate
 
-As of 2026-04-10, packaging for v3.0.0 remains intentionally paused until the operator completes one final live hardware test on the validated camera/runtime path.
+Previous blocker summary for the v3.0.0 packaging path:
 
-Do not resume compilation from this protocol until all of the following are true:
+1. Qt VC runtime DLL drift caused silent packaged `APPCRASH` on launch.
+2. Packaged YOLO failed when runtime DLL search paths or packaged settings pointed at the wrong model surface.
+3. Packaged settings and sound/transport values could drift away from the live WiFi firmware contract.
 
-1. The operator confirms the final live hardware retest passed.
-2. The 1280×720 camera path still opens cleanly through the in-app smoke test.
-3. No new runtime or syntax errors appear in the final sanity-check pass.
+The hold that paused packaging on 2026-04-10 is cleared only for an operator-authorized rebuild attempt. A new build attempt must still complete the post-build verification in sections `5A` and `5B` before the release is treated as good.
 
 ## 2. Active Packaging Path
 
@@ -44,6 +44,7 @@ Notes:
 4. `YOLO_MODELS` at the release root remains the only public packaged-model drop folder.
 5. Do not invoke this build helper until the gate in section `1A` is explicitly cleared.
 6. The build helper must refresh the bundled Qt VC runtime DLLs in `PyQt5\Qt5\bin` from `C:\Windows\System32` before smoke-testing the staged build and again after copying into the final release folder.
+7. The build helper replaces the existing `F:\SMART SENTRY V3.0.0` folder in place after the staged smoke test passes.
 
 ## 2A. Known Packaging Regressions To Block
 
@@ -90,13 +91,13 @@ Sync these files before sign-off:
 
 1. Confirm `SMART_SENTRY_V3_0_VERSION.txt` contains `3.0.0`.
 2. Confirm the app title resolves to Smart Sentry v3.0.0 at runtime.
-3. Confirm `run.py` resolves the active launcher without a hard-coded v2.3.2 import.
+3. Confirm `run.py` keeps frozen dispatch on the canonical packaged launcher identity `app.run_smart_sentry_v2_3_2` for the `3.0.0` token while the versioned v3 wrapper launchers import through `app.*` only.
 4. Confirm the packaging preflight resolves the active launcher module for v3.0.0.
 5. Run file diagnostics on `app/sentry_v2/sentry_v2_tab.py`, `run.py`, `app/smart_sentry_meta.py`, and the build helper path before packaging.
 6. From repository root, run `& ".\.venv\Scripts\python.exe" .\tools\camera_open_smoke_test.py` and confirm the result reports `ok: true`, `actual: [1280, 720]`, and `recovery_attempts: 0`.
 7. If camera startup regresses, run `& ".\.venv\Scripts\python.exe" .\tools\camera_backend_probe.py` and verify Windows still prefers a stable backend before packaging; on this validation machine the correct order is `MSMF -> DEFAULT -> DSHOW`.
 8. Confirm no one resumes packaging from the broken parent `.venv311\Scripts\python.exe` launch path if that interpreter is missing on the active machine.
-9. Confirm the source defaults and runtime path logic do not hard-code a stale release config path when packaging v3.0.0. At minimum, inspect `app/sentry_v2/sentry_v2_tab.py` and `app/sentry_v2/sentry_v2_config.py` for any remaining forced `smart_sentry_v2_3_2_*` live-path assumptions before sign-off.
+9. Confirm the source defaults and runtime path logic treat `app/config/smart_sentry_v3_0_0_settings.json` as the active canonical release file while still accepting older aliases only as migration fallbacks.
 
 ## 5A. Post-Build Artifact Verification
 
@@ -117,6 +118,7 @@ After every successful build, inspect the actual promoted release at `F:\SMART S
 5. Open the packaged active settings file and verify:
 	- `connection.udp_host` is `192.168.4.1`
 	- `connection.udp_port` is `9000`
+	- the canonical packaged settings file is `app/config/smart_sentry_v3_0_0_settings.json`
 	- `detection_mode.yolo_model_dir` points at the final release-root `YOLO_MODELS` folder
 	- `detection_mode.yolo_model_dir` does not point at `F:\SMART SENTRY V2\SMART SENTRY\YOLO_MODELS`
 	- `detection_mode.yolo_model_dir` does not point anywhere under `.pyinstaller-temp`
