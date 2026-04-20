@@ -26,9 +26,6 @@ def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
     app_root = repo_root / "app"
     active_version = read_active_version(repo_root)
-    active_version_token = active_version.replace(".", "_")
-    active_launcher_basename = f"run_smart_sentry_v{active_version_token}"
-    active_launcher_module = f"app.{active_launcher_basename}"
 
     for path_obj in (repo_root, app_root):
         path_str = str(path_obj)
@@ -37,7 +34,7 @@ def main() -> int:
 
     required_paths = [
         repo_root / "run.py",
-        app_root / f"{active_launcher_basename}.py",
+        app_root / "main.py",
         app_root / "smart_sentry_meta.py",
         app_root / "theme_manager.py",
         app_root / "runtime_paths.py",
@@ -46,7 +43,7 @@ def main() -> int:
     missing_paths = [str(path_obj) for path_obj in required_paths if not path_obj.exists()]
 
     required_modules = [
-        active_launcher_module,
+        "app.main",
         "app.runtime_paths",
         "smart_sentry_meta",
         "theme_manager",

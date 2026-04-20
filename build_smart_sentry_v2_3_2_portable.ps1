@@ -294,13 +294,8 @@ function Invoke-NativeProcess([string]$filePath, [string[]]$arguments, [string]$
 $activeVersionMetadata = Get-ActiveVersionMetadata
 $activeVersion = $activeVersionMetadata.Version
 $activeVersionToken = $activeVersion -replace '\.', '_'
-$canonicalLauncherBaseName = "run_smart_sentry_v2_3_2"
-$activeLauncherBaseName = $canonicalLauncherBaseName
-$activeLauncherModule = "app.$canonicalLauncherBaseName"
-$activeLauncherPath = Join-Path $repoRoot "app\$canonicalLauncherBaseName.py"
-$launcherScriptFiles = @($activeLauncherPath)
-$launcherScriptRelativePaths = @("app\$canonicalLauncherBaseName.py")
-$launcherModulesToBundle = @("app.$canonicalLauncherBaseName")
+$activeLauncherModule = "app.main"
+$activeLauncherPath = Join-Path $repoRoot "app\main.py"
 $releaseDir = Join-Path $OutputDrive "SMART SENTRY V$activeVersion"
 $releaseExeBase = "SMART_SENTRY_V$activeVersion"
 $releaseExeName = "$releaseExeBase.exe"
@@ -393,10 +388,7 @@ $db3kVersionPath = Join-Path $repoRoot 'DB3K_VERSION.txt'
 $rootModelsPath = Join-Path $repoRoot 'YOLO_MODELS'
 
 if (-not (Test-Path $activeLauncherPath)) {
-    throw "Active launcher for version $activeVersion was not found: $activeLauncherPath"
-}
-if ($launcherScriptFiles.Count -eq 0) {
-    throw "No app launcher scripts were discovered under app\\run_smart_sentry_v*.py"
+    throw "App launcher was not found: $activeLauncherPath"
 }
 
 $requiredModules = @('PyInstaller', 'PyQt5', 'cv2', 'numpy', 'serial', 'torch', 'ultralytics', 'lap')
@@ -454,7 +446,7 @@ $pyInstallerArgs = @(
     '--exclude-module', 'polars_runtime_32',
     '--exclude-module', '_polars_runtime_32',
     '--exclude-module', 'pytest',
-    '--hidden-import', $activeLauncherModule,
+    '--hidden-import', 'app.main',
     '--hidden-import', 'app.runtime_paths',
     '--hidden-import', 'smart_sentry_meta',
     '--hidden-import', 'theme_manager',
@@ -486,9 +478,6 @@ foreach ($excludedTorchModule in $torchRuntimeExcludes) {
     $pyInstallerArgs += @('--exclude-module', $excludedTorchModule)
 }
 
-foreach ($launcherModule in $launcherModulesToBundle) {
-    $pyInstallerArgs += @('--hidden-import', $launcherModule)
-}
 
 if (-not $bundleSklearn) {
     $pyInstallerArgs += @(
