@@ -453,6 +453,7 @@ $pyInstallerArgs = @(
     '--hidden-import', 'torch',
     '--hidden-import', 'torchvision',
     '--hidden-import', 'sentry_v2.sentry_v2_tab',
+    '--collect-submodules', 'numpy',
     '--add-data', "$appConfigPath;app/config",
     '--add-data', "$appSentryConfigPath;app/sentry_v2/config",
     '--add-data', "$appLogoPath;app",
