@@ -80,7 +80,12 @@ The following failures already occurred on the v3.0.0 path and must be treated a
 	- Root cause: package initialization timing issue in the frozen bundle. `_prepare_yolo_runtime()` triggers `import torch`. `torch/__init__.py` uses `typing_extensions._deprecated`, which causes `asyncio/__init__.py` to execute **while `torch/__init__.py` is still mid-`exec_module`**. At that moment `asyncio.__path__` is not yet established in the frozen importer context, so the relative import `from .base_events import *` (line 8) fails even though all asyncio submodules ARE present in the PYZ archive. This is not a missing-file problem; it is an initialization ordering problem. See ISS-077.
 	- Required prevention: `import asyncio` must remain as an explicit early import in `run.py` (before `from app.main import main`) so asyncio is fully initialized in `sys.modules` before torch is ever imported. If this line is removed, the error will recur in any frozen build on Python 3.11+.
 
-## 3. Release-Hold Validation
+7. **Frozen exe YOLO prepare fails with `ModuleNotFoundError: No module named 'unittest.result'`**
+	- Symptom: after ISS-077 asyncio fix, YOLO still fails. `yolo_runtime_diag.log` shows `prepare-failed` with `ModuleNotFoundError: No module named 'unittest.result'`. Import chain: `torch.utils._config_module` → `import unittest` → `unittest/__init__.py:60` relative import fails.
+	- Root cause: PyInstaller does not auto-collect `unittest` stdlib submodules. `unittest/__init__.py` requires `unittest.result`, `unittest.case`, `unittest.suite`, etc. which are absent without explicit collection. Same class of problem as ISS-076 (numpy._core).
+	- Required prevention: `--collect-submodules unittest` must remain in the `$pyInstallerArgs` array in `build_smart_sentry_v2_3_2_portable.ps1`. See ISS-078.
+
+
 
 Before packaging v3.0.0, confirm the unfinished operator tabs stay on release hold:
 

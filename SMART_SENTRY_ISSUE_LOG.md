@@ -130,6 +130,17 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
+### ISS-078 | 2026-04-20 | v3.0.0 | Build | Worked
+**Frozen Exe YOLO Prepare Failed With `ModuleNotFoundError: No module named 'unittest.result'`**
+
+- **Symptoms**: After ISS-077 was fixed (asyncio preload), YOLO still failed to load. `yolo_runtime_diag.log` showed `prepare-failed` with `ModuleNotFoundError: No module named 'unittest.result'`. Import chain: `import torch` → `torch.utils._config_module` → `import unittest` → `unittest/__init__.py:60` → `from .result import *` → failure.
+- **Root Cause**: Same class of problem as ISS-076 and ISS-077. PyInstaller does not automatically collect all Python stdlib submodules. `unittest/__init__.py` does `from .result import *` and similar relative imports requiring submodules (`unittest.result`, `unittest.case`, `unittest.suite`, etc.) to be present in the frozen bundle. These submodules were absent from the PYZ.
+- **Fix/Solution**: Added `'--collect-submodules', 'unittest'` to the `$pyInstallerArgs` array in `build_smart_sentry_v2_3_2_portable.ps1`, placed after the existing `--collect-submodules asyncio` line.
+- **Files Modified**: `build_smart_sentry_v2_3_2_portable.ps1`
+- **Notes**: This is the third stdlib submodule collection gap discovered in the v3.0.0 build (`numpy._core` → ISS-076, `asyncio` fixed via `run.py` preload → ISS-077, `unittest` → ISS-078). All three are triggered by torch's import chain. Commit paired with ISS-078 documentation.
+
+---
+
 ### ISS-077 | 2026-04-20 | v3.0.0 | Build | Worked
 **Frozen Exe YOLO Prepare Failed With `ModuleNotFoundError: No module named 'asyncio.base_events'`**
 

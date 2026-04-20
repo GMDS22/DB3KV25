@@ -455,6 +455,7 @@ $pyInstallerArgs = @(
     '--hidden-import', 'sentry_v2.sentry_v2_tab',
     '--collect-submodules', 'numpy',
     '--collect-submodules', 'asyncio',
+    '--collect-submodules', 'unittest',
     '--add-data', "$appConfigPath;app/config",
     '--add-data', "$appSentryConfigPath;app/sentry_v2/config",
     '--add-data', "$appLogoPath;app",
