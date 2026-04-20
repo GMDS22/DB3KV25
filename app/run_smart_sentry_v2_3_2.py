@@ -227,9 +227,9 @@ _EXIT_OVERLAY_STYLE = """
     border-radius: 10px;
 }
 #exitSplashStatus {
-    color: rgba(173, 201, 226, 0.82);
-    font-size: 13px;
-    letter-spacing: 0.4px;
+    color: rgba(173, 201, 226, 0.88);
+    font-size: 15px;
+    letter-spacing: 0.5px;
 }
 #exitSplashSep {
     background: rgba(173, 201, 226, 0.14);
@@ -239,19 +239,19 @@ _EXIT_OVERLAY_STYLE = """
 QProgressBar#exitSplashBar {
     background: rgba(173, 201, 226, 0.07);
     border: none;
-    border-radius: 1px;
-    min-height: 3px;
-    max-height: 3px;
+    border-radius: 2px;
+    min-height: 5px;
+    max-height: 5px;
 }
 QProgressBar#exitSplashBar::chunk {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
         stop:0 #1a6fa8, stop:0.5 #26a6d1, stop:1 #3ecfef);
-    border-radius: 1px;
+    border-radius: 2px;
 }
 """
 
-_EXIT_OVERLAY_W = 400
-_EXIT_OVERLAY_H = 310
+_EXIT_OVERLAY_W = 540
+_EXIT_OVERLAY_H = 200
 
 _EXIT_STATUS_STEPS = [
     (0,    "Closing camera feed",                 8),
@@ -277,21 +277,9 @@ class ExitSplashOverlay(QWidget):
         self.setStyleSheet(_EXIT_OVERLAY_STYLE)
 
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(24, 24, 24, 24)
+        root_layout.setContentsMargins(32, 28, 32, 28)
         root_layout.setSpacing(0)
         root_layout.addStretch(1)
-
-        # Logo
-        self._logo_label = QLabel(alignment=Qt.AlignCenter)  # type: ignore[call-overload]
-        logo_path = APP_DIR / "LOGO.png"
-        if logo_path.is_file():
-            pix = QPixmap(str(logo_path))
-            if not pix.isNull():
-                pix = pix.scaledToHeight(148, Qt.SmoothTransformation)  # type: ignore[attr-defined]
-                self._logo_label.setPixmap(pix)
-        root_layout.addWidget(self._logo_label)
-
-        root_layout.addSpacing(20)
 
         # Separator
         sep = QWidget()
@@ -299,14 +287,14 @@ class ExitSplashOverlay(QWidget):
         sep.setFixedHeight(1)
         root_layout.addWidget(sep)
 
-        root_layout.addSpacing(14)
+        root_layout.addSpacing(20)
 
         # Status label
         self._status_label = QLabel("", alignment=Qt.AlignCenter)  # type: ignore[call-overload]
         self._status_label.setObjectName("exitSplashStatus")
         root_layout.addWidget(self._status_label)
 
-        root_layout.addSpacing(12)
+        root_layout.addSpacing(16)
 
         # Progress bar
         self._bar = QProgressBar()
@@ -314,7 +302,7 @@ class ExitSplashOverlay(QWidget):
         self._bar.setRange(0, 100)
         self._bar.setValue(0)
         self._bar.setTextVisible(False)
-        self._bar.setFixedHeight(3)
+        self._bar.setFixedHeight(5)
         root_layout.addWidget(self._bar)
 
         root_layout.addStretch(1)

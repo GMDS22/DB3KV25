@@ -3895,11 +3895,70 @@ class SentryV2TabWidget(QWidget):
         _qa_chip_bar_lay.setContentsMargins(4, 2, 4, 2)
         _qa_chip_bar_lay.setSpacing(8)
 
-        self._chk_auto_lighting_qa = QCheckBox("Auto Lighting")
+        # ---- QA icon buttons ----
+        def _mk_qa_btn(label: str, tip: str, checkable: bool = True) -> QPushButton:
+            b = QPushButton(label)
+            b.setCheckable(checkable)
+            b.setFixedSize(26, 26)
+            b.setObjectName("qaIconBtn")
+            b.setToolTip(tip)
+            b.setCursor(Qt.PointingHandCursor)
+            return b
+
+        self._btn_auto_trigger_qa = _mk_qa_btn("⚡", "Auto Trigger ON/OFF")
+        self._btn_auto_trigger_qa.setChecked(bool(getattr(self.config.engagement, "auto_trigger_enabled", False)))
+        _qa_chip_bar_lay.addWidget(self._btn_auto_trigger_qa)
+
+        self._btn_safety_qa = _mk_qa_btn("🛡", "Safety (Fire Enable)")
+        _qa_chip_bar_lay.addWidget(self._btn_safety_qa)
+
+        self._btn_fire_qa = _mk_qa_btn("●", "Manual Fire — hold to fire", checkable=False)
+        _qa_chip_bar_lay.addWidget(self._btn_fire_qa)
+
+        _qa_sep1 = QFrame()
+        _qa_sep1.setFrameShape(QFrame.VLine)
+        _qa_sep1.setObjectName("qaIconSep")
+        _qa_chip_bar_lay.addWidget(_qa_sep1)
+
+        self._btn_buzzer_qa = _mk_qa_btn("♬", "Buzzer Sound ON/OFF")
+        self._btn_buzzer_qa.setChecked(bool(getattr(self.config.sound, "enabled", True)))
+        _qa_chip_bar_lay.addWidget(self._btn_buzzer_qa)
+
+        self._btn_led_qa = _mk_qa_btn("☀", "LED Output ON/OFF")
+        _qa_chip_bar_lay.addWidget(self._btn_led_qa)
+
+        self._btn_laser_qa = _mk_qa_btn("⊕", "Laser Output ON/OFF")
+        _qa_chip_bar_lay.addWidget(self._btn_laser_qa)
+
+        self._btn_acc_qa = _mk_qa_btn("⚙", "ACC Output ON/OFF")
+        _qa_chip_bar_lay.addWidget(self._btn_acc_qa)
+
+        self._btn_spare_qa = _mk_qa_btn("◈", "Spare Output ON/OFF")
+        _qa_chip_bar_lay.addWidget(self._btn_spare_qa)
+
+        _qa_sep2 = QFrame()
+        _qa_sep2.setFrameShape(QFrame.VLine)
+        _qa_sep2.setObjectName("qaIconSep")
+        _qa_chip_bar_lay.addWidget(_qa_sep2)
+
+        # Keep attr name _chk_auto_lighting_qa so existing sync code (_sync_auto_lighting_toggle_widgets,
+        # _apply_all_tooltips widget map) still works — QPushButton has the same setChecked/isChecked/blockSignals API.
+        self._chk_auto_lighting_qa = QPushButton("☼")
+        self._chk_auto_lighting_qa.setCheckable(True)
+        self._chk_auto_lighting_qa.setFixedSize(26, 26)
+        self._chk_auto_lighting_qa.setObjectName("qaIconBtn")
+        self._chk_auto_lighting_qa.setToolTip("Auto Lighting ON/OFF")
+        self._chk_auto_lighting_qa.setCursor(Qt.PointingHandCursor)
         self._chk_auto_lighting_qa.setChecked(bool(getattr(self.config.lighting, "auto_lighting_enabled", False)))
-        self._chk_auto_lighting_qa.toggled.connect(self._on_auto_lighting_toggled)
-        self._set_theme_role(self._chk_auto_lighting_qa, "compactValue")
+        self._chk_auto_lighting_qa.clicked.connect(self._on_auto_lighting_toggled)
         _qa_chip_bar_lay.addWidget(self._chk_auto_lighting_qa)
+
+        self._btn_keyboard_qa = _mk_qa_btn("⌨", "Keyboard Manual Controls ON/OFF")
+        self._btn_keyboard_qa.setChecked(bool(getattr(self.config.shortcuts, "manual_controls_enabled", False)))
+        _qa_chip_bar_lay.addWidget(self._btn_keyboard_qa)
+
+        self._btn_tune_qa = _mk_qa_btn("≡", "Movement & Tracking Settings (click to expand)", checkable=True)
+        _qa_chip_bar_lay.addWidget(self._btn_tune_qa)
 
         self._lbl_auto_luma_qa = QLabel("")
         self._set_theme_role(self._lbl_auto_luma_qa, "mutedCompact")
@@ -3907,6 +3966,60 @@ class SentryV2TabWidget(QWidget):
         _qa_chip_bar_lay.addStretch(1)
 
         _video_container_lay.addWidget(_qa_chip_bar, 0)
+
+        # ---- Tune flyout panel (hidden by default, toggled by _btn_tune_qa) ----
+        self._qa_tune_flyout = QWidget()
+        self._qa_tune_flyout.setObjectName("qaTuneFlyout")
+        _tf_lay = QHBoxLayout(self._qa_tune_flyout)
+        _tf_lay.setContentsMargins(6, 4, 6, 4)
+        _tf_lay.setSpacing(8)
+
+        _lbl_spd = QLabel("Speed:")
+        _lbl_spd.setObjectName("qaTuneLabel")
+        _tf_lay.addWidget(_lbl_spd)
+        self._sld_speed_qa = QSlider(Qt.Horizontal)
+        self._sld_speed_qa.setRange(10, 100)
+        self._sld_speed_qa.setValue(self.config.engagement.engagement_speed)
+        self._sld_speed_qa.setFixedWidth(80)
+        self._sld_speed_qa.setToolTip("Tracking / engagement speed (10–100)")
+        _tf_lay.addWidget(self._sld_speed_qa)
+
+        _lbl_srvt = QLabel("Servo ms:")
+        _lbl_srvt.setObjectName("qaTuneLabel")
+        _tf_lay.addWidget(_lbl_srvt)
+        self._spn_servo_time_qa = QSpinBox()
+        self._spn_servo_time_qa.setRange(0, 1000)
+        self._spn_servo_time_qa.setSingleStep(5)
+        self._spn_servo_time_qa.setValue(self.config.connection.bus_servo_time_ms)
+        self._spn_servo_time_qa.setFixedWidth(62)
+        self._spn_servo_time_qa.setToolTip("Bus servo move time in ms (0–1000)")
+        _tf_lay.addWidget(self._spn_servo_time_qa)
+
+        _lbl_settle = QLabel("Settle s:")
+        _lbl_settle.setObjectName("qaTuneLabel")
+        _tf_lay.addWidget(_lbl_settle)
+        self._spn_settle_qa = QDoubleSpinBox()
+        self._spn_settle_qa.setRange(0.1, 3.0)
+        self._spn_settle_qa.setSingleStep(0.1)
+        self._spn_settle_qa.setDecimals(1)
+        self._spn_settle_qa.setValue(self.config.engagement.precision_settle_time)
+        self._spn_settle_qa.setFixedWidth(62)
+        self._spn_settle_qa.setToolTip("Precision settle time in seconds (0.1–3.0)")
+        _tf_lay.addWidget(self._spn_settle_qa)
+
+        _lbl_vol = QLabel("Vol %:")
+        _lbl_vol.setObjectName("qaTuneLabel")
+        _tf_lay.addWidget(_lbl_vol)
+        self._sld_volume_qa = QSlider(Qt.Horizontal)
+        self._sld_volume_qa.setRange(0, 100)
+        self._sld_volume_qa.setValue(self._sound_volume_pct())
+        self._sld_volume_qa.setFixedWidth(70)
+        self._sld_volume_qa.setToolTip("Buzzer sound volume (0–100%)")
+        _tf_lay.addWidget(self._sld_volume_qa)
+
+        _tf_lay.addStretch(1)
+        self._qa_tune_flyout.setVisible(False)
+        _video_container_lay.addWidget(self._qa_tune_flyout, 0)
 
         self._layout_splitter.addWidget(_video_container)
 
@@ -4141,6 +4254,7 @@ class SentryV2TabWidget(QWidget):
         QTimer.singleShot(0, self._reflow_all_responsive_button_grids)
 
         self._apply_all_tooltips()
+        self._connect_qa_bar_signals()
         self._disable_wheel_scroll_on_all_inputs()
 
 
@@ -4671,6 +4785,41 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
     color: {tokens['text']};
     font-weight: 700;
     font-size: {max(base_font + 0.4, 10.6):.2f}pt;
+}}
+QWidget#sentryV2Root QPushButton#qaIconBtn {{
+    background-color: {tokens['surface_alt_rgba']};
+    border: 1px solid {tokens['button_border']};
+    border-radius: {radius_small}px;
+    color: {tokens['text']};
+    font-size: {max(base_font + 0.5, 10.0):.2f}pt;
+    min-height: 0px;
+    padding: 0px;
+}}
+QWidget#sentryV2Root QPushButton#qaIconBtn:hover {{
+    background-color: {tokens['accent_faint']};
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QPushButton#qaIconBtn:checked {{
+    background-color: {tokens['accent_mid']};
+    border-color: {tokens['accent']};
+    color: {tokens['hero_text']};
+}}
+QWidget#sentryV2Root QPushButton#qaIconBtn:pressed {{
+    background-color: {tokens['button_pressed']};
+}}
+QWidget#sentryV2Root QFrame#qaIconSep {{
+    color: {tokens['border']};
+    max-width: 1px;
+    min-width: 1px;
+}}
+QWidget#sentryV2Root QWidget#qaTuneFlyout {{
+    background-color: {tokens['surface_alt_rgba']};
+    border-top: 1px solid {tokens['border']};
+}}
+QWidget#sentryV2Root QLabel#qaTuneLabel {{
+    color: {tokens['muted']};
+    font-size: {max(status_font, 9.0):.2f}pt;
+    font-weight: 600;
 }}
 """
         self.setStyleSheet(stylesheet)
@@ -17760,6 +17909,94 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._chk_auto_lighting_qa.setChecked(bool(checked))
             self._chk_auto_lighting_qa.blockSignals(False)
 
+    def _sync_qa_btn(self, btn: QPushButton, checked: bool) -> None:
+        """Update a QA icon button's checked state without firing its clicked signal."""
+        btn.blockSignals(True)
+        btn.setChecked(bool(checked))
+        btn.blockSignals(False)
+
+    def _connect_qa_bar_signals(self) -> None:
+        """Wire bidirectional sync between the QA icon bar and the canonical control widgets."""
+        # Auto Trigger
+        self._chk_auto_trigger.toggled.connect(lambda c: self._sync_qa_btn(self._btn_auto_trigger_qa, c))
+        self._btn_auto_trigger_qa.clicked.connect(self._chk_auto_trigger.setChecked)
+
+        # Safety
+        self._btn_safety.toggled.connect(lambda c: self._sync_qa_btn(self._btn_safety_qa, c))
+        self._btn_safety_qa.clicked.connect(self._btn_safety.setChecked)
+
+        # Fire (press/hold — not checkable, no sync needed)
+        self._btn_fire_qa.pressed.connect(lambda: self._on_manual_fire(1))
+        self._btn_fire_qa.released.connect(lambda: self._on_manual_fire(0))
+
+        # Buzzer (back-sync is handled inside _sync_sound_widgets which includes _btn_buzzer_qa)
+        self._btn_buzzer_qa.clicked.connect(self._chk_sound_enabled.setChecked)
+
+        # LED / Laser / ACC / Spare
+        self._btn_led.toggled.connect(lambda c: self._sync_qa_btn(self._btn_led_qa, c))
+        self._btn_led_qa.clicked.connect(self._btn_led.setChecked)
+
+        self._btn_laser.toggled.connect(lambda c: self._sync_qa_btn(self._btn_laser_qa, c))
+        self._btn_laser_qa.clicked.connect(self._btn_laser.setChecked)
+
+        self._btn_acc.toggled.connect(lambda c: self._sync_qa_btn(self._btn_acc_qa, c))
+        self._btn_acc_qa.clicked.connect(self._btn_acc.setChecked)
+
+        self._btn_spare.toggled.connect(lambda c: self._sync_qa_btn(self._btn_spare_qa, c))
+        self._btn_spare_qa.clicked.connect(self._btn_spare.setChecked)
+
+        # Keyboard shortcuts
+        self._chk_manual_keyboard_enabled.toggled.connect(lambda c: self._sync_qa_btn(self._btn_keyboard_qa, c))
+        self._btn_keyboard_qa.clicked.connect(self._chk_manual_keyboard_enabled.setChecked)
+
+        # Tune flyout toggle
+        self._btn_tune_qa.clicked.connect(lambda checked: self._qa_tune_flyout.setVisible(checked))
+
+        # QA speed slider ↔ main _slider_speed
+        def _qa_speed_changed(v: int) -> None:
+            self._slider_speed.blockSignals(True)
+            self._slider_speed.setValue(v)
+            self._slider_speed.blockSignals(False)
+            self._on_engagement_changed()
+
+        self._sld_speed_qa.valueChanged.connect(_qa_speed_changed)
+        self._slider_speed.valueChanged.connect(lambda v: (
+            self._sld_speed_qa.blockSignals(True),
+            self._sld_speed_qa.setValue(v),
+            self._sld_speed_qa.blockSignals(False),
+        ))
+
+        # QA servo time spinbox ↔ main _spin_servo_time
+        def _qa_servo_time_changed(v: int) -> None:
+            self._spin_servo_time.blockSignals(True)
+            self._spin_servo_time.setValue(v)
+            self._spin_servo_time.blockSignals(False)
+            self._on_servo_time_changed(v)
+
+        self._spn_servo_time_qa.valueChanged.connect(_qa_servo_time_changed)
+        self._spin_servo_time.valueChanged.connect(lambda v: (
+            self._spn_servo_time_qa.blockSignals(True),
+            self._spn_servo_time_qa.setValue(v),
+            self._spn_servo_time_qa.blockSignals(False),
+        ))
+
+        # QA settle spinbox ↔ main _spin_prec_settle
+        def _qa_settle_changed(v: float) -> None:
+            self._spin_prec_settle.blockSignals(True)
+            self._spin_prec_settle.setValue(v)
+            self._spin_prec_settle.blockSignals(False)
+            self._on_engagement_changed()
+
+        self._spn_settle_qa.valueChanged.connect(_qa_settle_changed)
+        self._spin_prec_settle.valueChanged.connect(lambda v: (
+            self._spn_settle_qa.blockSignals(True),
+            self._spn_settle_qa.setValue(v),
+            self._spn_settle_qa.blockSignals(False),
+        ))
+
+        # QA volume slider (back-sync is handled inside _sync_sound_widgets which includes _sld_volume_qa)
+        self._sld_volume_qa.valueChanged.connect(self._on_sound_volume_changed)
+
     def _sound_volume_pct(self) -> int:
         return int(max(0, min(100, int(getattr(self.config.sound, "volume_pct", 100) or 100))))
 
@@ -17781,7 +18018,7 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
         human_voice_pitch = self._human_voice_pitch_pct()
         human_voice_volume = self._human_voice_volume_pct()
         voice_names = list(getattr(self, "_speech_voice_names", []) or [])
-        for attr_name in ("_chk_sound_enabled",):
+        for attr_name in ("_chk_sound_enabled", "_btn_buzzer_qa"):
             if hasattr(self, attr_name):
                 widget = getattr(self, attr_name)
                 widget.blockSignals(True)
@@ -17792,6 +18029,10 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
             self._slider_sound_volume.setValue(volume_pct)
             self._slider_sound_volume.setEnabled(enabled)
             self._slider_sound_volume.blockSignals(False)
+        if hasattr(self, "_sld_volume_qa"):
+            self._sld_volume_qa.blockSignals(True)
+            self._sld_volume_qa.setValue(volume_pct)
+            self._sld_volume_qa.blockSignals(False)
         if hasattr(self, "_combo_sound_personality"):
             combo_index = max(0, self._combo_sound_personality.findData(personality))
             self._combo_sound_personality.blockSignals(True)

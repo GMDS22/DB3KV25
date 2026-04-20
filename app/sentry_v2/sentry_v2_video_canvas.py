@@ -199,6 +199,14 @@ class SentryV2VideoCanvas(QLabel):
         max_height = max(1, int((target.height() - 48) * 0.56))
         desired = pixmap.scaled(max_width, max_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         scaled = desired if not desired.isNull() else pixmap
+        # Render at reduced opacity so the logo is a subtle watermark
+        faded = QPixmap(scaled.size())
+        faded.fill(QColor(0, 0, 0, 0))
+        painter = QPainter(faded)
+        painter.setOpacity(0.30)
+        painter.drawPixmap(0, 0, scaled)
+        painter.end()
+        scaled = faded
         x = (target.width() - scaled.width()) // 2
         y = max(0, ((target.height() - scaled.height()) // 2) - 8)
         self._display_rect = QRect(x, y, scaled.width(), scaled.height())
