@@ -37,9 +37,19 @@ app_dir_str = str(APP_DIR)
 if app_dir_str not in sys.path:
     sys.path.insert(0, app_dir_str)
 
-from PyQt5.QtCore import QEvent, QPoint, Qt
-from PyQt5.QtGui import QCloseEvent, QIcon, QMouseEvent
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QPushButton, QStyle, QVBoxLayout, QWidget
+from PyQt5.QtCore import QEvent, QPoint, Qt, QTimer, pyqtSignal
+from PyQt5.QtGui import QCloseEvent, QIcon, QMouseEvent, QPixmap
+from PyQt5.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QProgressBar,
+    QPushButton,
+    QStyle,
+    QVBoxLayout,
+    QWidget,
+)
 
 try:
     from smart_sentry_meta import get_app_title
@@ -210,6 +220,163 @@ class FramelessControlStrip(QWidget):
         super().mouseReleaseEvent(event)
 
 
+_EXIT_OVERLAY_STYLE = """
+#exitSplashRoot {
+    background: #08131d;
+}
+#exitSplashStatus {
+    color: rgba(173, 201, 226, 0.82);
+    font-size: 13px;
+    letter-spacing: 0.4px;
+}
+#exitSplashSep {
+    background: rgba(173, 201, 226, 0.14);
+    min-height: 1px;
+    max-height: 1px;
+}
+QProgressBar#exitSplashBar {
+    background: rgba(173, 201, 226, 0.07);
+    border: none;
+    border-radius: 1px;
+    min-height: 3px;
+    max-height: 3px;
+}
+QProgressBar#exitSplashBar::chunk {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #1a6fa8, stop:0.5 #26a6d1, stop:1 #3ecfef);
+    border-radius: 1px;
+}
+"""
+
+_EXIT_STATUS_STEPS = [
+    (0,    "Closing camera feed",                 8),
+    (500,  "Returning turret to rest position",   28),
+    (1800, "Disconnecting from boards",           72),
+    (2250, "Turning off accessories",             92),
+]
+_EXIT_DOTS_INTERVAL_MS = 380
+_EXIT_BAR_TICK_MS = 40
+_EXIT_GOODBYE_LINGER_MS = 900
+
+
+class ExitSplashOverlay(QWidget):
+    """Full-window overlay displayed during the graceful shutdown sequence."""
+
+    close_ready = pyqtSignal()
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self.setObjectName("exitSplashRoot")
+        self.setAttribute(QT_WA_STYLED_BACKGROUND, True)
+        self.setStyleSheet(_EXIT_OVERLAY_STYLE)
+
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+        root_layout.addStretch(1)
+
+        # Logo
+        self._logo_label = QLabel(alignment=Qt.AlignCenter)  # type: ignore[call-overload]
+        logo_path = APP_DIR / "LOGO.png"
+        if logo_path.is_file():
+            pix = QPixmap(str(logo_path))
+            if not pix.isNull():
+                pix = pix.scaledToHeight(96, Qt.SmoothTransformation)  # type: ignore[attr-defined]
+                self._logo_label.setPixmap(pix)
+        root_layout.addWidget(self._logo_label)
+
+        root_layout.addSpacing(28)
+
+        # Separator
+        sep = QWidget()
+        sep.setObjectName("exitSplashSep")
+        sep.setFixedHeight(1)
+        root_layout.addWidget(sep)
+
+        root_layout.addSpacing(18)
+
+        # Status label
+        self._status_label = QLabel("", alignment=Qt.AlignCenter)  # type: ignore[call-overload]
+        self._status_label.setObjectName("exitSplashStatus")
+        root_layout.addWidget(self._status_label)
+
+        root_layout.addSpacing(14)
+
+        # Progress bar
+        self._bar = QProgressBar()
+        self._bar.setObjectName("exitSplashBar")
+        self._bar.setRange(0, 100)
+        self._bar.setValue(0)
+        self._bar.setTextVisible(False)
+        self._bar.setFixedHeight(3)
+        bar_container = QWidget()
+        bar_lay = QHBoxLayout(bar_container)
+        bar_lay.setContentsMargins(48, 0, 48, 0)
+        bar_lay.addWidget(self._bar)
+        root_layout.addWidget(bar_container)
+
+        root_layout.addStretch(1)
+
+        # Internal state
+        self._dots_count = 0
+        self._status_base = ""
+        self._bar_target = 0
+        self._shutdown_done = False
+
+        # Dots animation timer
+        self._dots_timer = QTimer(self)
+        self._dots_timer.setInterval(_EXIT_DOTS_INTERVAL_MS)
+        self._dots_timer.timeout.connect(self._tick_dots)
+
+        # Bar easing timer
+        self._bar_timer = QTimer(self)
+        self._bar_timer.setInterval(_EXIT_BAR_TICK_MS)
+        self._bar_timer.timeout.connect(self._tick_bar)
+
+        # Schedule the status step sequence
+        for delay_ms, text, bar_pct in _EXIT_STATUS_STEPS:
+            QTimer.singleShot(delay_ms, lambda t=text, p=bar_pct: self._set_step(t, p))
+
+        self._dots_timer.start()
+        self._bar_timer.start()
+
+    def _set_step(self, text: str, bar_pct: int) -> None:
+        if self._shutdown_done:
+            return
+        self._status_base = text
+        self._dots_count = 0
+        self._bar_target = bar_pct
+        self._update_status_label()
+
+    def _tick_dots(self) -> None:
+        if self._shutdown_done:
+            return
+        self._dots_count = (self._dots_count + 1) % 4
+        self._update_status_label()
+
+    def _update_status_label(self) -> None:
+        dots = "." * self._dots_count
+        self._status_label.setText(self._status_base + dots)
+
+    def _tick_bar(self) -> None:
+        current = self._bar.value()
+        if current < self._bar_target:
+            step = max(1, (self._bar_target - current) // 5)
+            self._bar.setValue(min(current + step, self._bar_target))
+
+    def on_shutdown_complete(self) -> None:
+        """Call when the actual cleanup() has finished — shows 'Goodbye' then emits close_ready."""
+        if self._shutdown_done:
+            return
+        self._shutdown_done = True
+        self._dots_timer.stop()
+        self._bar_timer.stop()
+        self._bar_target = 100
+        self._bar.setValue(100)
+        self._status_label.setText("All systems safe\u2002\u2014\u2002Goodbye")
+        QTimer.singleShot(_EXIT_GOODBYE_LINGER_MS, self.close_ready.emit)
+
+
 class SmartSentryV2_3_2StandaloneWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -250,13 +417,25 @@ class SmartSentryV2_3_2StandaloneWindow(QMainWindow):
             self._control_strip.sync_window_state()
         super().changeEvent(event)
 
+    def resizeEvent(self, a0) -> None:  # type: ignore[override]
+        super().resizeEvent(a0)
+        if getattr(self, "_exit_overlay", None) is not None:
+            self._exit_overlay.setGeometry(self.centralWidget().rect() if self.centralWidget() else self.rect())
+
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         event = a0
+        # Second call after cleanup: allow the real close through.
         if getattr(self.sentry_v2_tab, "_cleanup_started", False):
             super().closeEvent(event)
             return
-        def _finish_close() -> None:
-            self.close()
+        # Overlay already shown — ignore duplicate close triggers until shutdown completes.
+        if getattr(self, "_exit_overlay", None) is not None:
+            try:
+                if event is not None:
+                    event.ignore()
+            except Exception:
+                pass
+            return
         try:
             if event is not None:
                 event.ignore()
@@ -266,8 +445,29 @@ class SmartSentryV2_3_2StandaloneWindow(QMainWindow):
             self.sentry_v2_tab.persist_window_geometry(self, immediate=True)
         except Exception:
             pass
+        # Stop the camera feed immediately so the overlay shows the logo cleanly.
         try:
-            self.sentry_v2_tab.begin_graceful_shutdown(on_complete=_finish_close)
+            self.sentry_v2_tab.close_camera_for_exit()
+        except Exception:
+            pass
+        # Create and show the exit overlay over the whole window.
+        try:
+            overlay = ExitSplashOverlay(self.centralWidget() or self)
+            overlay.setGeometry((self.centralWidget() or self).rect())
+            overlay.show()
+            overlay.raise_()
+            self._exit_overlay = overlay
+        except Exception:
+            self._exit_overlay = None
+        def _on_shutdown_done() -> None:
+            overlay_ref = getattr(self, "_exit_overlay", None)
+            if overlay_ref is not None:
+                overlay_ref.close_ready.connect(self.close)
+                overlay_ref.on_shutdown_complete()
+            else:
+                self.close()
+        try:
+            self.sentry_v2_tab.begin_graceful_shutdown(on_complete=_on_shutdown_done)
         except Exception:
             try:
                 self.sentry_v2_tab.cleanup()

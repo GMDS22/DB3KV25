@@ -3767,6 +3767,14 @@ class SentryV2TabWidget(QWidget):
         if callback is not None:
             QTimer.singleShot(0, callback)
 
+    def close_camera_for_exit(self) -> None:
+        """Stop the camera feed immediately so the exit overlay can show the logo cleanly.
+        Full resource cleanup (timers, comm, workers) still happens in cleanup() as normal."""
+        try:
+            self._close_camera(log_close=False)
+        except Exception:
+            pass
+
     def cleanup(self) -> None:
         """Stop timers and release all resources. Safe to call multiple times."""
         if self._cleanup_started:
