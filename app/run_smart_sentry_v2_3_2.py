@@ -222,7 +222,9 @@ class FramelessControlStrip(QWidget):
 
 _EXIT_OVERLAY_STYLE = """
 #exitSplashRoot {
-    background: #08131d;
+    background: #0a1828;
+    border: 1px solid rgba(173, 201, 226, 0.18);
+    border-radius: 10px;
 }
 #exitSplashStatus {
     color: rgba(173, 201, 226, 0.82);
@@ -248,6 +250,9 @@ QProgressBar#exitSplashBar::chunk {
 }
 """
 
+_EXIT_OVERLAY_W = 400
+_EXIT_OVERLAY_H = 310
+
 _EXIT_STATUS_STEPS = [
     (0,    "Closing camera feed",                 8),
     (500,  "Returning turret to rest position",   28),
@@ -268,10 +273,11 @@ class ExitSplashOverlay(QWidget):
         super().__init__(parent)
         self.setObjectName("exitSplashRoot")
         self.setAttribute(QT_WA_STYLED_BACKGROUND, True)
+        self.setFixedSize(_EXIT_OVERLAY_W, _EXIT_OVERLAY_H)
         self.setStyleSheet(_EXIT_OVERLAY_STYLE)
 
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setContentsMargins(24, 24, 24, 24)
         root_layout.setSpacing(0)
         root_layout.addStretch(1)
 
@@ -281,11 +287,11 @@ class ExitSplashOverlay(QWidget):
         if logo_path.is_file():
             pix = QPixmap(str(logo_path))
             if not pix.isNull():
-                pix = pix.scaledToHeight(96, Qt.SmoothTransformation)  # type: ignore[attr-defined]
+                pix = pix.scaledToHeight(148, Qt.SmoothTransformation)  # type: ignore[attr-defined]
                 self._logo_label.setPixmap(pix)
         root_layout.addWidget(self._logo_label)
 
-        root_layout.addSpacing(28)
+        root_layout.addSpacing(20)
 
         # Separator
         sep = QWidget()
@@ -293,14 +299,14 @@ class ExitSplashOverlay(QWidget):
         sep.setFixedHeight(1)
         root_layout.addWidget(sep)
 
-        root_layout.addSpacing(18)
+        root_layout.addSpacing(14)
 
         # Status label
         self._status_label = QLabel("", alignment=Qt.AlignCenter)  # type: ignore[call-overload]
         self._status_label.setObjectName("exitSplashStatus")
         root_layout.addWidget(self._status_label)
 
-        root_layout.addSpacing(14)
+        root_layout.addSpacing(12)
 
         # Progress bar
         self._bar = QProgressBar()
@@ -309,11 +315,7 @@ class ExitSplashOverlay(QWidget):
         self._bar.setValue(0)
         self._bar.setTextVisible(False)
         self._bar.setFixedHeight(3)
-        bar_container = QWidget()
-        bar_lay = QHBoxLayout(bar_container)
-        bar_lay.setContentsMargins(48, 0, 48, 0)
-        bar_lay.addWidget(self._bar)
-        root_layout.addWidget(bar_container)
+        root_layout.addWidget(self._bar)
 
         root_layout.addStretch(1)
 
@@ -419,8 +421,16 @@ class SmartSentryV2_3_2StandaloneWindow(QMainWindow):
 
     def resizeEvent(self, a0) -> None:  # type: ignore[override]
         super().resizeEvent(a0)
-        if getattr(self, "_exit_overlay", None) is not None:
-            self._exit_overlay.setGeometry(self.centralWidget().rect() if self.centralWidget() else self.rect())
+        self._reposition_exit_overlay()
+
+    def _reposition_exit_overlay(self) -> None:
+        overlay = getattr(self, "_exit_overlay", None)
+        if overlay is None:
+            return
+        parent = self.centralWidget() or self
+        pw, ph = parent.width(), parent.height()
+        ow, oh = overlay.width(), overlay.height()
+        overlay.move((pw - ow) // 2, (ph - oh) // 2)
 
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         event = a0
@@ -450,10 +460,13 @@ class SmartSentryV2_3_2StandaloneWindow(QMainWindow):
             self.sentry_v2_tab.close_camera_for_exit()
         except Exception:
             pass
-        # Create and show the exit overlay over the whole window.
+        # Create and show the exit overlay centered over the window.
         try:
-            overlay = ExitSplashOverlay(self.centralWidget() or self)
-            overlay.setGeometry((self.centralWidget() or self).rect())
+            parent = self.centralWidget() or self
+            overlay = ExitSplashOverlay(parent)
+            pw, ph = parent.width(), parent.height()
+            ow, oh = _EXIT_OVERLAY_W, _EXIT_OVERLAY_H
+            overlay.move((pw - ow) // 2, (ph - oh) // 2)
             overlay.show()
             overlay.raise_()
             self._exit_overlay = overlay

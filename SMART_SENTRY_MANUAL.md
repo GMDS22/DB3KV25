@@ -1009,6 +1009,21 @@ The current live contract is:
 - startup rest and close rest are optional and timed by `rest_startup_delay_ms` and `rest_close_timeout_ms`.
 - home and rest moves use guided two-stage motion profiles rather than one abrupt speed, with a configurable approach window and separate cruise/approach speeds.
 
+### Exit Splash Overlay
+
+When the operator closes the app window a centered card overlay (`ExitSplashOverlay`) immediately appears over the main content area. The camera feed is stopped before the overlay renders so the logo displays cleanly instead of a frozen frame.
+
+The overlay shows:
+- The **DB3K logo** (148 px height, centered).
+- A **status label** with an animated trailing-dot suffix that cycles through four stages synchronized with the shutdown timeline:
+  - `0 ms` — *Closing camera feed*
+  - `500 ms` — *Returning turret to rest position*
+  - `1800 ms` — *Disconnecting from boards*
+  - `2250 ms` — *Turning off accessories*
+- A **3 px gradient progress bar** that eases toward a per-step target value.
+
+Once the underlying `cleanup()` call completes the overlay transitions to **"All systems safe \u2014 Goodbye"**, the bar fills to 100 %, and the window closes after a 900 ms pause. The overlay has no effect on the rest-return or hardware shutdown sequence — those are unchanged and governed by `rest_on_close_enabled` and `rest_close_timeout_ms`.
+
 ### PIR Guard Behavior
 
 Current PIR guard behavior is cue-first and scan-second:
