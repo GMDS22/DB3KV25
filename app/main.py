@@ -29,9 +29,6 @@ def _preload_torch_runtime() -> None:
         return
 
 
-_configure_ml_runtime_env()
-_preload_torch_runtime()
-
 APP_DIR = Path(__file__).resolve().parent
 if not getattr(sys, "frozen", False):
     app_dir_str = str(APP_DIR)
