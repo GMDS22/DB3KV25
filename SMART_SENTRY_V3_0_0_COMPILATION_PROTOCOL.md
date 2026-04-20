@@ -75,6 +75,11 @@ The following failures already occurred on the v3.0.0 path and must be treated a
 	- Root cause: NumPy 2.x restructured C extensions into `numpy._core.*` submodules that PyInstaller's standard hook does not enumerate. They are absent from the bundle unless explicitly collected. See ISS-076.
 	- Required prevention: `--collect-submodules numpy` must remain in the `$pyInstallerArgs` array in `build_smart_sentry_v2_3_2_portable.ps1`. Do not remove it. If numpy is upgraded and a new submodule is missing, this flag will already cover it.
 
+6. **Frozen exe YOLO prepare fails with `ModuleNotFoundError: No module named 'asyncio.base_events'`**
+	- Symptom: packaged app launches and UI appears, but every YOLO load attempt fails silently. `SMART_SENTRY_V3_0_0_FILES\logs\yolo_runtime_diag.log` shows `prepare-failed` entries with `ModuleNotFoundError: No module named 'asyncio.base_events'`.
+	- Root cause: `_prepare_yolo_runtime()` triggers `import torch`. `torch/__init__.py` uses `typing_extensions._deprecated`, which causes `asyncio/__init__.py` to execute. In Python 3.11, `asyncio/__init__.py` eagerly imports all `asyncio.*` submodules (including `asyncio.base_events`) at package init time. PyInstaller does not auto-collect these stdlib submodules, so they are absent from the frozen bundle. See ISS-077.
+	- Required prevention: `--collect-submodules asyncio` must remain in the `$pyInstallerArgs` array in `build_smart_sentry_v2_3_2_portable.ps1`, placed after `--collect-submodules numpy`. Do not remove it. This is a Python 3.11 + PyInstaller regression that affects any frozen app that imports torch.
+
 ## 3. Release-Hold Validation
 
 Before packaging v3.0.0, confirm the unfinished operator tabs stay on release hold:

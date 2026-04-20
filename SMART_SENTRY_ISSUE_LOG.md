@@ -130,6 +130,17 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
+### ISS-077 | 2026-04-20 | v3.0.0 | Build | Worked
+**Frozen Exe YOLO Prepare Failed With `ModuleNotFoundError: No module named 'asyncio.base_events'`**
+
+- **Symptoms**: The packaged `SMART_SENTRY_V3.0.0.exe` launched and the UI appeared, but YOLO failed to load in every attempt. Checking `SMART_SENTRY_V3_0_0_FILES\logs\yolo_runtime_diag.log` showed multiple `prepare-failed` entries, all with the error `ModuleNotFoundError: No module named 'asyncio.base_events'`. The app was otherwise functional; only AI/YOLO detection was unavailable.
+- **Root Cause**: `_prepare_yolo_runtime()` in `sentry_v2_tab.py` calls `import torch`. During `torch/__init__.py` initialization, a `@_deprecated` decorator from `typing_extensions` is applied, which internally calls `asyncio/__init__.py`. `asyncio/__init__.py` line 8 explicitly imports `asyncio.base_events` (and several other `asyncio.*` submodules). PyInstaller does not auto-collect all `asyncio.*` stdlib submodules in Python 3.11; only the top-level `asyncio` package is bundled by default, so `asyncio.base_events`, `asyncio.events`, `asyncio.futures`, etc. are absent from the frozen bundle. The exact traceback chain was: `_prepare_yolo_runtime()` → `import torch` → `torch/__init__.py:1756` `@_deprecated` → `typing_extensions.py:2997` `__call__` → `asyncio/__init__.py:8` → `ModuleNotFoundError: No module named 'asyncio.base_events'`.
+- **Fix/Solution**: Added `'--collect-submodules', 'asyncio'` to the `$pyInstallerArgs` array in `build_smart_sentry_v2_3_2_portable.ps1`, placed immediately after `'--collect-submodules', 'numpy'`. This forces PyInstaller to walk and bundle all `asyncio.*` submodules (including `asyncio.base_events`, `asyncio.events`, `asyncio.futures`, `asyncio.locks`, `asyncio.queues`, `asyncio.streams`, `asyncio.tasks`, `asyncio.transports`, `asyncio.unix_events`, `asyncio.windows_events`, `asyncio.windows_utils`) into the frozen bundle.
+- **Files Modified**: `build_smart_sentry_v2_3_2_portable.ps1`
+- **Notes**: Diagnosed directly from the YOLO diagnostic log at `SMART_SENTRY_V3_0_0_FILES\logs\yolo_runtime_diag.log`. This is a Python 3.11 + PyInstaller regression: `asyncio/__init__.py` in 3.11 imports all submodules eagerly at package init time rather than lazily. Any frozen app that imports `torch` (or any library that triggers `asyncio/__init__.py` via the `typing_extensions._deprecated` chain) will hit this unless `--collect-submodules asyncio` is present. Must remain in the build script for all future builds. Commit `6f18fa7`. Related to ISS-076 (same pattern: stdlib submodule not auto-bundled by PyInstaller).
+
+---
+
 ### ISS-076 | 2026-04-20 | v3.0.0 | Build | Worked
 **Frozen Exe Crashed With `ModuleNotFoundError: No module named 'numpy._core._exceptions'`**
 
