@@ -4,7 +4,7 @@
   "items": [
     {
       "date": "2026-04-20",
-      "title": "Frozen exe YOLO prepare asyncio fix (ISS-077): --collect-submodules asyncio added to PyInstaller build args in build_smart_sentry_v2_3_2_portable.ps1. In Python 3.11, asyncio/__init__.py eagerly imports asyncio.base_events and all other asyncio.* submodules at package init time. import torch triggers typing_extensions._deprecated which executes asyncio/__init__.py, so all asyncio.* submodules must be bundled or YOLO prepare fails with ModuleNotFoundError: No module named 'asyncio.base_events'. Failure was visible in SMART_SENTRY_V3_0_0_FILES/logs/yolo_runtime_diag.log as repeated prepare-failed entries. SMART_SENTRY_ISSUE_LOG.md and SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md updated."
+      "title": "Frozen exe YOLO prepare asyncio fix (ISS-077): added 'import asyncio' to run.py before 'from app.main import main'. Root cause was a package initialization timing issue in the frozen bundle: import torch triggers asyncio/__init__.py (via typing_extensions._deprecated) while torch/__init__.py is still mid-exec_module, so asyncio.__path__ is not yet established and the relative import 'from .base_events import *' fails with ModuleNotFoundError even though all asyncio submodules ARE present in the PYZ archive. Preloading asyncio in run.py ensures it is fully in sys.modules before torch is ever imported. Confirmed via CArchiveReader inspection of the EXE's PYZ. SMART_SENTRY_ISSUE_LOG.md and SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md updated."
     },
     {
       "date": "2026-04-20",
