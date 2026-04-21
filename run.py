@@ -58,6 +58,22 @@ import PIL.Image  # noqa: E402
 # ModuleNotFoundError: No module named 'yaml.error'. (ISS-084)
 import yaml  # noqa: E402
 
+# Pre-import ultralytics on the main thread — the definitive fix for the entire class
+# of partial-init races in _prepare_yolo_runtime.
+#
+# ultralytics/__init__.py triggers a chain of third-party imports (yaml, PIL, requests,
+# urllib3, etc.), each of which has relative imports in its own __init__.py. In the
+# frozen bundle, if any of these packages are first imported from the worker thread
+# (_prepare_yolo_runtime), PyInstaller's frozen importer may race: the relative import
+# (e.g. `from .error import *` in yaml/__init__.py) runs before __path__ is fully
+# established, causing ModuleNotFoundError for the sub-module.
+#
+# By importing ultralytics here, on the main thread, all of the above transitive
+# dependencies are fully initialized in sys.modules. When the worker thread later calls
+# `import ultralytics`, Python finds it already complete and skips re-execution entirely.
+# (ISS-084, ISS-083 definitive fix)
+import ultralytics  # noqa: E402
+
 if not getattr(sys, "frozen", False):
     _app_dir = str(Path(__file__).resolve().parent / "app")
     if _app_dir not in sys.path:
