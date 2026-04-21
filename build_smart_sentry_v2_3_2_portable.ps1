@@ -457,7 +457,6 @@ $pyInstallerArgs = @(
     '--collect-submodules', 'asyncio',
     '--collect-submodules', 'unittest',
     '--collect-submodules', 'torchgen',
-    '--collect-submodules', 'torch.testing',
     '--add-data', "$appConfigPath;app/config",
     '--add-data', "$appSentryConfigPath;app/sentry_v2/config",
     '--add-data', "$appLogoPath;app",
@@ -468,8 +467,6 @@ $pyInstallerArgs = @(
 )
 
 $torchRuntimeExcludes = @(
-    'torch.testing',
-    'torch.testing._internal',
     'torch.distributed._shard',
     'torch.distributed._sharded_tensor',
     'torch.distributed._sharding_spec',
