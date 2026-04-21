@@ -1357,227 +1357,88 @@ def _normalize_engagement_precision_limits(settings: dict, raw_settings: Optiona
     return resolved
 
 MASTER_PROFILE_PRESETS = {
-    "demo_observer": {
-        "label": "Demo Observer",
-        "description": "Wide-net observer profile for spotting tiny and far moving objects without class lock or auto-fire.",
-        "tooltip_key": "preset_master_demo_observer",
+    "watchman": {
+        "label": "Watchman",
+        "description": "Eyes-open observer — tracks any and all movement across the full area without class lock or auto-fire. Best for monitoring and demonstration. Detection: background subtraction (all movers).",
+        "tooltip_key": "preset_master_watchman",
         "detection": "observer_motion_watch",
         "filter": "observer_all_movers",
         "threat": "small_target_follow",
         "engagement": "demo_track_multi",
         "servo": "smooth",
     },
-    "indoor_precision": {
-        "label": "Indoor Precision",
-        "description": "Most selective profile for short-range indoor spaces.",
-        "tooltip_key": "preset_master_indoor_precision",
+    "guard_post": {
+        "label": "Guard Post",
+        "description": "All-round guard for people-in-frame scenarios. Motion-gated detection with balanced person engagement — fires at qualified threats without being trigger-happy. Detection: motion-locked YOLO hybrid.",
+        "tooltip_key": "preset_master_guard_post",
+        "detection": "motion_locked",
+        "filter": "person_focus_closest",
+        "threat": "balanced_guard",
+        "engagement": "balanced_response",
+        "servo": "balanced",
+    },
+    "close_quarters": {
+        "label": "Close Quarters",
+        "description": "Short-range indoor precision. Identifies persons before any movement is made, with deliberate servo motion and strict center fire gate. Ideal for doorways and corridors. Detection: pure YOLO.",
+        "tooltip_key": "preset_master_close_quarters",
         "detection": "yolo",
         "filter": "human_focus",
         "threat": "class_first",
         "engagement": "indoor_precision",
         "servo": "smooth",
     },
-    "balanced_sentry": {
-        "label": "Balanced Sentry",
-        "description": "Middle-ground profile between conservative tracking and active engagement.",
-        "tooltip_key": "preset_master_balanced_sentry",
-        "detection": "motion_locked",
-        "filter": "sniper_medium_motion",
-        "threat": "balanced_guard",
-        "engagement": "balanced_response",
-        "servo": "balanced",
-    },
-    "vehicle_intercept": {
-        "label": "Vehicle Intercept",
-        "description": "Tracks larger fast movers with wider aim tolerance and quicker handoff.",
-        "tooltip_key": "preset_master_vehicle_intercept",
+    "street_watch": {
+        "label": "Street Watch",
+        "description": "Outdoor perimeter covering vehicles and persons at range. Rapid engagement for fast movers across open ground. Detection: motion-gated YOLO for fewer false positives outdoors.",
+        "tooltip_key": "preset_master_street_watch",
         "detection": "motion_yolo",
         "filter": "vehicle_watch",
         "threat": "speed_hunter",
         "engagement": "outdoor_chase",
         "servo": "balanced",
     },
-    "aggressive_pursuit": {
-        "label": "Aggressive Pursuit",
-        "description": "Highest-tempo profile with permissive detection, fast slew, and heavy firing.",
-        "tooltip_key": "preset_master_aggressive_pursuit",
-        "detection": "best_hybrid",
-        "filter": "wide_net",
-        "threat": "speed_hunter",
-        "engagement": "saturation_burst",
-        "servo": "fast",
-    },
-    "dog_tracker": {
-        "label": "Dog Tracker",
-        "description": "Dog-specific tracking profile with class lock and center-follow engagement.",
-        "tooltip_key": "preset_master_dog_tracker",
+    "pet_warden": {
+        "label": "Pet Warden",
+        "description": "Medium-pet follow with no auto-fire. Tracks and centers on dog/cat-scale targets (0.02 – 10 % of frame area). Safe for pet activity monitoring — servo follows without engaging. Detection: YOLO with motion gate.",
+        "tooltip_key": "preset_master_pet_warden",
         "detection": "dog_follow",
         "filter": "dog_focus",
         "threat": "pet_center_lock",
         "engagement": "dog_follow_center",
         "servo": "balanced",
     },
-    "cat_tracker": {
-        "label": "Cat Tracker",
-        "description": "Cat-specific tracking profile for agile small targets with tight center lock.",
-        "tooltip_key": "preset_master_cat_tracker",
-        "detection": "cat_follow",
-        "filter": "cat_focus",
-        "threat": "pet_center_lock",
-        "engagement": "cat_follow_center",
-        "servo": "balanced",
-    },
-    "rat_like_tracker": {
-        "label": "Rat-Like Tracker",
-        "description": "Rat-specific YOLO tracking profile with tiny-size constraints, high center bias, and continuous follow when the rat pauses.",
-        "tooltip_key": "preset_master_rat_like_tracker",
+    "rodent_hunter": {
+        "label": "Rodent Hunter",
+        "description": "Precision engagement for rat/small-rodent scale targets (0.005 – 4 % of frame area). Fast servo response with hard center lock for tight accuracy on tiny movers. Detection: YOLO with small-object motion gate.",
+        "tooltip_key": "preset_master_rodent_hunter",
         "detection": "rat_like_follow",
         "filter": "rat_like_motion",
-        "threat": "small_target_follow",
-        "engagement": "rat_follow_center",
+        "threat": "sniper_small_center_lock",
+        "engagement": "sniper_small_center",
         "servo": "fast",
     },
-    "color_follow_small": {
-        "label": "Color Follow Small",
-        "description": "Tracks and aims at small colored objects. Uses OR fusion so even a static colored blob triggers tracking. Pick your color preset after applying.",
-        "tooltip_key": "preset_master_color_follow_small",
-        "detection": "color_motion",
-        "filter": "small_movers",
-        "threat": "small_target_follow",
-        "engagement": "color_follow_track",
-        "servo": "balanced",
-    },
-    "person_track_fire": {
-        "label": "Person Track + Fire",
-        "description": "Full person-tracking pipeline. YOLO-only detection catches still and moving people alike. Person-class filter rejects non-human detections and has no upper size limit for close-range subjects. Closest-person scoring keeps the nearest adult prioritised. Person-scale engagement tolerances maintain aim lock through natural body sway and brief occlusions.",
-        "tooltip_key": "preset_master_person_track_fire",
-        "detection": "person_yolo",
-        "filter": "person_focus_closest",
-        "threat": "person_closest_center",
-        "engagement": "person_track_fire",
-        "servo": "balanced",
-    },
-    "sniper_movement_small": {
-        "label": "Sniper Movement Small",
-        "description": "Motion-locked sniper profile for small rodent-sized targets.",
-        "tooltip_key": "preset_master_sniper_movement_small",
-        "detection": "mode_10__small",
-        "filter": "sniper_small_motion",
-        "threat": "sniper_small_center_lock",
-        "engagement": "sniper_small_center",
-        "servo": "smooth",
-    },
-    "sniper_movement_medium": {
-        "label": "Sniper Movement Medium",
-        "description": "Motion-locked sniper profile for medium cat/dog-sized targets.",
-        "tooltip_key": "preset_master_sniper_movement_medium",
-        "detection": "mode_10__medium",
-        "filter": "sniper_medium_motion",
-        "threat": "sniper_medium_center_lock",
-        "engagement": "sniper_medium_center",
-        "servo": "smooth",
-    },
-    "sniper_movement_large": {
-        "label": "Sniper Movement Large",
-        "description": "Motion-locked sniper profile for large person-scale targets.",
-        "tooltip_key": "preset_master_sniper_movement_large",
-        "detection": "mode_10__large",
-        "filter": "sniper_large_motion",
-        "threat": "sniper_large_center_lock",
-        "engagement": "sniper_large_center",
-        "servo": "smooth",
-    },
-    "sniper_color_small": {
-        "label": "Sniper Color Small",
-        "description": "Color-led sniper profile for small rodent-sized colored targets.",
-        "tooltip_key": "preset_master_sniper_color_small",
-        "detection": "mode_8__small",
-        "filter": "sniper_small_motion",
-        "threat": "sniper_small_center_lock",
-        "engagement": "sniper_small_center",
-        "servo": "smooth",
-    },
-    "sniper_color_medium": {
-        "label": "Sniper Color Medium",
-        "description": "Color-led sniper profile for medium cat/dog-sized colored targets.",
-        "tooltip_key": "preset_master_sniper_color_medium",
-        "detection": "mode_8__medium",
-        "filter": "sniper_medium_motion",
-        "threat": "sniper_medium_center_lock",
-        "engagement": "sniper_medium_center",
-        "servo": "smooth",
-    },
-    "sniper_color_large": {
-        "label": "Sniper Color Large",
-        "description": "Color-led sniper profile for person-scale colored targets.",
-        "tooltip_key": "preset_master_sniper_color_large",
-        "detection": "mode_8__large",
-        "filter": "sniper_large_motion",
-        "threat": "sniper_large_center_lock",
-        "engagement": "sniper_large_center",
-        "servo": "smooth",
-    },
-    "sniper_yolo_small": {
-        "label": "Sniper YOLO Small",
-        "description": "YOLO sniper profile for rat/small-rodent class targets.",
-        "tooltip_key": "preset_master_sniper_yolo_small",
-        "detection": "mode_2__small",
-        "filter": "sniper_small_rodent",
-        "threat": "sniper_small_center_lock",
-        "engagement": "sniper_small_center",
-        "servo": "smooth",
-    },
-    "sniper_yolo_medium": {
-        "label": "Sniper YOLO Medium",
-        "description": "YOLO sniper profile for cat/dog targets.",
-        "tooltip_key": "preset_master_sniper_yolo_medium",
-        "detection": "mode_2__medium",
-        "filter": "sniper_medium_pet",
-        "threat": "sniper_medium_center_lock",
-        "engagement": "sniper_medium_center",
-        "servo": "smooth",
-    },
-    "sniper_yolo_large": {
-        "label": "Sniper YOLO Large",
-        "description": "YOLO sniper profile for person targets.",
-        "tooltip_key": "preset_master_sniper_yolo_large",
-        "detection": "mode_2__large",
-        "filter": "sniper_large_person",
-        "threat": "sniper_large_center_lock",
-        "engagement": "sniper_large_center",
-        "servo": "smooth",
-    },
-    "sniper_hybrid_small": {
-        "label": "Sniper Hybrid Small",
-        "description": "Hybrid sniper profile for small rodent targets with strict center fire gate.",
-        "tooltip_key": "preset_master_sniper_hybrid_small",
-        "detection": "mode_4__small",
-        "filter": "sniper_small_rodent",
-        "threat": "sniper_small_center_lock",
-        "engagement": "sniper_small_center",
-        "servo": "smooth",
-    },
-    "sniper_hybrid_medium": {
-        "label": "Sniper Hybrid Medium",
-        "description": "Hybrid sniper profile for medium cat/dog targets with strict center fire gate.",
-        "tooltip_key": "preset_master_sniper_hybrid_medium",
-        "detection": "mode_4__medium",
-        "filter": "sniper_medium_pet",
-        "threat": "sniper_medium_center_lock",
-        "engagement": "sniper_medium_center",
-        "servo": "smooth",
-    },
-    "sniper_hybrid_large": {
-        "label": "Sniper Hybrid Large",
-        "description": "Hybrid sniper profile for person targets with strict center fire gate.",
-        "tooltip_key": "preset_master_sniper_hybrid_large",
+    "perimeter_sniper": {
+        "label": "Perimeter Sniper",
+        "description": "High-precision person engagement with strict center fire gate. Slow, deliberate servo movement and stringent aim tolerances — won't fire until perfectly centered on a person-scale target. Detection: YOLO + motion hybrid.",
+        "tooltip_key": "preset_master_perimeter_sniper",
         "detection": "mode_4__large",
         "filter": "sniper_large_person",
         "threat": "sniper_large_center_lock",
         "engagement": "sniper_large_center",
         "servo": "smooth",
     },
+    "color_tag": {
+        "label": "Color Tag",
+        "description": "Tracks a specific colored object regardless of YOLO class. Set your hue/saturation range in Detection settings, then apply. OR fusion means even a stationary colored blob triggers tracking. Detection: color + motion.",
+        "tooltip_key": "preset_master_color_tag",
+        "detection": "color_motion",
+        "filter": "small_movers",
+        "threat": "small_target_follow",
+        "engagement": "color_follow_track",
+        "servo": "balanced",
+    },
 }
+
 
 THREAT_AI_PRESETS = {
     "balanced_guard": {
@@ -3959,6 +3820,38 @@ class SentryV2TabWidget(QWidget):
 
         self._btn_tune_qa = _mk_qa_btn("≡", "Movement & Tracking Settings (click to expand)", checkable=True)
         _qa_chip_bar_lay.addWidget(self._btn_tune_qa)
+
+        _qa_sep_beh = QFrame()
+        _qa_sep_beh.setFrameShape(QFrame.VLine)
+        _qa_sep_beh.setObjectName("qaIconSep")
+        _qa_chip_bar_lay.addWidget(_qa_sep_beh)
+
+        self._btn_behaviour_watchful_qa = _mk_qa_btn(
+            "👁",
+            "Watchful — always follows the closest mover regardless of target criteria; "
+            "immediately switches to a valid target when one is detected",
+        )
+        _qa_chip_bar_lay.addWidget(self._btn_behaviour_watchful_qa)
+
+        self._btn_behaviour_curious_qa = _mk_qa_btn(
+            "?",
+            "Curious Guard — does not track non-valid targets but makes periodic check "
+            "movements toward detected movers; valid-target engagement is always active",
+        )
+        _qa_chip_bar_lay.addWidget(self._btn_behaviour_curious_qa)
+
+        self._btn_behaviour_strict_qa = _mk_qa_btn(
+            "⊙",
+            "Strict — only moves and acts when an object fully passes all detection and "
+            "filter criteria; ignores everything else",
+        )
+        _qa_chip_bar_lay.addWidget(self._btn_behaviour_strict_qa)
+
+        # Set initial checked state for behaviour buttons (radio-style)
+        _beh_init = getattr(self.config.guard, "sentry_behaviour", 2)
+        self._btn_behaviour_watchful_qa.setChecked(_beh_init == 0)
+        self._btn_behaviour_curious_qa.setChecked(_beh_init == 1)
+        self._btn_behaviour_strict_qa.setChecked(_beh_init == 2)
 
         self._lbl_auto_luma_qa = QLabel("")
         self._set_theme_role(self._lbl_auto_luma_qa, "mutedCompact")
@@ -17953,6 +17846,16 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         # Tune flyout toggle
         self._btn_tune_qa.clicked.connect(lambda checked: self._qa_tune_flyout.setVisible(checked))
 
+        # Sentry behaviour buttons (radio-style: only one active at a time)
+        def _on_behaviour_btn(mode: int) -> None:
+            self.config.guard.sentry_behaviour = mode
+            self._sync_behaviour_buttons()
+            self._push_config()
+
+        self._btn_behaviour_watchful_qa.clicked.connect(lambda: _on_behaviour_btn(0))
+        self._btn_behaviour_curious_qa.clicked.connect(lambda: _on_behaviour_btn(1))
+        self._btn_behaviour_strict_qa.clicked.connect(lambda: _on_behaviour_btn(2))
+
         # QA speed slider ↔ main _slider_speed
         def _qa_speed_changed(v: int) -> None:
             self._slider_speed.blockSignals(True)
@@ -17997,6 +17900,18 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         # QA volume slider (back-sync is handled inside _sync_sound_widgets which includes _sld_volume_qa)
         self._sld_volume_qa.valueChanged.connect(self._on_sound_volume_changed)
+
+    def _sync_behaviour_buttons(self) -> None:
+        """Sync the three sentry-behaviour QA buttons to the current config value (radio-style)."""
+        mode = int(getattr(self.config.guard, "sentry_behaviour", 2))
+        for btn, val in (
+            (self._btn_behaviour_watchful_qa, 0),
+            (self._btn_behaviour_curious_qa, 1),
+            (self._btn_behaviour_strict_qa, 2),
+        ):
+            btn.blockSignals(True)
+            btn.setChecked(mode == val)
+            btn.blockSignals(False)
 
     def _sound_volume_pct(self) -> int:
         return int(max(0, min(100, int(getattr(self.config.sound, "volume_pct", 100) or 100))))

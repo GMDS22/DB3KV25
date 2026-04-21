@@ -372,6 +372,14 @@ class GuardConfig:
     random_tilt_max: float = SENTRY_RANDOM_TILT_MAX
     random_dwell: float = 3.0       # seconds to pause at each random point
     random_speed: float = 8.0       # degrees per second
+    # --- Sentry behaviour mode ---
+    # 0=Watchful (tracks any mover, engages valid targets)
+    # 1=Curious Guard (glances at movers, only engages valid targets)
+    # 2=Strict (only moves/acts for fully-qualified valid targets)
+    sentry_behaviour: int = 2
+    # Curious Guard glance parameters
+    curious_glance_interval_s: float = 7.0
+    curious_glance_dwell_s: float = 1.3
 
 
 @dataclass

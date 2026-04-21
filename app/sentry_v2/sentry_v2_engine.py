@@ -169,6 +169,14 @@ class SentryV2Engine:
         self._pir_scan_awaiting_settle: bool = False  # Waiting for servo settle before next scan point
         self._pir_settle_start: float = 0.0
 
+        # Sentry behaviour state (modes 0=Watchful, 1=Curious, 2=Strict)
+        self._behaviour_watchful_last_move: float = 0.0   # cooldown for watchful follow ticks
+        self._behaviour_curious_glance_active: bool = False
+        self._behaviour_curious_glance_start: float = 0.0
+        self._behaviour_curious_glance_pan: float = 0.0
+        self._behaviour_curious_glance_tilt: float = 0.0
+        self._behaviour_curious_last_glance: float = 0.0  # last time a glance was initiated
+
         # Callbacks
         self._cb_fire: Optional[Callable[[int], None]] = None
         self._cb_move: Optional[Callable[[float, float], None]] = None
@@ -291,6 +299,12 @@ class SentryV2Engine:
         self._patrol_dwelling = False
         self._patrol_last_update = 0.0
         self._patrol_initialized = False
+        self._behaviour_watchful_last_move = 0.0
+        self._behaviour_curious_glance_active = False
+        self._behaviour_curious_glance_start = 0.0
+        self._behaviour_curious_glance_pan = 0.0
+        self._behaviour_curious_glance_tilt = 0.0
+        self._behaviour_curious_last_glance = 0.0
         if self._log_precision_tuning and self._current_precision_engagement_id:
             self._precision_logger.end_engagement()
             self._current_precision_engagement_id = None
@@ -509,8 +523,79 @@ class SentryV2Engine:
                 self._update_pir_confirmation(targets, now)
             return
 
-        # No threats and no PIR cues — run patrol logic
-        self._update_patrol(now)
+        # No threats and no PIR cues — behaviour + patrol logic
+        behaviour = self.cfg.guard.sentry_behaviour
+        if behaviour == 0:  # Watchful: track any mover, only engage valid targets
+            if not self._update_watchful_tracking(now):
+                self._update_patrol(now)
+        elif behaviour == 1:  # Curious Guard: glance at movers, only engage valid targets
+            if not self._update_curious_glance(now):
+                self._update_patrol(now)
+        else:  # Strict (2): only move for valid targets
+            self._update_patrol(now)
+
+    def _update_watchful_tracking(self, now: float) -> bool:
+        """Watchful mode: softly track the most prominent mover when no valid targets.
+
+        Returns True if a tracking move was issued (caller should suppress patrol).
+        """
+        WATCHFUL_MOVE_INTERVAL = 0.25  # max 4 move commands per second
+        raw = self.last_detections
+        if not raw:
+            return False
+        if now - self._behaviour_watchful_last_move < WATCHFUL_MOVE_INTERVAL:
+            return True  # detections exist, suppress patrol even on cooldown
+        # Pick the detection with the largest bbox area (most prominent mover)
+        best = max(
+            raw,
+            key=lambda d: (d.bbox[2] * d.bbox[3]) if (d.bbox and len(d.bbox) >= 4) else 0.0,
+        )
+        target_pan, target_tilt = self._planner.aim_from_normalized_center(
+            float(best.norm_cx), float(best.norm_cy),
+            self.current_pan, self.current_tilt,
+        )
+        self._behaviour_watchful_last_move = now
+        self._move_turret(target_pan, target_tilt)
+        return True
+
+    def _update_curious_glance(self, now: float) -> bool:
+        """Curious Guard mode: brief periodic glance at non-qualifying movers.
+
+        Returns True if a glance is currently active (caller should suppress patrol).
+        """
+        g = self.cfg.guard
+        if self._behaviour_curious_glance_active:
+            # Already glancing — check if dwell time is up
+            if now - self._behaviour_curious_glance_start >= g.curious_glance_dwell_s:
+                # Dwell complete — cancel glance, return to guard home
+                self._behaviour_curious_glance_active = False
+                self._behaviour_curious_last_glance = now
+                self._move_turret(g.guard_pan, g.guard_tilt)
+            return True  # suppress patrol while glancing
+
+        # Not glancing — check if enough time has passed and there are raw detections
+        if now - self._behaviour_curious_last_glance < g.curious_glance_interval_s:
+            return False  # too soon since last glance
+
+        raw = self.last_detections
+        if not raw:
+            return False
+
+        # Pick the most prominent unqualified detection
+        best = max(
+            raw,
+            key=lambda d: (d.bbox[2] * d.bbox[3]) if (d.bbox and len(d.bbox) >= 4) else 0.0,
+        )
+        glance_pan, glance_tilt = self._planner.aim_from_normalized_center(
+            float(best.norm_cx), float(best.norm_cy),
+            self.current_pan, self.current_tilt,
+        )
+        self._behaviour_curious_glance_active = True
+        self._behaviour_curious_glance_start = now
+        self._behaviour_curious_glance_pan = glance_pan
+        self._behaviour_curious_glance_tilt = glance_tilt
+        self._move_turret(glance_pan, glance_tilt)
+        return True
 
     def _update_pir_confirmation(self, targets: List[TrackedTarget], now: float) -> None:
         """Wait for camera to confirm a target at the PIR cue point."""
