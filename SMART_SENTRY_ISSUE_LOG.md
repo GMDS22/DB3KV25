@@ -130,6 +130,17 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
+### ISS-083 | 2026-04-21 | v3.0.0 | Build | Worked
+**Frozen Exe YOLO Prepare Fails — `ImportError: cannot import name '_version' from partially initialized module 'PIL'`**
+
+- **Symptoms**: After ISS-082 (torch.testing) was fixed, the EXE launched but YOLO prepare still failed. `yolo_runtime_diag.log` showed `prepare-failed` with `ImportError: cannot import name '_version' from partially initialized module 'PIL' (most likely due to a circular import)`. Traceback: `_prepare_yolo_runtime` → `import ultralytics` → `ultralytics/__init__.py:13` → `ultralytics.utils` → `ultralytics.utils.patches:15` → `from PIL import Image` → `PIL/__init__.py:18` → `from . import _version` → ImportError.
+- **Root Cause**: `PIL/__init__.py` at line 18 does `from . import _version` to set `__version__`. In the frozen bundle, `_prepare_yolo_runtime` runs on a worker thread. If anything (e.g. cv2's data path) has already placed a partially-initialized `PIL` entry in `sys.modules` before PIL's `__init__` completed, the second access via the relative import `from . import _version` finds PIL in `sys.modules` as partially initialized and raises ImportError. This is a thread-safety/ordering issue in PyInstaller's frozen importer: relative imports inside a package's `__init__` can fail if the parent package is already in `sys.modules` as partially initialized from a concurrent import path.
+- **Fix/Solution**: Added `import PIL` and `import PIL.Image` to `run.py` on the main thread, immediately after the `import torch.testing` pre-import. This fully initializes PIL in `sys.modules` before any worker thread can trigger a partial import. When `_prepare_yolo_runtime`'s `from PIL import Image` fires, PIL is already complete in `sys.modules` and the relative import of `_version` is never re-executed.
+- **Files Modified**: `run.py`
+- **Notes**: PIL 12.2.0 (`_version.__version__ = "12.2.0"`). PIL `__init__.py` line 18 does `from . import _version` then immediately `del _version` after extracting `__version__`. The `del _version` is fine at runtime but the partial-init race only affects the import step. The same pre-import pattern has been used for asyncio (ISS-077), unittest (ISS-078), torchgen (ISS-079), torch.testing (ISS-080/081/082). Related: ISS-082.
+
+---
+
 ### ISS-082 | 2026-04-21 | v3.0.0 | Build | Worked
 **Frozen Exe crash at startup — `ModuleNotFoundError: No module named 'torch.testing'` (ISS-081 fix ineffective)**
 

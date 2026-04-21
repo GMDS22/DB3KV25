@@ -39,6 +39,18 @@ import torchgen  # noqa: E402
 import torchgen.model  # noqa: E402
 import torch.testing  # noqa: E402  (ISS-080 fix — torch.autograd.gradcheck imports this at module level)
 
+# Pre-import PIL on the main thread before any background threads start.
+# PIL/__init__.py line 18 does `from . import _version` then `del _version`. In the
+# frozen bundle, if PIL is first imported from a worker thread (_prepare_yolo_runtime),
+# the relative import `from . import _version` fails with:
+#   ImportError: cannot import name '_version' from partially initialized module 'PIL'
+# because another import chain (e.g. cv2 data path) may have already placed a partially
+# initialized PIL in sys.modules before __init__ finished. Importing PIL and PIL.Image
+# here on the main thread ensures PIL is fully initialized before any thread uses it.
+# (ISS-083)
+import PIL  # noqa: E402
+import PIL.Image  # noqa: E402
+
 if not getattr(sys, "frozen", False):
     _app_dir = str(Path(__file__).resolve().parent / "app")
     if _app_dir not in sys.path:

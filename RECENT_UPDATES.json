@@ -2,6 +2,15 @@
     "updates":  [
                     {
                         "version":  "3.0.0",
+                        "fix":  "Added import PIL and import PIL.Image to run.py pre-imports on main thread — prevents partial-init race when _prepare_yolo_runtime worker thread imports PIL for the first time via ultralytics.utils.patches",
+                        "category":  "Build",
+                        "date":  "2026-04-21",
+                        "issue":  "ISS-083",
+                        "title":  "Frozen exe YOLO prepare fails: PIL partially initialized circular import",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.0.0",
                         "fix":  "Direct filesystem glob.glob(torch/testing/**/*.py) in hook-torch.py to build datas tuples manually — collect_data_files(..., includes=['**/*.py']) returns empty because PyInstaller strips .py from data collection; direct glob bypasses both C-ext analysis failure and .py filter",
                         "category":  "Build",
                         "date":  "2026-04-21",
