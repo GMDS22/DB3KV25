@@ -51,6 +51,13 @@ import torch.testing  # noqa: E402  (ISS-080 fix — torch.autograd.gradcheck im
 import PIL  # noqa: E402
 import PIL.Image  # noqa: E402
 
+# Pre-import yaml on the main thread before any background threads start.
+# ultralytics/utils/__init__.py line 562 does `import yaml` inside YAML.__init__,
+# which fires on a worker thread. yaml/__init__.py line 2 does `from .error import *`;
+# if yaml is partially initialized in sys.modules from a concurrent path, this raises
+# ModuleNotFoundError: No module named 'yaml.error'. (ISS-084)
+import yaml  # noqa: E402
+
 if not getattr(sys, "frozen", False):
     _app_dir = str(Path(__file__).resolve().parent / "app")
     if _app_dir not in sys.path:
