@@ -1,50 +1,11 @@
-﻿{
-  "schema": 1,
-  "max_items": 11,
-  "items": [
-    {
-      "date": "2026-04-20",
-      "title": "Frozen exe YOLO prepare unittest fix (ISS-078): added 'import unittest' to run.py (same timing fix as ISS-077 asyncio). torch.utils._config_module triggers import unittest mid-exec_module while torch is still loading; unittest.__path__ is not yet established so unittest.result cannot be resolved even though it is present in PYZ. Pre-importing unittest in run.py ensures it is fully in sys.modules before torch runs. --collect-submodules unittest in build script retained. SMART_SENTRY_ISSUE_LOG.md and COMPILATION_PROTOCOL.md updated."
-    },
-    {
-      "date": "2026-04-20",
-      "title": "Frozen exe YOLO prepare asyncio fix (ISS-077): added 'import asyncio' to run.py before 'from app.main import main'. Root cause was a package initialization timing issue in the frozen bundle: import torch triggers asyncio/__init__.py (via typing_extensions._deprecated) while torch/__init__.py is still mid-exec_module, so asyncio.__path__ is not yet established and the relative import 'from .base_events import *' fails with ModuleNotFoundError even though all asyncio submodules ARE present in the PYZ archive. Preloading asyncio in run.py ensures it is fully in sys.modules before torch is ever imported. Confirmed via CArchiveReader inspection of the EXE's PYZ. SMART_SENTRY_ISSUE_LOG.md and SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md updated."
-    },
-    {
-      "date": "2026-04-20",
-      "title": "Frozen exe numpy._core._exceptions fix (ISS-076): --collect-submodules numpy added to PyInstaller build args in build_smart_sentry_v2_3_2_portable.ps1. NumPy 2.x restructured C extensions into numpy._core.* submodules that the standard hook does not enumerate; without this flag the frozen app crashed at cv2 import time with ModuleNotFoundError: No module named 'numpy._core._exceptions'. SMART_SENTRY_ISSUE_LOG.md and SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md updated."
-    },
-    {
-      "date": "2026-04-20",
-      "title": "Frozen exe numpy double-import fix and versionless codebase refactor (ISS-075): removed module-level _preload_torch_runtime() and _configure_ml_runtime_env() calls from app/main.py that caused PyInstaller's 'cannot load module more than once per process' crash (torch+numpy loaded at from app.main import main time, then cv2->numpy triggered a second load). Deleted versioned launcher chain (run_smart_sentry_v2_3_2.py, run_smart_sentry_v3_0_0.py); run.py now uses a direct from app.main import main import with no dispatch logic. Build script and packaging preflight updated to reference app.main directly. SMART_SENTRY_ISSUE_LOG.md and SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md updated."
-    },
-    {
-      "date": "2026-04-20",
-      "title": "Graceful exit splash overlay: closing the app now shows a centered DB3K logo card over the main window. The camera feed is stopped immediately so the logo renders cleanly. Four animated status steps (Closing camera feed -> Returning turret to rest position -> Disconnecting from boards -> Turning off accessories) play out with trailing-dot animation and a thin 3 px gradient progress bar while the turret physically returns to its rest position. Once the underlying cleanup() finishes the overlay transitions to All systems safe - Goodbye, the bar fills to 100%, and the window closes after a 900 ms pause. The hardware shutdown sequence, rest_on_close_enabled, and rest_close_timeout_ms behavior are unchanged. SMART_SENTRY_MANUAL.md updated."
-    },
-    {
-      "date": "2026-04-20",
-      "title": "Codebase simplification and movement bug fix pass: deleted 3-hop wrapper launcher chain (run_smart_sentry_v3_0_0.py, run_smart_sentry_v3.py, run_smart_sentry_v2_3_1.py), hardcoded canonical launcher in run.py and build script, consolidated 10 config files to 4 canonical v3_0_0 files, removed 12 debug print(flush=True) calls from sentry_v2_engine.py hot path that were causing OS-level write syscall blocking during precision tracking, and replaced all try/except dual-import chains with single app.* imports across sentry_v2_config.py, sentry_v2_tab.py, smart_sentry_meta.py, db3k_meta.py, and face_identity.py."
-    },
-    {
-      "date": "2026-04-16",
-      "title": "Auto Lighting Control fully activated and WiFi adapter stability fix: ACCESSORY_PWM_ENABLED set to 1 in both ESP32 firmware sketches, compiled and flashed to COM28 (ESP32-D0WD-V3). LED now auto-adjusts brightness via 8-bit LEDC PWM at 5 kHz based on live scene luminance. Windows WiFi stability improved: ConnectionConfig now carries a wifi_interface field, a new WiFi Adapter dropdown lists all detected adapters, and USB selective suspend was disabled for the SMART SENTRY CON dongle. Ctrl+Alt+L shortcut registered. Docs updated: SMART_SENTRY_MANUAL.md, SMART_SENTRY_SHORTCUT_KEYS.md, AUTO_LIGHTING_CONTROL_IMPLEMENTATION_GUIDE.md."
-    },
-    {
-      "date": "2026-04-15",
-      "title": "ESP32 accessory PWM MOSFET infrastructure: both ESP32 sketches now include compile-time ACCESSORY_PWM_ENABLED flag (default 0 = off). When set to 1, all four outputs are driven by 8-bit LEDC PWM via MOSFET driver (5 kHz); a bool-compat helper maps legacy ON/OFF app commands to full duty cycle (255) without any app-side change. Motion, fire, safety, PIR, buzzer, telemetry, and link-loss safe mode are unaffected. ESP32_CURRENT_SKETCH.md updated."
-    },
-    {
-      "date": "2026-04-15",
-      "title": "Smart Sentry YOLO autotracking and loss-recovery fix (ISS-070, ISS-071, ISS-073): min_threat_score lowered to 0.25; fire_trigger_enter tolerances corrected to realistic YOLO-tracking values (2.5 deg/2.0 deg) and aim-lock tolerances widened to 3.0 deg/2.5 deg with required frames reduced from 7 to 2; semantic_min_confirm_frames reduced to 1 to fix loss-recovery re-detection failure caused by ByteTrack track_id resets, with loss_local_search spans widened to 20 deg/12 deg, dwell increased to 0.40s, and target_loss_timeout extended to 5.0s. app/config/smart_sentry_v3_0_0_settings.json and validate_settings.py updated."
-    },
-    {
-      "date": "2026-04-11",
-      "title": "Smart Sentry packaged OpenCV data fix: app/sentry_v2/face_identity.py now resolves the Haar cascade from valid packaged/runtime locations and falls back cleanly when the asset is absent. SmartSentryV2.spec and build_smart_sentry_v2_3_2_portable.ps1 now explicitly bundle cv2/data into the portable release."
-    },
-    {
-      "date": "2026-04-11",
-      "title": "Smart Sentry packaged YOLO runtime-prep fix: app/sentry_v2/sentry_v2_tab.py now prepares frozen DLL search paths without the recursion-prone path-resolution step that could fail before torch imported, keeps add_dll_directory handles alive for the process lifetime, and reports the exception type in YOLO runtime-prep failures. tools/repro_yolo_prepare.py was added to reproduce the frozen-runtime helper path outside the EXE."
-    }
-  ]
+{
+    "updates":  {
+                    "version":  "3.0.0",
+                    "date":  "2026-04-20",
+                    "issue":  "ISS-079",
+                    "title":  "Frozen exe YOLO: torchgen.model not bundled",
+                    "fix":  "Added --collect-submodules torchgen to build script; added import torchgen; import torchgen.model to run.py",
+                    "category":  "Build",
+                    "status":  "Worked"
+                }
 }

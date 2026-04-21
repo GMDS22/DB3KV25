@@ -456,6 +456,7 @@ $pyInstallerArgs = @(
     '--collect-submodules', 'numpy',
     '--collect-submodules', 'asyncio',
     '--collect-submodules', 'unittest',
+    '--collect-submodules', 'torchgen',
     '--add-data', "$appConfigPath;app/config",
     '--add-data', "$appSentryConfigPath;app/sentry_v2/config",
     '--add-data', "$appLogoPath;app",

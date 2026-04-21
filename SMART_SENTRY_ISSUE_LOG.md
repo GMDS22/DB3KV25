@@ -130,6 +130,12 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
+### ISS-079 | 2026-04-20 | v3.0.0 | Build | Worked
+**Title**: Frozen exe YOLO prepare fails — ModuleNotFoundError: No module named 'torchgen.model'
+**Context**: Third PyInstaller build (exit 0) still fails YOLO prepare with 	orchgen.model not found.
+**Root Cause**: 	orch/utils/_python_dispatch.py line 13-14 does import torchgen; import torchgen.model at module level. In the one-dir build, all torch .py files are collected to disk as physical files. PyInstaller's dependency analysis does not trace imports inside collected-to-disk files, so 	orchgen (a separate top-level package) is never discovered and not bundled into the support folder. Error is not a timing issue — the package is simply absent from the output directory.
+**Fix**: Added --collect-submodules torchgen to uild_smart_sentry_v2_3_2_portable.ps1 (line 459). Added import torchgen; import torchgen.model to un.py as pre-import documentation and to ensure PyInstaller's static analysis sees the dependency from the entry point.
+**Files Changed**: un.py, SMART SENTRY/build_smart_sentry_v2_3_2_portable.ps1
 ### ISS-078 | 2026-04-20 | v3.0.0 | Build | Worked
 **Frozen Exe YOLO Prepare Failed With `ModuleNotFoundError: No module named 'unittest.result'`**
 

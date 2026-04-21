@@ -28,6 +28,16 @@ import asyncio  # noqa: E402
 # import chain finds unittest already initialized and skips re-execution.
 import unittest  # noqa: E402
 
+# Pre-import torchgen before any torch import occurs.
+# torch/utils/_python_dispatch.py line 13-14 does `import torchgen; import torchgen.model`
+# at module level. In the frozen exe (one-dir build), torchgen must be physically present
+# in the support folder. PyInstaller does not automatically discover torchgen from torch's
+# transitive dependency analysis. The build script uses --collect-submodules torchgen to
+# bundle it; this pre-import documents the dependency and ensures it appears in sys.modules
+# before any sub-thread triggers torch.nn imports. (ISS-079)
+import torchgen  # noqa: E402
+import torchgen.model  # noqa: E402
+
 if not getattr(sys, "frozen", False):
     _app_dir = str(Path(__file__).resolve().parent / "app")
     if _app_dir not in sys.path:
