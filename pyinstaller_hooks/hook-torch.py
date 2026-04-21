@@ -63,6 +63,26 @@ datas = collect_data_files(
 )
 
 hiddenimports = collect_submodules("torch", filter=_include_torch_submodule, on_error="ignore")
+
+# ISS-081 fix: torch.testing.__init__ imports torch._C.FileCheck (C extension) which causes
+# the module to be silently dropped when torch._C analysis fails during collect_submodules.
+# Explicitly collect torch.testing submodules in a separate call to guarantee inclusion.
+_testing_mods = collect_submodules("torch.testing", on_error="ignore")
+if _testing_mods:
+    hiddenimports += [m for m in _testing_mods if m not in hiddenimports]
+    logger.info("custom hook-torch: explicitly added %d torch.testing submodules (ISS-081)", len(_testing_mods))
+else:
+    # Fallback: hard-code the known submodules if collect_submodules still fails
+    _testing_fallback = [
+        "torch.testing",
+        "torch.testing._comparison",
+        "torch.testing._creation",
+        "torch.testing._utils",
+        "torch.testing._internal",
+    ]
+    hiddenimports += [m for m in _testing_fallback if m not in hiddenimports]
+    logger.info("custom hook-torch: used fallback hard-coded torch.testing imports (ISS-081)")
+
 binaries = collect_dynamic_libs("torch", search_patterns=PY_DYLIB_PATTERNS + ["*.so.*"])
 
 if is_win:

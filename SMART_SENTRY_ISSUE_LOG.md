@@ -130,7 +130,18 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
-### ISS-080 | 2026-04-21 | v3.0.0 | Build | Worked
+### ISS-081 | 2026-04-21 | v3.0.0 | Build | Worked
+**Frozen Exe YOLO Prepare Fails — `ModuleNotFoundError: No module named 'torch.testing'` (recurrence after ISS-080 incomplete fix)**
+
+- **Symptoms**: Build 5 EXE (after ISS-080) launched with `MainWindowTitle = "Unhandled exception in script"` — `Failed to execute script 'run' due to unhandled exception: No module named 'torch.testing'`. The `logs/yolo_runtime_diag.log` was never created because the crash happened before UI reached YOLO init. Confirmed: `torch.testing` absent from PYZ (not found in EXE binary string scan) and `torch/testing/` folder not present in `SMART_SENTRY_V3_0_0_FILES/`.
+- **Root Cause**: ISS-080 fix removed `"torch.testing"` from `EXCLUDED_TORCH_PREFIXES` in `hook-torch.py`, but this was insufficient. `torch.testing.__init__` imports `from torch._C import FileCheck` — a C extension. During PyInstaller's static module graph analysis, importing `torch._C` fails (it's a `.pyd`), so the entire `torch.testing` package is silently dropped by `collect_submodules("torch", on_error="ignore")`. The package never appears in the build log at all, which confirms it was excluded by the `on_error="ignore"` path, not by the prefix filter. The physical `.py` file `torch/autograd/gradcheck.py` is collected to disk and imports `torch.testing` at runtime, but `torch.testing` itself was never bundled.
+- **Fix/Solution**: Added an explicit separate `collect_submodules("torch.testing", on_error="ignore")` call in `hook-torch.py` after the main torch collect, with a hard-coded fallback list if that also fails. Added `--collect-submodules torch.testing` to `build_smart_sentry_v2_3_2_portable.ps1`. The `import torch.testing` pre-import in `run.py` was already in place from ISS-080.
+- **Files Modified**: `pyinstaller_hooks/hook-torch.py`, `build_smart_sentry_v2_3_2_portable.ps1`
+- **Notes**: When `collect_submodules("pkg")` runs with `on_error="ignore"` and the package's `__init__` imports a C extension that fails analysis, the entire package is silently dropped — even if the package itself is not in any exclusion list. The workaround is always to add an explicit separate `collect_submodules("pkg.subpackage")` call for known-problematic subpackages. Related: ISS-080.
+
+---
+
+### ISS-080 | 2026-04-21 | v3.0.0 | Build | Partial (see ISS-081)
 **Frozen Exe YOLO Prepare Fails — `ModuleNotFoundError: No module named 'torch.testing'`**
 
 - **Symptoms**: After ISS-079 fix (torchgen), YOLO still failed. `yolo_runtime_diag.log` showed `prepare-failed` with `ModuleNotFoundError: No module named 'torch.testing'`. Import chain: `import torch` → `torch.functional` → `torch.nn` → `torch.nn.modules` → `torch.nn.modules.batchnorm` → `torch.nn.modules._functions` → `torch.autograd` → `torch.autograd.gradcheck` → `import torch.testing` → failure.
