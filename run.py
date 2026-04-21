@@ -74,6 +74,20 @@ import yaml  # noqa: E402
 # (ISS-084, ISS-083 definitive fix)
 import ultralytics  # noqa: E402
 
+# Pre-import html on the main thread.
+# torchvision/datasets/flickr.py imports `from html.parser import HTMLParser`.
+# html/__init__.py line 6 does `from . import entities`. Same partial-init race as
+# asyncio/yaml/PIL if html is first touched from a worker thread. (ISS-085)
+import html  # noqa: E402
+
+# Force-initialize ultralytics.models on the main thread.
+# ultralytics/__init__.py uses __getattr__ to lazy-load ultralytics.models only when
+# a model class (YOLO, SAM, etc.) is first accessed. If that access happens on the
+# worker thread, it imports torchvision → datasets → flickr → html.parser → html.entities
+# race. Importing ultralytics.models here resolves the entire lazy chain on the main thread.
+# (ISS-085 definitive)
+import ultralytics.models  # noqa: E402
+
 if not getattr(sys, "frozen", False):
     _app_dir = str(Path(__file__).resolve().parent / "app")
     if _app_dir not in sys.path:
