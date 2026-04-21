@@ -130,6 +130,17 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
+### ISS-085 | 2026-04-21 | v3.0.0 | Build | Worked
+**Frozen Exe YOLO Prepare Fails — `ModuleNotFoundError: No module named 'html.entities'` + `prepare-ok` never written to log**
+
+- **Symptoms**: After ISS-084 (yaml/ultralytics) was fixed, YOLO prepare still failed. `yolo_runtime_diag.log` showed `prepare-failed` with `ModuleNotFoundError: No module named 'html.entities'`. Traceback: `_prepare_yolo_runtime` → `from ultralytics import YOLO` → `ultralytics/__init__.py:38 __getattr__` → `importlib.import_module("ultralytics.models")` → `ultralytics/models/__init__.py:6` → `from .sam import SAM` → `ultralytics/models/sam/__init__.py:3` → `from .model import SAM` → `sam/model.py:24` → `from .predict import ...` → `sam/predict.py:40` → `from .sam3.geometry_encoders import Prompt` → `geometry_encoders.py:7` → `import torchvision` → `torchvision/__init__.py:8` → `torchvision.datasets` → `flickr.py:4` → `from html.parser import HTMLParser` → `html/__init__.py:6` → `from . import entities` → ModuleNotFoundError. Secondary bug: `_emit_yolo_runtime_diagnostics` early-return guard suppressed `prepare-ok` writes (only `prepare-start` and `prepare-failed` reached the log).
+- **Root Cause**: Two separate issues. (1) Same partial-init race as previous ISS: `html/__init__.py:6` does `from . import entities`. When `html` is first imported on the worker thread via the torchvision → flickr chain, `html.__path__` isn't yet established. (2) `ultralytics.__getattr__("YOLO")` lazily imports `ultralytics.models` (via `importlib.import_module`) even though we had `import ultralytics` in run.py — because `ultralytics.models` is a sub-module that `ultralytics.__init__` intentionally defers via `__getattr__`, so `import ultralytics` alone does NOT import `ultralytics.models`. (3) `_emit_yolo_runtime_diagnostics` condition `stage != "prepare-failed"` was too broad — it suppressed `prepare-ok` after `prepare-start` was written, making success invisible.
+- **Fix/Solution**: (1) Added `import html` and `import ultralytics.models` to `run.py` pre-import block on main thread — `ultralytics.models` forces the full SAM → torchvision → html → html.entities chain to initialize before any worker runs. (2) Fixed `_emit_yolo_runtime_diagnostics` early-return condition from `stage != "prepare-failed"` to `stage not in {"prepare-ok", "prepare-failed"}` so both success and failure are always written after `prepare-start`.
+- **Files Modified**: `run.py`, `app/sentry_v2/sentry_v2_tab.py`
+- **Notes**: 9th partial-init race fix in this session. After this fix, only `prepare-start` appeared in the log (no `prepare-failed`) indicating success — but `prepare-ok` was suppressed by the emit guard bug. The emit guard fix makes success conclusively visible. Related: ISS-083, ISS-084.
+
+---
+
 ### ISS-084 | 2026-04-21 | v3.0.0 | Build | Worked
 **Frozen Exe YOLO Prepare Fails — `ModuleNotFoundError: No module named 'yaml.error'`**
 
