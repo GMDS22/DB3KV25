@@ -1,11 +1,41 @@
-{
-    "updates":  {
-                    "version":  "3.0.0",
-                    "date":  "2026-04-20",
-                    "issue":  "ISS-079",
-                    "title":  "Frozen exe YOLO: torchgen.model not bundled",
-                    "fix":  "Added --collect-submodules torchgen to build script; added import torchgen; import torchgen.model to run.py",
-                    "category":  "Build",
-                    "status":  "Worked"
-                }
+﻿{
+    "updates":  [
+                    {
+                        "version":  "3.0.0",
+                        "fix":  "Removed torch.testing from EXCLUDED_TORCH_PREFIXES in hook-torch.py; added import torch.testing to run.py",
+                        "category":  "Build",
+                        "date":  "2026-04-21",
+                        "issue":  "ISS-080",
+                        "title":  "Frozen exe YOLO: torch.testing not bundled (excluded by hook)",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.0.0",
+                        "fix":  "Added --collect-submodules torchgen to build script; added import torchgen; import torchgen.model to run.py",
+                        "category":  "Build",
+                        "date":  "2026-04-20",
+                        "issue":  "ISS-079",
+                        "title":  "Frozen exe YOLO: torchgen.model not bundled",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.0.0",
+                        "fix":  "Added import unittest to run.py before app.main import; retained --collect-submodules unittest in build script",
+                        "category":  "Build",
+                        "date":  "2026-04-20",
+                        "issue":  "ISS-078",
+                        "title":  "Frozen exe YOLO: unittest.result timing failure",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.0.0",
+                        "fix":  "Added import asyncio to run.py before app.main import",
+                        "category":  "Build",
+                        "date":  "2026-04-20",
+                        "issue":  "ISS-077",
+                        "title":  "Frozen exe YOLO: asyncio.base_events timing failure",
+                        "status":  "Worked"
+                    }
+                ],
+    "max_items":  11
 }

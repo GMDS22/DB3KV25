@@ -10,7 +10,6 @@ from PyInstaller.utils.hooks import logger
 
 
 EXCLUDED_TORCH_PREFIXES = (
-    "torch.testing",
     "torch.utils.benchmark",
     "torch.distributed.algorithms",
     "torch.distributed.autograd",

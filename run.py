@@ -37,6 +37,7 @@ import unittest  # noqa: E402
 # before any sub-thread triggers torch.nn imports. (ISS-079)
 import torchgen  # noqa: E402
 import torchgen.model  # noqa: E402
+import torch.testing  # noqa: E402  (ISS-080 fix — torch.autograd.gradcheck imports this at module level)
 
 if not getattr(sys, "frozen", False):
     _app_dir = str(Path(__file__).resolve().parent / "app")

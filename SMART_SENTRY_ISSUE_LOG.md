@@ -130,12 +130,25 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
+### ISS-080 | 2026-04-21 | v3.0.0 | Build | Worked
+**Frozen Exe YOLO Prepare Fails — `ModuleNotFoundError: No module named 'torch.testing'`**
+
+- **Symptoms**: After ISS-079 fix (torchgen), YOLO still failed. `yolo_runtime_diag.log` showed `prepare-failed` with `ModuleNotFoundError: No module named 'torch.testing'`. Import chain: `import torch` → `torch.functional` → `torch.nn` → `torch.nn.modules` → `torch.nn.modules.batchnorm` → `torch.nn.modules._functions` → `torch.autograd` → `torch.autograd.gradcheck` → `import torch.testing` → failure.
+- **Root Cause**: `torch.testing` was explicitly listed in `EXCLUDED_TORCH_PREFIXES` in `pyinstaller_hooks/hook-torch.py` as a size-optimization exclusion. However, `torch/autograd/gradcheck.py` imports `torch.testing` at module level. Because `torch` files are collected to disk as physical `.py` files in the one-dir build, PyInstaller does not trace imports within those files. `torch.testing` was therefore absent from the support folder. Unlike ISS-077/ISS-078, this is a true missing-package gap, not a timing issue — the package is simply not collected.
+- **Fix/Solution**: Removed `"torch.testing"` from `EXCLUDED_TORCH_PREFIXES` in `pyinstaller_hooks/hook-torch.py` so the hook includes `torch.testing` in its `collect_submodules` pass. Added `import torch.testing` to `run.py` as a pre-import to document the dependency and ensure PyInstaller's static analysis traces it from the entry point.
+- **Files Modified**: `pyinstaller_hooks/hook-torch.py`, `run.py`
+- **Notes**: Recurrence risk: any `torch.*` package excluded from the hook that is imported at module level by another physical `.py` torch file will produce the same error. Review `EXCLUDED_TORCH_PREFIXES` if new `ModuleNotFoundError: No module named 'torch.*'` errors appear. Related: ISS-079 (torchgen), ISS-077/ISS-078 (timing).
+
+---
+
 ### ISS-079 | 2026-04-20 | v3.0.0 | Build | Worked
-**Title**: Frozen exe YOLO prepare fails � ModuleNotFoundError: No module named 'torchgen.model'
+**Title**: Frozen exe YOLO prepare fails � ModuleNotFoundError: No module named 'torchgen.model'
 **Context**: Third PyInstaller build (exit 0) still fails YOLO prepare with 	orchgen.model not found.
-**Root Cause**: 	orch/utils/_python_dispatch.py line 13-14 does import torchgen; import torchgen.model at module level. In the one-dir build, all torch .py files are collected to disk as physical files. PyInstaller's dependency analysis does not trace imports inside collected-to-disk files, so 	orchgen (a separate top-level package) is never discovered and not bundled into the support folder. Error is not a timing issue � the package is simply absent from the output directory.
-**Fix**: Added --collect-submodules torchgen to uild_smart_sentry_v2_3_2_portable.ps1 (line 459). Added import torchgen; import torchgen.model to un.py as pre-import documentation and to ensure PyInstaller's static analysis sees the dependency from the entry point.
-**Files Changed**: un.py, SMART SENTRY/build_smart_sentry_v2_3_2_portable.ps1
+**Root Cause**: 	orch/utils/_python_dispatch.py line 13-14 does import torchgen; import torchgen.model at module level. In the one-dir build, all torch .py files are collected to disk as physical files. PyInstaller's dependency analysis does not trace imports inside collected-to-disk files, so 	orchgen (a separate top-level package) is never discovered and not bundled into the support folder. Error is not a timing issue � the package is simply absent from the output directory.
+**Fix**: Added --collect-submodules torchgen to uild_smart_sentry_v2_3_2_portable.ps1 (line 459). Added import torchgen; import torchgen.model to 
+un.py as pre-import documentation and to ensure PyInstaller's static analysis sees the dependency from the entry point.
+**Files Changed**: 
+un.py, SMART SENTRY/build_smart_sentry_v2_3_2_portable.ps1
 ### ISS-078 | 2026-04-20 | v3.0.0 | Build | Worked
 **Frozen Exe YOLO Prepare Failed With `ModuleNotFoundError: No module named 'unittest.result'`**
 
