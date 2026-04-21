@@ -130,7 +130,18 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
-### ISS-081 | 2026-04-21 | v3.0.0 | Build | Worked
+### ISS-082 | 2026-04-21 | v3.0.0 | Build | Worked
+**Frozen Exe crash at startup — `ModuleNotFoundError: No module named 'torch.testing'` (ISS-081 fix ineffective)**
+
+- **Symptoms**: Build 6 EXE (after ISS-081 explicit `collect_submodules("torch.testing")` fix) still crashes at startup with `Unhandled exception in script: No module named 'torch.testing'`. Build 6 log confirmed `custom hook-torch: explicitly added 95 torch.testing submodules (ISS-081)`, but ALL 95 were logged as `ERROR: Hidden import '...' not found` during analysis. The `torch/testing/` folder was absent from the bundle and `torch.testing` was absent from the PYZ.
+- **Root Cause**: When PyInstaller processes hiddenimports, it analyzes each module by attempting to import it in a sandboxed AST walker. For `torch.testing`, this requires analyzing `torch.testing.__init__`, which imports `from torch._C import FileCheck`. `torch._C` is a compiled C extension (`.pyd`) — PyInstaller cannot statically analyze it, so the entire `torch.testing` package tree is reported as "not found" and excluded from the PYZ. Adding module names via `collect_submodules` only registers strings as hiddenimport candidates; the analysis step still fails. This is distinct from the `on_error="ignore"` path — `collect_submodules` itself succeeds, but the subsequent per-module analysis in PyInstaller's graph fails silently.
+- **Fix/Solution**: Changed approach entirely — instead of hiddenimports, use `collect_data_files("torch.testing", includes=["**/*.py"])` to physically copy all `torch/testing/**/*.py` files into the bundle as data (bypassing PyInstaller analysis entirely). At runtime, `torch._C.pyd` IS present in the bundle, so `torch.testing.__init__` executes correctly when Python loads the physical `.py` file.
+- **Files Modified**: `pyinstaller_hooks/hook-torch.py`
+- **Notes**: The `collect_data_files(..., includes=["**/*.py"])` technique is the correct workaround for any torch subpackage whose `__init__` imports a C extension. The physical .py files are loadable at runtime even though they cannot be analyzed at build time. Related: ISS-081 (first attempt, ineffective).
+
+---
+
+### ISS-081 | 2026-04-21 | v3.0.0 | Build | Failed (see ISS-082)
 **Frozen Exe YOLO Prepare Fails — `ModuleNotFoundError: No module named 'torch.testing'` (recurrence after ISS-080 incomplete fix)**
 
 - **Symptoms**: Build 5 EXE (after ISS-080) launched with `MainWindowTitle = "Unhandled exception in script"` — `Failed to execute script 'run' due to unhandled exception: No module named 'torch.testing'`. The `logs/yolo_runtime_diag.log` was never created because the crash happened before UI reached YOLO init. Confirmed: `torch.testing` absent from PYZ (not found in EXE binary string scan) and `torch/testing/` folder not present in `SMART_SENTRY_V3_0_0_FILES/`.

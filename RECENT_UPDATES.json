@@ -2,12 +2,21 @@
     "updates":  [
                     {
                         "version":  "3.0.0",
+                        "fix":  "Used collect_data_files('torch.testing', includes=['**/*.py']) in hook-torch.py to physically copy .py files into bundle, bypassing C-extension analysis failure",
+                        "category":  "Build",
+                        "date":  "2026-04-21",
+                        "issue":  "ISS-082",
+                        "title":  "Frozen exe crash: torch.testing not bundled — hiddenimports analysis fails for C-ext packages",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.0.0",
                         "fix":  "Added explicit collect_submodules('torch.testing') in hook-torch.py with hard-coded fallback; added --collect-submodules torch.testing to build script",
                         "category":  "Build",
                         "date":  "2026-04-21",
                         "issue":  "ISS-081",
                         "title":  "Frozen exe crash at startup: torch.testing not collected (torch._C C-ext kills silent analysis)",
-                        "status":  "Worked"
+                        "status":  "Failed (see ISS-082)"
                     },
                     {
                         "version":  "3.0.0",
