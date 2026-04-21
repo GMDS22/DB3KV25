@@ -130,6 +130,17 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
+### ISS-084 | 2026-04-21 | v3.0.0 | Build | Worked
+**Frozen Exe YOLO Prepare Fails — `ModuleNotFoundError: No module named 'yaml.error'`**
+
+- **Symptoms**: After ISS-083 (PIL) was fixed, YOLO prepare still failed. `yolo_runtime_diag.log` showed `prepare-failed` with `ModuleNotFoundError: No module named 'yaml.error'`. Traceback: `_prepare_yolo_runtime` → `import ultralytics` → `ultralytics/__init__.py:13` → `ultralytics.utils.__init__:660` → `YAML.load(DEFAULT_CFG_PATH)` → `YAML.__init__:562` → `import yaml` (lazy, inside YAML class constructor) → `yaml/__init__.py:2` → `from .error import *` → ModuleNotFoundError.
+- **Root Cause**: Same partial-init race as ISS-083 (PIL) and ISS-077 (asyncio). `yaml/__init__.py` line 2 does `from .error import *`. When yaml is first imported lazily (inside `ultralytics.utils.YAML.__init__`) on the worker thread, PyInstaller's frozen importer runs `yaml/__init__.py:exec_module`. The relative import `from .error import *` fires before `yaml.__path__` is fully established in the frozen importer context, causing ModuleNotFoundError.
+- **Fix/Solution (definitive)**: Instead of adding individual pre-imports for each affected package (yaml, PIL, requests, urllib3, etc.), added a single `import ultralytics` to `run.py` on the main thread, after all existing pre-imports. This fully initializes ultralytics and ALL its transitive dependencies (yaml, PIL, requests, urllib3, and any future additions) in `sys.modules` before any worker thread runs. When `_prepare_yolo_runtime` calls `import ultralytics`, Python finds it complete in `sys.modules` and returns immediately — no re-execution, no partial-init races. The individual `import yaml` and `import PIL`/`import PIL.Image` pre-imports are also retained as documentation of the dependency chain.
+- **Files Modified**: `run.py`
+- **Notes**: This is the 7th partial-init race fixed in this frozen build session (ISS-077 asyncio, ISS-078 unittest, ISS-079 torchgen, ISS-080/081/082 torch.testing, ISS-083 PIL, ISS-084 yaml). The `import ultralytics` pre-import is the definitive fix for the whole class. Future build regressions: if a new package is added to ultralytics' import chain at module level, the pre-import chain handles it automatically. Related: ISS-083.
+
+---
+
 ### ISS-083 | 2026-04-21 | v3.0.0 | Build | Worked
 **Frozen Exe YOLO Prepare Fails — `ImportError: cannot import name '_version' from partially initialized module 'PIL'`**
 

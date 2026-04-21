@@ -2,11 +2,11 @@
     "updates":  [
                     {
                         "version":  "3.0.0",
-                        "fix":  "Added import PIL and import PIL.Image to run.py pre-imports on main thread — prevents partial-init race when _prepare_yolo_runtime worker thread imports PIL for the first time via ultralytics.utils.patches",
+                        "fix":  "Pre-import ultralytics on main thread in run.py — definitive fix for all partial-init races in frozen bundle: once ultralytics and all transitive deps (yaml, PIL, requests, urllib3, etc.) are in sys.modules before any worker thread runs, _prepare_yolo_runtime finds them complete and never re-executes",
                         "category":  "Build",
                         "date":  "2026-04-21",
-                        "issue":  "ISS-083",
-                        "title":  "Frozen exe YOLO prepare fails: PIL partially initialized circular import",
+                        "issue":  "ISS-084",
+                        "title":  "Frozen exe YOLO prepare fails: yaml.error not found — pre-import ultralytics is definitive fix",
                         "status":  "Worked"
                     },
                     {
