@@ -2,7 +2,7 @@
     "updates":  [
                     {
                         "version":  "3.0.0",
-                        "fix":  "Used collect_data_files('torch.testing', includes=['**/*.py']) in hook-torch.py to physically copy .py files into bundle, bypassing C-extension analysis failure",
+                        "fix":  "Direct filesystem glob.glob(torch/testing/**/*.py) in hook-torch.py to build datas tuples manually — collect_data_files(..., includes=['**/*.py']) returns empty because PyInstaller strips .py from data collection; direct glob bypasses both C-ext analysis failure and .py filter",
                         "category":  "Build",
                         "date":  "2026-04-21",
                         "issue":  "ISS-082",
