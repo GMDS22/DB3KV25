@@ -12010,8 +12010,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         return candidates[-1]
 
     def _emit_yolo_runtime_diagnostics(self, stage: str, error_text: str = "", trace_text: str = "") -> None:
-        # Keep startup noise low: emit once unless we are recording a failure.
-        if self._yolo_runtime_diag_dumped and stage != "prepare-failed":
+        # Keep startup noise low: suppress intermediate/repeated diagnostics but
+        # always let the final result (prepare-ok or prepare-failed) through.
+        if self._yolo_runtime_diag_dumped and stage not in {"prepare-ok", "prepare-failed"}:
             return
         should_mark_dumped = stage in {"prepare-start", "prepare-ok", "prepare-failed"}
         if should_mark_dumped:
