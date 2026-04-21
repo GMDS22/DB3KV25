@@ -66,15 +66,25 @@ datas = collect_data_files(
 # This causes PyInstaller's static analysis to fail for ALL torch.testing modules,
 # so they cannot be included in PYZ via hiddenimports — even explicit collect_submodules
 # calls (ISS-081) register names but all show "not found" in the build log.
-# Fix: physically copy torch/testing/**/*.py files via datas so they land in the bundle
-# as physical files. At runtime torch._C.pyd IS present, so the .py files execute fine.
-from PyInstaller.utils.hooks import collect_data_files as _collect_data_files
-_testing_py_data = _collect_data_files("torch.testing", includes=["**/*.py"])
-if _testing_py_data:
-    datas += _testing_py_data
-    logger.info("custom hook-torch: added %d torch.testing .py files via datas (ISS-082)", len(_testing_py_data))
+# Fix: physically copy torch/testing/**/*.py files into bundle as data using a direct
+# filesystem glob. collect_data_files(..., includes=["**/*.py"]) is ineffective because
+# PyInstaller strips .py files from data collection (they are treated as module files).
+# Using a direct glob to os.path/glob bypasses that filter entirely.
+import glob as _glob
+import os as _os
+import torch as _torch_probe
+_torch_root = _os.path.dirname(_torch_probe.__file__)
+_testing_root = _os.path.join(_torch_root, "testing")
+_testing_py_count = 0
+if _os.path.isdir(_testing_root):
+    for _py_src in _glob.glob(_os.path.join(_testing_root, "**", "*.py"), recursive=True):
+        _rel_dir = _os.path.relpath(_os.path.dirname(_py_src), _torch_root)
+        datas.append((_py_src, _os.path.join("torch", _rel_dir)))
+        _testing_py_count += 1
+if _testing_py_count:
+    logger.info("custom hook-torch: added %d torch.testing .py files via direct glob datas (ISS-082)", _testing_py_count)
 else:
-    logger.warning("custom hook-torch: torch.testing .py data collection returned nothing (ISS-082)")
+    logger.warning("custom hook-torch: torch.testing direct glob found nothing — check torch install (ISS-082)")
 
 hiddenimports = collect_submodules("torch", filter=_include_torch_submodule, on_error="ignore")
 
