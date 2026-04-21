@@ -1137,11 +1137,13 @@ class SentryV2Engine:
     def _engagement_response_scale(self, *, use_fire_limits: bool) -> float:
         speed_value = int(max(10, min(100, int(getattr(self.cfg.engagement, "engagement_speed", 80) or 80))))
         ratio = float(speed_value - 10) / 90.0
-        # Wider authority range so fast presets (80-100) actually feel fast.
-        # Demo/sniper presets (10-40) remain calm; chase/saturation ramp up.
-        scale = 0.65 + (ratio * 0.85)
+        # Scale ranges [0.65, 1.0]: slow presets are dampened, fast presets are
+        # at full authority.  Previously exceeded 1.0 at high speeds, which
+        # amplified corrections and caused commanded_pan to race ahead of the
+        # actual servo position, producing visible overshoot on initial lock-on.
+        scale = min(1.0, 0.65 + (ratio * 0.85))
         if use_fire_limits:
-            scale = min(scale, 1.15)
+            scale = min(scale, 1.0)
         return scale
 
     def _safe_log_precision_frame(self, **kwargs: object) -> None:
@@ -2136,6 +2138,12 @@ class SentryV2Engine:
             integral_limit = max(6.0, float(eng.precision_max_step) * 8.0)
             self._pid_integral_pan = max(-integral_limit, min(integral_limit, self._pid_integral_pan))
             self._pid_integral_tilt = max(-integral_limit, min(integral_limit, self._pid_integral_tilt))
+
+        # Seed prev_err on the first frame so D-term starts at zero rather than
+        # firing at full error magnitude (kd * full_err amplifies the first step).
+        if first_frame:
+            self._pid_prev_err_pan = ctrl_pan
+            self._pid_prev_err_tilt = ctrl_tilt
 
         d_pan = ctrl_pan - self._pid_prev_err_pan
         d_tilt = ctrl_tilt - self._pid_prev_err_tilt

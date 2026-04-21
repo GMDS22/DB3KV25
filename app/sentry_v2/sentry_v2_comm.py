@@ -360,6 +360,23 @@ class SentryV2Comm:
         snapshot["diag_age_s"] = max(0.0, time.time() - diag_last_update) if diag_last_update > 0.0 else None
         return snapshot
 
+    def set_tracking_active(self, active: bool) -> None:
+        """Switch servo position feedback to high-rate (tracking) or low-rate (idle) mode.
+
+        During ENGAGING, a shorter post-move delay and poll interval let
+        _sync_engine_pose_from_feedback anchor each precision correction to the
+        servo's actual position rather than the accumulated commanded position.
+        This prevents commanded_pan from racing ahead of the servo during rapid
+        tracking, which is the primary source of initial-lock overshoot.
+        """
+        with self._lock:
+            if active:
+                self._feedback_post_move_delay_s = 0.020
+                self._feedback_poll_interval_s = 0.050
+            else:
+                self._feedback_post_move_delay_s = 0.35
+                self._feedback_poll_interval_s = 0.75
+
     def _reset_io_runtime_state(self, *, active: bool, source: str, last_error: str = "") -> None:
         with self._lock:
             self._io_runtime = {
