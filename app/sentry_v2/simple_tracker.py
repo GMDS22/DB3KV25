@@ -18,6 +18,8 @@ class _TrackState:
     center_x: float
     center_y: float
     last_seen: float
+    velocity_x: float = 0.0
+    velocity_y: float = 0.0
 
 
 class SimpleBBoxTracker:
@@ -54,7 +56,8 @@ class SimpleBBoxTracker:
                 track = self._tracks[track_id]
                 for det_idx in unmatched_det_indices:
                     det = detections[det_idx]
-                    dist = math.hypot(det.center_x - track.center_x, det.center_y - track.center_y)
+                    predicted_x, predicted_y = self._predict_track_center(track, timestamp)
+                    dist = math.hypot(det.center_x - predicted_x, det.center_y - predicted_y)
                     match_limit = self._match_distance_limit(track, det)
                     if dist > match_limit:
                         continue
@@ -83,6 +86,8 @@ class SimpleBBoxTracker:
 
         for track_id, det_idx in matches:
             det = detections[det_idx]
+            prev_track = self._tracks[track_id]
+            velocity_x, velocity_y = self._updated_track_velocity(prev_track, det, timestamp)
             det.track_id = track_id
             self._tracks[track_id] = _TrackState(
                 track_id=track_id,
@@ -91,6 +96,8 @@ class SimpleBBoxTracker:
                 center_x=det.center_x,
                 center_y=det.center_y,
                 last_seen=timestamp,
+                velocity_x=velocity_x,
+                velocity_y=velocity_y,
             )
 
         for det_idx in unmatched_det_indices:
@@ -105,6 +112,8 @@ class SimpleBBoxTracker:
                 center_x=det.center_x,
                 center_y=det.center_y,
                 last_seen=timestamp,
+                velocity_x=0.0,
+                velocity_y=0.0,
             )
 
         self._prune(timestamp)
@@ -165,6 +174,24 @@ class SimpleBBoxTracker:
         if iou >= 0.35 and area_cost <= 0.35 and dist <= (match_limit * 0.28):
             return True
         return False
+
+    @staticmethod
+    def _predict_track_center(track: _TrackState, timestamp: float) -> Tuple[float, float]:
+        age_s = max(0.0, min(0.35, float(timestamp - track.last_seen)))
+        return (
+            float(track.center_x) + (float(track.velocity_x) * age_s),
+            float(track.center_y) + (float(track.velocity_y) * age_s),
+        )
+
+    @staticmethod
+    def _updated_track_velocity(track: _TrackState, det: DetectedObject, timestamp: float) -> Tuple[float, float]:
+        dt = max(0.001, float(timestamp - track.last_seen))
+        observed_vx = (float(det.center_x) - float(track.center_x)) / dt
+        observed_vy = (float(det.center_y) - float(track.center_y)) / dt
+        return (
+            (float(track.velocity_x) * 0.55) + (observed_vx * 0.45),
+            (float(track.velocity_y) * 0.55) + (observed_vy * 0.45),
+        )
 
     @staticmethod
     def _bbox_area(bbox: Tuple[int, int, int, int]) -> float:

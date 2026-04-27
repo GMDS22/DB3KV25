@@ -44,6 +44,8 @@ class TrackedTarget:
     heading_y: float = 0.0
     persistence: float = 0.0    # seconds since first seen
     approach_rate: float = 0.0  # closing speed toward center (positive = approaching)
+    history_samples: int = 0
+    heading_stability: float = 0.0
 
     @property
     def id(self) -> int:
@@ -165,18 +167,37 @@ class ThreatScorer:
         heading_x, heading_y = 0.0, 0.0
         approach_rate = 0.0
         hist = self._history.get(tid, [])
+        history_samples = len(hist)
+        heading_stability = 0.0
         if len(hist) >= 2:
-            t0, x0, y0 = hist[-2]
-            t1, x1, y1 = hist[-1]
-            dt = max(0.001, t1 - t0)
-            vx = (x1 - x0) / dt
-            vy = (y1 - y0) / dt
-            speed = math.sqrt(vx * vx + vy * vy)
-            heading_x, heading_y = vx, vy
-            # Approach rate: positive if getting closer to center
-            dist_prev = math.sqrt((x0 - 0.5) ** 2 + (y0 - 0.5) ** 2)
-            dist_now = math.sqrt((x1 - 0.5) ** 2 + (y1 - 0.5) ** 2)
-            approach_rate = (dist_prev - dist_now) / dt  # positive = approaching
+            recent_hist = self._recent_motion_window(hist)
+            segments: List[Tuple[float, float]] = []
+            norm_segments: List[Tuple[float, float]] = []
+            for (t0, x0, y0), (t1, x1, y1) in zip(recent_hist, recent_hist[1:]):
+                dt = max(0.001, t1 - t0)
+                vx = (x1 - x0) / dt
+                vy = (y1 - y0) / dt
+                segments.append((vx, vy))
+                seg_speed = math.sqrt(vx * vx + vy * vy)
+                if seg_speed >= 0.02:
+                    norm_segments.append((vx / seg_speed, vy / seg_speed))
+
+            if segments:
+                heading_x = sum(vx for vx, _ in segments) / float(len(segments))
+                heading_y = sum(vy for _, vy in segments) / float(len(segments))
+                speed = math.sqrt(heading_x * heading_x + heading_y * heading_y)
+
+                start_t, start_x, start_y = recent_hist[0]
+                end_t, end_x, end_y = recent_hist[-1]
+                window_dt = max(0.001, end_t - start_t)
+                dist_prev = math.sqrt((start_x - 0.5) ** 2 + (start_y - 0.5) ** 2)
+                dist_now = math.sqrt((end_x - 0.5) ** 2 + (end_y - 0.5) ** 2)
+                approach_rate = (dist_prev - dist_now) / window_dt
+
+            if norm_segments:
+                mean_nx = sum(vx for vx, _ in norm_segments) / float(len(norm_segments))
+                mean_ny = sum(vy for _, vy in norm_segments) / float(len(norm_segments))
+                heading_stability = max(0.0, min(1.0, math.sqrt((mean_nx * mean_nx) + (mean_ny * mean_ny))))
 
         speed_score = min(1.0, speed / 2.0)  # cap at 2 norm-units/sec
         approach_score = max(0.0, min(1.0, approach_rate / 1.0 + 0.5))
@@ -224,6 +245,8 @@ class ThreatScorer:
             heading_y=heading_y,
             persistence=persistence,
             approach_rate=approach_rate,
+            history_samples=history_samples,
+            heading_stability=heading_stability,
         )
 
     # ------------------------------------------------------------------ #
@@ -246,6 +269,20 @@ class ThreatScorer:
             self._history.pop(k, None)
             self._first_seen.pop(k, None)
             self._last_seen.pop(k, None)
+
+    def _recent_motion_window(
+        self,
+        history: List[Tuple[float, float, float]],
+        *,
+        max_points: int = 5,
+        max_span_s: float = 0.45,
+    ) -> List[Tuple[float, float, float]]:
+        if len(history) <= 2:
+            return list(history)
+        window = list(history[-max_points:])
+        while len(window) > 2 and (window[-1][0] - window[0][0]) > max_span_s:
+            window.pop(0)
+        return window
 
     # ------------------------------------------------------------------ #
     # ML model (optional)

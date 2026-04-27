@@ -17727,10 +17727,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         )
 
     def _sync_engine_pose_from_feedback(self) -> None:
-        # CHANGE WARNING: Precision aiming uses engine.current_pan/current_tilt as
-        # its live reference. Do not overwrite that reference with delayed bus-servo
-        # readback while a new commanded move is still in flight, or the precision
-        # loop will chase stale feedback and oscillate.
+        # Phase-1 note: commanded and measured pose are now separated in the
+        # engine, so fresh debug-board feedback should continuously refresh the
+        # live control pose even while a commanded move is still settling.
         feedback = self._comm.get_servo_feedback_snapshot()
         feedback_age = feedback.get("age_s")
         feedback_pan = feedback.get("pan_deg")
@@ -17740,17 +17739,6 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if float(feedback_age) > 1.0:
             return
         now = time.time()
-        commanded_pan = float(getattr(self, "_last_commanded_pan", feedback_pan))
-        commanded_tilt = float(getattr(self, "_last_commanded_tilt", feedback_tilt))
-        command_age_s = now - float(getattr(self, "_last_commanded_pose_time_s", 0.0) or 0.0)
-        move_time_s = max(0.0, float(getattr(self, "_last_commanded_move_time_ms", 0) or 0) / 1000.0)
-        settle_window_s = max(0.18, min(1.25, move_time_s + 0.18))
-        feedback_to_command_err = max(
-            abs(float(feedback_pan) - commanded_pan),
-            abs(float(feedback_tilt) - commanded_tilt),
-        )
-        if command_age_s < settle_window_s and feedback_to_command_err > 1.5:
-            return
         pan, tilt = self._clamp_manual_angles(float(feedback_pan), float(feedback_tilt))
         self.engine.update_runtime_pose(pan, tilt, measured=True, timestamp=now)
 

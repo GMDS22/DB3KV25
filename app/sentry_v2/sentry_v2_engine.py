@@ -1152,6 +1152,31 @@ class SentryV2Engine:
             scale = min(scale, 1.0)
         return scale
 
+    def _inflight_correction_scale(self, *, use_fire_limits: bool) -> float:
+        if use_fire_limits:
+            return 1.0
+        if not self._has_recent_measured_pose():
+            return 1.0
+
+        command_started_at = float(getattr(self, "_last_command_time", 0.0) or 0.0)
+        if command_started_at <= 0.0:
+            return 1.0
+
+        command_age_s = max(0.0, time.time() - command_started_at)
+        settle_window_s = self._command_settle_window_s(0.06)
+        if command_age_s >= settle_window_s:
+            return 1.0
+
+        remaining_pan = abs(float(self.current_pan) - float(self._last_commanded_pan))
+        remaining_tilt = abs(float(self.current_tilt) - float(self._last_commanded_tilt))
+        remaining_error = max(remaining_pan, remaining_tilt)
+        if remaining_error <= 0.85:
+            return 1.0
+
+        progress_scale = max(0.15, min(1.0, command_age_s / max(0.06, settle_window_s)))
+        remaining_scale = max(0.18, min(1.0, 1.0 - ((remaining_error - 0.85) / 3.25)))
+        return min(progress_scale, remaining_scale)
+
     def _safe_log_precision_frame(self, **kwargs: object) -> None:
         if not self._log_precision_tuning or self._precision_logging_faulted:
             return
@@ -1402,6 +1427,10 @@ class SentryV2Engine:
             return False
         min_persistence = max(0.05, float(getattr(eng, "predictive_min_persistence_s", 0.18) or 0.18))
         if float(target.persistence) < min_persistence:
+            return False
+        if int(getattr(target, "history_samples", 0) or 0) < 4:
+            return False
+        if float(getattr(target, "heading_stability", 0.0) or 0.0) < 0.60:
             return False
         return True
 
@@ -2145,6 +2174,7 @@ class SentryV2Engine:
         corr_tilt = eng.precision_kp * ctrl_tilt + eng.precision_ki * self._pid_integral_tilt + eng.precision_kd * d_tilt
 
         response_scale = self._engagement_response_scale(use_fire_limits=use_fire_limits)
+        response_scale *= self._inflight_correction_scale(use_fire_limits=use_fire_limits)
         corr_pan *= response_scale
         corr_tilt *= response_scale
 
