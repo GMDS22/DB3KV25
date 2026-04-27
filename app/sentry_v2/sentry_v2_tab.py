@@ -17760,6 +17760,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._last_commanded_pose_time_s = time.time()
         if move_time_ms is not None:
             self._last_commanded_move_time_ms = max(0, int(move_time_ms))
+        effective_move_time_ms = max(0, int(getattr(self, "_last_commanded_move_time_ms", 0) or 0))
+        self.engine.note_commanded_move(
+            float(pan),
+            float(tilt),
+            move_time_s=float(effective_move_time_ms) / 1000.0,
+            timestamp=float(self._last_commanded_pose_time_s),
+        )
 
     def _tracking_move_settle_window_s(self, move_time_ms: int) -> float:
         commanded_s = max(0.0, float(move_time_ms) / 1000.0)

@@ -81,6 +81,7 @@ class SentryV2Engine:
         self._last_commanded_pan: float = self.current_pan
         self._last_commanded_tilt: float = self.current_tilt
         self._last_command_time: float = 0.0
+        self._last_command_move_time_s: float = 0.0
         self._last_measured_pose_time: float = 0.0
 
         # Engagement queue
@@ -2363,9 +2364,30 @@ class SentryV2Engine:
         if measured:
             self._last_measured_pose_time = time.time() if timestamp is None else float(timestamp)
 
+    def note_commanded_move(
+        self,
+        pan: float,
+        tilt: float,
+        *,
+        move_time_s: float = 0.0,
+        timestamp: Optional[float] = None,
+    ) -> None:
+        pan, tilt = self._clamp_angles(pan, tilt)
+        self._last_commanded_pan = pan
+        self._last_commanded_tilt = tilt
+        self._last_command_time = time.time() if timestamp is None else float(timestamp)
+        self._last_command_move_time_s = max(0.0, float(move_time_s or 0.0))
+
+    def _command_settle_window_s(self, min_settle_s: float) -> float:
+        move_time_s = max(0.0, float(getattr(self, "_last_command_move_time_s", 0.0) or 0.0))
+        settle_from_move_s = max(0.09, min(0.42, (move_time_s * 0.82) + 0.03))
+        return max(float(min_settle_s), settle_from_move_s)
+
     def _acquire_phase_ready(self, now: float, min_settle_s: float) -> bool:
-        settle_s = max(0.0, float(min_settle_s))
-        if (now - float(self._last_command_time or 0.0)) < settle_s:
+        command_started_at = float(self._last_command_time or self._phase_start or now)
+        command_age_s = max(0.0, now - command_started_at)
+        settle_s = self._command_settle_window_s(min_settle_s)
+        if command_age_s < settle_s:
             return False
         if not self._has_recent_measured_pose(now):
             return True
@@ -2373,19 +2395,16 @@ class SentryV2Engine:
         remaining_tilt = abs(float(self.current_tilt) - float(self._last_commanded_tilt))
         if max(remaining_pan, remaining_tilt) <= 1.25:
             return True
-        return (now - float(self._last_command_time or 0.0)) >= min(0.48, max(0.18, settle_s + 0.12))
+        hard_timeout_s = max(settle_s, min(0.58, float(self._last_command_move_time_s or 0.0) + 0.08))
+        return command_age_s >= hard_timeout_s
 
     def _move_turret(self, pan: float, tilt: float) -> None:
         pan, tilt = self._clamp_angles(pan, tilt)
         if not self._motion_enabled:
             return
-        command_time = time.time()
-        self._last_commanded_pan = pan
-        self._last_commanded_tilt = tilt
-        self._last_command_time = command_time
         # When fresh measured pose is available, keep it as the live control
         # reference and treat this as a commanded move only.
-        if not self._has_recent_measured_pose(command_time):
+        if not self._has_recent_measured_pose():
             self.current_pan = pan
             self.current_tilt = tilt
         if self._cb_move:
