@@ -1,6 +1,24 @@
 ﻿{
     "updates":  [
                     {
+                        "version":  "3.5.0",
+                        "fix":  "Promoted the active desktop release to Smart Sentry v3.5.0 for the Nano Board USB + Debug Board USB topology, validated the new theme font-scale and settings-panel-width controls, and fixed graceful shutdown so LED, laser, ACC, and spare outputs are switched off and safety is locked before board disconnect.",
+                        "category":  "UI/Runtime",
+                        "date":  "2026-04-27",
+                        "issue":  "ISS-087",
+                        "title":  "Smart Sentry v3.5.0 Nano dual-USB release promotion and shutdown safety fix",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.0.0",
+                        "fix":  "Added Arduino Nano USB serial IO replacement firmware at arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR so the Smart Sentry dual-USB runtime can keep the desktop app unchanged while moving fire, LED PWM auto-lighting, PIR telemetry, trigger-servo runtime tuning, and buzzer cues to a Nano board over USB serial.",
+                        "category":  "Firmware",
+                        "date":  "2026-04-27",
+                        "issue":  "ISS-086",
+                        "title":  "Nano USB IO board replacement added for Smart Sentry dual-USB runtime",
+                        "status":  "Worked"
+                    },
+                    {
                         "version":  "3.0.0",
                         "fix":  "Added import html and import ultralytics.models to run.py pre-imports; fixed _emit_yolo_runtime_diagnostics early-return guard to allow prepare-ok through (stage not in prepare-ok/prepare-failed instead of stage != prepare-failed). ultralytics.models forces SAM→torchvision→html chain on main thread; emit guard fix makes YOLO success visible in log.",
                         "category":  "Build",

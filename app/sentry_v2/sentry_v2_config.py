@@ -182,6 +182,10 @@ class EngagementConfig:
     auto_trigger_enabled: bool = False
     # --- Trigger mode (False = Water/MOSFET, True = Projectile/BB Servo) ---
     trigger_mode_bb: bool = False
+    # Water/MOSFET trigger tuning pushed to the IO firmware at runtime.
+    trigger_mosfet_pulse_ms: int = 120
+    trigger_mosfet_cycle_count: int = 1
+    trigger_mosfet_cycle_off_ms: int = 50
     # Projectile trigger-servo tuning pushed to the ESP32 at runtime.
     trigger_servo_rest_deg: int = 0
     trigger_servo_fire_deg: int = 45
@@ -469,7 +473,7 @@ class LightingConfig:
     """Automated LED brightness control settings."""
     auto_lighting_enabled: bool = False
     led_pwm_value: int = 255
-    auto_brightness_threshold: int = 80
+    auto_brightness_threshold: int = 140
     auto_pwm_min: int = 60
     auto_pwm_max: int = 255
     auto_sample_interval_frames: int = 8
@@ -553,14 +557,14 @@ class ConnectionConfig:
     """Connection settings for SMART SENTRY V3.
 
     Modes:
-        0  ESP32 USB only               (single COM)
-        1  ESP32 USB + Debug Board USB  (2 COM ports)
+        0  Arduino Nano USB IO only     (single COM; legacy ESP32 serial also supported)
+        1  Arduino Nano + Debug Board   (2 COM ports; Nano IO + Debug Board USB)
         2  ESP32 WiFi + Debug Board USB (1 COM + UDP)
         3  ESP32 WiFi (fully wireless)  (UDP only)
         4  Dual ESP32 WiFi              (2 UDP endpoints)
     """
     connection_type: int = 3
-    # ESP32 serial (modes 0, 1)
+    # Primary USB IO board serial (modes 0, 1) — legacy ESP32 or Nano replacement
     esp32_port: str = ""
     esp32_baud: int = 115200
     # Debug board serial (modes 1, 2)

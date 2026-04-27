@@ -34,7 +34,7 @@ SOUND_PERSONALITY_PROFILES: dict[str, SoundPersonalityProfile] = {
 
 
 class SentryV2SoundEngine:
-    """Non-blocking procedural tone scheduler for ESP32 buzzer playback."""
+    """Non-blocking procedural tone scheduler for Smart Sentry board-buzzer playback."""
 
     def __init__(self, send_tone: Callable[[int, int], None]):
         self._send_tone = send_tone

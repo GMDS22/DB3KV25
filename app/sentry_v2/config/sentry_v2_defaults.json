@@ -33,6 +33,9 @@
     "optimize_slew_order": true,
     "return_delay": 1.5,
     "engagement_speed": 80,
+    "trigger_mosfet_pulse_ms": 120,
+    "trigger_mosfet_cycle_count": 1,
+    "trigger_mosfet_cycle_off_ms": 50,
     "trigger_servo_rest_deg": 0,
     "trigger_servo_fire_deg": 45,
     "trigger_servo_speed_dps": 360
@@ -48,6 +51,14 @@
   "pir_guard": {
     "pir_enabled": false,
     "pir_event_blink_enabled": false
+  },
+  "lighting": {
+    "auto_lighting_enabled": false,
+    "led_pwm_value": 255,
+    "auto_brightness_threshold": 140,
+    "auto_pwm_min": 60,
+    "auto_pwm_max": 255,
+    "auto_sample_interval_frames": 8
   },
   "sound": {
     "enabled": true,

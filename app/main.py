@@ -253,9 +253,9 @@ _EXIT_OVERLAY_H = 200
 
 _EXIT_STATUS_STEPS = [
     (0,    "Closing camera feed",                 8),
-    (500,  "Returning turret to rest position",   28),
-    (1800, "Disconnecting from boards",           72),
-    (2250, "Turning off accessories",             92),
+    (450,  "Turning off accessories",             30),
+    (1050, "Returning turret to rest position",   58),
+    (1800, "Disconnecting from boards",           86),
 ]
 _EXIT_DOTS_INTERVAL_MS = 380
 _EXIT_BAR_TICK_MS = 40

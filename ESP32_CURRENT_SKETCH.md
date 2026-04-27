@@ -16,10 +16,11 @@ For the current Smart Sentry desktop app, treat the ESP32 WiFi plus Debug Board 
 
 ## Current Required Sketches
 
-1. USB Serial IO / Dual-Port IO (ESP32 handles fire/safety/relays over USB serial)
-- Current sketch: [arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino](arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino)
-- Why: Includes IO telemetry plus PIR event support and current command-token compatibility.
-- Used with: Smart Sentry v2 connection modes where ESP32 IO is on serial tokens.
+1. USB Serial IO / Dual-Port IO (debug board still owns pan/tilt)
+- Current ESP32 sketch: [arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino](arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino)
+- New Nano replacement sketch: [arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino](arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino)
+- Why: Both sketches satisfy the current serial IO contract for Smart Sentry's dual-USB mode, while the Nano variant replaces only the USB accessory board and keeps the existing desktop transport logic unchanged.
+- Used with: Smart Sentry v2 connection modes where the IO board is on serial tokens and the Debug Board remains on its own USB link.
 
 2. Full WiFi UDP Runtime (ESP32 receives motion + IO over UDP JSON)
 - Current sketch: [arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino](arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino)
@@ -67,6 +68,10 @@ From repository root:
 
 # USB Serial IO + PIR sketch
 .\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino"
+
+# Arduino Nano USB Serial IO + PIR sketch
+.\tools\arduino-cli\arduino-cli.exe compile --fqbn arduino:avr:nano "arduino\SMART_SENTRY_V3_0_NANO_USB_IO_PIR"
+.\tools\arduino-cli\arduino-cli.exe upload -p COM5 --fqbn arduino:avr:nano "arduino\SMART_SENTRY_V3_0_NANO_USB_IO_PIR"
 
 # Yahboom Servo Driver UDP sketch (secondary ESP32)
 .\tools\flash_esp32_udp.ps1 -Port COM6 -Sketch "arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino"

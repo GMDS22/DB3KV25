@@ -47,9 +47,9 @@ This document defines the intended **portable-only** surface for Smart Sentry v2
 
 This is the only supported source-side and operator-facing portable-release model folder. Do not mirror models into app/models/ or app/YOLO_MODELS/.
 
-For the packaged release, keep the public drop location at the release root as `F:\SMART SENTRY V2.3.1\YOLO_MODELS`. Bundled fallback weights may also exist under `SMART_SENTRY_V2_3_1_FILES\YOLO_MODELS`, but that support-folder copy is not the operator-facing drop target.
+For the packaged release, keep the public drop location at the release root as `F:\SMART SENTRY V3.5.0\YOLO_MODELS`. Bundled fallback weights may also exist under `SMART_SENTRY_V3_5_0_FILES\YOLO_MODELS`, but that support-folder copy is not the operator-facing drop target.
 
-Use Python 3.11 in `F:\SMART SENTRY V2\.venv311` as the standard packaging interpreter. Do not treat `.venv` or a system 3.12 install as the default release environment.
+Use the interpreter selected by the build helper in this order: `SMART_SENTRY_PYTHON_EXE`, then parent or repo `.venv311`, then parent or repo `.venv`.
 
 ## Required dependency manifest
 

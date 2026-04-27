@@ -124,7 +124,7 @@ Config fields (stored in `config.lighting`):
 |---|---|---|
 | `auto_lighting_enabled` | `False` | Master toggle |
 | `led_pwm_value` | `255` | Manual PWM when auto is off |
-| `auto_brightness_threshold` | `80` | Luma value (0-255) below which LED activates |
+| `auto_brightness_threshold` | `140` | Luma value (0-255) below which LED activates |
 | `auto_pwm_min` | `60` | Minimum PWM when scene is just below threshold |
 | `auto_pwm_max` | `255` | Maximum PWM when scene is near black |
 | `auto_sample_interval_frames` | `8` | Frame interval between luminance samples |
@@ -158,9 +158,9 @@ Config fields (stored in `config.lighting`):
 - [ ] `ACCESSORY_PWM_ENABLED 1` compiled and flashed
 - [ ] Oscilloscope confirms 5 kHz PWM on GPIO32 at varying duty
 - [ ] App LED button ON + auto OFF → slider drives PWM correctly
-- [ ] App LED button ON + auto ON, cover camera → PWM ramps to max
-- [ ] App LED button ON + auto ON, point at bright source → PWM drops to 0
-- [ ] App LED button OFF → PWM always 0 regardless of auto flag
+- [ ] App auto ON, cover camera → PWM ramps to max even if the manual LED button is OFF
+- [ ] App auto ON, point at bright source → PWM drops to 0
+- [ ] App auto OFF + LED button OFF → PWM stays at 0
 - [ ] `Ctrl+Alt+L` toggles feature; video chip bar mirrors Controls tab checkbox
 - [ ] Settings survive app restart (check `config.lighting` in JSON)
 - [ ] DB3000 FlySky variant behaves identically

@@ -12,6 +12,8 @@ Use this file first whenever:
 
 This file is intentionally written as a behavioral spec, not just a feature summary. It describes the intended runtime logic, the real code ownership points, and the places where careless edits commonly cause regressions.
 
+Future-design note: proposed next-version tracking and scene-memory work lives in `SMART_SENTRY_VNEXT_TRACKING_AND_SCENE_MEMORY_PROPOSAL.md`. Do not treat that file as active runtime behavior until the implementation is complete and this blueprint is updated to match.
+
 ---
 
 ## 1. Primary Runtime Rule

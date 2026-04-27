@@ -1,11 +1,13 @@
 # SMART SENTRY V2 — COMPLETE REFERENCE MANUAL
 
-> **Version:** 3.0.0  
+> **Version:** 3.5.0  
 > **Module Path:** `app/sentry_v2/`  
-> **Last Updated:** 2026-04-09  
-> **Status:** Verified against the current standalone Smart Sentry release candidate for v3.0.0. The canonical runtime settings file is `app/config/smart_sentry_v3_0_0_settings.json`; older settings paths remain compatibility fallbacks only. The full settings system still defines 13 tabs, but `Facial Recognition` and `AI Assistant` are temporarily hidden by release hold for v3.0.0 and can be restored quickly by removing their hold entries.
+> **Last Updated:** 2026-04-27  
+> **Status:** Verified against the current standalone Smart Sentry v3.5.0 release candidate. The canonical runtime settings file is `app/config/smart_sentry_v3_5_0_settings.json`; older settings paths remain compatibility fallbacks only. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`, and the full settings system still defines 13 tabs while `Facial Recognition` and `AI Assistant` remain temporarily hidden by release hold for the active release line.
 
 Primary behavior-contract note: for the current authoritative tracking, PIR, target-loss, center-aim, and fire-gating blueprint, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md` first before changing engine or preset behavior.
+
+Future-design note: for the proposed next-version tracking, overshoot-reduction, and scene-memory behavior work that is not live yet, read `SMART_SENTRY_VNEXT_TRACKING_AND_SCENE_MEMORY_PROPOSAL.md`.
 
 ---
 
@@ -35,7 +37,7 @@ Primary behavior-contract note: for the current authoritative tracking, PIR, tar
 
 Smart Sentry v2 is a standalone turret control application launched from the DB3000 launcher. Its **detection logic**, **serial/UDP communication**, **camera ownership**, and **state machine** are self-contained inside `app/sentry_v2/`.
 
-Pinned firmware note: the current live app contract uses the ESP32 WiFi + Debug Board USB path with `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` as the active WiFi firmware. Waveshare single-board firmware files remain in the repo for archived bench work only and are not part of the current app.
+Pinned firmware note: the current live app contract uses the Arduino Nano USB IO + Debug Board USB path with `arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino` as the active IO firmware. Waveshare single-board firmware files remain in the repo for archived bench work only and are not part of the current app.
 
 - **Standalone camera ownership:** Smart Sentry opens and owns its own camera or stream source
 - **Separate runtime settings:** Smart Sentry persists to `app/config/smart_sentry_v3_0_0_settings.json` and accepts older files only as migration fallbacks
@@ -198,7 +200,7 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 
 **Verified current shortcut note:** the top-row `Quick Keys` button and the Shortcut Keys tab both point operators to `SMART_SENTRY_SHORTCUT_KEYS.md`, and the live shortcut runtime stays window-focused so hotkeys only fire while the Smart Sentry window is active.
 
-**Verified current auto lighting note:** the Controls tab includes an Auto Lighting Control group. When enabled (`Ctrl+Alt+L` or the checkbox in Controls or the video chip bar), the camera loop samples scene luminance every N frames and adjusts LED PWM: LED ramps toward `auto_pwm_max` as the scene darkens below `auto_brightness_threshold`, and turns off when bright. The LED button is the master on/off gate — auto lighting only acts while the button is ON. Manual LED PWM (`led_pwm_value`) is used when the LED is ON but auto mode is off. Full PWM dimming requires ESP32 firmware `ACCESSORY_PWM_ENABLED 1`; with relay hardware (`ACCESSORY_PWM_ENABLED 0`) the LED still auto-switches ON/OFF but does not dim. All `LightingConfig` fields are persisted to the settings JSON.
+**Verified current auto lighting note:** the Controls tab includes an Auto Lighting Control group. When enabled (`Ctrl+Alt+L` or the checkbox in Controls or the video chip bar), the camera loop samples scene luminance every N frames and adjusts LED PWM: LED ramps toward `auto_pwm_max` as the scene darkens below `auto_brightness_threshold`, and turns off when bright. In auto mode the app owns the LED output directly, so dim scenes can turn the LED on automatically even if the manual LED button is off. Manual LED PWM (`led_pwm_value`) is used only when auto mode is off and the LED button is ON. Full PWM dimming requires ESP32 firmware `ACCESSORY_PWM_ENABLED 1`; with relay hardware (`ACCESSORY_PWM_ENABLED 0`) the LED still auto-switches ON/OFF but does not dim. All `LightingConfig` fields are persisted to the settings JSON.
 
 **Verified current WiFi adapter note:** the Connection tab WiFi UDP panel includes a `WiFi Adapter` dropdown that lists all Windows WiFi interfaces detected via `netsh`. Setting it to a dedicated USB dongle (e.g. `SMART SENTRY CON`) locks the auto-reconnect watchdog to that adapter for all `netsh wlan connect` calls, preventing the app from accidentally joining the ESP32 SSID on the wrong adapter. The selection is saved to `ConnectionConfig.wifi_interface`.
 
@@ -862,6 +864,9 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 | `engagement_speed` | `int` | 80 | Servo speed multiplier |
 | `auto_trigger_enabled` | `bool` | False | Enable automatic firing |
 | `trigger_mode_bb` | `bool` | False | False=Water/MOSFET path, True=Projectile/ESP32 GPIO13 trigger-servo path on the current DB3000 ESP32 contract |
+| `trigger_mosfet_pulse_ms` | `int` | 120 | Water/MOSFET ON time for each fire pulse |
+| `trigger_mosfet_cycle_count` | `int` | 1 | Number of water-mode ON pulses to run for one fire request |
+| `trigger_mosfet_cycle_off_ms` | `int` | 50 | OFF gap between water-mode MOSFET pulses |
 | `precision_aim_enabled` | `bool` | True | Enable PID refinement |
 | `precision_settle_time` | `float` | 0.5 | Max PID refinement duration |
 | `precision_kp` | `float` | 0.02 | PID proportional gain |
@@ -1160,6 +1165,8 @@ Notes:
 
 - `M0` and `M1` select which trigger output semantics the IO firmware should use. They do not change target selection, centering, or fire-gate logic in the engine.
 - On the current Smart Sentry app path, `M0` means the water/MOSFET output and `M1` means the projectile trigger-servo path on ESP32 GPIO13.
+- On the Nano USB IO serial path, water/MOSFET runtime tuning uses `J` = pulse ON ms, `K` = cycles per fire request, and `N` = OFF gap ms. Projectile runtime tuning uses `U` = rest deg, `V` = fire deg, and `H` = speed deg/s. In ESP32 WiFi bridge modes, support depends on the active firmware build.
+- Manual fire now starts one configured water-mode MOSFET pulse train per press when `M0` is active, and one projectile trigger-servo pulse per press when `M1` is active.
 - Archived Waveshare single-board bridge material is different and may intentionally leave trigger-servo PWM unassigned. Do not assume `M1` implies a live projectile output on archived Waveshare-only docs or bench paths.
 
 ### Bus Servo Packet Format
@@ -1588,6 +1595,12 @@ Smart Sentry documentation is intentionally split into three layers so future ch
    - what the setting controls
    - valid range or allowed values when applicable
    - what increasing or decreasing the value does when that concept applies
+
+### Proposal Docs
+
+- File: `SMART_SENTRY_VNEXT_TRACKING_AND_SCENE_MEMORY_PROPOSAL.md`
+- Purpose: proposed future tracking and behavior work that is not yet the live runtime contract
+- Update when planning a verified future behavior change before the implementation is promoted into the blueprint and manual
 
 This split keeps the manual stable, the issue log concise, and the tooltip text maintainable.
 

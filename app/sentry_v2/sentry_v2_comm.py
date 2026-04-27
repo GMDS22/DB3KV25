@@ -1,19 +1,21 @@
 """
 SMART SENTRY V3 — Standalone Communication
 
-Handles direct serial (USB COM) and UDP (WiFi) communication with the ESP32
-and optional Debug Board, independent of the main application's serial pipeline.
+Handles direct serial (USB COM) and UDP (WiFi) communication with the ESP32,
+Arduino Nano USB IO replacement, and optional Debug Board, independent of the
+main application's serial pipeline.
 
 Connection Modes:
-    0  ESP32 USB only         → full ASCII protocol on one COM port
-    1  ESP32 USB + Debug Board USB  → bus servo pan/tilt on Debug Board COM,
-                                      IO tokens on ESP32 COM  (2 USB cables)
+    0  Arduino Nano USB IO only       → full ASCII protocol on one COM port
+    1  Arduino Nano USB + Debug Board USB  → bus servo pan/tilt on Debug Board COM,
+                                              IO tokens on the Nano USB COM port
+                                              (2 USB cables)
     2  ESP32 WiFi + Debug Board USB → bus servo pan/tilt on Debug Board COM,
                                       IO tokens over UDP       (1 USB cable)
     3  ESP32 WiFi + Debug Board on ESP32 UART2 → full ASCII protocol over UDP
                                                  (no runtime USB)
 
-ESP32 ASCII protocol: ``P{pan}T{tilt}F{fire}L{led}R{laser}G{acc}A{spare}S{safety}M{mode}\n``
+USB IO ASCII protocol: ``P{pan}T{tilt}F{fire}L{led}R{laser}G{acc}A{spare}S{safety}M{mode}\n``
 Bus servo protocol:    Yahboom-style register write (0xFF 0xFF ID LEN INST REG …)
 """
 
@@ -40,7 +42,7 @@ from .sentry_v2_config import (
 
 
 class SentryV2Comm:
-    """Self-contained ESP32 + Debug Board communication for SMART SENTRY V3."""
+    """Self-contained USB IO board + Debug Board communication for SMART SENTRY V3."""
 
     PAN_OUTPUT_MIN = SENTRY_PAN_MIN
     PAN_OUTPUT_MAX = SENTRY_PAN_MAX
@@ -48,15 +50,17 @@ class SentryV2Comm:
     TILT_OUTPUT_MAX = SENTRY_TILT_MAX
 
     # --- Connection mode constants ---
-    MODE_ESP32_USB = 0           # Single USB — full ASCII to ESP32
-    MODE_DUAL_USB = 1            # Debug Board USB (pan/tilt) + ESP32 USB (IO)
+    SERIAL_IO_LABEL = "USB IO Board"
+
+    MODE_ESP32_USB = 0           # Single USB — full ASCII to the serial IO board
+    MODE_DUAL_USB = 1            # Debug Board USB (pan/tilt) + USB IO board (IO)
     MODE_WIFI_DEBUG_USB = 2      # Debug Board USB (pan/tilt) + ESP32 WiFi (IO)
     MODE_WIFI_FULL = 3           # Everything over WiFi (debug board on ESP32)
     MODE_DUAL_ESP32_WIFI = 4     # Dual ESP32 WiFi (servos + IO separate)
 
     MODE_LABELS = [
-        "ESP32 USB",
-        "ESP32 USB + Debug Board USB",
+        "Arduino Nano USB IO Board",
+        "Arduino Nano USB + Debug Board USB",
         "ESP32 WiFi + Debug Board USB",
         "ESP32 WiFi + Debug Board on ESP32 UART",
         "Dual ESP32 WiFi",
@@ -86,7 +90,7 @@ class SentryV2Comm:
         return port_text
 
     def __init__(self) -> None:
-        # Primary ESP32 serial (modes 0, 1)
+        # Primary serial IO board (modes 0, 1) — ESP32 or Nano replacement
         self._ser: Optional[_serial.Serial] = None
         # Debug board serial (modes 1, 2)
         self._bus_ser: Optional[_serial.Serial] = None
@@ -108,6 +112,9 @@ class SentryV2Comm:
         self.spare_on: bool = False        # GPIO 26 spare relay
         self.safety_armed: bool = False   # False=LOCKED (S1), True=ARMED (S0)
         self.trigger_mode_bb: bool = False  # False=Water M0, True=BB M1
+        self.trigger_mosfet_pulse_ms: int = 120
+        self.trigger_mosfet_cycle_count: int = 1
+        self.trigger_mosfet_cycle_off_ms: int = 50
         self.trigger_servo_rest_deg: int = 0
         self.trigger_servo_fire_deg: int = 45
         self.trigger_servo_speed_dps: int = 360
@@ -682,7 +689,7 @@ class SentryV2Comm:
         try:
             if self._mode == self.MODE_ESP32_USB:
                 ok = self._open_serial(esp32_port, esp32_baud, primary=True)
-                self._connect_details["ESP32 USB"] = (ok, esp32_port if ok else self._last_error)
+                self._connect_details[self.SERIAL_IO_LABEL] = (ok, esp32_port if ok else self._last_error)
                 if ok:
                     self._start_receiver()
                 return ok
@@ -713,19 +720,19 @@ class SentryV2Comm:
 
                 if esp_disabled:
                     ok_esp = False
-                    esp_err = "ESP32 link skipped (blank or same as Debug Board COM port)"
-                    self._connect_details["ESP32 USB"] = (False, esp_err)
+                    esp_err = "USB IO link skipped (blank or same as Debug Board COM port)"
+                    self._connect_details[self.SERIAL_IO_LABEL] = (False, esp_err)
                 else:
                     ok_esp = self._open_serial(esp32_port, esp32_baud, primary=True)
                     esp_err = self._last_error
-                    self._connect_details["ESP32 USB"] = (ok_esp, esp32_port if ok_esp else esp_err)
+                    self._connect_details[self.SERIAL_IO_LABEL] = (ok_esp, esp32_port if ok_esp else esp_err)
 
                 if not ok_bus and not ok_esp and not esp_disabled:
-                    self._last_error = f"Both failed — Debug: {bus_err} | ESP32: {esp_err}"
+                    self._last_error = f"Both failed — Debug: {bus_err} | IO board: {esp_err}"
                 elif not ok_bus:
                     self._last_error = f"Debug board failed: {bus_err}"
                 elif not ok_esp and not esp_disabled:
-                    self._last_error = f"ESP32 failed: {esp_err}"
+                    self._last_error = f"USB IO board failed: {esp_err}"
                 if ok_esp:
                     self._start_receiver()
                 return ok_bus and (ok_esp or esp_disabled)
@@ -1162,7 +1169,7 @@ class SentryV2Comm:
             return f"Sound link standby: ESP32 WiFi {udp_target[0]}:{udp_target[1]} send path ready"
         if self.can_send_sound():
             if m in (self.MODE_ESP32_USB, self.MODE_DUAL_USB):
-                return "Sound link ready: ESP32 serial"
+                return "Sound link ready: USB IO serial"
             if self._udp_target is not None:
                 return f"Sound link ready: ESP32 WiFi {self._udp_target[0]}:{self._udp_target[1]}"
             return "Sound link ready"
@@ -1193,9 +1200,9 @@ class SentryV2Comm:
             return "Disconnected"
         m = self._mode
         if m == self.MODE_ESP32_USB:
-            return f"ESP32 USB: {self._ser.port} @ {self._ser.baudrate}"
+            return f"USB IO: {self._ser.port} @ {self._ser.baudrate}"
         elif m == self.MODE_DUAL_USB:
-            return f"ESP32: {self._ser.port} | Debug: {self._bus_ser.port}"
+            return f"USB IO: {self._ser.port} | Debug: {self._bus_ser.port}"
         elif m == self.MODE_WIFI_DEBUG_USB:
             if self._udp_target is not None:
                 return f"WiFi: {self._udp_target[0]}:{self._udp_target[1]} | Debug: {self._bus_ser.port}"
@@ -1289,9 +1296,9 @@ class SentryV2Comm:
                 ser = self._ser
             try:
                 if ser is None or not ser.is_open:
-                    self._last_error = "ESP32 serial sound transport unavailable"
+                    self._last_error = "USB IO serial sound transport unavailable"
                     return False
-                cmd = f"SOUND:{freq}:{duration}\n"
+                cmd = f"SOUND:{freq}:{duration}:{volume}\n"
                 ser.write(cmd.encode("utf-8"))
                 self._last_cmd = cmd.rstrip()
                 self._last_error = ""
@@ -1529,7 +1536,7 @@ class SentryV2Comm:
     def _handle_serial_line(self, line: str) -> None:
         if not line:
             return
-        self._emit_transport_log(f"ESP32 USB RX {line}")
+        self._emit_transport_log(f"USB IO RX {line}")
         match = re.search(r"PIR_EVENT\s+sensor_id=(\d+)\s+timestamp=(\d+)", line, re.IGNORECASE)
         if not match:
             match = re.search(r"\[PIR\]\s*Sensor\s+(\d+)\s+triggered\b.*?\bt=(\d+)", line, re.IGNORECASE)
@@ -1689,16 +1696,39 @@ class SentryV2Comm:
         self.safety_armed = armed
         return self.send_command(pan, tilt)
 
+    def send_shutdown_state(self, pan: float, tilt: float) -> bool:
+        """Send a final safe outputs-off state before disconnecting transport."""
+        self.led_pwm = 0
+        self.laser_on = False
+        self.acc_on = False
+        self.spare_on = False
+        self.safety_armed = False
+
+        pan_out, tilt_out = self._normalize_output_angles(pan, tilt)
+        m = self._mode
+        if m == self.MODE_ESP32_USB:
+            return self._send_ascii(pan_out, tilt_out, fire=0, via_serial=True)
+        if m == self.MODE_DUAL_USB:
+            return self._send_io_serial(0)
+        if m == self.MODE_WIFI_DEBUG_USB:
+            return self._send_io_udp(0)
+        if m == self.MODE_WIFI_FULL:
+            return self._send_wifi_full(pan_out, tilt_out, fire=0)
+        if m == self.MODE_DUAL_ESP32_WIFI:
+            return self._send_io_udp(0)
+        return False
+
     def send_trigger_runtime_config(self) -> bool:
         m = self._mode
         if m in (self.MODE_ESP32_USB, self.MODE_DUAL_USB):
             return self._send_trigger_runtime_config_serial()
-        if not self._bridge_optional_feature_supported("trigger_servo_assigned"):
-            return self._bridge_optional_feature_noop("trigger_servo_assigned", "Trigger runtime config")
         payload: Dict[str, Any] = {
             "action": "config",
             "trigger": {
                 "mode": 1 if self.trigger_mode_bb else 0,
+                "mosfet_pulse_ms": int(max(10, min(2000, int(self.trigger_mosfet_pulse_ms)))),
+                "mosfet_cycle_count": int(max(1, min(20, int(self.trigger_mosfet_cycle_count)))),
+                "mosfet_cycle_off_ms": int(max(10, min(2000, int(self.trigger_mosfet_cycle_off_ms)))),
                 "servo_rest_deg": int(max(0, min(180, int(self.trigger_servo_rest_deg)))),
                 "servo_fire_deg": int(max(0, min(180, int(self.trigger_servo_fire_deg)))),
                 "servo_speed_dps": int(max(10, min(5000, int(self.trigger_servo_speed_dps)))),
@@ -1743,15 +1773,24 @@ class SentryV2Comm:
         try:
             if ser is None or not ser.is_open:
                 return False
+            pulse_ms = int(max(10, min(2000, int(self.trigger_mosfet_pulse_ms))))
+            cycle_count = int(max(1, min(20, int(self.trigger_mosfet_cycle_count))))
+            cycle_off_ms = int(max(10, min(2000, int(self.trigger_mosfet_cycle_off_ms))))
             rest_deg = int(max(0, min(180, int(self.trigger_servo_rest_deg))))
             fire_deg = int(max(rest_deg, min(180, int(self.trigger_servo_fire_deg))))
             speed_dps = int(max(10, min(5000, int(self.trigger_servo_speed_dps))))
             pir_blink = 1 if self.pir_event_blink_enabled else 0
+            ser.write(f"J{pulse_ms}\n".encode("utf-8"))
+            ser.write(f"K{cycle_count}\n".encode("utf-8"))
+            ser.write(f"N{cycle_off_ms}\n".encode("utf-8"))
             ser.write(f"U{rest_deg}\n".encode("utf-8"))
             ser.write(f"V{fire_deg}\n".encode("utf-8"))
             ser.write(f"H{speed_dps}\n".encode("utf-8"))
             ser.write(f"B{pir_blink}\n".encode("utf-8"))
-            self._last_cmd = f"SER CFG U{rest_deg} V{fire_deg} H{speed_dps} B{pir_blink}"
+            self._last_cmd = (
+                f"SER CFG J{pulse_ms} K{cycle_count} N{cycle_off_ms} "
+                f"U{rest_deg} V{fire_deg} H{speed_dps} B{pir_blink}"
+            )
             self._last_error = ""
             return True
         except Exception as e:
@@ -2141,9 +2180,12 @@ class SentryV2Comm:
             ser.write(f"S{io['safety']}\n".encode("utf-8"))
             ser.write(f"M{io['mode']}\n".encode("utf-8"))
             ser.write(
-                f"F{io['fire']}L{io['led']}R{io['laser']}G0\n".encode("utf-8")
+                f"F{io['fire']}L{io['led']}R{io['laser']}G{io['acc']}A{io['spare']}\n".encode("utf-8")
             )
-            self._last_cmd += f" | IO F{io['fire']}L{io['led']}R{io['laser']}"
+            self._last_cmd += (
+                f" | IO F{io['fire']}L{io['led']}R{io['laser']}"
+                f"G{io['acc']}A{io['spare']}"
+            )
             return True
         except Exception as e:
             self._last_error = str(e)

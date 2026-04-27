@@ -40,5 +40,5 @@ Smart Sentry keyboard shortcuts are window-focused. They only fire while the Sma
 - The top-row `Quick Keys` button opens this document without changing the header layout.
 - Manual movement shortcuts respect the same motion limits as the on-screen controls.
 - `Space` uses the same safety and trigger path as the on-screen `FIRE` button.
-- `Ctrl+Alt+L` toggles Auto Lighting. The LED button must also be ON for auto lighting to drive LED PWM.
+- `Ctrl+Alt+L` toggles Auto Lighting. When auto lighting is ON it drives LED PWM directly from scene brightness; the LED button is only the manual LED toggle when auto mode is OFF.
 - Friendly face recognition, AI Assistant commands, and preview overlays do not require shortcuts, but this key map is intended to keep the common setup and control actions reachable without leaving the video view.

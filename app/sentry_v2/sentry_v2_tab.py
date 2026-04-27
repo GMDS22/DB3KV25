@@ -306,8 +306,8 @@ SMART_SENTRY_V2_WIFI_SSID = "SMART-SENTRY-V2.3"
 SMART_SENTRY_V2_WIFI_PASSWORD = "db3000pass"
 SMART_SENTRY_V3_WIFI_SSID = "SMART-SENTRY-V3"
 SMART_SENTRY_V3_WIFI_PASSWORD = "smartv3pass"
-SMART_SENTRY_RELEASE_TITLE = get_app_title("Smart Sentry")
-SMART_SENTRY_RELEASE_SUBTITLE = "ESP32 WiFi + USB Control"
+SMART_SENTRY_RELEASE_TITLE = get_app_title("SMART SENTRY")
+SMART_SENTRY_RELEASE_SUBTITLE = "NANO BOARD USB + DEBUG BOARD USB"
 SMART_SENTRY_RELEASE_BADGE = ""
 
 
@@ -476,12 +476,27 @@ def _build_pin_assignment_dialog_content(mode_index: int, tokens: Dict[str, str]
     text = "".join([
         f"<div style='font-size:13px; line-height:1.4; color:{body_color};'>",
         f"<div style='font-weight:700; color:{heading_color}; margin-bottom:8px;'>Current connection mode</div>",
-        f"<div style='margin-bottom:8px; color:{body_color};'>This mode is USB-centered, so the key assignments live on the selected COM ports rather than on a WiFi bridge header map.</div>",
+        f"<div style='margin-bottom:8px; color:{body_color};'>This mode is USB-centered, so the key assignments live on the selected COM ports rather than on a WiFi bridge header map. The primary USB IO link may be either the legacy ESP32 USB board or the Arduino Nano USB replacement.</div>",
         table(
-            row("ESP32 USB", "Primary ASCII IO link when using direct USB"),
+            row("Arduino Nano USB", "Primary ASCII IO link when using the Nano replacement path"),
             row("Debug Board USB", "Pan/Tilt bus-servo motion path in dual-USB layouts"),
         ),
-        section("Complete ESP32 accessory map (all modes)"),
+        section("Nano USB replacement pin map"),
+        table(
+            row("D4", "Buzzer tone output"),
+            row("D5", "LED PWM output"),
+            row("D6", "Laser output"),
+            row("D7", "Accessory relay output"),
+            row("D8", "Trigger MOSFET output"),
+            row("D9", "Trigger servo PWM"),
+            row("A3", "Spare relay output"),
+            row("A0", "PIR sensor 0 input"),
+            row("A1", "PIR sensor 1 input"),
+            row("A2", "PIR sensor 2 input"),
+            row("D13", "Status blink LED"),
+        ),
+        f"<div style='color:{note_color}; margin:-2px 0 8px 0;'>Classic Nano note: PIR inputs require idle-LOW modules or external pulldown resistors because the ATmega328P does not provide internal pulldown mode.</div>",
+        section("Legacy ESP32 USB IO board map"),
         table(
             row("GPIO2", "Status LED"),
             row("GPIO4", "Buzzer"),
@@ -495,7 +510,7 @@ def _build_pin_assignment_dialog_content(mode_index: int, tokens: Dict[str, str]
             row("GPIO34", "PIR S2 — front zone"),
             row("GPIO39 (VN)", "PIR S3 — left zone"),
         ),
-        f"<div style='color:{note_color}; margin-top:8px;'>Switch to a WiFi mode to see the full sectioned pin map. Active PIR wiring: S1/GPIO35, S2/GPIO34, S3/GPIO39.</div>",
+        f"<div style='color:{note_color}; margin-top:8px;'>Switch to a WiFi mode to see the full sectioned ESP32 bridge map. For the Nano replacement path, use the Arduino Nano USB + Debug Board USB connection mode.</div>",
         "</div>",
     ])
     return title, text
@@ -3018,6 +3033,50 @@ THEME_PRESETS = {
         "tooltip_bg": "#ffffff",
         "tooltip_text": "#22313c",
     },
+    "aurora": {
+        "label": "Aurora Grid",
+        "description": "Cold cyan with lime telemetry accents for a sharper surveillance-console look.",
+        "is_light": False,
+        "root_bg": "#0b1214",
+        "surface": "#101b1f",
+        "surface_alt": "#0d171a",
+        "panel": "#0a1316",
+        "field": "#081014",
+        "border": "#2f5c5f",
+        "text": "#eaf7f7",
+        "muted": "#bed7d8",
+        "accent": "#49d7d1",
+        "accent_soft": "#2fb8b2",
+        "hero_start": "#123137",
+        "hero_mid": "#17464e",
+        "hero_end": "#1f6b71",
+        "video_bg": "#071013",
+        "video_text": "#8db2b5",
+        "tooltip_bg": "#d8f7f5",
+        "tooltip_text": "#123235",
+    },
+    "obsidian_gold": {
+        "label": "Obsidian Gold",
+        "description": "Dark graphite panels with brass highlights for a heavier operator-deck feel.",
+        "is_light": False,
+        "root_bg": "#11100d",
+        "surface": "#1a1814",
+        "surface_alt": "#15130f",
+        "panel": "#12110d",
+        "field": "#0d0c09",
+        "border": "#5b4a2f",
+        "text": "#f5f0e2",
+        "muted": "#d6ccb5",
+        "accent": "#d8ae57",
+        "accent_soft": "#b38739",
+        "hero_start": "#2a2113",
+        "hero_mid": "#403017",
+        "hero_end": "#6a4c1d",
+        "video_bg": "#0c0b08",
+        "video_text": "#a99772",
+        "tooltip_bg": "#f6ebcf",
+        "tooltip_text": "#2b2010",
+    },
 }
 
 
@@ -3759,6 +3818,10 @@ class SentryV2TabWidget(QWidget):
         except Exception:
             pass
         try:
+            self._send_shutdown_outputs_for_exit()
+        except Exception:
+            pass
+        try:
             self._finish_manual_sweep()
         except Exception:
             pass
@@ -3778,6 +3841,84 @@ class SentryV2TabWidget(QWidget):
         else:
             QTimer.singleShot(0, self._finalize_graceful_shutdown)
         return True
+
+    def _set_toggle_button_state_silently(
+        self,
+        button: Optional[QPushButton],
+        checked: bool,
+        *,
+        checked_label: str,
+        unchecked_label: str,
+    ) -> None:
+        if button is None:
+            return
+        button.blockSignals(True)
+        button.setChecked(bool(checked))
+        button.blockSignals(False)
+        button.setText(checked_label if checked else unchecked_label)
+
+    def _send_shutdown_outputs_for_exit(self) -> None:
+        self._auto_led_pwm = 0
+        self._led_on = False
+        self._laser_on = False
+        self._acc_on = False
+        self._spare_on = False
+        self._safety_armed = False
+
+        if hasattr(self, "_btn_led"):
+            self._set_toggle_button_state_silently(
+                self._btn_led,
+                False,
+                checked_label="LED: ON",
+                unchecked_label="LED: OFF",
+            )
+        if hasattr(self, "_btn_laser"):
+            self._set_toggle_button_state_silently(
+                self._btn_laser,
+                False,
+                checked_label="Laser: ON",
+                unchecked_label="Laser: OFF",
+            )
+        if hasattr(self, "_btn_acc"):
+            self._set_toggle_button_state_silently(
+                self._btn_acc,
+                False,
+                checked_label="ACC: ON",
+                unchecked_label="ACC: OFF",
+            )
+        if hasattr(self, "_btn_spare"):
+            self._set_toggle_button_state_silently(
+                self._btn_spare,
+                False,
+                checked_label="Spare: ON",
+                unchecked_label="Spare: OFF",
+            )
+        if hasattr(self, "_btn_safety"):
+            self._set_toggle_button_state_silently(
+                self._btn_safety,
+                False,
+                checked_label="Safety: ARMED",
+                unchecked_label="Safety: LOCKED",
+            )
+
+        if hasattr(self, "_btn_led_qa"):
+            self._sync_qa_btn(self._btn_led_qa, False)
+        if hasattr(self, "_btn_laser_qa"):
+            self._sync_qa_btn(self._btn_laser_qa, False)
+        if hasattr(self, "_btn_acc_qa"):
+            self._sync_qa_btn(self._btn_acc_qa, False)
+        if hasattr(self, "_btn_spare_qa"):
+            self._sync_qa_btn(self._btn_spare_qa, False)
+        if hasattr(self, "_btn_safety_qa"):
+            self._sync_qa_btn(self._btn_safety_qa, False)
+
+        if self._host_controls_hardware():
+            return
+
+        pan = float(getattr(self.engine, "current_pan", 90.0))
+        tilt = float(getattr(self.engine, "current_tilt", 55.0))
+        self._comm.send_shutdown_state(pan, tilt)
+        self._log("Shutdown: accessories off and safety locked")
 
     def _finalize_graceful_shutdown(self) -> None:
         if self._cleanup_started:
@@ -5652,7 +5793,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         lay.setSpacing(6)
 
         intro = QLabel(
-            "Choose a visual preset, then fine-tune opacity, contrast, accent strength, and radius. "
+            "Choose a visual preset, then fine-tune opacity, contrast, accent strength, font scale, and layout width. "
             "Changes apply live and save automatically."
         )
         intro.setWordWrap(True)
@@ -5717,6 +5858,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._slider_theme_window_opacity, self._lbl_theme_window_opacity = add_slider_row(3, "Window Opacity", 70, 100)
         self._slider_theme_contrast, self._lbl_theme_contrast = add_slider_row(4, "Contrast", 85, 125)
         self._slider_theme_radius, self._lbl_theme_radius = add_slider_row(5, "Corner Radius", 8, 24)
+        self._slider_theme_font_scale, self._lbl_theme_font_scale = add_slider_row(6, "Font Scale", 50, 280)
 
         for slider in (
             self._slider_theme_accent,
@@ -5725,17 +5867,57 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._slider_theme_window_opacity,
             self._slider_theme_contrast,
             self._slider_theme_radius,
+            self._slider_theme_font_scale,
         ):
             slider.valueChanged.connect(self._on_theme_settings_changed)
 
         note = QLabel(
             "Window opacity only affects the standalone Smart Sentry window. When this tab is embedded in another host window, "
-            "the host stays opaque and only the panel surfaces become more transparent."
+            "the host stays opaque and only the panel surfaces become more transparent. Shift + Mouse Wheel or Ctrl+Alt+Plus/Minus "
+            "still adjust font scale, and the slider below gives you a direct saved control for the same setting."
         )
         note.setWordWrap(True)
         self._set_theme_role(note, "subtleBody")
-        tune_lay.addWidget(note, 7, 0, 1, 3)
+        tune_lay.addWidget(note, 8, 0, 1, 3)
         lay.addWidget(tune_grp)
+
+        interface_grp = QGroupBox("Interface Settings")
+        interface_lay = QGridLayout(interface_grp)
+        interface_lay.setHorizontalSpacing(8)
+        interface_lay.setVerticalSpacing(8)
+
+        lbl_panel_width = QLabel("Settings Panel Width")
+        self._slider_ui_panel_width = QSlider(Qt.Horizontal)
+        self._slider_ui_panel_width.setRange(SENTRY_V2_PANEL_MIN_WIDTH, 860)
+        self._slider_ui_panel_width.setSingleStep(10)
+        self._slider_ui_panel_width.setPageStep(40)
+        self._slider_ui_panel_width.valueChanged.connect(self._on_theme_panel_width_changed)
+        self._lbl_ui_panel_width = QLabel("")
+        self._lbl_ui_panel_width.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        interface_lay.addWidget(lbl_panel_width, 0, 0)
+        interface_lay.addWidget(self._slider_ui_panel_width, 0, 1)
+        interface_lay.addWidget(self._lbl_ui_panel_width, 0, 2)
+
+        width_buttons = QHBoxLayout()
+        btn_panel_default = QPushButton("Default Width")
+        self._set_button_role(btn_panel_default, "utility")
+        btn_panel_default.clicked.connect(lambda: self._slider_ui_panel_width.setValue(SENTRY_V2_PANEL_DEFAULT_WIDTH))
+        width_buttons.addWidget(btn_panel_default)
+        btn_panel_wide = QPushButton("Wide Layout")
+        self._set_button_role(btn_panel_wide, "utility")
+        btn_panel_wide.clicked.connect(lambda: self._slider_ui_panel_width.setValue(680))
+        width_buttons.addWidget(btn_panel_wide)
+        width_buttons.addStretch(1)
+        self._register_responsive_box_layout(width_buttons, "compact_row")
+        interface_lay.addLayout(width_buttons, 1, 0, 1, 3)
+
+        interface_note = QLabel(
+            "Panel width is saved with the current operator profile. Use it to make the settings column denser on smaller screens or wider on touch-friendly benches."
+        )
+        interface_note.setWordWrap(True)
+        self._set_theme_role(interface_note, "subtleBody")
+        interface_lay.addWidget(interface_note, 2, 0, 1, 3)
+        lay.addWidget(interface_grp)
 
         summary_grp = QGroupBox("Theme Summary")
         summary_lay = QVBoxLayout(summary_grp)
@@ -5968,8 +6150,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         type_lay.addWidget(self._btn_wifi_pinout)
         lay.addWidget(type_grp)
 
-        # --- ESP32 Serial settings (modes 0, 1) ---
-        self._grp_esp32_serial = QGroupBox("ESP32 Serial (USB)")
+        # --- Arduino Nano / USB IO serial settings (modes 0, 1) ---
+        self._grp_esp32_serial = QGroupBox("Arduino Nano / USB IO Serial")
         esp_lay = QGridLayout(self._grp_esp32_serial)
 
         esp_lay.addWidget(QLabel("COM Port:"), 0, 0)
@@ -6867,6 +7049,48 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         trig_row.addWidget(self._combo_trigger_mode)
         lay.addLayout(trig_row)
 
+        self._grp_trigger_mosfet = QGroupBox("Water / MOSFET Trigger")
+        trigger_mosfet_lay = QGridLayout(self._grp_trigger_mosfet)
+        trigger_mosfet_lay.setHorizontalSpacing(6)
+        trigger_mosfet_lay.setVerticalSpacing(4)
+
+        trigger_mosfet_lay.addWidget(QLabel("Pulse ON (ms):"), 0, 0)
+        self._spin_trigger_mosfet_pulse_ms = QSpinBox()
+        self._spin_trigger_mosfet_pulse_ms.setRange(10, 2000)
+        self._spin_trigger_mosfet_pulse_ms.setSingleStep(10)
+        self._spin_trigger_mosfet_pulse_ms.setValue(int(getattr(self.config.engagement, "trigger_mosfet_pulse_ms", 120)))
+        self._spin_trigger_mosfet_pulse_ms.valueChanged.connect(self._on_trigger_mosfet_settings_changed)
+        self._apply_tooltip(self._spin_trigger_mosfet_pulse_ms, "trigger_mosfet_pulse_ms")
+        trigger_mosfet_lay.addWidget(self._spin_trigger_mosfet_pulse_ms, 0, 1)
+
+        trigger_mosfet_lay.addWidget(QLabel("Cycles per fire:"), 0, 2)
+        self._spin_trigger_mosfet_cycle_count = QSpinBox()
+        self._spin_trigger_mosfet_cycle_count.setRange(1, 20)
+        self._spin_trigger_mosfet_cycle_count.setValue(int(getattr(self.config.engagement, "trigger_mosfet_cycle_count", 1)))
+        self._spin_trigger_mosfet_cycle_count.valueChanged.connect(self._on_trigger_mosfet_settings_changed)
+        self._apply_tooltip(self._spin_trigger_mosfet_cycle_count, "trigger_mosfet_cycle_count")
+        trigger_mosfet_lay.addWidget(self._spin_trigger_mosfet_cycle_count, 0, 3)
+
+        trigger_mosfet_lay.addWidget(QLabel("Cycle OFF (ms):"), 1, 0)
+        self._spin_trigger_mosfet_cycle_off_ms = QSpinBox()
+        self._spin_trigger_mosfet_cycle_off_ms.setRange(10, 2000)
+        self._spin_trigger_mosfet_cycle_off_ms.setSingleStep(10)
+        self._spin_trigger_mosfet_cycle_off_ms.setValue(int(getattr(self.config.engagement, "trigger_mosfet_cycle_off_ms", 50)))
+        self._spin_trigger_mosfet_cycle_off_ms.valueChanged.connect(self._on_trigger_mosfet_settings_changed)
+        self._apply_tooltip(self._spin_trigger_mosfet_cycle_off_ms, "trigger_mosfet_cycle_off_ms")
+        trigger_mosfet_lay.addWidget(self._spin_trigger_mosfet_cycle_off_ms, 1, 1)
+
+        self._lbl_trigger_mosfet_summary = QLabel("")
+        self._set_theme_role(self._lbl_trigger_mosfet_summary, "statusMeta")
+        trigger_mosfet_lay.addWidget(self._lbl_trigger_mosfet_summary, 1, 2, 1, 2)
+
+        self._lbl_trigger_mosfet_status = QLabel("Water/MOSFET path: Nano USB IO firmware supports these pulse settings; WiFi bridge support depends on the active firmware build")
+        self._lbl_trigger_mosfet_status.setWordWrap(True)
+        self._set_theme_role(self._lbl_trigger_mosfet_status, "statusStrong")
+        trigger_mosfet_lay.addWidget(self._lbl_trigger_mosfet_status, 2, 0, 1, 4)
+
+        lay.addWidget(self._grp_trigger_mosfet)
+
         self._grp_trigger_servo = QGroupBox("Projectile Trigger Servo")
         trigger_servo_lay = QGridLayout(self._grp_trigger_servo)
         trigger_servo_lay.setHorizontalSpacing(6)
@@ -6907,7 +7131,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         trigger_servo_lay.addWidget(self._lbl_trigger_servo_status, 2, 0, 1, 4)
 
         lay.addWidget(self._grp_trigger_servo)
+        self._refresh_trigger_mosfet_summary()
         self._refresh_trigger_servo_summary()
+        self._sync_trigger_mode_panel_visibility()
 
         # Min threat to engage
         row = QHBoxLayout()
@@ -8860,7 +9086,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         lighting_note = QLabel(
             "When enabled the LED intensity is adjusted automatically based on scene brightness. "
-            "The LED button must be ON for auto-lighting to drive the output."
+            "Scene luma is the average camera brightness on a 0-255 scale where lower means darker. "
+            "Auto mode drives the LED directly; the LED button is only the manual output toggle when auto lighting is OFF."
         )
         lighting_note.setWordWrap(True)
         self._set_theme_role(lighting_note, "subtle")
@@ -8890,7 +9117,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         thresh_row.addWidget(QLabel("Dark threshold (0-255):"))
         self._spin_auto_brightness_threshold = QSpinBox()
         self._spin_auto_brightness_threshold.setRange(0, 255)
-        self._spin_auto_brightness_threshold.setValue(int(max(0, min(255, getattr(self.config.lighting, "auto_brightness_threshold", 80)))))
+        self._spin_auto_brightness_threshold.setValue(int(max(0, min(255, getattr(self.config.lighting, "auto_brightness_threshold", 140)))))
         self._spin_auto_brightness_threshold.valueChanged.connect(self._on_auto_brightness_threshold_changed)
         thresh_row.addWidget(self._spin_auto_brightness_threshold)
         thresh_row.addStretch(1)
@@ -8913,7 +9140,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         pwm_range_row.addStretch(1)
         lighting_lay.addLayout(pwm_range_row)
 
-        self._lbl_auto_luma = QLabel("Scene luma: --  PWM: --")
+        self._lbl_auto_luma = QLabel("Scene luma: --/255  Threshold: --  PWM: --")
         self._set_theme_role(self._lbl_auto_luma, "mutedCompact")
         lighting_lay.addWidget(self._lbl_auto_luma)
 
@@ -9018,7 +9245,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._chk_human_voice_enabled.toggled.connect(self._on_human_voice_enabled_changed)
         fire_lay.addWidget(self._chk_human_voice_enabled)
 
-        self._chk_mute_buzzer_for_human_voice = QCheckBox("Mute ESP32 buzzer while human voice mode is enabled")
+        self._chk_mute_buzzer_for_human_voice = QCheckBox("Mute board buzzer while human voice mode is enabled")
         self._chk_mute_buzzer_for_human_voice.setChecked(bool(getattr(self.config.sound, "mute_buzzer_when_human_voice_enabled", True)))
         self._chk_mute_buzzer_for_human_voice.toggled.connect(self._on_mute_buzzer_for_human_voice_changed)
         fire_lay.addWidget(self._chk_mute_buzzer_for_human_voice)
@@ -10259,8 +10486,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._update_conn_panel_visibility()
 
     _MODE_HINTS = [
-        "Single USB cable — full ASCII protocol to ESP32.",
-        "Two USB cables — bus servo to Debug Board + IO to ESP32.",
+        "Single USB cable — Arduino Nano USB IO only. Use this when the Nano is the only board connected to the PC for Smart Sentry IO.",
+        "Two USB cables — Arduino Nano USB + Debug Board USB. Use this when the Nano handles IO/accessories and the Debug Board handles pan/tilt bus servos.",
         "One USB cable — Debug Board stays on USB, ESP32 IO goes over WiFi.",
         "No runtime USB — PC talks to the Waveshare bridge over WiFi, and the local bus-servo UART runs on GPIO18/GPIO19.",
         "No USB cables — Primary ESP32 handles IO, Secondary ESP32 (Yahboom board) handles servos.",
@@ -10480,7 +10707,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if m in (0, 1):
             resolved_esp32 = self._resolve_serial_port("esp32", cc.esp32_port)
             if resolved_esp32 and resolved_esp32 != cc.esp32_port:
-                self._log(f"Auto-selected ESP32 COM port: {resolved_esp32}")
+                self._log(f"Auto-selected USB IO COM port: {resolved_esp32}")
                 self._edit_esp32_port.setText(resolved_esp32)
             if resolved_esp32:
                 cc.esp32_port = resolved_esp32
@@ -13368,6 +13595,17 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         est_ms = int(round((travel_deg / max(1, speed_dps)) * 1000.0)) if travel_deg else 0
         self._lbl_trigger_travel.setText(f"Travel: {travel_deg} deg | Estimated move: {est_ms} ms")
 
+    def _refresh_trigger_mosfet_summary(self) -> None:
+        if not hasattr(self, "_lbl_trigger_mosfet_summary"):
+            return
+        pulse_ms = int(self._spin_trigger_mosfet_pulse_ms.value())
+        cycle_count = int(self._spin_trigger_mosfet_cycle_count.value())
+        cycle_off_ms = int(self._spin_trigger_mosfet_cycle_off_ms.value())
+        total_ms = (pulse_ms * cycle_count) + (cycle_off_ms * max(0, cycle_count - 1))
+        self._lbl_trigger_mosfet_summary.setText(
+            f"Pulse train: {cycle_count} x {pulse_ms} ms | OFF gap: {cycle_off_ms} ms | Total: {total_ms} ms"
+        )
+
     def _apply_trigger_servo_widget_values_from_settings(self, settings: dict) -> None:
         if not hasattr(self, "_spin_trigger_servo_rest_deg"):
             return
@@ -13391,10 +13629,43 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             widget.blockSignals(False)
         self._refresh_trigger_servo_summary()
 
+    def _apply_trigger_mosfet_widget_values_from_settings(self, settings: dict) -> None:
+        if not hasattr(self, "_spin_trigger_mosfet_pulse_ms"):
+            return
+        widget_values = [
+            (
+                self._spin_trigger_mosfet_pulse_ms,
+                int(settings.get("trigger_mosfet_pulse_ms", self.config.engagement.trigger_mosfet_pulse_ms)),
+            ),
+            (
+                self._spin_trigger_mosfet_cycle_count,
+                int(settings.get("trigger_mosfet_cycle_count", self.config.engagement.trigger_mosfet_cycle_count)),
+            ),
+            (
+                self._spin_trigger_mosfet_cycle_off_ms,
+                int(settings.get("trigger_mosfet_cycle_off_ms", self.config.engagement.trigger_mosfet_cycle_off_ms)),
+            ),
+        ]
+        for widget, value in widget_values:
+            widget.blockSignals(True)
+            widget.setValue(int(value))
+            widget.blockSignals(False)
+        self._refresh_trigger_mosfet_summary()
+
+    def _sync_trigger_mode_panel_visibility(self) -> None:
+        is_bb = bool(self._combo_trigger_mode.currentIndex() == 1) if hasattr(self, "_combo_trigger_mode") else bool(self.config.engagement.trigger_mode_bb)
+        if hasattr(self, "_grp_trigger_mosfet"):
+            self._grp_trigger_mosfet.setVisible(not is_bb)
+        if hasattr(self, "_grp_trigger_servo"):
+            self._grp_trigger_servo.setVisible(is_bb)
+
     def _sync_comm_runtime_settings_from_config(self) -> None:
         engagement = self.config.engagement
         guard = self.config.guard
         pir_guard = self.config.pir_guard
+        self._comm.trigger_mosfet_pulse_ms = int(getattr(engagement, "trigger_mosfet_pulse_ms", 120))
+        self._comm.trigger_mosfet_cycle_count = int(getattr(engagement, "trigger_mosfet_cycle_count", 1))
+        self._comm.trigger_mosfet_cycle_off_ms = int(getattr(engagement, "trigger_mosfet_cycle_off_ms", 50))
         self._comm.trigger_servo_rest_deg = int(getattr(engagement, "trigger_servo_rest_deg", 0))
         self._comm.trigger_servo_fire_deg = int(getattr(engagement, "trigger_servo_fire_deg", 45))
         self._comm.trigger_servo_speed_dps = int(getattr(engagement, "trigger_servo_speed_dps", 360))
@@ -13428,10 +13699,22 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._queue_runtime_trigger_config_if_connected()
         self._note_sound_settings_changed()
 
+    def _on_trigger_mosfet_settings_changed(self) -> None:
+        self.config.engagement.trigger_mosfet_pulse_ms = int(self._spin_trigger_mosfet_pulse_ms.value())
+        self.config.engagement.trigger_mosfet_cycle_count = int(self._spin_trigger_mosfet_cycle_count.value())
+        self.config.engagement.trigger_mosfet_cycle_off_ms = int(self._spin_trigger_mosfet_cycle_off_ms.value())
+        self._sync_comm_runtime_settings_from_config()
+        self._refresh_trigger_mosfet_summary()
+        self._push_config()
+        self._save_config_quietly()
+        self._queue_runtime_trigger_config_if_connected()
+        self._note_sound_settings_changed()
+
     def _on_trigger_mode_changed(self, index: int) -> None:
         is_bb = (index == 1)
         self.config.engagement.trigger_mode_bb = is_bb
         self._comm.trigger_mode_bb = is_bb
+        self._sync_trigger_mode_panel_visibility()
         self._sync_comm_runtime_settings_from_config()
         if self._host_controls_hardware():
             pass
@@ -16081,6 +16364,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._slider_theme_window_opacity,
             self._slider_theme_contrast,
             self._slider_theme_radius,
+            self._slider_theme_font_scale,
+            self._slider_ui_panel_width,
         ]
         for widget in widgets:
             widget.blockSignals(True)
@@ -16096,6 +16381,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._slider_theme_window_opacity.setValue(_clamp_int(theme_cfg.window_opacity_pct, 70, 100))
             self._slider_theme_contrast.setValue(_clamp_int(theme_cfg.contrast_pct, 85, 125))
             self._slider_theme_radius.setValue(_clamp_int(theme_cfg.corner_radius_px, 8, 24))
+            self._slider_theme_font_scale.setValue(_clamp_int(theme_cfg.font_scale_pct, 50, 280))
+            self._slider_ui_panel_width.setValue(_clamp_int(int(getattr(self.config, "settings_panel_width", SENTRY_V2_PANEL_DEFAULT_WIDTH) or SENTRY_V2_PANEL_DEFAULT_WIDTH), SENTRY_V2_PANEL_MIN_WIDTH, 860))
         finally:
             for widget in widgets:
                 widget.blockSignals(False)
@@ -16108,11 +16395,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_theme_window_opacity.setText(f"{self._slider_theme_window_opacity.value()}%")
         self._lbl_theme_contrast.setText(f"{self._slider_theme_contrast.value()}%")
         self._lbl_theme_radius.setText(f"{self._slider_theme_radius.value()} px")
+        self._lbl_theme_font_scale.setText(f"{self._slider_theme_font_scale.value()}%")
+        self._lbl_ui_panel_width.setText(f"{self._slider_ui_panel_width.value()} px")
         self._lbl_theme_summary.setText(
             f"Preset: {tokens['preset_label']}\n"
             f"Accent {self._slider_theme_accent.value()}% | Panels {self._slider_theme_surface_opacity.value()}% | "
             f"Video {self._slider_theme_video_opacity.value()}% | Window {self._slider_theme_window_opacity.value()}%\n"
-            f"Contrast {self._slider_theme_contrast.value()}% | Radius {self._slider_theme_radius.value()} px"
+            f"Contrast {self._slider_theme_contrast.value()}% | Radius {self._slider_theme_radius.value()} px | Font {self._slider_theme_font_scale.value()}%\n"
+            f"Settings panel width {self._slider_ui_panel_width.value()} px"
         )
 
     def _on_theme_preset_changed(self, _index: int) -> None:
@@ -16131,13 +16421,23 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         theme_cfg.window_opacity_pct = int(self._slider_theme_window_opacity.value())
         theme_cfg.contrast_pct = int(self._slider_theme_contrast.value())
         theme_cfg.corner_radius_px = int(self._slider_theme_radius.value())
+        theme_cfg.font_scale_pct = int(self._slider_theme_font_scale.value())
         self._sync_theme_widgets()
         self._apply_theme()
         self._save_config_quietly()
 
+    def _on_theme_panel_width_changed(self, value: int) -> None:
+        width = _clamp_int(int(value), SENTRY_V2_PANEL_MIN_WIDTH, 860)
+        self.config.settings_panel_width = width
+        self._apply_panel_width(width)
+        self._sync_theme_widgets()
+        self._save_config_quietly()
+
     def _reset_theme_defaults(self) -> None:
         self.config.theme = ThemeConfig()
+        self.config.settings_panel_width = SENTRY_V2_PANEL_DEFAULT_WIDTH
         self._sync_theme_widgets()
+        self._apply_panel_width(self.config.settings_panel_width)
         self._apply_theme()
         self._save_config_quietly()
 
@@ -17097,7 +17397,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._combo_trigger_mode.blockSignals(True)
             self._combo_trigger_mode.setCurrentIndex(1 if settings["trigger_mode_bb"] else 0)
             self._combo_trigger_mode.blockSignals(False)
+            self._apply_trigger_mosfet_widget_values_from_settings(settings)
             self._apply_trigger_servo_widget_values_from_settings(settings)
+            self._sync_trigger_mode_panel_visibility()
 
             widget_values = [
                 (self._spin_min_threat, settings["min_threat_score"]),
@@ -17748,7 +18050,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if hasattr(self, "_lbl_human_voice_diag_route"):
             route_note = "Windows SAPI uses the current default playback device"
             if self._buzzer_suppressed_for_human_voice():
-                route_note += " | ESP32 buzzer is intentionally muted while human voice mode is enabled"
+                route_note += " | Board buzzer is intentionally muted while human voice mode is enabled"
             self._lbl_human_voice_diag_route.setText(f"Route: {route_note}")
         if hasattr(self, "_lbl_ai_voice_validation_status"):
             auto_speak = bool(getattr(self.config.ai_assistant, "auto_speak_responses", False))
@@ -17910,8 +18212,6 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         """Sample frame luminance and adjust LED PWM when auto-lighting is enabled."""
         if not bool(getattr(self.config.lighting, "auto_lighting_enabled", False)):
             return
-        if not self._led_on:
-            return
         try:
             import cv2 as _cv2
             gray = _cv2.cvtColor(frame, _cv2.COLOR_BGR2GRAY)
@@ -17919,7 +18219,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         except Exception:
             return
         self._scene_luma = luma
-        threshold = int(getattr(self.config.lighting, "auto_brightness_threshold", 80))
+        threshold = int(getattr(self.config.lighting, "auto_brightness_threshold", 140))
         pwm_min = int(max(0, min(255, getattr(self.config.lighting, "auto_pwm_min", 60))))
         pwm_max = int(max(0, min(255, getattr(self.config.lighting, "auto_pwm_max", 255))))
         if luma < threshold:
@@ -17930,9 +18230,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             new_pwm = 0
         pwm_changed = new_pwm != self._auto_led_pwm
         self._auto_led_pwm = new_pwm
-        luma_text = f"luma:{luma:.0f} pwm:{new_pwm}"
+        luma_text = f"luma:{luma:.0f} thr:{threshold} pwm:{new_pwm}"
         if hasattr(self, "_lbl_auto_luma"):
-            self._lbl_auto_luma.setText(f"Scene luma: {luma:.0f}  PWM: {new_pwm}")
+            self._lbl_auto_luma.setText(f"Scene luma: {luma:.0f}/255  Threshold: {threshold}  PWM: {new_pwm}")
         if hasattr(self, "_lbl_auto_luma_qa"):
             self._lbl_auto_luma_qa.setText(luma_text)
         if (force_dispatch or pwm_changed) and not self._host_controls_hardware():
@@ -17945,8 +18245,6 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _apply_auto_lighting_from_cached_frame(self, *, force_dispatch: bool = False) -> None:
         if not bool(getattr(self.config.lighting, "auto_lighting_enabled", False)):
-            return
-        if not self._led_on:
             return
         frame = getattr(self, "_last_raw_frame", None)
         if frame is not None:
@@ -18217,7 +18515,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if hasattr(self, "_lbl_sound_status") and self._buzzer_suppressed_for_human_voice() and bool(getattr(self.config.sound, "enabled", True)):
             self._set_label_content(
                 self._lbl_sound_status,
-                f"ESP32 buzzer muted while human voice mode is enabled | {SOUND_PERSONALITY_LABELS.get(personality, 'Sentinel')} {attitude_pct}% | Volume {volume_pct}%",
+                f"Board buzzer muted while human voice mode is enabled | {SOUND_PERSONALITY_LABELS.get(personality, 'Sentinel')} {attitude_pct}% | Volume {volume_pct}%",
                 self._status_text_style("neutral"),
             )
         self._sound_engine.set_profile(personality, attitude_pct)
@@ -18322,12 +18620,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
     def _on_auto_lighting_toggled(self, checked: bool) -> None:
         self.config.lighting.auto_lighting_enabled = bool(checked)
         self._sync_auto_lighting_toggle_widgets(bool(checked))
-        if self._led_on and not self._host_controls_hardware():
+        if not self._host_controls_hardware():
             if checked:
                 self._apply_auto_lighting_from_cached_frame(force_dispatch=True)
-            else:
+            elif self._led_on:
                 pwm = int(max(0, min(255, getattr(self.config.lighting, "led_pwm_value", 255))))
                 self._queue_comm_task("set_led_pwm", pwm, self.engine.current_pan, self.engine.current_tilt)
+            else:
+                self._queue_comm_task("set_led_pwm", 0, self.engine.current_pan, self.engine.current_tilt)
         self._save_config_quietly()
 
     def _on_led_pwm_slider_changed(self, value: int) -> None:
@@ -18347,12 +18647,16 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _on_auto_brightness_threshold_changed(self, value: int) -> None:
         self.config.lighting.auto_brightness_threshold = int(max(0, min(255, value)))
+        if bool(getattr(self.config.lighting, "auto_lighting_enabled", False)):
+            self._apply_auto_lighting_from_cached_frame(force_dispatch=True)
         self._save_config_quietly()
 
     def _on_auto_pwm_range_changed(self) -> None:
         if hasattr(self, "_spin_auto_pwm_min") and hasattr(self, "_spin_auto_pwm_max"):
             self.config.lighting.auto_pwm_min = int(max(0, min(255, self._spin_auto_pwm_min.value())))
             self.config.lighting.auto_pwm_max = int(max(0, min(255, self._spin_auto_pwm_max.value())))
+        if bool(getattr(self.config.lighting, "auto_lighting_enabled", False)):
+            self._apply_auto_lighting_from_cached_frame(force_dispatch=True)
         self._save_config_quietly()
 
     def _on_sound_personality_changed(self, index: int) -> None:
@@ -18873,7 +19177,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 sound_text = "Sound disabled"
                 sound_color = "#97a8b8"
             elif self._buzzer_suppressed_for_human_voice():
-                sound_text = "ESP32 buzzer muted while human voice mode is enabled"
+                sound_text = "Board buzzer muted while human voice mode is enabled"
                 sound_color = "#97a8b8"
             else:
                 sound_text = self._comm.sound_transport_info()

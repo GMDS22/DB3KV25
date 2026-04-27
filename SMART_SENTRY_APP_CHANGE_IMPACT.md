@@ -8,21 +8,27 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 
 ### Pinned current firmware path
 
-- Current Smart Sentry app topology: ESP32 WiFi + Debug Board USB
-- Current Smart Sentry app firmware: `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+- Current Smart Sentry app topology: Arduino Nano USB + Debug Board USB
+- Current Smart Sentry app firmware: `arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino`
 - Waveshare single-board firmware files are on hold and are not part of the current app contract.
 
 ### App identity
 
-- Active desktop app family: Smart Sentry v3.0.0 release target with legacy compatibility launchers retained
-- Current documented desktop release target: Smart Sentry v3.0.0
+- Active desktop app family: Smart Sentry v3.5.0 release target with legacy compatibility launchers retained
+- Current documented desktop release target: Smart Sentry v3.5.0
 - Main launcher from this repo: `run.py`
 
 ### Canonical settings path
 
-- Canonical runtime settings file: `app/config/smart_sentry_v3_0_0_settings.json`
+- Canonical runtime settings file: `app/config/smart_sentry_v3_5_0_settings.json`
 - Legacy compatibility fallbacks: `app/config/smart_sentry_v2_3_2_settings.json`, `app/config/smart_sentry_v2_3_1_settings.json`, `app/config/smart_sentry_v3_settings.json`, `app/config/sentry_v2_settings.json`
 - Rule: make runtime-setting changes against the canonical file only; if load/save sync logic changes, review the fallback chain in the same change.
+
+### Current release identity deltas
+
+- The active title panel now resolves `SMART SENTRY V3.5.0` with the subtitle `NANO BOARD USB + DEBUG BOARD USB`.
+- The active release includes theme font-scale and settings-panel-width controls in the theme tab.
+- Graceful shutdown now sends an outputs-off state and safety lock before transport disconnect.
 
 ### Transport authority
 
@@ -61,6 +67,14 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 
 - Sketch: `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
 - Used when ESP32 IO remains on direct serial tokens.
+
+### Arduino Nano USB serial IO replacement path
+
+- Sketch: `arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino`
+- Used when the ESP32 IO board is replaced by an Arduino Nano while the USB servo Debug Board remains the pan/tilt bus master.
+- App-side transport rule: no Python transport rewrite is required. Keep Smart Sentry in `ESP32 USB + Debug Board USB` mode, point the `ESP32 Port` field at the Nano COM port, and keep the Debug Board on its own COM port.
+- Current serial contract note: the recurring mode-1 sender in `app/sentry_v2/sentry_v2_comm.py` actively drives `S/M/F/L/R` on the main IO path and uses separate serial writes for `P`, `SOUND`, and `U/V/H/B`. The Nano sketch matches that contract so buzzer cues, LED PWM auto-lighting, PIR telemetry, and trigger-servo runtime tuning work without app-side transport changes.
+- Current app limitation note: the Nano sketch also accepts `G/A` for accessory and spare outputs, but the present mode-1 desktop sender does not emit those two tokens automatically. Treat that as an existing desktop-path limitation rather than a Nano firmware gap.
 
 ### DB3000 WiFi UDP baseline
 

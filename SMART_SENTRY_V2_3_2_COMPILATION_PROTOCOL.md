@@ -1,6 +1,6 @@
 # Smart Sentry v2.3.2 Compilation Protocol
 
-> Historical protocol note: the active v3.0.0 release-prep path is now documented in `SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md`. This v2.3.2 document is kept for the earlier release line.
+> Historical protocol note: the active v3.5.0 release-prep path is now documented in `SMART_SENTRY_V3_5_0_COMPILATION_PROTOCOL.md`. This v2.3.2 document is kept for the earlier release line.
 
 This document is the release-prep checklist for Smart Sentry v2.3.2.
 
