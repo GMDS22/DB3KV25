@@ -102,6 +102,8 @@ class SentryV2Engine:
         self._active_target_last_center: Optional[Tuple[float, float]] = None
         self._active_target_last_bbox: Optional[Tuple[int, int, int, int]] = None
         self._active_target_last_heading_norm: Tuple[float, float] = (0.0, 0.0)
+        self._active_target_last_history_samples: int = 0
+        self._active_target_last_heading_stability: float = 0.0
         self._active_target_last_seen_time: float = 0.0
         self._active_target_last_aim_pan: float = self.current_pan
         self._active_target_last_aim_tilt: float = self.current_tilt
@@ -277,6 +279,8 @@ class SentryV2Engine:
         self._active_target_last_center = None
         self._active_target_last_bbox = None
         self._active_target_last_heading_norm = (0.0, 0.0)
+        self._active_target_last_history_samples = 0
+        self._active_target_last_heading_stability = 0.0
         self._active_target_last_seen_time = 0.0
         self._active_target_last_aim_pan = self.current_pan
         self._active_target_last_aim_tilt = self.current_tilt
@@ -1089,9 +1093,14 @@ class SentryV2Engine:
         self._active_target_last_bbox = tuple(int(v) for v in det.bbox)
         if target is not None:
             self._active_target_last_heading_norm = (float(target.heading_x), float(target.heading_y))
+            self._active_target_last_history_samples = int(getattr(target, "history_samples", 0) or 0)
+            self._active_target_last_heading_stability = float(getattr(target, "heading_stability", 0.0) or 0.0)
             self._active_target_last_class = str(target.det.class_name or "").strip().lower()
             self._active_target_last_source = str(target.det.source or "").strip().lower()
         else:
+            self._active_target_last_heading_norm = (0.0, 0.0)
+            self._active_target_last_history_samples = 0
+            self._active_target_last_heading_stability = 0.0
             self._active_target_last_class = str(det.class_name or "").strip().lower()
             self._active_target_last_source = str(det.source or "").strip().lower()
         self._active_target_last_seen_time = float(timestamp or time.time())
@@ -1439,6 +1448,10 @@ class SentryV2Engine:
             return False
         if self._active_target_last_source in {"frame_diff", "backsub", "color"}:
             return False
+        if int(self._active_target_last_history_samples or 0) < 4:
+            return False
+        if float(self._active_target_last_heading_stability or 0.0) < 0.60:
+            return False
         return True
 
     def _clamp_prediction_heading_norm(
@@ -1688,8 +1701,11 @@ class SentryV2Engine:
             self._reset_loss_recovery_state()
             return
         self._capture_loss_recovery_context(now)
-        self._loss_recovery_anchor_pan = float(self._active_target_last_aim_pan)
-        self._loss_recovery_anchor_tilt = float(self._active_target_last_aim_tilt)
+        # Start the first recovery pass from the live runtime pose rather than
+        # the last requested aim point so reacquire does not chase a target from
+        # a commanded pose the turret never physically reached.
+        self._loss_recovery_anchor_pan = float(self.current_pan)
+        self._loss_recovery_anchor_tilt = float(self.current_tilt)
         self._loss_recovery_last_move_time = 0.0
         self._loss_recovery_search_index = 0
         self._loss_recovery_protocol = self._select_loss_recovery_protocol()
@@ -2043,14 +2059,14 @@ class SentryV2Engine:
         target_tilt = self._clamp_tilt(tilt)
         if abs(target_pan - self.current_pan) < 0.05 and abs(target_tilt - self.current_tilt) < 0.05:
             return
-        # Add subtle organic jitter so search movements don't look robotic.
-        # Seeded from the search index for repeatability, but visually natural.
-        jitter_seed = int(self._loss_recovery_search_index * 97 + int(now * 100) % 137)
-        jitter_rng = random.Random(jitter_seed)
-        jitter_pan = jitter_rng.gauss(0.0, 0.35)
-        jitter_tilt = jitter_rng.gauss(0.0, 0.22)
-        target_pan = self._clamp_pan(target_pan + jitter_pan)
-        target_tilt = self._clamp_tilt(target_tilt + jitter_tilt)
+        phase = str(self._loss_recovery_phase or "")
+        if "expand" in phase or self._loss_recovery_retry_count > 0:
+            # Keep a little variation only on wider recovery passes; tight first
+            # pursuit/local reacquire steps should stay literal.
+            jitter_seed = int(self._loss_recovery_search_index * 97 + int(now * 100) % 137)
+            jitter_rng = random.Random(jitter_seed)
+            target_pan = self._clamp_pan(target_pan + jitter_rng.gauss(0.0, 0.14))
+            target_tilt = self._clamp_tilt(target_tilt + jitter_rng.gauss(0.0, 0.09))
         self._loss_recovery_last_move_time = now
         self._move_turret(target_pan, target_tilt)
 
