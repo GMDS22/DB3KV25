@@ -3677,8 +3677,7 @@ class SentryV2TabWidget(QWidget):
             return
 
         target_pan, target_tilt, move_time_ms = self._guided_move_steps.popleft()
-        self.engine.current_pan = float(target_pan)
-        self.engine.current_tilt = float(target_tilt)
+        self.engine.update_runtime_pose(float(target_pan), float(target_tilt), measured=False)
         if self._host_controls_hardware():
             self.turret_move_requested.emit(float(target_pan), float(target_tilt))
         else:
@@ -13758,8 +13757,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if hold_guard:
             self.engine.hold_current_guard_position(pan, tilt)
         else:
-            self.engine.current_pan = pan
-            self.engine.current_tilt = tilt
+            self.engine.update_runtime_pose(pan, tilt, measured=False)
         if self._host_controls_hardware():
             self.turret_move_requested.emit(float(pan), float(tilt))
         else:
@@ -13800,8 +13798,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             float(getattr(self, "_manual_move_priority_until", 0.0) or 0.0),
             time.time() + float(getattr(self, "_manual_position_hold_s", 1.25) or 1.25),
         )
-        self.engine.current_pan = new_pan
-        self.engine.current_tilt = new_tilt
+        self.engine.update_runtime_pose(new_pan, new_tilt, measured=False)
         if self._host_controls_hardware():
             self.manual_move_requested.emit(int(pan_dir * step), int(tilt_dir * step))
         else:
@@ -13862,8 +13859,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             float(getattr(self, "_manual_move_priority_until", 0.0) or 0.0),
             time.time() + max(1.25, float(move_time_ms) / 1000.0 + 0.25),
         )
-        self.engine.current_pan = float(target_pan)
-        self.engine.current_tilt = float(target_tilt)
+        self.engine.update_runtime_pose(float(target_pan), float(target_tilt), measured=False)
         if self._host_controls_hardware():
             self.turret_move_requested.emit(float(target_pan), float(target_tilt))
         else:
@@ -17756,8 +17752,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if command_age_s < settle_window_s and feedback_to_command_err > 1.5:
             return
         pan, tilt = self._clamp_manual_angles(float(feedback_pan), float(feedback_tilt))
-        self.engine.current_pan = pan
-        self.engine.current_tilt = tilt
+        self.engine.update_runtime_pose(pan, tilt, measured=True, timestamp=now)
 
     def _remember_commanded_position(self, pan: float, tilt: float, *, move_time_ms: Optional[int] = None) -> None:
         self._last_commanded_pan = float(pan)
@@ -17782,15 +17777,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 feedback_age_s = 999.0
             if feedback_pan is not None and feedback_tilt is not None and feedback_age_s <= 1.2:
                 pan, tilt = self._clamp_manual_angles(float(feedback_pan), float(feedback_tilt))
-                self.engine.current_pan = pan
-                self.engine.current_tilt = tilt
+                self.engine.update_runtime_pose(pan, tilt, measured=True)
                 return
         pan, tilt = self._clamp_manual_angles(
             float(getattr(self, "_last_commanded_pan", self.engine.current_pan)),
             float(getattr(self, "_last_commanded_tilt", self.engine.current_tilt)),
         )
-        self.engine.current_pan = pan
-        self.engine.current_tilt = tilt
+        self.engine.update_runtime_pose(pan, tilt, measured=False)
 
     def _should_defer_auto_move(self, move_time_ms: int, move_delta: float) -> bool:
         if self._host_controls_hardware():

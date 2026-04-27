@@ -78,11 +78,15 @@ class SentryV2Engine:
         # Turret state (tracked by main app, seeded from guard config)
         self.current_pan: float = config.guard.guard_pan
         self.current_tilt: float = config.guard.guard_tilt
+        self._last_commanded_pan: float = self.current_pan
+        self._last_commanded_tilt: float = self.current_tilt
+        self._last_command_time: float = 0.0
+        self._last_measured_pose_time: float = 0.0
 
         # Engagement queue
         self._queue: List[EngagementOrder] = []
         self._queue_index: int = 0
-        self._engage_phase: str = "aim"   # "aim" → "precision" → "fire" → "cooldown"
+        self._engage_phase: str = "aim"   # "aim" (coarse acquire/settle) → "precision" → "fire" → "cooldown"
         self._phase_start: float = 0.0
 
         # Precision aiming PID state
@@ -754,10 +758,11 @@ class SentryV2Engine:
         if self._engage_phase == "aim":
             self._last_err_pan_deg = 0.0
             self._last_err_tilt_deg = 0.0
-            # Scale aim settle with engagement speed — fast presets skip delay
+            # Scale acquire/settle time with engagement speed — fast presets
+            # still get a real startup settle window before precision begins.
             speed_ratio = float(max(10, min(100, int(getattr(self.cfg.engagement, "engagement_speed", 80) or 80))) - 10) / 90.0
             aim_settle_time = max(0.06, 0.35 * (1.0 - speed_ratio * 0.75))
-            if elapsed >= aim_settle_time:
+            if self._acquire_phase_ready(now, aim_settle_time):
                 if self.cfg.engagement.precision_aim_enabled:
                     self._enter_precision_phase(now, order)
                 else:
@@ -1198,7 +1203,7 @@ class SentryV2Engine:
         self._change_state(SentryV2State.RETURNING)
 
     def _start_order_engagement(self, order: EngagementOrder, now: float) -> None:
-        """Start engagement for a queued order with a stable first step."""
+        """Start engagement with a coarse acquire move before precision."""
         self._reset_precision_state()
         self._remember_active_target(order.target.det, target=order.target, timestamp=now)
         # Seed aim anchors to the new order's planned position so that
@@ -1206,32 +1211,17 @@ class SentryV2Engine:
         # correct target, not the previous engagement's last aim point.
         self._active_target_last_aim_pan = self._clamp_pan(order.pan)
         self._active_target_last_aim_tilt = self._clamp_tilt(order.tilt)
-        if self.cfg.engagement.precision_aim_enabled:
-            # Avoid a blind first snap that can jump in the wrong direction.
-            self._enter_precision_phase(now, order)
-            return
-
         self._engage_phase = "aim"
         self._phase_start = now
         self._move_turret(order.pan, order.tilt)
 
     def _enter_precision_phase(self, now: float, order: EngagementOrder) -> None:
-        """Switch to precision phase and start optional precision logging session."""
+        """Switch to precision phase after the coarse acquire stage has settled."""
         self._engage_phase = "precision"
         self._phase_start = now
         self._reset_precision_state()
 
         target = self._find_active_target(order)
-        if target is not None:
-            initial_err_pan, initial_err_tilt = self._compute_tracking_angle_error(target, now, for_fire=False)
-            initial_corr_pan, initial_corr_tilt, _, _ = self._compute_visual_servo_correction(
-                initial_err_pan,
-                initial_err_tilt,
-                use_fire_limits=False,
-            )
-            if abs(initial_corr_pan) > 0.01 or abs(initial_corr_tilt) > 0.01:
-                self._move_turret(self.current_pan + initial_corr_pan, self.current_tilt + initial_corr_tilt)
-
         if not self._log_precision_tuning or self._precision_logging_faulted:
             return
 
@@ -2352,12 +2342,52 @@ class SentryV2Engine:
     # Turret helpers
     # ------------------------------------------------------------------ #
 
+    def _has_recent_measured_pose(self, now: Optional[float] = None) -> bool:
+        measured_at = float(getattr(self, "_last_measured_pose_time", 0.0) or 0.0)
+        if measured_at <= 0.0:
+            return False
+        sample_now = time.time() if now is None else float(now)
+        return (sample_now - measured_at) <= 1.2
+
+    def update_runtime_pose(
+        self,
+        pan: float,
+        tilt: float,
+        *,
+        measured: bool = True,
+        timestamp: Optional[float] = None,
+    ) -> None:
+        pan, tilt = self._clamp_angles(pan, tilt)
+        self.current_pan = pan
+        self.current_tilt = tilt
+        if measured:
+            self._last_measured_pose_time = time.time() if timestamp is None else float(timestamp)
+
+    def _acquire_phase_ready(self, now: float, min_settle_s: float) -> bool:
+        settle_s = max(0.0, float(min_settle_s))
+        if (now - float(self._last_command_time or 0.0)) < settle_s:
+            return False
+        if not self._has_recent_measured_pose(now):
+            return True
+        remaining_pan = abs(float(self.current_pan) - float(self._last_commanded_pan))
+        remaining_tilt = abs(float(self.current_tilt) - float(self._last_commanded_tilt))
+        if max(remaining_pan, remaining_tilt) <= 1.25:
+            return True
+        return (now - float(self._last_command_time or 0.0)) >= min(0.48, max(0.18, settle_s + 0.12))
+
     def _move_turret(self, pan: float, tilt: float) -> None:
         pan, tilt = self._clamp_angles(pan, tilt)
         if not self._motion_enabled:
             return
-        self.current_pan = pan
-        self.current_tilt = tilt
+        command_time = time.time()
+        self._last_commanded_pan = pan
+        self._last_commanded_tilt = tilt
+        self._last_command_time = command_time
+        # When fresh measured pose is available, keep it as the live control
+        # reference and treat this as a commanded move only.
+        if not self._has_recent_measured_pose(command_time):
+            self.current_pan = pan
+            self.current_tilt = tilt
         if self._cb_move:
             self._cb_move(pan, tilt)
 
