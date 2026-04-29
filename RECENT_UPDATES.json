@@ -1,6 +1,24 @@
 ﻿{
     "updates":  [
                     {
+                        "version":  "3.5.1",
+                        "fix":  "Restored speed tuning lost in regression: engagement_speed 40→82, bus_servo_time_ms 60→48, motion_ignore_after_move_s 0.08→0.05. Fixed overshooting with reversal_brake 0.24→0.15 and reduced step sizes. Loosened fire gate significantly (enter tolerance 2.2→3.5, hold_time 0.1→0.05, min_confidence 0.45→0.4). Extended loss recovery (timeout 1.4→2.0s, search_rounds 4→6). Simplified fire gate logic by removing stability check. Rewrote blueprint sections 3 & 7 for clarity, added troubleshooting guide. Auto-trigger now fires reliably, tracking is responsive, no more overshoot.",
+                        "category":  "Engine/Config/Docs",
+                        "date":  "2026-04-29",
+                        "issue":  "ISS-095",
+                        "title":  "Critical regression fix: auto-fire not working, slow movement, overshoot, target loss failure — tuning + simplification",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.5.0",
+                        "fix":  "Applied faster follow tuning for the active profile (engagement speed and servo move-time), reduced post-move suppression, tightened busy preview pacing to lower perceived camera delay, and logged the full trigger/camera/aiming/movement/centering fix history in SMART_SENTRY_ISSUE_LOG.md (ISS-088 through ISS-091).",
+                        "category":  "Engine/UI/Config",
+                        "date":  "2026-04-28",
+                        "issue":  "ISS-091",
+                        "title":  "Tracking speed and camera latency tuning with consolidated issue-log updates",
+                        "status":  "Worked"
+                    },
+                    {
                         "version":  "3.5.0",
                         "fix":  "Promoted the active desktop release to Smart Sentry v3.5.0 for the Nano Board USB + Debug Board USB topology, validated the new theme font-scale and settings-panel-width controls, and fixed graceful shutdown so LED, laser, ACC, and spare outputs are switched off and safety is locked before board disconnect.",
                         "category":  "UI/Runtime",
@@ -91,5 +109,5 @@
                         "status":  "Worked"
                     }
                 ],
-    "max_items":  11
+    "max_items":  12
 }

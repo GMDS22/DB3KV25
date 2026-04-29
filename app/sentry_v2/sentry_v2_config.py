@@ -41,6 +41,15 @@ AUTO_TRIGGER_MIN_FIRE_ENTER_PAN_DEG = 2.0
 AUTO_TRIGGER_MIN_FIRE_ENTER_TILT_DEG = 2.0
 AUTO_TRIGGER_MIN_FIRE_EXIT_PAN_DEG = 2.8
 AUTO_TRIGGER_MIN_FIRE_EXIT_TILT_DEG = 2.4
+AUTO_TRIGGER_MIN_PRECISION_DEADZONE_PAN_DEG = 0.18
+AUTO_TRIGGER_MIN_PRECISION_DEADZONE_TILT_DEG = 0.16
+AUTO_TRIGGER_MIN_FIRE_MICRO_ADJUST_PAN_STEP_DEG = 0.32
+AUTO_TRIGGER_MIN_FIRE_MICRO_ADJUST_TILT_STEP_DEG = 0.25
+AUTO_TRIGGER_MIN_TARGET_LOSS_TIMEOUT_S = 1.4
+AUTO_TRIGGER_MAX_AIM_LOCK_REQUIRED_FRAMES = 4
+AUTO_TRIGGER_MAX_AIM_LOCK_TIMEOUT_S = 2.0
+NANO_USB_HOST_BAUD = 115200
+NANO_USB_CONNECTION_TYPES = {0, 1}
 
 
 # Full COCO class list (80 classes) — same order as YOLOv8 default
@@ -200,8 +209,8 @@ class EngagementConfig:
     precision_kd: float = 0.015
     # Max correction step per frame (degrees)
     precision_max_step: float = 0.85
-    precision_deadzone_pan_deg: float = 0.18
-    precision_deadzone_tilt_deg: float = 0.15
+    precision_deadzone_pan_deg: float = 0.4
+    precision_deadzone_tilt_deg: float = 0.35
     precision_error_ema: float = 0.40
     precision_max_pan_step: float = 0.90
     precision_max_tilt_step: float = 0.75
@@ -221,6 +230,10 @@ class EngagementConfig:
     fire_trigger_refractory_time: float = 0.20
     fire_trigger_min_confidence: float = 0.45
     fire_trigger_min_persistence: float = 0.12
+    # Simple fire gate: fire when aim error (degrees from center) is within this value.
+    # Set this and precision_settle_time — no other settings required for auto-fire.
+    # 0 = use legacy aim_lock / precision_deadzone system instead.
+    fire_center_tolerance_deg: float = 3.5
     # Auto-fire requires a stable aim lock in precision mode.
     fire_requires_lock: bool = True
     aim_lock_pan_tolerance: float = 0.65
@@ -294,12 +307,26 @@ def normalize_auto_trigger_engagement(engagement: "EngagementConfig") -> List[st
         setattr(engagement, attr, minimum)
         adjustments.append(f"{attr}={current:.2f}->{minimum:.2f}")
 
+    def enforce_max(attr: str, maximum: float) -> None:
+        current = float(getattr(engagement, attr, maximum))
+        if current <= maximum:
+            return
+        setattr(engagement, attr, maximum)
+        adjustments.append(f"{attr}={current:.2f}->{maximum:.2f}")
+
     enforce_min("aim_lock_pan_tolerance", AUTO_TRIGGER_MIN_AIM_LOCK_PAN_DEG)
     enforce_min("aim_lock_tilt_tolerance", AUTO_TRIGGER_MIN_AIM_LOCK_TILT_DEG)
     enforce_min("fire_trigger_enter_pan_tolerance", AUTO_TRIGGER_MIN_FIRE_ENTER_PAN_DEG)
     enforce_min("fire_trigger_enter_tilt_tolerance", AUTO_TRIGGER_MIN_FIRE_ENTER_TILT_DEG)
     enforce_min("fire_trigger_exit_pan_tolerance", AUTO_TRIGGER_MIN_FIRE_EXIT_PAN_DEG)
     enforce_min("fire_trigger_exit_tilt_tolerance", AUTO_TRIGGER_MIN_FIRE_EXIT_TILT_DEG)
+    enforce_min("precision_deadzone_pan_deg", AUTO_TRIGGER_MIN_PRECISION_DEADZONE_PAN_DEG)
+    enforce_min("precision_deadzone_tilt_deg", AUTO_TRIGGER_MIN_PRECISION_DEADZONE_TILT_DEG)
+    enforce_min("fire_micro_adjust_max_pan_step", AUTO_TRIGGER_MIN_FIRE_MICRO_ADJUST_PAN_STEP_DEG)
+    enforce_min("fire_micro_adjust_max_tilt_step", AUTO_TRIGGER_MIN_FIRE_MICRO_ADJUST_TILT_STEP_DEG)
+    enforce_min("target_loss_timeout", AUTO_TRIGGER_MIN_TARGET_LOSS_TIMEOUT_S)
+    enforce_max("aim_lock_required_frames", AUTO_TRIGGER_MAX_AIM_LOCK_REQUIRED_FRAMES)
+    enforce_max("aim_lock_timeout", AUTO_TRIGGER_MAX_AIM_LOCK_TIMEOUT_S)
 
     enter_pan = float(getattr(engagement, "fire_trigger_enter_pan_tolerance", AUTO_TRIGGER_MIN_FIRE_ENTER_PAN_DEG))
     enter_tilt = float(getattr(engagement, "fire_trigger_enter_tilt_tolerance", AUTO_TRIGGER_MIN_FIRE_ENTER_TILT_DEG))
@@ -323,6 +350,25 @@ def normalize_auto_trigger_engagement(engagement: "EngagementConfig") -> List[st
     if recenter_tilt < exit_tilt:
         setattr(engagement, "fire_recenter_tilt_tolerance", exit_tilt)
         adjustments.append(f"fire_recenter_tilt_tolerance={recenter_tilt:.2f}->{exit_tilt:.2f}")
+
+    return adjustments
+
+
+def normalize_target_filter_tracking(filter_cfg: "TargetFilterConfig") -> List[str]:
+    """Clamp semantic confirmation gates so moving-camera reacquire remains possible."""
+    adjustments: List[str] = []
+
+    frames = int(getattr(filter_cfg, "semantic_min_confirm_frames", 1) or 1)
+    if frames > 1:
+        setattr(filter_cfg, "semantic_min_confirm_frames", 1)
+        adjustments.append(f"semantic_min_confirm_frames={frames}->1")
+
+    sem_conf = float(getattr(filter_cfg, "semantic_min_confirm_confidence", 0.0) or 0.0)
+    conf_floor = float(getattr(filter_cfg, "min_confidence", 0.5) or 0.5)
+    conf_cap = max(conf_floor, 0.52)
+    if sem_conf > conf_cap:
+        setattr(filter_cfg, "semantic_min_confirm_confidence", conf_cap)
+        adjustments.append(f"semantic_min_confirm_confidence={sem_conf:.2f}->{conf_cap:.2f}")
 
     return adjustments
 
@@ -594,6 +640,18 @@ class ConnectionConfig:
     test_source_zoom_pct: int = 100
 
 
+def normalize_connection_config(connection: "ConnectionConfig") -> List[str]:
+    """Clamp Nano USB modes to the shipped host baud expected by the firmware."""
+    updates: List[str] = []
+    mode = int(getattr(connection, "connection_type", 3) or 3)
+    # Always force Nano USB modes (0, 1) to 115200 baud, regardless of saved value
+    if mode in NANO_USB_CONNECTION_TYPES:
+        if int(getattr(connection, "esp32_baud", NANO_USB_HOST_BAUD) or NANO_USB_HOST_BAUD) != NANO_USB_HOST_BAUD:
+            connection.esp32_baud = NANO_USB_HOST_BAUD
+            updates.append("esp32_baud (forced to 115200 for Nano USB mode)")
+    return updates
+
+
 @dataclass
 class SentryV2Config:
     """Top-level configuration for SMART SENTRY V3."""
@@ -637,6 +695,7 @@ class SentryV2Config:
     prompted_allow_auto_fire: bool = False
     prompted_library_path: str = CANONICAL_PROMPTED_TARGETS_PATH
     quick_startup_enabled: bool = True
+    auto_export_logs_and_snapshot_on_close: bool = False
 
     # --- Persistence ---
     config_path: str = CANONICAL_SETTINGS_PATH
@@ -693,10 +752,12 @@ class SentryV2Config:
     @classmethod
     def from_dict(cls, d: dict) -> "SentryV2Config":
         cn = ConnectionConfig(**d.get("connection", {}))
+        normalize_connection_config(cn)
         if not str(cn.camera_source).strip():
             cn.camera_source = "0"
         dm = DetectionModeConfig(**d.get("detection_mode", {}))
         tf = TargetFilterConfig(**d.get("target_filter", {}))
+        normalize_target_filter_tracking(tf)
         ts = ThreatScoringConfig(**d.get("threat_scoring", {}))
         eg = EngagementConfig(**d.get("engagement", {}))
         gd_raw = dict(d.get("guard", {}))
@@ -780,6 +841,7 @@ class SentryV2Config:
             prompted_allow_auto_fire=d.get("prompted_allow_auto_fire", False),
             prompted_library_path=d.get("prompted_library_path", CANONICAL_PROMPTED_TARGETS_PATH),
             quick_startup_enabled=d.get("quick_startup_enabled", True),
+            auto_export_logs_and_snapshot_on_close=bool(d.get("auto_export_logs_and_snapshot_on_close", False)),
             config_path=d.get("config_path", CANONICAL_SETTINGS_PATH),
         )
 

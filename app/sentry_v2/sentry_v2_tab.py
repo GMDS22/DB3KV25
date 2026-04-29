@@ -46,6 +46,7 @@ from PyQt5.QtWidgets import (
     QFileDialog,
     QBoxLayout,
     QShortcut,
+    QAbstractSpinBox,
     QStyle,
     QStylePainter,
     QStyleOptionTab,
@@ -3281,8 +3282,8 @@ class SentryV2TabWidget(QWidget):
         self._last_display_frame: Optional[np.ndarray] = None
         self._last_raw_frame: Optional[np.ndarray] = None
         self._last_processed_frame_s: float = 0.0
-        self._display_frame_interval_s: float = 1.0 / 15.0
-        self._busy_display_frame_interval_s: float = 1.0 / 10.0
+        self._display_frame_interval_s: float = 1.0 / 24.0
+        self._busy_display_frame_interval_s: float = 1.0 / 18.0
         self._last_display_present_s: float = 0.0
         self._force_next_display_refresh: bool = True
         self._busy_preview_skip_target_boxes: bool = True
@@ -3409,6 +3410,7 @@ class SentryV2TabWidget(QWidget):
 
         # Build UI
         self._build_ui()
+        self._optimize_numeric_entry_performance()
         self._apply_theme()
         self._install_global_shortcuts()
 
@@ -3667,6 +3669,11 @@ class SentryV2TabWidget(QWidget):
             self._refresh_status()
             if log_message and not self._closing:
                 self._log(log_message)
+            if not cancelled:
+                # A completed guided move should not keep blocking auto-tracking.
+                # The pre-calculated priority window may be much longer than needed,
+                # so reset it now so the engine can resume corrections immediately.
+                self._manual_move_priority_until = 0.0
 
     def _advance_guided_move(self) -> None:
         if self._closing:
@@ -3809,6 +3816,17 @@ class SentryV2TabWidget(QWidget):
             return True
         if self._shutdown_in_progress:
             return True
+
+        # Persist any pending debounced setting edits before timers stop.
+        try:
+            if bool(getattr(self, "_pending_quiet_save", False)):
+                self._flush_quiet_config_save()
+        except Exception:
+            pass
+        try:
+            self._auto_export_runtime_artifacts_if_enabled()
+        except Exception:
+            pass
 
         self._shutdown_in_progress = True
         self._startup_rest_pending = False
@@ -4058,10 +4076,12 @@ class SentryV2TabWidget(QWidget):
         _qa_chip_bar_lay.setSpacing(8)
 
         # ---- QA icon buttons ----
+        qa_icon_size = 32
+
         def _mk_qa_btn(label: str, tip: str, checkable: bool = True) -> QPushButton:
             b = QPushButton(label)
             b.setCheckable(checkable)
-            b.setFixedSize(26, 26)
+            b.setFixedSize(qa_icon_size, qa_icon_size)
             b.setObjectName("qaIconBtn")
             b.setToolTip(tip)
             b.setCursor(Qt.PointingHandCursor)
@@ -4071,11 +4091,28 @@ class SentryV2TabWidget(QWidget):
         self._btn_auto_trigger_qa.setChecked(bool(getattr(self.config.engagement, "auto_trigger_enabled", False)))
         _qa_chip_bar_lay.addWidget(self._btn_auto_trigger_qa)
 
+        _lbl_trig_mode_qa = QLabel("Mode")
+        _lbl_trig_mode_qa.setObjectName("qaTuneLabel")
+        _qa_chip_bar_lay.addWidget(_lbl_trig_mode_qa)
+
+        self._combo_trigger_mode_qa = QComboBox()
+        self._combo_trigger_mode_qa.setObjectName("qaQuickCombo")
+        self._combo_trigger_mode_qa.addItems(["MOSFET", "SERVO"])
+        self._combo_trigger_mode_qa.setCurrentIndex(1 if self.config.engagement.trigger_mode_bb else 0)
+        self._combo_trigger_mode_qa.setFixedHeight(qa_icon_size)
+        self._combo_trigger_mode_qa.setMinimumWidth(88)
+        self._combo_trigger_mode_qa.setToolTip("Quick trigger transport mode: MOSFET or projectile servo")
+        self._combo_trigger_mode_qa.currentIndexChanged.connect(self._on_quick_trigger_mode_changed)
+        _qa_chip_bar_lay.addWidget(self._combo_trigger_mode_qa)
+
         self._btn_safety_qa = _mk_qa_btn("🛡", "Safety (Fire Enable)")
         _qa_chip_bar_lay.addWidget(self._btn_safety_qa)
 
-        self._btn_fire_qa = _mk_qa_btn("●", "Manual Fire — hold to fire", checkable=False)
+        self._btn_fire_qa = _mk_qa_btn("●", "Manual Fire", checkable=False)
         _qa_chip_bar_lay.addWidget(self._btn_fire_qa)
+
+        self._btn_home_qa = _mk_qa_btn("⌂", "Go Home", checkable=False)
+        _qa_chip_bar_lay.addWidget(self._btn_home_qa)
 
         _qa_sep1 = QFrame()
         _qa_sep1.setFrameShape(QFrame.VLine)
@@ -4107,7 +4144,7 @@ class SentryV2TabWidget(QWidget):
         # _apply_all_tooltips widget map) still works — QPushButton has the same setChecked/isChecked/blockSignals API.
         self._chk_auto_lighting_qa = QPushButton("☼")
         self._chk_auto_lighting_qa.setCheckable(True)
-        self._chk_auto_lighting_qa.setFixedSize(26, 26)
+        self._chk_auto_lighting_qa.setFixedSize(qa_icon_size, qa_icon_size)
         self._chk_auto_lighting_qa.setObjectName("qaIconBtn")
         self._chk_auto_lighting_qa.setToolTip("Auto Lighting ON/OFF")
         self._chk_auto_lighting_qa.setCursor(Qt.PointingHandCursor)
@@ -4157,6 +4194,17 @@ class SentryV2TabWidget(QWidget):
         self._lbl_auto_luma_qa = QLabel("")
         self._set_theme_role(self._lbl_auto_luma_qa, "mutedCompact")
         _qa_chip_bar_lay.addWidget(self._lbl_auto_luma_qa)
+
+        self._chk_auto_export_runtime_qa = QCheckBox("Auto Export Logs + Snapshot")
+        self._chk_auto_export_runtime_qa.setObjectName("qaAutoExportCheck")
+        self._chk_auto_export_runtime_qa.setChecked(
+            bool(getattr(self.config, "auto_export_logs_and_snapshot_on_close", False))
+        )
+        self._chk_auto_export_runtime_qa.setToolTip(
+            "Automatically export serial logs and runtime snapshot when closing the app"
+        )
+        self._chk_auto_export_runtime_qa.toggled.connect(self._on_auto_export_runtime_toggled)
+        _qa_chip_bar_lay.addWidget(self._chk_auto_export_runtime_qa)
         _qa_chip_bar_lay.addStretch(1)
 
         _video_container_lay.addWidget(_qa_chip_bar, 0)
@@ -4988,6 +5036,17 @@ QWidget#sentryV2Root QPushButton#qaIconBtn {{
     font-size: {max(base_font + 0.5, 10.0):.2f}pt;
     min-height: 0px;
     padding: 0px;
+}}
+QWidget#sentryV2Root QComboBox#qaQuickCombo {{
+    background-color: {tokens['surface_alt_rgba']};
+    border: 1px solid {tokens['button_border']};
+    border-radius: {radius_small}px;
+    color: {tokens['text']};
+    font-size: {max(base_font + 0.2, 9.8):.2f}pt;
+    padding: 0px 8px 0px 8px;
+}}
+QWidget#sentryV2Root QComboBox#qaQuickCombo:hover {{
+    border-color: {tokens['accent']};
 }}
 QWidget#sentryV2Root QPushButton#qaIconBtn:hover {{
     background-color: {tokens['accent_faint']};
@@ -8416,7 +8475,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._chk_shortcuts_enabled.toggled.connect(self._on_shortcuts_enabled_changed)
         global_lay.addWidget(self._chk_shortcuts_enabled)
 
-        self._chk_manual_keyboard_enabled = QCheckBox("Enable manual keyboard movement and fire keys (W/A/S/D + Space)")
+        self._chk_manual_keyboard_enabled = QCheckBox("Enable manual keyboard movement and fire keys (Arrows or W/A/S/D + Space)")
         self._chk_manual_keyboard_enabled.setChecked(bool(getattr(self.config.shortcuts, "manual_controls_enabled", False)))
         self._chk_manual_keyboard_enabled.toggled.connect(self._on_manual_shortcuts_enabled_changed)
         global_lay.addWidget(self._chk_manual_keyboard_enabled)
@@ -9183,8 +9242,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._btn_fire = QPushButton("FIRE")
         self._set_button_role(self._btn_fire, "danger")
         self._btn_fire.setMinimumHeight(36)
-        self._btn_fire.pressed.connect(lambda: self._on_manual_fire(1))
-        self._btn_fire.released.connect(lambda: self._on_manual_fire(0))
+        self._btn_fire.clicked.connect(self._on_manual_fire_single_press)
         self._apply_tooltip(self._btn_fire, "manual_fire")
         fire_lay.addWidget(self._btn_fire)
 
@@ -9933,7 +9991,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if not self._should_present_display_frame(now, busy=True):
             return False
         processed_age_s = now - float(getattr(self, "_last_processed_frame_s", 0.0) or 0.0)
-        stale_threshold_s = max(0.20, self._busy_display_frame_interval_s * 2.5)
+        stale_threshold_s = max(0.10, self._busy_display_frame_interval_s * 1.55)
         return self._detector_worker_busy or processed_age_s >= stale_threshold_s
 
     def _present_live_preview_frame(self, frame: np.ndarray, now: float) -> None:
@@ -10027,6 +10085,38 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             if not bool(self.config.prompted_allow_auto_fire):
                 self._log("Auto-fire suppressed for prompted target (manual-fire-only).")
                 return
+        io_runtime = self._comm.get_io_runtime_snapshot()
+        io_age = io_runtime.get("age_s")
+        io_is_live = False
+        try:
+            io_is_live = io_age is not None and float(io_age) <= 1.5
+        except Exception:
+            io_is_live = False
+        if io_is_live:
+            safety_value = io_runtime.get("safety")
+            current_fault = io_runtime.get("current_fault")
+            try:
+                safety_locked = safety_value is not None and int(safety_value) != 0
+            except Exception:
+                safety_locked = False
+            try:
+                fault_active = current_fault is not None and int(current_fault) != 0
+            except Exception:
+                fault_active = bool(current_fault)
+
+            if safety_locked:
+                self._queue_comm_task("set_safety", True, self.engine.current_pan, self.engine.current_tilt)
+                self._safety_armed = True
+                if hasattr(self, "_btn_safety") and self._btn_safety is not None:
+                    self._btn_safety.blockSignals(True)
+                    self._btn_safety.setChecked(True)
+                    self._btn_safety.setText("Safety: ARMED")
+                    self._btn_safety.blockSignals(False)
+                self._log("Auto-fire pre-arm sync: runtime safety LOCKED (S1), sent S0 arm request")
+                return
+            if fault_active:
+                self._log(f"Auto-fire blocked: runtime fault active ({current_fault})")
+                return
         pan = self.engine.current_pan
         tilt = self.engine.current_tilt
         interval = self.config.engagement.burst_interval_ms
@@ -10068,6 +10158,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _on_engine_move(self, pan: float, tilt: float) -> None:
         if time.time() < float(getattr(self, "_manual_move_priority_until", 0.0) or 0.0):
+            # Resync engine pose while manual has priority so _move_turret's
+            # dead-reckoning update (no measured pose path) doesn't drift
+            # current_pan away from the actual hardware position.
+            self._resync_engine_pose_after_deferred_move()
             return
         move_note = self._describe_engine_auto_move(pan, tilt)
         move_delta = self._get_command_delta(pan, tilt)
@@ -10292,19 +10386,29 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if int(event.modifiers()) != int(Qt.NoModifier):
             return False
         key = int(event.key())
-        if key not in (Qt.Key_W, Qt.Key_A, Qt.Key_S, Qt.Key_D, Qt.Key_Space):
+        if key not in (
+            Qt.Key_W,
+            Qt.Key_A,
+            Qt.Key_S,
+            Qt.Key_D,
+            Qt.Key_Up,
+            Qt.Key_Down,
+            Qt.Key_Left,
+            Qt.Key_Right,
+            Qt.Key_Space,
+        ):
             return False
         if bool(event.isAutoRepeat()):
             event.accept()
             return True
         if event_type == QEvent.KeyPress:
-            if key == Qt.Key_W:
+            if key in (Qt.Key_W, Qt.Key_Up):
                 self._manual_move(0, 1)
-            elif key == Qt.Key_A:
+            elif key in (Qt.Key_A, Qt.Key_Left):
                 self._manual_move(-1, 0)
-            elif key == Qt.Key_S:
+            elif key in (Qt.Key_S, Qt.Key_Down):
                 self._manual_move(0, -1)
-            elif key == Qt.Key_D:
+            elif key in (Qt.Key_D, Qt.Key_Right):
                 self._manual_move(1, 0)
             elif key == Qt.Key_Space and not self._manual_keyboard_fire_active:
                 self._manual_keyboard_fire_active = True
@@ -13657,6 +13761,20 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._grp_trigger_mosfet.setVisible(not is_bb)
         if hasattr(self, "_grp_trigger_servo"):
             self._grp_trigger_servo.setVisible(is_bb)
+        if hasattr(self, "_combo_trigger_mode_qa"):
+            self._combo_trigger_mode_qa.blockSignals(True)
+            self._combo_trigger_mode_qa.setCurrentIndex(1 if is_bb else 0)
+            self._combo_trigger_mode_qa.blockSignals(False)
+
+    def _on_quick_trigger_mode_changed(self, index: int) -> None:
+        if not hasattr(self, "_combo_trigger_mode"):
+            return
+        if self._combo_trigger_mode.currentIndex() == index:
+            return
+        self._combo_trigger_mode.blockSignals(True)
+        self._combo_trigger_mode.setCurrentIndex(index)
+        self._combo_trigger_mode.blockSignals(False)
+        self._on_trigger_mode_changed(index)
 
     def _sync_comm_runtime_settings_from_config(self) -> None:
         engagement = self.config.engagement
@@ -13713,6 +13831,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         is_bb = (index == 1)
         self.config.engagement.trigger_mode_bb = is_bb
         self._comm.trigger_mode_bb = is_bb
+        if hasattr(self, "_combo_trigger_mode_qa"):
+            self._combo_trigger_mode_qa.blockSignals(True)
+            self._combo_trigger_mode_qa.setCurrentIndex(index)
+            self._combo_trigger_mode_qa.blockSignals(False)
         self._sync_trigger_mode_panel_visibility()
         self._sync_comm_runtime_settings_from_config()
         if self._host_controls_hardware():
@@ -13733,6 +13855,19 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._save_config_quietly()
         mode_name = "Projectile (ESP32 GPIO13 Servo)" if is_bb else "Water (MOSFET)"
         self._log(f"Trigger mode: {mode_name}")
+
+    def _optimize_numeric_entry_performance(self) -> None:
+        """Reduce UI latency while typing in numeric fields.
+
+        QSpinBox/QDoubleSpinBox default keyboardTracking emits valueChanged on
+        every keystroke. Disabling it commits only on Enter/focus-out, which
+        keeps heavy setting handlers responsive.
+        """
+        for widget in self.findChildren(QAbstractSpinBox):
+            try:
+                widget.setKeyboardTracking(False)
+            except Exception:
+                continue
 
     # ------------------------------------------------------------------ #
     #  Manual control handlers
@@ -13813,6 +13948,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._startup_rest_completed = True
         pan = self._spin_guard_pan.value()
         tilt = self._spin_guard_tilt.value()
+        # Home is a manual override; cancel any active return/engagement runtime
+        # state first so queued auto-return nudges do not fight the guided move.
+        self.engine.hold_current_guard_position(float(self.engine.current_pan), float(self.engine.current_tilt))
         waking_from_rest = self._is_near_rest_position(float(self.engine.current_pan), float(self.engine.current_tilt), tolerance_deg=8.0)
         self._play_home_cue(waking_from_rest=waking_from_rest)
         self._start_guided_position_move(pan, tilt, maneuver="home", hold_guard=True, log_message="Go Home")
@@ -14012,6 +14150,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._arm_manual_projectile_fire_release(pan, tilt)
             return
         self._queue_comm_task("send_command", pan, tilt, fire=state, move_time_ms=self._get_manual_move_time_ms())
+
+    def _on_manual_fire_single_press(self, _checked: bool = False) -> None:
+        self._on_manual_fire(1)
 
     def _arm_manual_projectile_fire_release(self, pan: float, tilt: float) -> None:
         self._manual_projectile_fire_release_pan = float(pan)
@@ -14908,6 +15049,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         except Exception as exc:
             self._log(f"Serial log export failed: {exc}")
 
+    def _auto_export_runtime_artifacts_if_enabled(self) -> None:
+        if not bool(getattr(self.config, "auto_export_logs_and_snapshot_on_close", False)):
+            return
+        self._export_serial_log()
+        self._export_runtime_snapshot()
+        self._log("Auto-export complete: serial log and runtime snapshot")
+
     def _open_serial_log_folder(self) -> None:
         try:
             SENTRY_V2_LOG_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -15385,6 +15533,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             f"Ctrl+Shift+Right - Manual pan right{manual_suffix}",
             f"Ctrl+Shift+Up - Manual tilt up{manual_suffix}",
             f"Ctrl+Shift+Down - Manual tilt down{manual_suffix}",
+            f"Left Arrow - Manual pan left{manual_suffix}",
+            f"Right Arrow - Manual pan right{manual_suffix}",
+            f"Up Arrow - Manual tilt up{manual_suffix}",
+            f"Down Arrow - Manual tilt down{manual_suffix}",
             f"A - Manual pan left{manual_suffix}",
             f"D - Manual pan right{manual_suffix}",
             f"W - Manual tilt up{manual_suffix}",
@@ -15420,7 +15572,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
     def _update_shortcut_labels(self) -> None:
         lines = self._shortcut_display_lines()
         base_count = 16 if bool(self.config.shortcuts.enabled) else 0
-        manual_count = 9 if self._manual_keyboard_shortcuts_enabled() else 0
+        manual_count = 13 if self._manual_keyboard_shortcuts_enabled() else 0
         summary = (
             f"Shortcuts: {base_count + manual_count} active commands | runtime: {'enabled' if self.config.shortcuts.enabled else 'disabled'} | "
             f"manual movement/fire: {'enabled' if getattr(self.config.shortcuts, 'manual_controls_enabled', False) else 'disabled'}"
@@ -16893,8 +17045,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             tf.max_size_ratio = float(settings["max_size_ratio"])
             tf.shape_filter_enabled = bool(settings.get("shape_filter_enabled", False))
             tf.shape_profile_name = str(settings.get("shape_profile_name", "") or "")
-            tf.semantic_min_confirm_frames = int(settings.get("semantic_min_confirm_frames", 1) or 1)
-            tf.semantic_min_confirm_confidence = float(settings.get("semantic_min_confirm_confidence", 0.0) or 0.0)
+            tf.semantic_min_confirm_frames = max(1, min(1, int(settings.get("semantic_min_confirm_frames", 1) or 1)))
+            tf.semantic_min_confirm_confidence = min(
+                max(float(tf.min_confidence), 0.0),
+                float(settings.get("semantic_min_confirm_confidence", 0.0) or 0.0),
+            )
             tf.semantic_confirm_ttl_s = float(settings.get("semantic_confirm_ttl_s", 0.8) or 0.8)
             self._detector.set_yolo_classes(",".join(tf.allowed_classes))
             self._push_config()
@@ -17736,11 +17891,24 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         feedback_tilt = feedback.get("tilt_deg")
         if feedback_pan is None or feedback_tilt is None or feedback_age is None:
             return
-        if float(feedback_age) > 1.0:
-            return
         now = time.time()
+        feedback_age_s = float(feedback_age)
+        # Anchor current_pan to real feedback only during ENGAGING (precision aiming).
+        # In GUARDING/RETURNING the engine must use commanded position for patrol
+        # dead-reckoning; pinning to stale 750 ms feedback would stall patrol.
+        is_engaging = (self.engine.state == SentryV2State.ENGAGING)
+        if is_engaging:
+            if feedback_age_s > 0.28:
+                pan, tilt = self._clamp_manual_angles(
+                    float(getattr(self, "_last_commanded_pan", self.engine.current_pan)),
+                    float(getattr(self, "_last_commanded_tilt", self.engine.current_tilt)),
+                )
+                self.engine.update_runtime_pose(pan, tilt, measured=False, timestamp=now)
+                return
+        elif feedback_age_s > 1.0:
+            return
         pan, tilt = self._clamp_manual_angles(float(feedback_pan), float(feedback_tilt))
-        self.engine.update_runtime_pose(pan, tilt, measured=True, timestamp=now)
+        self.engine.update_runtime_pose(pan, tilt, measured=is_engaging, timestamp=now)
 
     def _remember_commanded_position(self, pan: float, tilt: float, *, move_time_ms: Optional[int] = None) -> None:
         self._last_commanded_pan = float(pan)
@@ -17772,7 +17940,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 feedback_age_s = 999.0
             if feedback_pan is not None and feedback_tilt is not None and feedback_age_s <= 1.2:
                 pan, tilt = self._clamp_manual_angles(float(feedback_pan), float(feedback_tilt))
-                self.engine.update_runtime_pose(pan, tilt, measured=True)
+                # Use measured=True only during ENGAGING so that GUARDING patrol can
+                # use dead-reckoning without having _last_measured_pose_time refreshed
+                # on every deferred frame (which would stall patrol via _move_turret).
+                is_engaging = (self.engine.state == SentryV2State.ENGAGING)
+                self.engine.update_runtime_pose(pan, tilt, measured=is_engaging)
                 return
         pan, tilt = self._clamp_manual_angles(
             float(getattr(self, "_last_commanded_pan", self.engine.current_pan)),
@@ -17789,10 +17961,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         preview_window_s = max(self._display_frame_interval_s * 1.15, 0.08)
         if self.engine.state == SentryV2State.ENGAGING:
-            if not self._should_defer_tracking_move(move_time_ms):
+            # Keep precision recentering responsive while a previous command settles.
+            # Small corrections must not be starved by feedback cadence jitter.
+            if move_delta <= 0.9:
                 return False
-            if move_delta <= 1.2:
-                return True
+            if not self._should_defer_tracking_move(move_time_ms, move_delta):
+                return False
 
         commanded_at = float(getattr(self, "_last_commanded_pose_time_s", 0.0) or 0.0)
         if commanded_at <= 0.0:
@@ -17806,6 +17980,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         )
         if self.engine.state != SentryV2State.ENGAGING or move_delta >= 1.2:
             settle_window_s = max(settle_window_s, min(0.58, (float(move_time_ms) / 1000.0) + 0.08))
+        if (
+            self.engine.state == SentryV2State.ENGAGING
+            and move_delta >= 1.0
+            and command_age_s >= min(0.16, settle_window_s * 0.55)
+        ):
+            # Never let stale/slow feedback fully starve ENGAGING corrections.
+            return False
         if command_age_s >= settle_window_s:
             return False
 
@@ -17826,7 +18007,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             # Only block on stale feedback during precision tracking (ENGAGING).
             # In GUARDING/RETURNING, stale feedback must not block patrol moves.
             if self.engine.state == SentryV2State.ENGAGING:
-                return True
+                return False
             return False
 
         feedback_pan = feedback.get("pan_deg")
@@ -17847,7 +18028,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             tolerance = max(tolerance, 0.70)
         return remaining_error > tolerance
 
-    def _should_defer_tracking_move(self, move_time_ms: int) -> bool:
+    def _should_defer_tracking_move(self, move_time_ms: int, move_delta: float) -> bool:
         if self._host_controls_hardware():
             return False
         if self.engine.state != SentryV2State.ENGAGING:
@@ -17871,19 +18052,19 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         feedback_age = feedback.get("age_s")
         if feedback_age is None:
-            return True
+            return move_delta >= 1.0 and command_age_s < min(0.12, settle_window_s * 0.45)
 
         try:
             feedback_age_s = float(feedback_age)
         except Exception:
             feedback_age_s = 999.0
         if feedback_age_s > 0.35:
-            return True
+            return False
 
         feedback_pan = feedback.get("pan_deg")
         feedback_tilt = feedback.get("tilt_deg")
         if feedback_pan is None or feedback_tilt is None:
-            return True
+            return move_delta >= 1.0 and command_age_s < min(0.12, settle_window_s * 0.45)
 
         commanded_pan = float(getattr(self, "_last_commanded_pan", feedback_pan))
         commanded_tilt = float(getattr(self, "_last_commanded_tilt", feedback_tilt))
@@ -18274,9 +18455,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._btn_safety.toggled.connect(lambda c: self._sync_qa_btn(self._btn_safety_qa, c))
         self._btn_safety_qa.clicked.connect(self._btn_safety.setChecked)
 
-        # Fire (press/hold — not checkable, no sync needed)
-        self._btn_fire_qa.pressed.connect(lambda: self._on_manual_fire(1))
-        self._btn_fire_qa.released.connect(lambda: self._on_manual_fire(0))
+        # Fire (single press — not checkable, no sync needed)
+        self._btn_fire_qa.clicked.connect(self._on_manual_fire_single_press)
+
+        # Home quick action
+        self._btn_home_qa.clicked.connect(self._on_home_clicked)
 
         # Buzzer (back-sync is handled inside _sync_sound_widgets which includes _btn_buzzer_qa)
         self._btn_buzzer_qa.clicked.connect(self._chk_sound_enabled.setChecked)
@@ -18617,6 +18800,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             else:
                 self._queue_comm_task("set_led_pwm", 0, self.engine.current_pan, self.engine.current_tilt)
         self._save_config_quietly()
+
+    def _on_auto_export_runtime_toggled(self, checked: bool) -> None:
+        self.config.auto_export_logs_and_snapshot_on_close = bool(checked)
+        self._save_config_quietly()
+        self._log(
+            "Auto-export on close: "
+            + ("ON (serial log + runtime snapshot)" if checked else "OFF")
+        )
 
     def _on_led_pwm_slider_changed(self, value: int) -> None:
         self.config.lighting.led_pwm_value = int(max(0, min(255, value)))
@@ -19148,6 +19339,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 safety_text = "ARMED" if self._safety_armed else "LOCKED"
             else:
                 safety_text = "ARMED" if int(safety_value) == 0 else "LOCKED"
+                self._safety_armed = (int(safety_value) == 0)
+                if hasattr(self, "_btn_safety") and self._btn_safety is not None:
+                    self._btn_safety.blockSignals(True)
+                    self._btn_safety.setChecked(self._safety_armed)
+                    self._btn_safety.setText(f"Safety: {'ARMED' if self._safety_armed else 'LOCKED'}")
+                    self._btn_safety.blockSignals(False)
             if mode_value is None:
                 trigger_text = "Projectile" if self.config.engagement.trigger_mode_bb else "Water"
             else:

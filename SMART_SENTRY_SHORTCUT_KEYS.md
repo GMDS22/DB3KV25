@@ -20,6 +20,10 @@ Smart Sentry keyboard shortcuts are window-focused. They only fire while the Sma
 | `Ctrl+Shift+Right` | Manual pan right | Only active when manual movement/fire keyboard control is enabled |
 | `Ctrl+Shift+Up` | Manual tilt up | Only active when manual movement/fire keyboard control is enabled |
 | `Ctrl+Shift+Down` | Manual tilt down | Only active when manual movement/fire keyboard control is enabled |
+| `Left Arrow` | Manual pan left | Only active when manual movement/fire keyboard control is enabled |
+| `Right Arrow` | Manual pan right | Only active when manual movement/fire keyboard control is enabled |
+| `Up Arrow` | Manual tilt up | Only active when manual movement/fire keyboard control is enabled |
+| `Down Arrow` | Manual tilt down | Only active when manual movement/fire keyboard control is enabled |
 | `A` | Manual pan left | Only active when manual movement/fire keyboard control is enabled |
 | `D` | Manual pan right | Only active when manual movement/fire keyboard control is enabled |
 | `W` | Manual tilt up | Only active when manual movement/fire keyboard control is enabled |
@@ -33,12 +37,28 @@ Smart Sentry keyboard shortcuts are window-focused. They only fire while the Sma
 | `Ctrl+Alt+Plus` | Zoom UI in | Increases panel font scale |
 | `Ctrl+Alt+Minus` | Zoom UI out | Decreases panel font scale |
 
+## Mini Wireless Keyboard (i8-style) Recommended Mapping
+
+Based on the saved keyboard images (D-pad + media cluster + side Home/Pg keys), this mapping is recommended for Smart Sentry:
+
+| Keyboard control | Smart Sentry action | Notes |
+|---|---|---|
+| Right-side D-pad arrows | Manual pan/tilt | Works directly as `Left/Right/Up/Down` when manual keyboard control is enabled |
+| `OK` button in D-pad | `Space` (manual fire), if your unit emits Enter/Space through key-remap software | Leave unmapped by default for safety unless tested |
+| Main `Space` key | Manual fire hold | Press to fire, release to stop |
+| `W/A/S/D` | Manual pan/tilt fallback | Use if your D-pad is in mouse mode |
+| `Home` | `Ctrl+Alt+W` (Go home) | Use OS-level remapper if needed because many i8 keyboards emit plain Home |
+| `PgDn` | `Ctrl+Alt+R` (Go rest) | Use OS-level remapper if needed |
+| `WWW` or `.com` | `Ctrl+Alt+Q` (Quick keys) | Good candidate for opening this reference quickly |
+| Media play/pause | Optional: map to `Ctrl+Alt+E` (enable/disable sentry) | Recommended only if you do not use media keys during operation |
+
 ## Operator Notes
 
 - The shortcut system is enabled or disabled from the `Shortcut Keys` tab.
 - Manual movement and fire keyboard controls have a separate checkbox in the `Shortcut Keys` tab and default to disabled for safety.
 - The top-row `Quick Keys` button opens this document without changing the header layout.
 - Manual movement shortcuts respect the same motion limits as the on-screen controls.
+- Arrow keys and `W/A/S/D` share the same manual movement path (pan/tilt).
 - `Space` uses the same safety and trigger path as the on-screen `FIRE` button.
 - `Ctrl+Alt+L` toggles Auto Lighting. When auto lighting is ON it drives LED PWM directly from scene brightness; the LED button is only the manual LED toggle when auto mode is OFF.
 - Friendly face recognition, AI Assistant commands, and preview overlays do not require shortcuts, but this key map is intended to keep the common setup and control actions reachable without leaving the video view.

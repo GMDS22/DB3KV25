@@ -57,24 +57,22 @@ The engine is frame-driven. Every camera frame, it filters detections, scores re
 
 ---
 
-## 3. Guard Rule Of Thumb
+## 3. Core Operational Rule
 
-This is the operational rule the whole stack should follow:
+Simple rule:
 
-1. While guarding, keep the turret at guard position or in the configured patrol pattern.
-2. When something is detected, do not treat raw detection alone as fire authority.
-3. First validate that it is a credible target through the current detection mode, filter preset, and threat scoring rules.
-4. If it passes those rules, immediately start aiming the turret so the object center is moved toward frame center.
-5. If the target is rejected, disappears, or never becomes credible, stop pursuing it and return to guard behavior.
-6. If the target remains credible, keep tracking it.
-7. Fire only if automatic firing is enabled and the fire gate confirms centered, stable, trustworthy aim.
-8. After the engagement ends or the target is finally lost, return to guard or run the bounded loss-recovery behavior first, depending on the active mode.
+1. **Detect** — camera sees something
+2. **Validate** — check if it's a credible target (class, size, confidence rules)
+3. **Track** — move turret to center it on frame
+4. **Fire** — only if centered + auto-fire enabled + no safety mask blocks it
 
-The important principle is this:
+**That's it.** Do not block tracking with too many validation gates. Tracking IS validation. Once a target is centered:
+- If `auto_trigger_enabled = true`, and the target is reasonably confident, fire.
+- If the target disappears while tracking, look for it briefly, then return to guard.
+- If the target appears again, switch back to it.
+- In patrol guard modes, returning from engagement should resume patrol naturally (no forced home nudge each cycle).
 
-Detection is a suggestion.
-Tracking is a validation action.
-Firing is a gated consequence only after centering and stability are proven.
+The key principle: **Track first. Fire only if centered and enabled.** Remove unnecessary complexity.
 
 ---
 
@@ -201,9 +199,10 @@ Behavior contract:
 - search tightly around the last known aim first
 - widen only after the local area has been checked
 - retry more in sparse scenes than in crowded scenes
+- **stop immediately and switch to tracking any credible target that becomes visible during the search**
 - in fixed/static guard, end in a clean return to guard position
 
-This is the careful, bounded, “stay near where the target was lost” behavior.
+This is the careful, bounded, "stay near where the target was lost" behavior, but prioritizes reacquiring any visible target over completing the full search pattern.
 
 ### Loss-Recovery Settings That Matter Most
 
@@ -223,56 +222,38 @@ This is the careful, bounded, “stay near where the target was lost” behavior
 
 Loss recovery should feel bounded and purposeful, not random and not frozen. In static guard mode it must never leave the turret stranded off-home when recovery ends.
 
+Returning-state clarification:
+
+- if a valid target becomes visible again during RETURNING, the engine should re-enter ENGAGING directly instead of forcing a home move first
+- static guard keeps explicit home return behavior
+- patrol guard modes (sweep/waypoint/random) resume patrol flow without mandatory home-pingpong moves
+
 ---
 
-## 7. Aiming And Fire Protocol
+## 7. Aiming And Fire Protocol (Simplified)
 
-### Aiming Stages
+### Fire Gate (Simplified)
 
-The engagement controller has four stages:
+Automatic firing happens when ALL of these are true:
 
-1. `aim`
-2. `precision`
-3. `fire`
-4. `cooldown` or queue advance
+1. `auto_trigger_enabled` is ON (user control)
+2. Target is **centered** within firing tolerance (see `fire_trigger_enter_pan_tolerance`, `fire_trigger_enter_tilt_tolerance`)
+3. Target has **minimum confidence** (`fire_trigger_min_confidence`) — typically 0.4+
+4. Target has appeared for long enough (`fire_trigger_min_persistence`) — typically 0.08s+
+5. **No no-fire mask** is blocking the aim point
+6. Target stayed centered for **hold time** (`fire_trigger_hold_time`) — typically 0.05s+
 
-### Precision Aim Contract
+That is the entire gate. Simple.
 
-Once a target is active, the turret should aim using the current live target center. The precision phase uses:
+**Tuning:** 
+- To fire more often: increase tolerances, lower confidence/persistence thresholds, reduce hold time
+- To fire less often: do the opposite
+- **Do not add new checks here.** If firing is blocked, check the settings above or a no-fire mask.
 
-- camera-model conversion from target-center error to angle error
-- EMA-smoothed error
-- deadzone suppression
-- bounded PD-style correction with reversal braking
-- aim-lock frame accumulation only while error remains within tolerance
+UI control note:
 
-This is the core centering logic and should be treated as protected baseline behavior.
-
-### Fire Gate Contract
-
-Automatic firing is allowed only if all of the following are true:
-
-- `auto_trigger_enabled` is on
-- the target is still credible
-- no no-fire mask blocks the current aim point
-- aim is inside the current fire-entry tolerance window
-- aim error rates are stable enough
-- target confidence and persistence meet the minimum fire thresholds
-- hold time inside the fire window completes successfully
-
-Current fire authority is in `app/sentry_v2/sentry_v2_engine.py`.
-
-### General Firing Rule Of Thumb
-
-The turret should not fire because something exists somewhere in frame.
-
-It should fire only after:
-
-1. the target is selected
-2. the target center is driven toward frame center
-3. the aim is stable enough
-4. the target still satisfies trust conditions
-5. firing is enabled for that preset or workflow
+- trigger mode is available both in the full engagement settings panel and as a quick selector below the video panel
+- both controls are mirrored (changing one updates the other): `MOSFET` (water path) vs `SERVO` (projectile trigger-servo path)
 
 ### Trigger Mode Note
 
@@ -290,8 +271,6 @@ Historical clarification:
 ---
 
 ## 8. Preset System: How To Think About It
-
-Behavior in Smart Sentry is not determined by one preset only.
 
 A complete behavior stack is made from five layers:
 
@@ -547,7 +526,56 @@ These should remain true unless the project deliberately changes them and this f
 
 ---
 
-## 12. Known Editor Trap Areas
+## 12. Quick Troubleshooting
+
+### "It won't auto-fire"
+
+Check in this order:
+
+1. Is `auto_trigger_enabled` ON in the UI? (literally a checkbox)
+2. Is the target **centered on screen**? (red box at center means it's being aimed)
+3. Are there any **no-fire masks** configured that block the center?
+4. Check the **fire gate settings**:
+   - `fire_trigger_enter_pan_tolerance` (degrees) — is it too tight?
+   - `fire_trigger_enter_tilt_tolerance` (degrees) — is it too tight?
+   - `fire_trigger_min_confidence` — is it too high? (try 0.35-0.4)
+   - `fire_trigger_hold_time` — is it too long? (try 0.05s)
+
+**Default fix:** Loosen `fire_trigger_enter_*_tolerance` by 20%, lower confidence to 0.35, reduce hold_time to 0.05.
+
+### "It moves very slow"
+
+Check in this order:
+
+1. `engagement_speed` — higher = faster (try 80-90)
+2. `bus_servo_time_ms` — lower = faster (try 40-50)
+3. `precision_max_pan_step` / `precision_max_tilt_step` — increase these
+
+**Default fix:** Set `engagement_speed` to 80+, `bus_servo_time_ms` to 48.
+
+### "It overshoots (wobbles)"
+
+Check in this order:
+
+1. `precision_reversal_brake` — lower = less overshoot (try 0.1-0.15)
+2. `precision_max_pan_step` — lower = less overshoot (try 0.4-0.5)
+3. `precision_max_tilt_step` — lower = less overshoot (try 0.3-0.4)
+
+**Default fix:** Reduce reversal_brake to 0.1, max_pan_step to 0.4.
+
+### "It loses targets immediately"
+
+Check in this order:
+
+1. `target_loss_timeout` (seconds) — how long before giving up? (try 1.5-2.0)
+2. `loss_search_rounds` — more rounds = longer search (try 5-6)
+3. `loss_direction_pursuit_s` — how long to pursue in last direction? (try 0.3-0.4)
+
+**Default fix:** Increase `target_loss_timeout` to 2.0, `loss_search_rounds` to 6.
+
+---
+
+## 13. Known Editor Trap Areas (Simplified)
 
 These are the places most likely to produce accidental regressions.
 
@@ -653,51 +681,38 @@ This does not change the tracking math, but it is an editor-facing documentation
 
 ---
 
-## 13. Practical Tuning Rules
+## 14. Practical Tuning Rules (Simplified)
 
-Use these as guardrails when tuning behavior.
+### Auto-Trigger Not Working
 
-### If The Turret Tracks But Feels Too Slow
+1. Check `auto_trigger_enabled` is ON
+2. Check target is centered (red box at center)
+3. Increase `fire_trigger_enter_pan_tolerance` and `fire_trigger_enter_tilt_tolerance` by ~1 degree
+4. Lower `fire_trigger_min_confidence` to 0.35-0.4
+5. Reduce `fire_trigger_hold_time` to 0.05
 
-- raise servo timing from `smooth` to `balanced` first
-- then adjust `engagement_speed`
-- then adjust precision step limits carefully
-- do not start by removing smoothing entirely
+### Movement Too Slow
 
-### If The Turret Jitters Or Overshoots
+1. Increase `engagement_speed` to 80+
+2. Lower `bus_servo_time_ms` to 40-50
+3. Increase `precision_max_pan_step` to 0.6+
+4. Increase `precision_max_tilt_step` to 0.5+
 
-- reduce aggressive step size before widening deadzones too much
-- verify stale feedback is not the real cause
-- do not loosen fire tolerances as a first fix
+### Movement Overshoots / Wobbles
 
-### If PIR Looks Static
+1. Lower `precision_reversal_brake` to 0.1-0.15
+2. Lower `precision_max_pan_step` to 0.4-0.5
+3. Lower `precision_max_tilt_step` to 0.3-0.4
 
-- lower `cue_hold_time_s`
-- verify `scan_on_no_detect` is enabled
-- verify offset-first scan behavior was not regressed
+### Target Loss (Can't Reacquire)
 
-### If Red-Box Targets Do Not Cause Immediate Aim Attempts
-
-- check target promotion and movement gating first
-- check whether the target is already almost centered
-- check if motion output is disabled or deferred
-
-### If Auto-Fire Rarely Happens
-
-- check whether auto-fire is disabled by preset
-- check aim-lock tolerances and required frames
-- check confidence and persistence thresholds
-- check no-fire mask blocking
-
-### If Auto-Fire Happens Too Easily
-
-- tighten enter tolerances before altering detection presets
-- increase required aim-lock frames
-- increase hold time inside the fire gate
+1. Increase `target_loss_timeout` to 2.0+ seconds
+2. Increase `loss_search_rounds` to 5-6
+3. Increase `loss_direction_pursuit_s` to 0.4
 
 ---
 
-## 14. Change Checklist For Future Editors
+## 15. Change Checklist For Future Editors
 
 Before modifying tracking behavior, review all of these together:
 
@@ -719,7 +734,7 @@ If this file is not updated, the change is not finished.
 
 ---
 
-## 15. Bottom-Line Operational Summary
+## 16. Bottom-Line Operational Summary
 
 The intended Smart Sentry behavior is:
 

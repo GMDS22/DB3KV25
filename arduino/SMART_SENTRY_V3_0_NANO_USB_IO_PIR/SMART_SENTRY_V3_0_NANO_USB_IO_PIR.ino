@@ -45,7 +45,7 @@ static const uint8_t PIN_PIR_SENSOR_2 = A2;
 static const int SERVO_REST_DEG_DEFAULT = 0;
 static const int SERVO_FIRE_DEG_DEFAULT = 45;
 static const int SERVO_SPEED_DPS_DEFAULT = 360;
-static const uint32_t TRIGGER_PULSE_MS = 120;
+static const uint32_t TRIGGER_PULSE_MS = 120;         // legacy; projectile mode now uses trigger_mosfet_pulse_ms (J command)
 static const uint32_t MOSFET_PULSE_MS_DEFAULT = 120;
 static const uint8_t MOSFET_CYCLE_COUNT_DEFAULT = 1;
 static const uint32_t MOSFET_CYCLE_OFF_MS_DEFAULT = 50;
@@ -523,7 +523,10 @@ static void applyOutputs() {
   }
 
   if (projectile_pulse_active) {
-    if ((now_ms - projectile_pulse_start_ms) >= TRIGGER_PULSE_MS) {
+    // Use J-configurable pulse ms for hold time so the servo has enough time
+    // to reach the fire angle before the target reverses.
+    uint32_t hold_ms = (uint32_t)max(10, trigger_mosfet_pulse_ms);
+    if ((now_ms - projectile_pulse_start_ms) >= hold_ms) {
       setTriggerServoTarget(false);
       projectile_pulse_active = false;
       fire_token = 0;

@@ -2,7 +2,7 @@
 
 > **Version:** 3.5.0  
 > **Module Path:** `app/sentry_v2/`  
-> **Last Updated:** 2026-04-27  
+> **Last Updated:** 2026-04-29  
 > **Status:** Verified against the current standalone Smart Sentry v3.5.0 release candidate. The canonical runtime settings file is `app/config/smart_sentry_v3_5_0_settings.json`; older settings paths remain compatibility fallbacks only. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`, and the full settings system still defines 13 tabs while `Facial Recognition` and `AI Assistant` remain temporarily hidden by release hold for the active release line.
 
 Primary behavior-contract note: for the current authoritative tracking, PIR, target-loss, center-aim, and fire-gating blueprint, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md` first before changing engine or preset behavior.
@@ -198,7 +198,9 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 
 **Verified current identity note:** the underlying Facial Recognition implementation still persists its face library separately at `app/config/smart_sentry_v2_3_2_faces.json` and keeps the lightweight Haar-cascade plus embedding workflow in the codebase, but the tab is intentionally on release hold for v3.0.0 and is not part of the active release surface.
 
-**Verified current shortcut note:** the top-row `Quick Keys` button and the Shortcut Keys tab both point operators to `SMART_SENTRY_SHORTCUT_KEYS.md`, and the live shortcut runtime stays window-focused so hotkeys only fire while the Smart Sentry window is active.
+**Verified current shortcut note:** the top-row `Quick Keys` button and the Shortcut Keys tab both point operators to `SMART_SENTRY_SHORTCUT_KEYS.md`, and the live shortcut runtime stays window-focused so hotkeys only fire while the Smart Sentry window is active. Manual movement now accepts both `W/A/S/D` and `Left/Right/Up/Down` arrows when the manual keyboard toggle is enabled.
+
+**Verified current buzzer-control note:** the Sound ON/OFF toggle (including the QA mute chip) controls whether buzzer cues are sent at all, and the Sound volume slider controls `volume_pct` on the buzzer transport payload (`SOUND:freq:duration:volume` on serial and `volume_pct` in UDP sound packets). When human voice mode is enabled with buzzer suppression, buzzer output is intentionally muted.
 
 **Verified current auto lighting note:** the Controls tab includes an Auto Lighting Control group. When enabled (`Ctrl+Alt+L` or the checkbox in Controls or the video chip bar), the camera loop samples scene luminance every N frames and adjusts LED PWM: LED ramps toward `auto_pwm_max` as the scene darkens below `auto_brightness_threshold`, and turns off when bright. In auto mode the app owns the LED output directly, so dim scenes can turn the LED on automatically even if the manual LED button is off. Manual LED PWM (`led_pwm_value`) is used only when auto mode is off and the LED button is ON. Full PWM dimming requires ESP32 firmware `ACCESSORY_PWM_ENABLED 1`; with relay hardware (`ACCESSORY_PWM_ENABLED 0`) the LED still auto-switches ON/OFF but does not dim. All `LightingConfig` fields are persisted to the settings JSON.
 

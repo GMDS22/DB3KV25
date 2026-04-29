@@ -234,7 +234,7 @@ static bool fire_hold    = false;
 
 static uint32_t last_cmd_ms      = 0;
 static uint32_t last_state_ms    = 0;
-static uint32_t last_fire_start_ms = 0;
+static uint32_t last_mosfet_fire_start_ms = 0;
 static bool     fire_active        = false;
 static bool     rapid_fire_active  = false;
 static bool     trigger_servo_pwm_ready = false;
@@ -1035,7 +1035,7 @@ static void update_fire_outputs(uint32_t now_val, bool blocked) {
     return;
   }
   if (trigger_cfg.mode == 0) {
-    // Water (MOSFET with optional rapid fire)
+    // Water (MOSFET pulse)
     if (rapid_cfg.enabled) {
       int rate_hz = max(1, rapid_cfg.rate_hz);
       float duty  = rapid_cfg.duty;
@@ -1046,7 +1046,18 @@ static void update_fire_outputs(uint32_t now_val, bool blocked) {
       set_mosfet(on); fire_active = on; rapid_fire_active = true;
       return;
     }
-    set_mosfet(true); fire_active = true; rapid_fire_active = false;
+    // Single pulse
+    if (!fire_active) {
+      fire_active = true;
+      last_mosfet_fire_start_ms = now_val;
+      set_mosfet(true);
+      Serial.println("[FIRE] MOSFET -> ON");
+    } else if ((now_val - last_mosfet_fire_start_ms) > (uint32_t)trigger_cfg.mosfet_pulse_ms) {
+      set_mosfet(false);
+      fire_active = false;
+      fire_request = 0;
+      Serial.println("[FIRE] MOSFET -> OFF");
+    }
     return;
   }
   // Projectile (trigger servo pulse)

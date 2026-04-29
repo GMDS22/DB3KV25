@@ -56,6 +56,7 @@
 |-------|-----------|
 | `border-radius` on `QLabel#sentryV2Video` | [ISS-003](#iss-003) |
 | Frame buffer not detached from OpenCV | [ISS-018](#iss-018) |
+| Busy preview pacing/fallback too conservative | [ISS-090](#iss-090) |
 
 ### YOLO/Detection Not Promoting to Engagement
 | Check | Reference |
@@ -71,6 +72,8 @@
 | Aim settle time scaling | [ISS-011](#iss-011) |
 | Stale loss-recovery anchor after target switch | [ISS-009](#iss-009) |
 | PID derivative damping too low (`precision_kd`) | [ISS-070](#iss-070) |
+| ENGAGING pose freshness stale in fire phase | [ISS-088](#iss-088) |
+| Tracking speed profile too conservative for current hardware | [ISS-091](#iss-091) |
 
 ### Turret Won't Return Home After Engagement
 | Check | Reference |
@@ -85,6 +88,15 @@
 | `semantic_min_confirm_frames ≥ 2` — ByteTrack ID resets after each search pan | [ISS-073](#iss-073) |
 | `target_loss_timeout` too short; add more search time | [ISS-073](#iss-073) |
 | `loss_local_search_pan/tilt_deg` too narrow; person is outside sweep | [ISS-072](#iss-072), [ISS-073](#iss-073) |
+| Returning state bounces home then re-engages stale/nearby target repeatedly | [ISS-096](#iss-096) |
+
+### Turret Stops Tracking While Detection Still Showing
+| Check | Reference |
+|-------|-----------|
+| `_manual_move_priority_until` lock active after manual nudge (1.25 s+ lockout) | [ISS-097](#iss-097) |
+| Guided move (rest/guard position) set extended priority lock; not cleared on completion | [ISS-097](#iss-097) |
+| `_has_visible_reacquire_candidate()` halts loss recovery but score just below `min_threat_score` → 2 s idle freeze | [ISS-097](#iss-097) |
+| Auto Motion toggle is OFF (`_pan_tilt_motion_enabled = False`) — manual moves still work | [ISS-097](#iss-097) |
 
 ### PIR Sensors Seem One-Sided / Search Not Visible
 | Check | Reference |
@@ -100,12 +112,24 @@
 | Burst fire blocking UI thread | [ISS-037](#iss-037) |
 | `fire_trigger_enter_pan/tilt_tolerance` tighter than YOLO natural jitter (auto-fire never fires) | [ISS-071](#iss-071) |
 | Auto-trigger toggle enabled but stale fire-gate settings stayed loaded in memory | [ISS-074](#iss-074) |
+| Manual fire UX incorrectly wired as hold-to-fire | [ISS-089](#iss-089) |
 
 ### Detection Stalls After Changes
 | Check | Reference |
 |-------|-----------|
 | `_last_engage_time` not cleared on runtime reset | [ISS-021](#iss-021) |
 | Motion-locked fallback dropped by class filter | [ISS-055](#iss-055) |
+
+### Waypoint Patrol Not Moving
+| Check | Reference |
+|-------|-----------|
+| Watchful guard mode suppresses patrol while raw detections are on cooldown | [ISS-096](#iss-096) |
+| Patrol mode was forced to home nudge on every return cycle | [ISS-096](#iss-096) |
+
+### Settings Typing Feels Slow
+| Check | Reference |
+|-------|-----------|
+| QSpinBox/QDoubleSpinBox keyboard tracking emits on every keypress | [ISS-096](#iss-096) |
 
 ### Key Files for Camera Issues
 - `app/sentry_v2/sentry_v2_tab.py` — camera open/close, health checks, recovery, frame pipeline
@@ -127,6 +151,108 @@
 ## Issue Log
 
 Issues numbered newest-first. Search by symptom, file name, or category with `Ctrl+F`.
+
+---
+
+### ISS-096 | 2026-04-29 | v3.5.0 | Engine/UI/Docs | Worked
+### ISS-097 | 2026-04-30 | v3.5.0 | Engine/UI | Worked
+**Tracking Freeze: Detections Show But Turret Stops Moving Mid-Session**
+
+- **Symptoms**: After extended tracking or manual nudges, turret stops applying auto-corrections while detections are still visible and state shows ENGAGING. Manual directional moves still work. Turret "freezes" on a position for 1–5 seconds then may resume.
+- **Root Cause** (five confirmed paths):
+  1. **`_manual_move_priority_until` lockout** – Every manual move (and every guided position move) sets a 1.25 s (or longer) priority window. During this window `_on_engine_move()` silently discards all engine auto-moves without resyncing the engine's `current_pan`, causing pose corruption if no hardware feedback is present. Guided moves set `now + max(1.25, duration + 0.40)` which could be several seconds.
+  2. **Wide reacquire threshold gap** – In the precision phase, when `_find_active_target` returns `None` and `_has_visible_reacquire_candidate()` halts the loss-recovery search (target score slightly below `min_threat_score` but with `persistence ≥ 0.10`), the wide reacquire check used the strict `min_threat_score` threshold. No re-engagement happened; engine idled for the full `target_loss_timeout = 2.0 s`.
+  3. **`_finish_guided_move` did not clear priority lock** – After a guided move completed, `_manual_move_priority_until` continued blocking auto-tracking until it expired naturally (often 0.5–2 s after the move had already finished).
+  4. **Auto Motion toggle** (pre-existing design): `_pan_tilt_motion_enabled = False` blocks all engine auto-moves but allows manual overrides — gives identical "detects but won't track" symptom.
+  5. **Normal RETURNING + cycle_cooldown gap** (by design): 1.5 s return + up to 0.5 s cooldown = ~2 s window between engagements where detections show but no tracking corrections are applied.
+- **Fix/Solution**:
+  - **Fix A+D** (`sentry_v2_tab.py` `_on_engine_move`): Added `_resync_engine_pose_after_deferred_move()` call when `_manual_move_priority_until` guard fires the early return, matching the existing defer-path behavior and preventing engine pose corruption.
+  - **Fix C** (`sentry_v2_engine.py` precision phase wide reacquire): Replaced strict `min_threat_score` filter with `relaxed_reacquire_score = max(0.20, min_score * 0.65)`, consistent with the existing `_has_visible_reacquire_candidate()` relaxed threshold. Tie-breaks on `(threat_score, persistence)` instead of `threat_score` alone.
+  - **Fix E** (`sentry_v2_tab.py` `_finish_guided_move`): Added `self._manual_move_priority_until = 0.0` when a guided move completes normally, so engine auto-tracking resumes immediately instead of waiting out the remaining pre-calculated priority window.
+- **Files Modified**: `app/sentry_v2/sentry_v2_engine.py`, `app/sentry_v2/sentry_v2_tab.py`
+- **Notes**: Path 4 (Auto Motion toggle) is intentional behavior; added to the troubleshooting reference table so operators know to check it. Path 5 (return/cooldown gap) is by design and unchanged. The `_update_returning` re-engage shortcut from ISS-096 only fires when `cycle_cooldown ≤ return_delay`; with defaults (2.0 > 1.5) it is effectively dead code for this config.
+
+---
+
+**Waypoint Patrol Stall, Return Ping-Pong, Slow Settings Typing, and Missing Quick Trigger Mode Control**
+
+- **Symptoms**: (1) Guard mode set to waypoint patrol but turret often appeared stationary, (2) after tracking, turret could bounce between guard home and last object region several times, (3) editing many numeric settings felt laggy while typing, (4) trigger mode (MOSFET vs servo) was not quickly accessible below the video panel, (5) bottom video quick-action icons were too small.
+- **Root Cause**: 
+  - Watchful mode returned "suppress patrol" during move cooldown even when no movement command was issued, causing apparent patrol freeze.
+  - RETURNING path always commanded a home nudge for patrol modes, then GUARDING could re-engage shortly after, producing back-and-forth behavior.
+  - Numeric widgets used default keyboard tracking, so heavy valueChanged handlers executed on each keystroke.
+  - Trigger mode selector existed only in full settings panel.
+  - QA icon button sizes were fixed at small values.
+- **Fix/Solution**:
+  - Engine: in watchful cooldown, allow patrol to continue instead of suppressing it.
+  - Engine: in RETURNING, re-engage immediately if a valid target is visible after return delay; for patrol modes, stop forcing a home nudge and resume patrol naturally.
+  - UI performance: disabled keyboard tracking for all spin boxes so changes commit on enter/focus-out instead of every keypress.
+  - UI controls: added quick trigger mode selector (MOSFET/SERVO) to the quick bar below video, synchronized bidirectionally with main trigger mode combo.
+  - UI polish: increased quick-bar icon button size for better usability.
+  - Documentation: aligned behavior contract notes with implemented return/patrol and trigger quick-control behavior.
+- **Files Modified**: `app/sentry_v2/sentry_v2_engine.py`, `app/sentry_v2/sentry_v2_tab.py`, `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md`, `SMART_SENTRY_ISSUE_LOG.md`
+- **Notes**: This keeps static guard return-to-home intact while improving waypoint/random patrol continuity and preventing repeated return/re-engage oscillations.
+
+---
+
+### ISS-095 | 2026-04-29 | v3.5.0 | Engine | Worked
+**Auto-Fire Not Triggering; Overshooting; Too Slow; Target Loss Ineffective**
+
+- **Symptoms**: Multiple coordinated regressions: (1) auto-trigger never fires even at center, (2) turret moves very slowly, (3) movement overshoots/wobbles, (4) target loss recovery just moves past visible targets without re-detecting, (5) fire gating felt overly complicated with too many interdependent conditions.
+- **Root Cause**: (1) Speed tuning from ISS-091 was lost (settings reset to defaults), reverting to `engagement_speed: 40`, `bus_servo_time_ms: 60`; (2) Fire gate had removal of "stability" check (motion-rate gates) but kept strict tolerances + confidence/persistence requirements + hold time, making it impossible for typical confidence values to pass; (3) Reversal brake was too aggressive (`0.24`), causing overshoot; (4) Loss recovery timeouts were too short + step intervals too slow; (5) Fire gating logic referenced too many settings with unintuitive names.
+- **Fix/Solution**: 
+  - **Speed**: Restored to tuned values: `engagement_speed: 82`, `bus_servo_time_ms: 48`, `motion_ignore_after_move_s: 0.05`
+  - **Overshooting**: Reduced reversal brake to `0.15`, `precision_max_pan_step` to `0.5`, `precision_max_tilt_step` to `0.4`
+  - **Auto-Fire**: Loosened fire gate significantly: `fire_trigger_enter_pan_tolerance: 3.5`, `fire_trigger_enter_tilt_tolerance: 2.8`, `fire_trigger_hold_time: 0.05`, `fire_trigger_min_confidence: 0.4`, `fire_trigger_min_persistence: 0.08`, `aim_lock_required_frames: 1`
+  - **Loss Recovery**: Extended timeouts and faster search: `target_loss_timeout: 2.0`, `loss_direction_pursuit_s: 0.4`, `loss_search_step_interval_s: 0.15`, `loss_search_rounds: 6`
+  - **Simplification**: Removed "stability" (motion-rate) checks from `_trigger_should_fire()`, leaving only centered + confident + no-fire-mask + hold-time. Added docstring explaining the gate is simple and should not be made more complex.
+  - **Documentation**: Completely rewrote blueprint section 3 (Core Operational Rule) to be 4 simple steps instead of 8. Simplified section 7 (Fire Gate) to show only essential conditions. Added section 12 (Quick Troubleshooting) with 4 common issues and direct setting fixes. Removed verbose/redundant sections 13-15.
+- **Files Modified**: `app/config/smart_sentry_v3_5_0_settings.json`, `app/sentry_v2/sentry_v2_engine.py`, `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md`
+- **Notes**: Fire gate now explicitly checks for "no stability requirement" — this is intentional to make auto-fire work reliably. Target quality still gates via confidence/persistence but with much looser thresholds. All changes preserve the centering precision from ISS-091 while fixing firing responsiveness. Blueprint now aligns with actual simplified code behavior.
+
+---
+
+### ISS-091 | 2026-04-28 | v3.5.0 | Config | Worked
+**Tracking Feels Too Slow Despite Stable Centering**
+
+- **Symptoms**: Target centering and engage behavior were acceptable, but turret follow speed felt sluggish during target movement and reacquisition.
+- **Root Cause**: Active profile values were still on a moderate tracking-speed posture for this hardware (`engagement_speed: 62`, `bus_servo_time_ms: 60`), which produced larger command move times than desired.
+- **Fix/Solution**: Updated active v3.5 profile to a faster but stable tune: `engagement_speed: 82`, `bus_servo_time_ms: 48`. Also reduced post-move motion suppression from `motion_ignore_after_move_s: 0.08` to `0.05` to improve follow responsiveness after each command.
+- **Files Modified**: `app/config/smart_sentry_v3_5_0_settings.json`
+- **Notes**: This tuning intentionally leaves precision/fire gates unchanged to preserve the improved centering behavior while increasing follow speed.
+
+---
+
+### ISS-090 | 2026-04-28 | v3.5.0 | Camera | Worked
+**Camera Preview Still Felt Delayed During Busy Detection**
+
+- **Symptoms**: Live video looked slightly delayed even after prior responsiveness improvements, especially when detector load was high.
+- **Root Cause**: Busy preview fallback cadence and stale-frame threshold remained conservative, delaying fallback-presented frames under sustained detector load.
+- **Fix/Solution**: Tightened preview pacing and stale fallback threshold: `_display_frame_interval_s 1/20 -> 1/24`, `_busy_display_frame_interval_s 1/14 -> 1/18`, and `stale_threshold_s max(0.14, busy*1.8) -> max(0.10, busy*1.55)`.
+- **Files Modified**: `app/sentry_v2/sentry_v2_tab.py`
+- **Notes**: Change targets perceived latency only; no camera-open/recovery path changes were made.
+
+---
+
+### ISS-089 | 2026-04-27 | v3.5.0 | UI | Worked
+**Manual Fire Quick Access Showed Hold-To-Fire Instead Of Single Press**
+
+- **Symptoms**: Quick-access fire control displayed and behaved as hold-to-fire, conflicting with expected single-press manual fire behavior.
+- **Root Cause**: Fire buttons were wired to `pressed/released` (`_on_manual_fire(1/0)`) and QA tooltip explicitly advertised hold semantics.
+- **Fix/Solution**: Rewired both main and QA fire controls to a click-based single-press handler and updated QA tooltip text to remove hold messaging.
+- **Files Modified**: `app/sentry_v2/sentry_v2_tab.py`
+- **Notes**: Firmware compatibility confirmed; single `F=1` command is pulse-managed by firmware trigger paths and does not require hold semantics.
+
+---
+
+### ISS-088 | 2026-04-27 | v3.5.0 | Engine | Worked
+**ENGAGING Fire Phase Did Not Persistently Recenter Moving Targets**
+
+- **Symptoms**: In ENGAGING state, turret could stay offset and fail to micro-readjust while target moved, especially after entering fire phase.
+- **Root Cause**: Stale measured pose could keep fire-phase gating active without forcing re-entry into precision correction, and stale feedback could defer meaningful follow moves.
+- **Fix/Solution**: Added tighter measured-pose freshness gating in ENGAGING/fire logic, forced fire->precision fallback on stale measured pose, and adjusted stale-feedback deferral behavior so tracking corrections continue when feedback is stale.
+- **Files Modified**: `app/sentry_v2/sentry_v2_engine.py`, `app/sentry_v2/sentry_v2_tab.py`
+- **Notes**: This fix restored persistent recentering without widening fire gates.
 
 ---
 

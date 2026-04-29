@@ -553,7 +553,9 @@ class SentryV2Engine:
         if not raw:
             return False
         if now - self._behaviour_watchful_last_move < WATCHFUL_MOVE_INTERVAL:
-            return True  # detections exist, suppress patrol even on cooldown
+            # Let patrol continue between watchful micro-tracks instead of
+            # freezing when noisy raw detections keep arriving.
+            return False
         # Pick the detection with the largest bbox area (most prominent mover)
         best = max(
             raw,
@@ -785,6 +787,32 @@ class SentryV2Engine:
                         self._start_loss_recovery(now)
                 if self._loss_recovery_enabled():
                     self._update_loss_recovery(now)
+                # Wide reacquire: if scan panned to where YOLO sees a qualifying
+                # target of the correct class anywhere in frame, re-engage immediately
+                # rather than waiting for the strict pixel-proximity check.
+                # Use a relaxed threshold matching _has_visible_reacquire_candidate so
+                # a target that paused loss-recovery (score near but below min_score,
+                # or high persistence) can still be re-engaged here instead of waiting
+                # out the full target_loss_timeout (a visible-target freeze of up to 2s).
+                if self._loss_recovery_phase and self.last_targets:
+                    anchor_class = str(getattr(self, "_active_target_last_class", "") or "").strip().lower()
+                    min_score = self.cfg.engagement.min_threat_score
+                    relaxed_reacquire_score = max(0.20, min_score * 0.65)
+                    candidates = [
+                        t for t in self.last_targets
+                        if t.threat_score >= relaxed_reacquire_score
+                        and (not anchor_class or str(t.det.class_name or "").strip().lower() == anchor_class)
+                    ]
+                    if candidates:
+                        best = max(candidates, key=lambda t: (t.threat_score, float(t.persistence)))
+                        old_id = int(order.target.det.track_id)
+                        order.target = best
+                        self._remember_active_target(best.det, target=best)
+                        self._target_lost_since = 0.0
+                        self._reset_loss_recovery_state()
+                        self._last_reacquire_note = f"scan reacquire {old_id}->{int(best.det.track_id)}"
+                        self._last_reacquire_time = now
+                        return  # re-engage on next frame
                 if (now - self._target_lost_since) >= self.cfg.engagement.target_loss_timeout:
                     if self._should_retry_loss_recovery():
                         self._restart_loss_recovery(now)
@@ -902,6 +930,16 @@ class SentryV2Engine:
             tracked_target = self._find_active_target(order)
             tracked_det = tracked_target.det if tracked_target is not None else None
             if tracked_det is not None:
+                if not self._has_recent_measured_pose(
+                    now,
+                    max_age_s=self._engagement_pose_freshness_s(for_fire=True),
+                ):
+                    self._last_reacquire_note = "fire stale pose -> precision"
+                    self._last_reacquire_time = now
+                    self._engage_phase = "precision"
+                    self._phase_start = now
+                    self._reset_precision_state()
+                    return
                 self._last_err_pan_deg, self._last_err_tilt_deg = self._compute_tracking_angle_error(
                     tracked_target,
                     now,
@@ -1008,7 +1046,7 @@ class SentryV2Engine:
         return None
 
     def _find_reacquire_target(self, order: EngagementOrder) -> Optional[TrackedTarget]:
-        if not self.last_targets:
+        if not self.last_targets and not self.last_detections:
             return None
 
         anchor_center = self._active_target_last_center or (
@@ -1042,14 +1080,53 @@ class SentryV2Engine:
 
         best_target: Optional[TrackedTarget] = None
         best_cost = float("inf")
+        current_time = time.time()
+        scored_track_ids = {int(target.det.track_id) for target in self.last_targets}
+        candidate_targets: List[Tuple[TrackedTarget, bool]] = [(target, False) for target in self.last_targets]
+        provisional_conf_floor = max(
+            0.30,
+            float(getattr(self.cfg.target_filter, "min_confidence", 0.5) or 0.5) * 0.70,
+        )
+        provisional_dets: List[DetectedObject] = []
 
-        for target in self.last_targets:
+        for det in self.last_detections:
+            det_track_id = int(det.track_id)
+            if det_track_id in scored_track_ids:
+                continue
+
+            target_class = str(det.class_name or "").strip().lower()
+            target_source = str(det.source or "").strip().lower()
+            if anchor_source and target_source and target_source != anchor_source:
+                continue
+            if anchor_class and anchor_class not in NON_SEMANTIC_REACQUIRE_CLASSES:
+                if target_class and target_class != anchor_class:
+                    continue
+
+            dist_px = ((float(det.center_x) - anchor_center[0]) ** 2 + (float(det.center_y) - anchor_center[1]) ** 2) ** 0.5
+            iou = self._bbox_iou(anchor_bbox, det.bbox)
+            area_similarity = min(anchor_area, self._bbox_area(det.bbox)) / max(anchor_area, self._bbox_area(det.bbox))
+            if dist_px > reacquire_radius_px and iou < 0.08:
+                continue
+            if area_similarity < 0.35 and iou < 0.12:
+                continue
+            if float(det.confidence) < provisional_conf_floor and iou < 0.18 and dist_px > (reacquire_radius_px * 0.55):
+                continue
+            provisional_dets.append(det)
+
+        if provisional_dets:
+            for target in self._scorer.score(provisional_dets, current_time):
+                candidate_targets.append((target, True))
+
+        for target, provisional in candidate_targets:
             det = target.det
             target_class = str(det.class_name or "").strip().lower()
             target_source = str(det.source or "").strip().lower()
             if anchor_source and target_source and target_source != anchor_source:
                 continue
-            if target.threat_score < (self.cfg.engagement.min_threat_score * 0.70):
+            if provisional:
+                if float(det.confidence) < provisional_conf_floor:
+                    continue
+            elif target.threat_score < (self.cfg.engagement.min_threat_score * 0.70):
                 continue
             if anchor_class and anchor_class not in NON_SEMANTIC_REACQUIRE_CLASSES:
                 if target_class and target_class != anchor_class:
@@ -1067,8 +1144,10 @@ class SentryV2Engine:
                 (dist_px / max(1.0, reacquire_radius_px))
                 - (iou * 0.85)
                 - (area_similarity * 0.35)
-                - (target.threat_score * 0.20)
+                - (target.threat_score * (0.14 if provisional else 0.20))
             )
+            if provisional:
+                cost += 0.08
             if self._adaptive_loss_recovery_enabled():
                 visible_count = int(self._loss_recovery_context.get("visible_target_count", len(self.last_targets)) or len(self.last_targets))
                 crowd_threshold = max(1, int(getattr(self.cfg.engagement, "loss_scene_crowding_threshold", 3) or 3))
@@ -1148,6 +1227,12 @@ class SentryV2Engine:
             float(target.det.confidence) >= float(eng.fire_trigger_min_confidence)
             and float(target.persistence) >= float(eng.fire_trigger_min_persistence)
         )
+
+    def _engagement_pose_freshness_s(self, *, for_fire: bool = False) -> float:
+        # ENGAGING needs materially fresher pose than patrol/returning. Fire
+        # phase is stricter so micro-adjust and firing never run on delayed
+        # debug-board feedback while the target is still moving.
+        return 0.22 if for_fire else 0.28
 
     def _engagement_response_scale(self, *, use_fire_limits: bool) -> float:
         speed_value = int(max(10, min(100, int(getattr(self.cfg.engagement, "engagement_speed", 80) or 80))))
@@ -1248,7 +1333,39 @@ class SentryV2Engine:
         self._active_target_last_aim_tilt = self._clamp_tilt(order.tilt)
         self._engage_phase = "aim"
         self._phase_start = now
-        self._move_turret(order.pan, order.tilt)
+        target = self._find_active_target(order)
+        if target is not None:
+            # Initial acquire must be derived from live target position, but keep
+            # the first jump bounded to avoid abrupt moves from stale queue plans.
+            err_pan, err_tilt = self._compute_tracking_angle_error(target, now, for_fire=False)
+            max_step_pan = max(2.0, float(getattr(self.cfg.engagement, "precision_max_pan_step", 0.0) or 0.0) * 3.0)
+            max_step_tilt = max(1.6, float(getattr(self.cfg.engagement, "precision_max_tilt_step", 0.0) or 0.0) * 3.0)
+            step_pan = max(-max_step_pan, min(max_step_pan, float(err_pan)))
+            step_tilt = max(-max_step_tilt, min(max_step_tilt, float(err_tilt)))
+            self._move_turret(self.current_pan + step_pan, self.current_tilt + step_tilt)
+        else:
+            self._move_turret(order.pan, order.tilt)
+
+    def _has_visible_reacquire_candidate(self) -> bool:
+        if not self.last_targets:
+            return False
+        anchor_class = str(getattr(self, "_active_target_last_class", "") or "").strip().lower()
+        min_score = float(self.cfg.engagement.min_threat_score)
+        min_conf = max(
+            0.35,
+            float(getattr(self.cfg.target_filter, "min_confidence", 0.5) or 0.5) * 0.72,
+        )
+        relaxed_score = max(0.30, min_score * 0.65)
+        for target in self.last_targets:
+            det = target.det
+            class_name = str(det.class_name or "").strip().lower()
+            if anchor_class and anchor_class not in NON_SEMANTIC_REACQUIRE_CLASSES and class_name != anchor_class:
+                continue
+            if float(det.confidence) < min_conf:
+                continue
+            if float(target.threat_score) >= relaxed_score or float(target.persistence) >= 0.10:
+                return True
+        return False
 
     def _enter_precision_phase(self, now: float, order: EngagementOrder) -> None:
         """Switch to precision phase after the coarse acquire stage has settled."""
@@ -1757,6 +1874,14 @@ class SentryV2Engine:
         if self._target_lost_since <= 0.0 or not self._loss_recovery_enabled():
             return
 
+        # If credible targets are visible, stop the search and let the main loop reacquire immediately
+        if self.last_targets:
+            min_score = self.cfg.engagement.min_threat_score
+            if any(target.threat_score >= min_score for target in self.last_targets):
+                return
+        if self._has_visible_reacquire_candidate():
+            return
+
         if self._adaptive_loss_recovery_enabled():
             best_alternative = self._best_loss_recovery_alternative_target()
             if best_alternative is not None:
@@ -2093,12 +2218,31 @@ class SentryV2Engine:
         lock_tilt: float,
         now: float,
     ) -> bool:
+        """
+        Simplified fire gate: check only essential conditions.
+        
+        Gate conditions (all must be true to fire):
+          1. Not in refractory period
+          2. No fire mask blocking current aim
+          3. Target is centered within firing tolerance
+          4. Target has minimum confidence and persistence
+          5. Hold time requirement met
+        """
         eng = self.cfg.engagement
+        
+        # Refractory check: prevent rapid re-firing
         if now < self._trigger_refractory_until:
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
             return False
 
+        # No-fire mask check: safety-critical
+        if self._current_no_fire_mask() is not None:
+            self._trigger_hold_start = 0.0
+            self._trigger_gate_active = False
+            return False
+
+        # Centering check: use hysteresis (wider exit than enter)
         enter_pan = float(eng.fire_trigger_enter_pan_tolerance)
         enter_tilt = float(eng.fire_trigger_enter_tilt_tolerance)
         exit_pan = max(enter_pan, float(eng.fire_trigger_exit_pan_tolerance))
@@ -2107,25 +2251,19 @@ class SentryV2Engine:
         gate_tilt = exit_tilt if self._trigger_gate_active else enter_tilt
 
         centered = abs(lock_pan) <= gate_pan and abs(lock_tilt) <= gate_tilt
-        stable = (
-            self._err_pan_rate_deg_s <= float(eng.fire_trigger_max_pan_rate)
-            and self._err_tilt_rate_deg_s <= float(eng.fire_trigger_max_tilt_rate)
-        )
+        
+        # Target quality check: simplified - only confidence and persistence
         trustworthy = (
             float(target.det.confidence) >= float(eng.fire_trigger_min_confidence)
             and float(target.persistence) >= float(eng.fire_trigger_min_persistence)
         )
 
-        if self._current_no_fire_mask() is not None:
+        if not (centered and trustworthy):
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
             return False
 
-        if not (centered and stable and trustworthy):
-            self._trigger_hold_start = 0.0
-            self._trigger_gate_active = False
-            return False
-
+        # Hold time accumulation
         if self._trigger_hold_start <= 0.0:
             self._trigger_hold_start = now
             self._trigger_gate_active = True
@@ -2160,6 +2298,11 @@ class SentryV2Engine:
 
         deadzone_pan = float(eng.precision_deadzone_pan_deg)
         deadzone_tilt = float(eng.precision_deadzone_tilt_deg)
+        if use_fire_limits:
+            # Keep fire-phase tracking alive: use a tighter deadzone while
+            # micro-adjusting so moving targets are actively recentered.
+            deadzone_pan = min(deadzone_pan, 0.18)
+            deadzone_tilt = min(deadzone_tilt, 0.16)
         ctrl_pan = 0.0 if abs(lock_pan) <= deadzone_pan else lock_pan
         ctrl_tilt = 0.0 if abs(lock_tilt) <= deadzone_tilt else lock_tilt
 
@@ -2203,8 +2346,20 @@ class SentryV2Engine:
         self._last_pid_d_tilt = float(eng.precision_kd) * d_tilt
 
         if use_fire_limits:
-            pan_limit = float(eng.fire_micro_adjust_max_pan_step)
-            tilt_limit = float(eng.fire_micro_adjust_max_tilt_step)
+            fire_window_pan = max(0.8, float(getattr(eng, "fire_recenter_pan_tolerance", 0.0) or 0.0))
+            fire_window_tilt = max(0.8, float(getattr(eng, "fire_recenter_tilt_tolerance", 0.0) or 0.0))
+            fire_pan_limit = float(eng.fire_micro_adjust_max_pan_step)
+            fire_tilt_limit = float(eng.fire_micro_adjust_max_tilt_step)
+            precision_pan_limit = float(eng.precision_max_pan_step) if float(eng.precision_max_pan_step) > 0.0 else float(eng.precision_max_step)
+            precision_tilt_limit = float(eng.precision_max_tilt_step) if float(eng.precision_max_tilt_step) > 0.0 else float(eng.precision_max_step)
+            pan_limit = max(
+                fire_pan_limit,
+                min(precision_pan_limit * 0.55, fire_pan_limit + ((abs(lock_pan) / fire_window_pan) * 0.22)),
+            )
+            tilt_limit = max(
+                fire_tilt_limit,
+                min(precision_tilt_limit * 0.55, fire_tilt_limit + ((abs(lock_tilt) / fire_window_tilt) * 0.18)),
+            )
         else:
             pan_limit = float(eng.precision_max_pan_step) if float(eng.precision_max_pan_step) > 0.0 else float(eng.precision_max_step)
             tilt_limit = float(eng.precision_max_tilt_step) if float(eng.precision_max_tilt_step) > 0.0 else float(eng.precision_max_step)
@@ -2215,10 +2370,19 @@ class SentryV2Engine:
         return corr_pan, corr_tilt, lock_pan, lock_tilt
 
     def _should_return_to_precision(self, err_pan: float, err_tilt: float) -> bool:
+        if not self._has_recent_measured_pose(max_age_s=self._engagement_pose_freshness_s(for_fire=True)):
+            return True
         eng = self.cfg.engagement
+        # Keep moving targets centered: while in fire phase, if target error drifts
+        # beyond a tighter threshold, switch back to precision immediately.
+        fire_center_tol = max(0.0, float(getattr(eng, "fire_center_tolerance_deg", 3.5)))
+        dynamic_pan_tol = max(0.8, fire_center_tol * 0.4)
+        dynamic_tilt_tol = max(0.8, fire_center_tol * 0.4)
+        recenter_pan_tol = min(float(eng.fire_recenter_pan_tolerance), dynamic_pan_tol)
+        recenter_tilt_tol = min(float(eng.fire_recenter_tilt_tolerance), dynamic_tilt_tol)
         return (
-            abs(err_pan) > float(eng.fire_recenter_pan_tolerance)
-            or abs(err_tilt) > float(eng.fire_recenter_tilt_tolerance)
+            abs(err_pan) > recenter_pan_tol
+            or abs(err_tilt) > recenter_tilt_tol
         )
 
     # ------------------------------------------------------------------ #
@@ -2228,16 +2392,31 @@ class SentryV2Engine:
     def _update_returning(self, now: float) -> None:
         """Wait briefly, then return to guard/patrol position."""
         if now - self._return_start >= self.cfg.engagement.return_delay:
+            # If a valid target is visible again while returning, re-enter
+            # engagement directly and avoid ping-ponging between home and
+            # target position.
+            if self.last_targets and (now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown):
+                queue = self._planner.plan(self.last_targets, self.current_pan, self.current_tilt)
+                if queue:
+                    self._queue = queue
+                    self.last_queue = queue
+                    self._queue_index = 0
+                    self._patrol_initialized = False
+                    self._reset_precision_state()
+                    self._change_state(SentryV2State.ENGAGING)
+                    first = self._queue[0]
+                    self.active_order = first
+                    self._remember_active_target(first.target.det)
+                    self._start_order_engagement(first, now)
+                    return
+
             mode = self.cfg.guard.guard_mode
             if mode == 0:
                 # Static guard — move back to guard point
                 gp, gt = self._planner.get_return_position()
                 self._move_turret(gp, gt)
-            else:
-                # Patrol modes — nudge turret toward guard home so it doesn't
-                # stay stranded at the last engagement point while patrol re-inits.
-                gp, gt = self._planner.get_return_position()
-                self._move_turret(gp, gt)
+            # Patrol modes intentionally do not force a home nudge here;
+            # they should resume patrol naturally from current pose.
             self._patrol_initialized = False  # patrol will re-init on next tick
             self._change_state(SentryV2State.GUARDING)
 
@@ -2389,12 +2568,12 @@ class SentryV2Engine:
     # Turret helpers
     # ------------------------------------------------------------------ #
 
-    def _has_recent_measured_pose(self, now: Optional[float] = None) -> bool:
+    def _has_recent_measured_pose(self, now: Optional[float] = None, *, max_age_s: float = 1.2) -> bool:
         measured_at = float(getattr(self, "_last_measured_pose_time", 0.0) or 0.0)
         if measured_at <= 0.0:
             return False
         sample_now = time.time() if now is None else float(now)
-        return (sample_now - measured_at) <= 1.2
+        return (sample_now - measured_at) <= max(0.01, float(max_age_s))
 
     def update_runtime_pose(
         self,

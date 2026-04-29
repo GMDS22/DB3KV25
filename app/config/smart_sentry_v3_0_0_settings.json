@@ -92,7 +92,7 @@
     "engagement_speed": 40,
     "auto_trigger_enabled": true,
     "trigger_mode_bb": false,
-    "trigger_mosfet_pulse_ms": 120,
+    "trigger_mosfet_pulse_ms": 150,
     "trigger_mosfet_cycle_count": 2,
     "trigger_mosfet_cycle_off_ms": 50,
     "trigger_servo_rest_deg": 0,
