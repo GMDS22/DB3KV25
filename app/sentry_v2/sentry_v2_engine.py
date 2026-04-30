@@ -176,6 +176,30 @@ class SentryV2Engine:
         self._pir_scan_awaiting_settle: bool = False  # Waiting for servo settle before next scan point
         self._pir_settle_start: float = 0.0
 
+        # Acoustic guard state (USB microphone anomaly trigger)
+        self._sound_alert_pending: bool = False
+        self._sound_alert_pending_since: float = 0.0
+        self._sound_alert_pending_level_db: float = 0.0
+        self._sound_alert_pending_baseline_db: float = 0.0
+        self._sound_alert_active: bool = False
+        self._sound_alert_phase: str = ""
+        self._sound_alert_phase_started: float = 0.0
+        self._sound_alert_last_update: float = 0.0
+        self._sound_alert_last_started: float = 0.0
+        self._sound_alert_points: List[Tuple[float, float]] = []
+        self._sound_alert_point_index: int = 0
+        self._sound_alert_step_started: bool = False
+        self._sound_alert_sweep_stage: int = 0
+        self._sound_alert_note: str = ""
+        self._sound_alert_note_time: float = 0.0
+
+        # Stationary-target release protocol state
+        self._stationary_release_track_id: int = -1
+        self._stationary_release_anchor_center: Optional[Tuple[float, float]] = None
+        self._stationary_release_since: float = 0.0
+        self._stationary_release_fire_cycles: int = 0
+        self._stationary_release_suppress_until: float = 0.0
+
         # Sentry behaviour state (modes 0=Watchful, 1=Curious, 2=Strict)
         self._behaviour_watchful_last_move: float = 0.0   # cooldown for watchful follow ticks
         self._behaviour_curious_glance_active: bool = False
@@ -314,6 +338,25 @@ class SentryV2Engine:
         self._behaviour_curious_glance_pan = 0.0
         self._behaviour_curious_glance_tilt = 0.0
         self._behaviour_curious_last_glance = 0.0
+        self._sound_alert_pending = False
+        self._sound_alert_pending_since = 0.0
+        self._sound_alert_pending_level_db = 0.0
+        self._sound_alert_pending_baseline_db = 0.0
+        self._sound_alert_active = False
+        self._sound_alert_phase = ""
+        self._sound_alert_phase_started = 0.0
+        self._sound_alert_last_update = 0.0
+        self._sound_alert_points = []
+        self._sound_alert_point_index = 0
+        self._sound_alert_step_started = False
+        self._sound_alert_sweep_stage = 0
+        self._sound_alert_note = ""
+        self._sound_alert_note_time = 0.0
+        self._stationary_release_track_id = -1
+        self._stationary_release_anchor_center = None
+        self._stationary_release_since = 0.0
+        self._stationary_release_fire_cycles = 0
+        self._stationary_release_suppress_until = 0.0
         if self._log_precision_tuning and self._current_precision_engagement_id:
             self._precision_logger.end_engagement()
             self._current_precision_engagement_id = None
@@ -460,6 +503,283 @@ class SentryV2Engine:
         )
         self._move_turret(self._pir_cue_pan, self._pir_cue_tilt)
 
+    def _set_sound_alert_note(self, note: str, *, when: Optional[float] = None) -> None:
+        self._sound_alert_note = str(note or "")
+        self._sound_alert_note_time = float(time.time() if when is None else when)
+
+    def _stationary_release_enabled(self) -> bool:
+        return bool(getattr(self.cfg.engagement, "stationary_release_enabled", True))
+
+    def _stationary_release_motion_threshold_px(self, det: DetectedObject) -> float:
+        configured_px = float(getattr(self.cfg.engagement, "stationary_release_motion_px", 36.0) or 36.0)
+        bbox = tuple(int(v) for v in det.bbox)
+        diag_px = ((float(bbox[2]) ** 2) + (float(bbox[3]) ** 2)) ** 0.5
+        adaptive_px = max(configured_px, min(140.0, diag_px * 0.45))
+        return float(max(12.0, adaptive_px))
+
+    def _note_stationary_release_fire(self, det: DetectedObject, now: float) -> None:
+        if not self._stationary_release_enabled():
+            return
+        track_id = int(det.track_id)
+        center = (float(det.center_x), float(det.center_y))
+        if self._stationary_release_track_id != track_id or self._stationary_release_anchor_center is None:
+            self._stationary_release_track_id = track_id
+            self._stationary_release_anchor_center = center
+            self._stationary_release_since = now
+            self._stationary_release_fire_cycles = 1
+            self._stationary_release_suppress_until = 0.0
+            return
+
+        threshold_px = self._stationary_release_motion_threshold_px(det)
+        anchor_x, anchor_y = self._stationary_release_anchor_center
+        movement_px = ((center[0] - anchor_x) ** 2 + (center[1] - anchor_y) ** 2) ** 0.5
+        if movement_px <= threshold_px:
+            self._stationary_release_fire_cycles += 1
+            self._stationary_release_anchor_center = (
+                (anchor_x * 0.82) + (center[0] * 0.18),
+                (anchor_y * 0.82) + (center[1] * 0.18),
+            )
+            return
+
+        # Target moved materially; treat as a fresh engagement track.
+        self._stationary_release_anchor_center = center
+        self._stationary_release_since = now
+        self._stationary_release_fire_cycles = 1
+        self._stationary_release_suppress_until = 0.0
+
+    def _apply_stationary_release_protocol(self, targets: List[TrackedTarget], now: float) -> List[TrackedTarget]:
+        if not self._stationary_release_enabled() or not targets:
+            return targets
+
+        lead = targets[0]
+        lead_track_id = int(lead.det.track_id)
+        if self._stationary_release_track_id != lead_track_id:
+            return targets
+        if self._stationary_release_anchor_center is None:
+            return targets
+
+        center = (float(lead.det.center_x), float(lead.det.center_y))
+        threshold_px = self._stationary_release_motion_threshold_px(lead.det)
+        anchor_x, anchor_y = self._stationary_release_anchor_center
+        movement_px = ((center[0] - anchor_x) ** 2 + (center[1] - anchor_y) ** 2) ** 0.5
+
+        if movement_px > threshold_px:
+            # Lead target is no longer stationary enough to suppress.
+            self._stationary_release_anchor_center = center
+            self._stationary_release_since = now
+            self._stationary_release_fire_cycles = 0
+            self._stationary_release_suppress_until = 0.0
+            return targets
+
+        # Smooth anchor in place so small detector jitter does not collapse dwell time.
+        self._stationary_release_anchor_center = (
+            (anchor_x * 0.88) + (center[0] * 0.12),
+            (anchor_y * 0.88) + (center[1] * 0.12),
+        )
+
+        if self._stationary_release_suppress_until > now:
+            self._last_reacquire_note = (
+                f"stationary release active t{lead_track_id} ({self._stationary_release_suppress_until - now:.1f}s)"
+            )
+            return [t for t in targets if int(t.det.track_id) != lead_track_id]
+
+        min_cycles = int(max(1, int(getattr(self.cfg.engagement, "stationary_release_min_fire_cycles", 3) or 3)))
+        hold_s = float(max(0.5, float(getattr(self.cfg.engagement, "stationary_release_hold_s", 8.0) or 8.0)))
+        dwell_s = max(0.0, now - float(self._stationary_release_since or now))
+        if self._stationary_release_fire_cycles >= min_cycles and dwell_s >= hold_s:
+            suppress_s = float(max(2.0, float(getattr(self.cfg.engagement, "stationary_release_suppress_s", 10.0) or 10.0)))
+            self._stationary_release_suppress_until = now + suppress_s
+            self._last_reacquire_note = (
+                f"stationary release t{lead_track_id}: {self._stationary_release_fire_cycles} fire cycles, "
+                f"{dwell_s:.1f}s dwell"
+            )
+            self._set_pir_note(
+                f"Static target released for {suppress_s:.0f}s (track {lead_track_id})",
+                when=now,
+            )
+            return [t for t in targets if int(t.det.track_id) != lead_track_id]
+
+        return targets
+
+    def _should_force_stationary_release_in_single_target(
+        self,
+        order: EngagementOrder,
+        tracked_target: Optional[TrackedTarget],
+        now: float,
+    ) -> bool:
+        """Return True when a single-target engage loop should release a static target."""
+        if not self._stationary_release_enabled() or tracked_target is None:
+            return False
+
+        det = tracked_target.det
+        track_id = int(det.track_id)
+        if self._stationary_release_track_id != track_id:
+            return False
+        if self._stationary_release_anchor_center is None:
+            return False
+
+        if self._stationary_release_suppress_until > now:
+            self._last_reacquire_note = (
+                f"stationary release active t{track_id} ({self._stationary_release_suppress_until - now:.1f}s)"
+            )
+            return True
+
+        center = (float(det.center_x), float(det.center_y))
+        threshold_px = self._stationary_release_motion_threshold_px(det)
+        anchor_x, anchor_y = self._stationary_release_anchor_center
+        movement_px = ((center[0] - anchor_x) ** 2 + (center[1] - anchor_y) ** 2) ** 0.5
+        if movement_px > threshold_px:
+            return False
+
+        min_cycles = int(max(1, int(getattr(self.cfg.engagement, "stationary_release_min_fire_cycles", 3) or 3)))
+        hold_s = float(max(0.5, float(getattr(self.cfg.engagement, "stationary_release_hold_s", 8.0) or 8.0)))
+        dwell_s = max(0.0, now - float(self._stationary_release_since or now))
+        if self._stationary_release_fire_cycles < min_cycles or dwell_s < hold_s:
+            return False
+
+        suppress_s = float(max(2.0, float(getattr(self.cfg.engagement, "stationary_release_suppress_s", 10.0) or 10.0)))
+        self._stationary_release_suppress_until = now + suppress_s
+        self._last_reacquire_note = (
+            f"stationary release t{track_id}: {self._stationary_release_fire_cycles} fire cycles, {dwell_s:.1f}s dwell"
+        )
+        self._set_pir_note(
+            f"Static target released for {suppress_s:.0f}s (track {track_id})",
+            when=now,
+        )
+        return True
+
+    def on_sound_anomaly_detected(
+        self,
+        level_db: float,
+        baseline_db: float,
+        timestamp: Optional[float] = None,
+    ) -> None:
+        """Queue a non-interruptive acoustic alert workflow."""
+        now = float(timestamp or time.time())
+        cfg = getattr(self.cfg, "acoustic_guard", None)
+        if self.state == SentryV2State.PAUSED or cfg is None or not bool(getattr(cfg, "enabled", False)):
+            return
+
+        cooldown_s = max(0.5, float(getattr(cfg, "event_cooldown_s", 8.0) or 8.0))
+        if self._sound_alert_last_started > 0.0 and (now - self._sound_alert_last_started) < cooldown_s:
+            return
+
+        # Keep only the strongest pending event in a burst.
+        if self._sound_alert_pending:
+            if float(level_db) <= float(self._sound_alert_pending_level_db):
+                return
+        self._sound_alert_pending = True
+        self._sound_alert_pending_since = now
+        self._sound_alert_pending_level_db = float(level_db)
+        self._sound_alert_pending_baseline_db = float(baseline_db)
+        self._set_sound_alert_note(
+            f"Acoustic anomaly queued ({float(level_db):.1f}dB vs {float(baseline_db):.1f}dB baseline)",
+            when=now,
+        )
+
+    def _cancel_sound_alert(self, *, reason: str = "") -> None:
+        self._sound_alert_active = False
+        self._sound_alert_phase = ""
+        self._sound_alert_phase_started = 0.0
+        self._sound_alert_last_update = 0.0
+        self._sound_alert_points = []
+        self._sound_alert_point_index = 0
+        self._sound_alert_step_started = False
+        self._sound_alert_sweep_stage = 0
+        if reason:
+            self._set_sound_alert_note(reason)
+
+    def _start_sound_alert_sequence(self, now: float) -> None:
+        self._sound_alert_pending = False
+        self._sound_alert_pending_since = 0.0
+        self._sound_alert_active = True
+        self._sound_alert_phase = "initial_search"
+        self._sound_alert_phase_started = now
+        self._sound_alert_last_update = now
+        self._sound_alert_points = self._build_sound_initial_points()
+        self._sound_alert_point_index = 0
+        self._sound_alert_step_started = False
+        self._sound_alert_sweep_stage = 0
+        self._sound_alert_last_started = now
+        self._set_sound_alert_note("Acoustic alert: initial search pattern")
+
+    def _build_sound_initial_points(self) -> List[Tuple[float, float]]:
+        guard_tilt = self._clamp_tilt(float(self.cfg.guard.guard_tilt))
+        # Requested quick-search pattern for sound events: left cue -> center -> right cue.
+        raw_points = (45.0, 135.0, 230.0)
+        points: List[Tuple[float, float]] = []
+        for pan in raw_points:
+            points.append((self._clamp_pan(float(pan)), guard_tilt))
+        return points
+
+    def _sound_alert_hold_s(self, attr: str, fallback: float) -> float:
+        cfg = getattr(self.cfg, "acoustic_guard", None)
+        if cfg is None:
+            return float(fallback)
+        return max(0.05, float(getattr(cfg, attr, fallback) or fallback))
+
+    def _update_sound_alert_sequence(self, now: float) -> None:
+        if not self._sound_alert_active:
+            return
+
+        dt = 0.0 if self._sound_alert_last_update <= 0.0 else max(0.0, now - self._sound_alert_last_update)
+        self._sound_alert_last_update = now
+
+        phase = str(self._sound_alert_phase or "")
+        if phase == "initial_search":
+            if self._sound_alert_point_index >= len(self._sound_alert_points):
+                self._sound_alert_phase = "sweep"
+                self._sound_alert_sweep_stage = 0
+                self._sound_alert_phase_started = now
+                self._set_sound_alert_note("Acoustic alert: secondary sweep scan", when=now)
+                return
+
+            target_pan, target_tilt = self._sound_alert_points[self._sound_alert_point_index]
+            quick_speed = max(45.0, float(getattr(self.cfg.guard, "sweep_speed", 22.0)) * 2.8)
+            arrived = self._patrol_move_toward(target_pan, target_tilt, quick_speed, dt)
+            if not self._sound_alert_step_started:
+                self._sound_alert_step_started = True
+                self._sound_alert_phase_started = now
+                self._set_sound_alert_note(
+                    f"Acoustic alert: quick search {self._sound_alert_point_index + 1}/3 -> pan {target_pan:.1f}",
+                    when=now,
+                )
+            if arrived:
+                self._sound_alert_point_index += 1
+                self._sound_alert_step_started = False
+            return
+
+        if phase == "sweep":
+            pan_min, pan_max = sorted((float(self.cfg.guard.sweep_pan_min), float(self.cfg.guard.sweep_pan_max)))
+            if abs(pan_max - pan_min) < 1.0:
+                pan_min, pan_max = sorted((float(self.cfg.guard.pan_min), float(self.cfg.guard.pan_max)))
+            sweep_speed = max(2.0, float(getattr(self.cfg.acoustic_guard, "sweep_speed_dps", self.cfg.guard.sweep_speed)))
+            base_tilt = float(self.cfg.guard.sweep_tilt)
+            tilt_span = 7.0
+            tilt_low = self._clamp_tilt(base_tilt - tilt_span)
+            tilt_high = self._clamp_tilt(base_tilt + tilt_span)
+            if self._sound_alert_sweep_stage == 0:
+                arrived = self._patrol_move_toward(pan_min, tilt_low, sweep_speed, dt)
+                if arrived:
+                    self._sound_alert_sweep_stage = 1
+                return
+            if self._sound_alert_sweep_stage == 1:
+                arrived = self._patrol_move_toward(pan_max, tilt_high, sweep_speed, dt)
+                if arrived:
+                    self._sound_alert_sweep_stage = 2
+                return
+            if self._sound_alert_sweep_stage == 2:
+                arrived = self._patrol_move_toward(pan_min, base_tilt, sweep_speed, dt)
+                if arrived:
+                    mode = int(getattr(self.cfg.guard, "guard_mode", 0) or 0)
+                    if mode == 0:
+                        self._move_turret(self.cfg.guard.guard_pan, self.cfg.guard.guard_tilt)
+                    self._patrol_initialized = False
+                    self._cancel_sound_alert(reason="Acoustic alert: clear, resume guard")
+                return
+
+        self._cancel_sound_alert(reason="Acoustic alert reset")
+
     # ------------------------------------------------------------------ #
     # GUARDING state
     # ------------------------------------------------------------------ #
@@ -470,10 +790,12 @@ class SentryV2Engine:
         If scoreable threats exist above threshold, plan engagement.
         Also handles PIR sensor cues for blind-spot detection.
         """
+        targets_for_engagement = self._apply_stationary_release_protocol(targets, now)
+
         # Check for threats first — engagement always takes priority
-        if targets:
+        if targets_for_engagement:
             if now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown:
-                queue = self._planner.plan(targets, self.current_pan, self.current_tilt)
+                queue = self._planner.plan(targets_for_engagement, self.current_pan, self.current_tilt)
                 if queue:
                     # Log engagement promotion for primary target
                     if self._log_autotracking and queue:
@@ -496,6 +818,7 @@ class SentryV2Engine:
                     self.active_order = first
                     self._remember_active_target(first.target.det)
                     self._start_order_engagement(first, now)
+                    self._cancel_sound_alert(reason="Acoustic alert interrupted: visual target acquired")
                     # Target found — complete active cue but preserve queued
                     # events so other sensor zones are hunted after this engage.
                     self._pir_manager.complete_active_cue()
@@ -531,6 +854,22 @@ class SentryV2Engine:
                 # Waiting for confirmation at cue point
                 self._update_pir_confirmation(targets, now)
             return
+
+        acoustic_cfg = getattr(self.cfg, "acoustic_guard", None)
+        if acoustic_cfg is not None:
+            ttl_s = max(1.0, float(getattr(acoustic_cfg, "queue_ttl_s", 14.0) or 14.0))
+            if self._sound_alert_pending and self._sound_alert_pending_since > 0.0 and (now - self._sound_alert_pending_since) > ttl_s:
+                self._sound_alert_pending = False
+                self._sound_alert_pending_since = 0.0
+                self._set_sound_alert_note("Acoustic alert expired before execution", when=now)
+
+            if bool(getattr(acoustic_cfg, "enabled", False)):
+                if self._sound_alert_active:
+                    self._update_sound_alert_sequence(now)
+                    return
+                if self._sound_alert_pending:
+                    self._start_sound_alert_sequence(now)
+                    return
 
         # No threats and no PIR cues — behaviour + patrol logic
         behaviour = self.cfg.guard.sentry_behaviour
@@ -1008,6 +1347,9 @@ class SentryV2Engine:
             wait = burst_duration + self.cfg.engagement.inter_target_cooldown
             if elapsed >= wait:
                 if self.cfg.engagement.single_target_only and tracked_det is not None:
+                    if self._should_force_stationary_release_in_single_target(order, tracked_target, now):
+                        self._advance_queue(now)
+                        return
                     self._engage_phase = "precision"
                     self._phase_start = now
                     self._reset_precision_state()
@@ -1231,8 +1573,11 @@ class SentryV2Engine:
     def _engagement_pose_freshness_s(self, *, for_fire: bool = False) -> float:
         # ENGAGING needs materially fresher pose than patrol/returning. Fire
         # phase is stricter so micro-adjust and firing never run on delayed
-        # debug-board feedback while the target is still moving.
-        return 0.22 if for_fire else 0.28
+        # debug-board feedback while the target is still moving.  The runtime
+        # exports show the current debug-board cadence can land around 0.45 s
+        # under load, so tighter gates just force repeated fire->precision
+        # resets instead of using the measured pose we already have.
+        return 0.48 if for_fire else 0.55
 
     def _engagement_response_scale(self, *, use_fire_limits: bool) -> float:
         speed_value = int(max(10, min(100, int(getattr(self.cfg.engagement, "engagement_speed", 80) or 80))))
@@ -1442,6 +1787,7 @@ class SentryV2Engine:
             burst = self.cfg.engagement.burst_count
             if self._cb_fire:
                 self._cb_fire(burst)
+                self._note_stationary_release_fire(order.target.det, now)
                 self.engagement_log.append({
             "track_id": order.target.det.track_id,
             "class": order.target.det.class_name,
@@ -2686,6 +3032,11 @@ class SentryV2Engine:
             "pir_sensor_id": int(self._pir_cue_sensor_id),
             "pir_queue_length": int(self._pir_manager.peek_queue_count()),
             "pir_status": self._pir_manager.get_status_text(),
+            "sound_alert_pending": bool(self._sound_alert_pending),
+            "sound_alert_active": bool(self._sound_alert_active),
+            "sound_alert_phase": str(self._sound_alert_phase),
+            "sound_alert_note": str(self._sound_alert_note),
+            "sound_alert_recent": bool(self._sound_alert_note_time and (time.time() - self._sound_alert_note_time) <= 3.0),
             "loss_recovery_phase": self._loss_recovery_phase,
             "no_fire_mask": self._last_no_fire_mask_name,
             "motion_enabled": bool(self._motion_enabled),

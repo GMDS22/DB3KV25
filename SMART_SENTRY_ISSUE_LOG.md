@@ -114,6 +114,13 @@
 | Auto-trigger toggle enabled but stale fire-gate settings stayed loaded in memory | [ISS-074](#iss-074) |
 | Manual fire UX incorrectly wired as hold-to-fire | [ISS-089](#iss-089) |
 
+### Turret Stays on One Target Forever / PIR–Acoustic Guard Never Runs
+| Check | Reference |
+|-------|-----------|
+| Single-target ENGAGING loop never exits; stationary release only ran in GUARDING | [ISS-098](#iss-098) |
+| `stationary_release_hold_s` not tuned — default 8 s may be too long for your scenario | [ISS-098](#iss-098) |
+| `stationary_release_enabled` is off in config | [ISS-098](#iss-098) |
+
 ### Detection Stalls After Changes
 | Check | Reference |
 |-------|-----------|
@@ -154,8 +161,31 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
+### ISS-100 | 2026-04-30 | v3.5.1 | Engine/Camera/UI | Worked
+**Aiming/Tracking Slowness from Stale ENGAGING Pose Gate and Conservative Live Preview Cadence**
+
+- **Symptoms**: Camera preview felt delayed during active runs and aiming/tracking repeatedly slowed down even with high engagement speed. Runtime snapshots showed ENGAGING state with repeated `fire stale pose -> precision` reacquire notes.
+- **Root Cause**: During ENGAGING, controller-side feedback sync discarded measured pose when debug-board feedback age exceeded `0.28 s`, while observed runtime feedback under load was commonly around `0.45-0.50 s`. This caused frequent fallback to commanded pose and repeated fire-phase resets to precision. In parallel, local source capture/preview cadence remained conservative (`50 ms` capture tick and throttled display intervals), increasing perceived latency.
+- **Fix/Solution**: Raised live preview cadence and aligned ENGAGING pose freshness with observed hardware feedback timing: capture timer moved to `33 ms` target cadence, display intervals tightened (`1/30` normal, `1/24` busy), ENGAGING feedback acceptance widened to `0.55 s`, and engine engagement pose freshness updated (`0.48 s` fire, `0.55 s` engage). Precision correction math, PID gains, and fire-gate behavior were left unchanged.
+- **Files Modified**: `app/sentry_v2/sentry_v2_tab.py`, `app/sentry_v2/sentry_v2_engine.py`, `SMART_SENTRY_ISSUE_LOG.md`
+- **Notes**: This addresses live-latency and reacquire-loop behavior without reducing precision constraints. Separate startup camera-open backend delay may still exist and is tracked independently.
+
+---
+
+### ISS-099 | 2026-04-30 | v3.5.0 | UI/Config | Worked
+**Startup Crash on Launch: Missing EngagementConfig Field `precision_step_deg`**
+
+- **Symptoms**: App crashed at startup during `SentryV2TabWidget._build_ui()` with `AttributeError: 'EngagementConfig' object has no attribute 'precision_step_deg'` while initializing the Quick Access precision-step spinbox.
+- **Root Cause**: UI regression in the quick-access panel referenced legacy field `precision_step_deg`, but `EngagementConfig` now uses `precision_max_step` (already used by the main precision-step control).
+- **Fix/Solution**: Updated quick-access spinbox initialization to read `self.config.engagement.precision_max_step`, aligning it with current config schema and the main precision-step widget.
+- **Files Modified**: `app/sentry_v2/sentry_v2_tab.py`, `SMART_SENTRY_ISSUE_LOG.md`
+- **Notes**: This was a launch-blocking UI initialization error. Full app startup path now proceeds past `_build_ui()` after the fix.
+
+---
+
 ### ISS-096 | 2026-04-29 | v3.5.0 | Engine/UI/Docs | Worked
 ### ISS-097 | 2026-04-30 | v3.5.0 | Engine/UI | Worked
+### ISS-098 | 2026-04-30 | v3.5.0 | Engine/Config/UI/Docs | Worked
 **Tracking Freeze: Detections Show But Turret Stops Moving Mid-Session**
 
 - **Symptoms**: After extended tracking or manual nudges, turret stops applying auto-corrections while detections are still visible and state shows ENGAGING. Manual directional moves still work. Turret "freezes" on a position for 1–5 seconds then may resume.
@@ -192,6 +222,24 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
   - Documentation: aligned behavior contract notes with implemented return/patrol and trigger quick-control behavior.
 - **Files Modified**: `app/sentry_v2/sentry_v2_engine.py`, `app/sentry_v2/sentry_v2_tab.py`, `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md`, `SMART_SENTRY_ISSUE_LOG.md`
 - **Notes**: This keeps static guard return-to-home intact while improving waypoint/random patrol continuity and preventing repeated return/re-engage oscillations.
+
+---
+
+### ISS-098 | 2026-04-30 | v3.5.0 | Engine/Config/UI/Docs | Worked
+**Turret Stays Locked on One Stationary Visible Target Indefinitely; PIR/Acoustic Guard Never Runs**
+
+- **Symptoms**: When single-target mode is active and the only visible target stops moving, Smart Sentry holds ENGAGING indefinitely, cycling through aim→precision→fire phases forever. PIR cues and acoustic guard triggers are never acted on because those paths are only processed during GUARDING, which is never re-entered.
+- **Root Cause** (two paths):
+  1. **GUARDING-only release check** — The first stationary-release implementation (`_apply_stationary_release_protocol`) ran during GUARDING scan entry. If the engine never returned to GUARDING (single target kept the ENGAGING loop alive), the release check was unreachable.
+  2. **Single-target ENGAGING loop** — With `single_target_only=True` and one confirmed visible target, the fire-phase loop repeats without advancing the queue or transitioning to RETURNING, so the state machine never cycles back through GUARDING naturally.
+- **Fix/Solution**:
+  - Added `_should_force_stationary_release_in_single_target()` in `sentry_v2_engine.py`, checked after each fire cycle inside the single-target ENGAGING path. When the stationary-release criteria are met (hold time exceeded, minimum fire cycles reached, no significant motion), the engine forces queue advance and transitions to RETURNING so guard workflows resume.
+  - Added `stationary_release_hold_s` (default `8.0`, range 0.5–∞) to `EngagementConfig` in `sentry_v2_config.py` as the user-facing control for maximum continuous hold time on one stationary visible target before release can trigger.
+  - Existing config fields added alongside it: `stationary_release_enabled`, `stationary_release_min_fire_cycles`, `stationary_release_suppress_s`, `stationary_release_motion_px`.
+  - Added `_spin_stationary_release_hold` (`Max stationary target hold (s)`, range 1.0–60.0) to the advanced Engage tab in `sentry_v2_tab.py`, wired to `_on_engagement_changed`, and included in both engagement preset apply lists.
+  - Updated `sentry_v2_tooltips.py`: added detailed `stationary_release_hold_s` tooltip explaining the combined fire-cycle + hold-time + motion criteria; clarified `target_loss_timeout` tooltip to be explicit that it applies to *lost* (not visible) targets only.
+- **Files Modified**: `app/sentry_v2/sentry_v2_engine.py`, `app/sentry_v2/sentry_v2_config.py`, `app/sentry_v2/sentry_v2_tab.py`, `app/sentry_v2/sentry_v2_tooltips.py`
+- **Notes**: The `_apply_stationary_release_protocol` GUARDING-path check is kept as a safety net. The new ENGAGING-path check is the primary fix for the real-world single-target scenario. The `target_loss_timeout` tooltip confusion (operators confusing it with hold duration) was a secondary driver for this fix.
 
 ---
 
@@ -1138,6 +1186,7 @@ Issues investigated but **not fixed**. Check before re-attempting the same appro
 - **Issue**: Smart Sentry did not run its own detector in shared-feed mode.
 - **Fix Tried**: Investigated only.
 - **Resolution**: Later fixed by [ISS-039](#iss-039) (internal detector flag).
+| 2026-04-30 | When single-target mode was active and the only visible target stopped moving, Smart Sentry held ENGAGING indefinitely and never re-entered GUARDING, so PIR cues and acoustic guard triggers were never acted on. The earlier stationary-release protocol only ran during GUARDING entry and was unreachable in this scenario. | Added `_should_force_stationary_release_in_single_target()` to `app/sentry_v2/sentry_v2_engine.py` and invoked it after each fire cycle inside the single-target ENGAGING loop; added `stationary_release_hold_s` plus four companion config fields to `EngagementConfig` in `app/sentry_v2/sentry_v2_config.py`; added `Max stationary target hold (s)` spinbox (1.0–60.0 s) to the advanced Engage tab in `app/sentry_v2/sentry_v2_tab.py` with preset list wiring; and updated `app/sentry_v2/sentry_v2_tooltips.py` with a detailed tooltip for the new setting and a clarified `target_loss_timeout` tooltip. | Worked |
 | 2026-04-16 | Auto-trigger could still stay effectively broken after the earlier tolerance fix because enabling the UI toggle did not normalize stale fire-gate settings already loaded from older profiles. | Added `normalize_auto_trigger_engagement()` in `app/sentry_v2/sentry_v2_config.py`, applied it on config construction, live engagement edits, and the auto-trigger toggle path in `app/sentry_v2/sentry_v2_tab.py`, synced the active and legacy settings JSON files to the fireable gate values, and added a regression test in `tests/test_sentry_v2_engagement_config.py`. | Worked |
 | 2026-04-09 | PIR no-target completion could clear cue state without issuing an explicit return-home move, which let static guard setups stay parked at the final PIR hunt point and made operators think there was a hidden post-hunt dwell timer. | Updated `app/sentry_v2/sentry_v2_engine.py` so PIR no-target paths explicitly command the configured guard/home position, filled in missing tooltip coverage for the newer loss-recovery and guard/rest controls in `app/sentry_v2/sentry_v2_tab.py` plus `app/sentry_v2/sentry_v2_tooltips.py`, extended `test_pir_ui_config.py`, and corrected the PIR docs to state that `Cue Hold` is the pre-hunt dwell while a post-hunt stall is a bug, not a feature. | Worked |
 | 2026-04-09 | Human voice playback could overlap with the ESP32 buzzer path, and operators still lacked a focused in-app voice diagnostics surface while investigating why Windows speech might be inaudible on some setups. | Added a persisted `mute_buzzer_when_human_voice_enabled` guard in `app/sentry_v2/sentry_v2_config.py`, suppressed firmware buzzer cues from `app/sentry_v2/sentry_v2_tab.py` while human voice mode is enabled, added a dedicated Voice Diagnostics group with backend, selected voice, speech-state, route note, fallback phrase, stop, refresh, and `Validate Voices` actions, filled in explicit tooltip coverage for the newer human-voice and assistant speech controls via `app/sentry_v2/sentry_v2_tooltips.py`, and verified in `.venv311` that both `Microsoft Zira Desktop` and `Microsoft David Desktop` are accepted by Qt and enter a valid speech state under the real validation path. | Worked |

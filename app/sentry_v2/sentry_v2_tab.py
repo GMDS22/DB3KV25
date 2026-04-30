@@ -100,6 +100,7 @@ from .prompted_targets import (
 from .sentry_v2_video_canvas import SentryV2VideoCanvas
 from .simple_tracker import SimpleBBoxTracker
 from .sound_engine import SentryV2SoundEngine
+from .acoustic_guard import USBMicrophoneAnomalyDetector
 from .sentry_v2_tooltips import SENTRY_V2_TOOLTIPS
 from .face_identity import FaceIdentityLibrary, FaceIdentityRuntime, FaceMatchResult
 from .sentry_v2_config import (
@@ -3125,6 +3126,7 @@ class SentryV2TabWidget(QWidget):
     detection_mode_changed = pyqtSignal(int)
     color_preset_changed = pyqtSignal(str)
     pir_event_received = pyqtSignal(int, float)
+    acoustic_anomaly_received = pyqtSignal(float, float)
     # Thread-safe camera open result signals (emitted from bg thread, handled on main thread)
     _cam_bg_opened = pyqtSignal(object, str, str, int, int, bool)   # (src, backend, backend_name), src_text, kind, rw, rh, rfs
     _cam_bg_failed = pyqtSignal(str)                                 # src_text
@@ -3159,6 +3161,17 @@ class SentryV2TabWidget(QWidget):
         self._sound_engine = SentryV2SoundEngine(self._queue_sound_tone)
         self._sound_engine.set_enabled(bool(getattr(self.config.sound, "enabled", True)))
         self._sound_engine.set_profile(self._sound_personality_key(), self._sound_attitude_pct())
+        self._acoustic_detector = USBMicrophoneAnomalyDetector(
+            self._emit_acoustic_anomaly,
+            sample_rate_hz=int(getattr(self.config.acoustic_guard, "sample_rate_hz", 16000)),
+            block_size=int(getattr(self.config.acoustic_guard, "block_size", 1024)),
+            warmup_seconds=float(getattr(self.config.acoustic_guard, "warmup_seconds", 3.0)),
+            baseline_adapt_rate=float(getattr(self.config.acoustic_guard, "baseline_adapt_rate", 0.035)),
+            anomaly_threshold_db=float(getattr(self.config.acoustic_guard, "anomaly_threshold_db", 8.0)),
+            anomaly_zscore_threshold=float(getattr(self.config.acoustic_guard, "anomaly_zscore_threshold", 2.8)),
+            cooldown_s=float(getattr(self.config.acoustic_guard, "event_cooldown_s", 8.0)),
+            device_name=str(getattr(self.config.acoustic_guard, "device_name", "") or ""),
+        )
         self._speech_engine = None
         self._speech_available: bool = False
         self._speech_voice_names: List[str] = []
@@ -3275,6 +3288,7 @@ class SentryV2TabWidget(QWidget):
         self._last_tracking_suppression_s: float = 0.0
         self._last_reacquire_note_seen: str = ""
         self._last_pir_note_seen: str = ""
+        self._last_sound_alert_note_seen: str = ""
         self._last_blocked_mask_seen: str = ""
         self._last_mask_trace_snapshot: str = ""
         self._last_scope_view_active: bool = False
@@ -3282,8 +3296,10 @@ class SentryV2TabWidget(QWidget):
         self._last_display_frame: Optional[np.ndarray] = None
         self._last_raw_frame: Optional[np.ndarray] = None
         self._last_processed_frame_s: float = 0.0
-        self._display_frame_interval_s: float = 1.0 / 24.0
-        self._busy_display_frame_interval_s: float = 1.0 / 18.0
+        self._display_frame_interval_s: float = 1.0 / 30.0
+        self._busy_display_frame_interval_s: float = 1.0 / 24.0
+        self._live_capture_interval_ms: int = 33
+        self._engaging_feedback_pose_max_age_s: float = 0.55
         self._last_display_present_s: float = 0.0
         self._force_next_display_refresh: bool = True
         self._busy_preview_skip_target_boxes: bool = True
@@ -3369,6 +3385,7 @@ class SentryV2TabWidget(QWidget):
         self.detection_result_ready.connect(self._on_detection_result_ready)
         self.command_result_ready.connect(self._on_command_result_ready)
         self.pir_event_received.connect(self._on_comm_pir_event_received)
+        self.acoustic_anomaly_received.connect(self._on_acoustic_anomaly_received)
         self._yolo_load_result.connect(self._on_yolo_load_result)
         self.assistant_reply_ready.connect(self._on_ai_assistant_reply_ready)
         self.assistant_models_ready.connect(self._on_ai_assistant_models_ready)
@@ -3380,6 +3397,8 @@ class SentryV2TabWidget(QWidget):
         self._startup_autoconnect_active: bool = False
         self._startup_autoconnect_retry: int = 0
         self._pending_quiet_save: bool = False
+        self._pending_runtime_apply: bool = False
+        self._runtime_apply_in_progress: bool = False
         self._last_wifi_autojoin_attempt_s: float = 0.0
         self._last_wifi_link_refresh_s: float = 0.0
         self._wifi_autojoin_inflight: bool = False
@@ -3418,6 +3437,10 @@ class SentryV2TabWidget(QWidget):
         self._quiet_save_timer.setSingleShot(True)
         self._quiet_save_timer.timeout.connect(self._flush_quiet_config_save)
 
+        self._runtime_apply_timer = QTimer(self)
+        self._runtime_apply_timer.setSingleShot(True)
+        self._runtime_apply_timer.timeout.connect(self._flush_pending_runtime_apply)
+
         # Status refresh timer
         self._status_timer = QTimer(self)
         self._status_timer.timeout.connect(self._refresh_status)
@@ -3427,6 +3450,7 @@ class SentryV2TabWidget(QWidget):
         self._link_watchdog_timer.timeout.connect(self._connection_watchdog_tick)
         self._link_watchdog_timer.start(2000)
         self.wifi_autojoin_result.connect(self._on_wifi_autojoin_result)
+        self._sync_acoustic_guard_runtime()
         self._schedule_startup_tasks()
 
     def _load_settings_config(self) -> SentryV2Config:
@@ -3819,6 +3843,11 @@ class SentryV2TabWidget(QWidget):
 
         # Persist any pending debounced setting edits before timers stop.
         try:
+            if bool(getattr(self, "_pending_runtime_apply", False)):
+                self._flush_pending_runtime_apply()
+        except Exception:
+            pass
+        try:
             if bool(getattr(self, "_pending_quiet_save", False)):
                 self._flush_quiet_config_save()
         except Exception:
@@ -3986,6 +4015,10 @@ class SentryV2TabWidget(QWidget):
         except Exception:
             pass
         try:
+            self._acoustic_detector.stop()
+        except Exception:
+            pass
+        try:
             self._stop_human_speech()
         except Exception:
             pass
@@ -4076,7 +4109,7 @@ class SentryV2TabWidget(QWidget):
         _qa_chip_bar_lay.setSpacing(8)
 
         # ---- QA icon buttons ----
-        qa_icon_size = 32
+        qa_icon_size = 38
 
         def _mk_qa_btn(label: str, tip: str, checkable: bool = True) -> QPushButton:
             b = QPushButton(label)
@@ -4087,7 +4120,7 @@ class SentryV2TabWidget(QWidget):
             b.setCursor(Qt.PointingHandCursor)
             return b
 
-        self._btn_auto_trigger_qa = _mk_qa_btn("⚡", "Auto Trigger ON/OFF")
+        self._btn_auto_trigger_qa = _mk_qa_btn("🎯", "Auto Trigger ON/OFF")
         self._btn_auto_trigger_qa.setChecked(bool(getattr(self.config.engagement, "auto_trigger_enabled", False)))
         _qa_chip_bar_lay.addWidget(self._btn_auto_trigger_qa)
 
@@ -4101,17 +4134,21 @@ class SentryV2TabWidget(QWidget):
         self._combo_trigger_mode_qa.setCurrentIndex(1 if self.config.engagement.trigger_mode_bb else 0)
         self._combo_trigger_mode_qa.setFixedHeight(qa_icon_size)
         self._combo_trigger_mode_qa.setMinimumWidth(88)
-        self._combo_trigger_mode_qa.setToolTip("Quick trigger transport mode: MOSFET or projectile servo")
+        self._combo_trigger_mode_qa.setToolTip(
+            "Quick trigger mode selector.\n"
+            "MOSFET Water Mode: uses pulse time/count/off-gap settings for water pump style output.\n"
+            "Projectile GPIO13 Servo Mode: uses trigger-servo rest/fire angle and servo speed settings."
+        )
         self._combo_trigger_mode_qa.currentIndexChanged.connect(self._on_quick_trigger_mode_changed)
         _qa_chip_bar_lay.addWidget(self._combo_trigger_mode_qa)
 
-        self._btn_safety_qa = _mk_qa_btn("🛡", "Safety (Fire Enable)")
+        self._btn_safety_qa = _mk_qa_btn("🛑", "Safety (Fire Enable)")
         _qa_chip_bar_lay.addWidget(self._btn_safety_qa)
 
-        self._btn_fire_qa = _mk_qa_btn("●", "Manual Fire", checkable=False)
+        self._btn_fire_qa = _mk_qa_btn("🔥", "Manual Fire", checkable=False)
         _qa_chip_bar_lay.addWidget(self._btn_fire_qa)
 
-        self._btn_home_qa = _mk_qa_btn("⌂", "Go Home", checkable=False)
+        self._btn_home_qa = _mk_qa_btn("🏠", "Go Home", checkable=False)
         _qa_chip_bar_lay.addWidget(self._btn_home_qa)
 
         _qa_sep1 = QFrame()
@@ -4119,20 +4156,28 @@ class SentryV2TabWidget(QWidget):
         _qa_sep1.setObjectName("qaIconSep")
         _qa_chip_bar_lay.addWidget(_qa_sep1)
 
-        self._btn_buzzer_qa = _mk_qa_btn("♬", "Buzzer Sound ON/OFF")
+        self._btn_buzzer_qa = _mk_qa_btn("🔊", "Buzzer Sound ON/OFF")
         self._btn_buzzer_qa.setChecked(bool(getattr(self.config.sound, "enabled", True)))
         _qa_chip_bar_lay.addWidget(self._btn_buzzer_qa)
 
-        self._btn_led_qa = _mk_qa_btn("☀", "LED Output ON/OFF")
+        self._btn_acoustic_guard_qa = _mk_qa_btn("🎤", "Acoustic Guard (USB Mic) ON/OFF")
+        self._btn_acoustic_guard_qa.setChecked(bool(getattr(self.config.acoustic_guard, "enabled", False)))
+        _qa_chip_bar_lay.addWidget(self._btn_acoustic_guard_qa)
+
+        self._btn_pir_guard_qa = _mk_qa_btn("🟥", "PIR Sensors ON/OFF")
+        self._btn_pir_guard_qa.setChecked(bool(getattr(self.config.pir_guard, "pir_enabled", False)))
+        _qa_chip_bar_lay.addWidget(self._btn_pir_guard_qa)
+
+        self._btn_led_qa = _mk_qa_btn("💡", "LED Output ON/OFF")
         _qa_chip_bar_lay.addWidget(self._btn_led_qa)
 
-        self._btn_laser_qa = _mk_qa_btn("⊕", "Laser Output ON/OFF")
+        self._btn_laser_qa = _mk_qa_btn("📍", "Laser Output ON/OFF")
         _qa_chip_bar_lay.addWidget(self._btn_laser_qa)
 
-        self._btn_acc_qa = _mk_qa_btn("⚙", "ACC Output ON/OFF")
+        self._btn_acc_qa = _mk_qa_btn("AC", "ACC Output ON/OFF")
         _qa_chip_bar_lay.addWidget(self._btn_acc_qa)
 
-        self._btn_spare_qa = _mk_qa_btn("◈", "Spare Output ON/OFF")
+        self._btn_spare_qa = _mk_qa_btn("SP", "Spare Output ON/OFF")
         _qa_chip_bar_lay.addWidget(self._btn_spare_qa)
 
         _qa_sep2 = QFrame()
@@ -4142,21 +4187,25 @@ class SentryV2TabWidget(QWidget):
 
         # Keep attr name _chk_auto_lighting_qa so existing sync code (_sync_auto_lighting_toggle_widgets,
         # _apply_all_tooltips widget map) still works — QPushButton has the same setChecked/isChecked/blockSignals API.
-        self._chk_auto_lighting_qa = QPushButton("☼")
+        self._chk_auto_lighting_qa = QPushButton("🌗")
         self._chk_auto_lighting_qa.setCheckable(True)
         self._chk_auto_lighting_qa.setFixedSize(qa_icon_size, qa_icon_size)
         self._chk_auto_lighting_qa.setObjectName("qaIconBtn")
-        self._chk_auto_lighting_qa.setToolTip("Auto Lighting ON/OFF")
+        self._chk_auto_lighting_qa.setToolTip(
+            "Auto Lighting ON/OFF.\n"
+            "When ON, LED PWM is driven automatically by scene brightness using the configured threshold and min/max PWM limits.\n"
+            "When OFF, manual LED level is used."
+        )
         self._chk_auto_lighting_qa.setCursor(Qt.PointingHandCursor)
         self._chk_auto_lighting_qa.setChecked(bool(getattr(self.config.lighting, "auto_lighting_enabled", False)))
         self._chk_auto_lighting_qa.clicked.connect(self._on_auto_lighting_toggled)
         _qa_chip_bar_lay.addWidget(self._chk_auto_lighting_qa)
 
-        self._btn_keyboard_qa = _mk_qa_btn("⌨", "Keyboard Manual Controls ON/OFF")
+        self._btn_keyboard_qa = _mk_qa_btn("KB", "Keyboard Manual Controls ON/OFF")
         self._btn_keyboard_qa.setChecked(bool(getattr(self.config.shortcuts, "manual_controls_enabled", False)))
         _qa_chip_bar_lay.addWidget(self._btn_keyboard_qa)
 
-        self._btn_tune_qa = _mk_qa_btn("≡", "Movement & Tracking Settings (click to expand)", checkable=True)
+        self._btn_tune_qa = _mk_qa_btn("SET", "Movement & Tracking Settings (click to expand)", checkable=True)
         _qa_chip_bar_lay.addWidget(self._btn_tune_qa)
 
         _qa_sep_beh = QFrame()
@@ -4165,21 +4214,21 @@ class SentryV2TabWidget(QWidget):
         _qa_chip_bar_lay.addWidget(_qa_sep_beh)
 
         self._btn_behaviour_watchful_qa = _mk_qa_btn(
-            "👁",
+            "👁️",
             "Watchful — always follows the closest mover regardless of target criteria; "
             "immediately switches to a valid target when one is detected",
         )
         _qa_chip_bar_lay.addWidget(self._btn_behaviour_watchful_qa)
 
         self._btn_behaviour_curious_qa = _mk_qa_btn(
-            "?",
+            "❓",
             "Curious Guard — does not track non-valid targets but makes periodic check "
             "movements toward detected movers; valid-target engagement is always active",
         )
         _qa_chip_bar_lay.addWidget(self._btn_behaviour_curious_qa)
 
         self._btn_behaviour_strict_qa = _mk_qa_btn(
-            "⊙",
+            "✅",
             "Strict — only moves and acts when an object fully passes all detection and "
             "filter criteria; ignores everything else",
         )
@@ -4223,7 +4272,7 @@ class SentryV2TabWidget(QWidget):
         self._sld_speed_qa.setRange(10, 100)
         self._sld_speed_qa.setValue(self.config.engagement.engagement_speed)
         self._sld_speed_qa.setFixedWidth(80)
-        self._sld_speed_qa.setToolTip("Tracking / engagement speed (10–100)")
+        self._sld_speed_qa.setToolTip(SENTRY_V2_TOOLTIPS.get("engagement_speed", ""))
         _tf_lay.addWidget(self._sld_speed_qa)
 
         _lbl_srvt = QLabel("Servo ms:")
@@ -4234,7 +4283,7 @@ class SentryV2TabWidget(QWidget):
         self._spn_servo_time_qa.setSingleStep(5)
         self._spn_servo_time_qa.setValue(self.config.connection.bus_servo_time_ms)
         self._spn_servo_time_qa.setFixedWidth(62)
-        self._spn_servo_time_qa.setToolTip("Bus servo move time in ms (0–1000)")
+        self._spn_servo_time_qa.setToolTip(SENTRY_V2_TOOLTIPS.get("servo_move_time", ""))
         _tf_lay.addWidget(self._spn_servo_time_qa)
 
         _lbl_settle = QLabel("Settle s:")
@@ -4246,8 +4295,44 @@ class SentryV2TabWidget(QWidget):
         self._spn_settle_qa.setDecimals(1)
         self._spn_settle_qa.setValue(self.config.engagement.precision_settle_time)
         self._spn_settle_qa.setFixedWidth(62)
-        self._spn_settle_qa.setToolTip("Precision settle time in seconds (0.1–3.0)")
+        self._spn_settle_qa.setToolTip(SENTRY_V2_TOOLTIPS.get("precision_settle", ""))
         _tf_lay.addWidget(self._spn_settle_qa)
+
+        _lbl_pstep = QLabel("Prec step°:")
+        _lbl_pstep.setObjectName("qaTuneLabel")
+        _tf_lay.addWidget(_lbl_pstep)
+        self._spn_prec_step_qa = QDoubleSpinBox()
+        self._spn_prec_step_qa.setRange(0.1, 5.0)
+        self._spn_prec_step_qa.setSingleStep(0.1)
+        self._spn_prec_step_qa.setDecimals(1)
+        self._spn_prec_step_qa.setValue(float(self.config.engagement.precision_max_step))
+        self._spn_prec_step_qa.setFixedWidth(62)
+        self._spn_prec_step_qa.setToolTip(SENTRY_V2_TOOLTIPS.get("precision_step", ""))
+        _tf_lay.addWidget(self._spn_prec_step_qa)
+
+        _lbl_sweep = QLabel("Sweep dps:")
+        _lbl_sweep.setObjectName("qaTuneLabel")
+        _tf_lay.addWidget(_lbl_sweep)
+        self._spn_sweep_speed_qa = QDoubleSpinBox()
+        self._spn_sweep_speed_qa.setRange(1.0, 30.0)
+        self._spn_sweep_speed_qa.setSingleStep(0.5)
+        self._spn_sweep_speed_qa.setDecimals(1)
+        self._spn_sweep_speed_qa.setValue(float(self.config.guard.sweep_speed))
+        self._spn_sweep_speed_qa.setFixedWidth(62)
+        self._spn_sweep_speed_qa.setToolTip(SENTRY_V2_TOOLTIPS.get("sweep_speed", ""))
+        _tf_lay.addWidget(self._spn_sweep_speed_qa)
+
+        _lbl_asweep = QLabel("Acous dps:")
+        _lbl_asweep.setObjectName("qaTuneLabel")
+        _tf_lay.addWidget(_lbl_asweep)
+        self._spn_acoustic_sweep_speed_qa = QDoubleSpinBox()
+        self._spn_acoustic_sweep_speed_qa.setRange(2.0, 80.0)
+        self._spn_acoustic_sweep_speed_qa.setSingleStep(0.5)
+        self._spn_acoustic_sweep_speed_qa.setDecimals(1)
+        self._spn_acoustic_sweep_speed_qa.setValue(float(getattr(self.config.acoustic_guard, "sweep_speed_dps", 22.0)))
+        self._spn_acoustic_sweep_speed_qa.setFixedWidth(62)
+        self._spn_acoustic_sweep_speed_qa.setToolTip(SENTRY_V2_TOOLTIPS.get("acoustic_sweep_speed_dps", ""))
+        _tf_lay.addWidget(self._spn_acoustic_sweep_speed_qa)
 
         _lbl_vol = QLabel("Vol %:")
         _lbl_vol.setObjectName("qaTuneLabel")
@@ -4256,7 +4341,7 @@ class SentryV2TabWidget(QWidget):
         self._sld_volume_qa.setRange(0, 100)
         self._sld_volume_qa.setValue(self._sound_volume_pct())
         self._sld_volume_qa.setFixedWidth(70)
-        self._sld_volume_qa.setToolTip("Buzzer sound volume (0–100%)")
+        self._sld_volume_qa.setToolTip(SENTRY_V2_TOOLTIPS.get("sound_volume", ""))
         _tf_lay.addWidget(self._sld_volume_qa)
 
         _tf_lay.addStretch(1)
@@ -4470,9 +4555,20 @@ class SentryV2TabWidget(QWidget):
 
         pinned_bottom = QWidget()
         pinned_bottom.setObjectName("sentryV2PinnedBottom")
-        pinned_bottom_layout = QHBoxLayout(pinned_bottom)
+        pinned_bottom_layout = QVBoxLayout(pinned_bottom)
         pinned_bottom_layout.setContentsMargins(0, 0, 0, 0)
-        pinned_bottom_layout.setSpacing(0)
+        pinned_bottom_layout.setSpacing(6)
+
+        self._btn_apply_config = QPushButton("APPLY SETTINGS")
+        self._btn_apply_config.setObjectName("sentryV2PinnedApply")
+        self._btn_apply_config.setMinimumHeight(34)
+        self._btn_apply_config.setMinimumWidth(0)
+        self._btn_apply_config.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._set_button_role(self._btn_apply_config, "utility")
+        self._btn_apply_config.clicked.connect(self._apply_pending_runtime_settings)
+        self._btn_apply_config.setEnabled(False)
+        self._apply_tooltip(self._btn_apply_config, "apply_settings")
+        pinned_bottom_layout.addWidget(self._btn_apply_config)
 
         self._btn_save_config = QPushButton("SAVE SETTINGS")
         self._btn_save_config.setObjectName("sentryV2PinnedSave")
@@ -4685,6 +4781,12 @@ QWidget#sentryV2Root QPushButton#sentryV2PinnedSave {{
     min-width: 0px;
     font-size: {max(base_font + 0.8, 10.8):.2f}pt;
     font-weight: 800;
+}}
+QWidget#sentryV2Root QPushButton#sentryV2PinnedApply {{
+    min-height: {max(button_min_h + 4, 34)}px;
+    min-width: 0px;
+    font-size: {max(base_font + 0.4, 10.2):.2f}pt;
+    font-weight: 700;
 }}
 QWidget#sentryV2Root QWidget#sentryV2TabsNav {{
     background-color: {tokens['surface_alt_rgba']};
@@ -5033,7 +5135,8 @@ QWidget#sentryV2Root QPushButton#qaIconBtn {{
     border: 1px solid {tokens['button_border']};
     border-radius: {radius_small}px;
     color: {tokens['text']};
-    font-size: {max(base_font + 0.5, 10.0):.2f}pt;
+    font-size: {max(base_font + 1.4, 11.6):.2f}pt;
+    font-weight: 700;
     min-height: 0px;
     padding: 0px;
 }}
@@ -5607,6 +5710,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._spin_recenter_pan: "fire_recenter_pan",
             self._spin_recenter_tilt: "fire_recenter_tilt",
             self._spin_target_loss_timeout: "target_loss_timeout",
+            self._spin_stationary_release_hold: "stationary_release_hold_s",
             self._chk_continuous_hunt_loss: "continuous_hunt_on_loss",
             self._chk_adaptive_loss_recovery: "adaptive_loss_recovery_enabled",
             self._combo_loss_search_style: "loss_search_style",
@@ -6031,6 +6135,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._slider_webcam_zoom.setSingleStep(5)
         self._slider_webcam_zoom.setPageStep(10)
         self._slider_webcam_zoom.setValue(int(getattr(self.config.connection, "webcam_zoom_pct", 100)))
+        self._slider_webcam_zoom.setToolTip(
+            "Webcam zoom scale. Range: 40 to 200%. Increasing zooms in (larger apparent target size, narrower view). "
+            "Decreasing zooms out (wider view, smaller apparent target size)."
+        )
         self._slider_webcam_zoom.valueChanged.connect(self._on_source_zoom_changed)
         webcam_zoom_row.addWidget(self._slider_webcam_zoom, 1)
         self._lbl_webcam_zoom = QLabel("")
@@ -6046,6 +6154,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._slider_test_zoom.setSingleStep(5)
         self._slider_test_zoom.setPageStep(10)
         self._slider_test_zoom.setValue(int(getattr(self.config.connection, "test_source_zoom_pct", 100)))
+        self._slider_test_zoom.setToolTip(
+            "Test-source zoom scale. Range: 25 to 200%. Increasing zooms in for closer inspection of recorded media. "
+            "Decreasing zooms out for a wider context view."
+        )
         self._slider_test_zoom.valueChanged.connect(self._on_source_zoom_changed)
         test_zoom_row.addWidget(self._slider_test_zoom, 1)
         self._lbl_test_zoom = QLabel("")
@@ -6083,6 +6195,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         self._btn_test_media = QPushButton("Open Media...")
         self._set_button_role(self._btn_test_media, "utility")
+        self._btn_test_media.setToolTip("Open a local image or video file as the current test source.")
         self._btn_test_media.clicked.connect(self._browse_test_media)
         cam_lay.addWidget(self._btn_test_media, 7, 0, 1, 2)
 
@@ -6095,6 +6208,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         self._btn_open_video_url = QPushButton("Open URL")
         self._set_button_role(self._btn_open_video_url, "utility")
+        self._btn_open_video_url.setToolTip("Load a test video from the URL field into the preview pipeline.")
         self._btn_open_video_url.clicked.connect(self._open_video_url)
         url_button_row = QHBoxLayout()
         url_button_row.addStretch(1)
@@ -6111,11 +6225,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         resolution_action_grid.setVerticalSpacing(4)
         self._btn_apply_camera_resolution = QPushButton("Apply Res")
         self._set_button_role(self._btn_apply_camera_resolution, "utility")
+        self._btn_apply_camera_resolution.setToolTip("Apply the selected camera resolution to the active camera source.")
         self._btn_apply_camera_resolution.clicked.connect(self._apply_camera_resolution)
         resolution_action_grid.addWidget(self._btn_apply_camera_resolution, 0, 0)
 
         self._btn_restart_app = QPushButton("Restart")
         self._set_button_role(self._btn_restart_app, "utility")
+        self._btn_restart_app.setToolTip("Restart Smart Sentry to cleanly reinitialize camera and runtime state.")
         self._btn_restart_app.clicked.connect(self._restart_application)
         resolution_action_grid.addWidget(self._btn_restart_app, 0, 1)
         self._style_button_row([self._btn_apply_camera_resolution, self._btn_restart_app], "utility")
@@ -6127,26 +6243,31 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         media_ctrl_grid.setVerticalSpacing(4)
         self._btn_test_media_play = QPushButton("Play")
         self._set_button_role(self._btn_test_media_play, "utility")
+        self._btn_test_media_play.setToolTip("Resume test video playback from the current frame.")
         self._btn_test_media_play.clicked.connect(self._play_test_media)
         media_ctrl_grid.addWidget(self._btn_test_media_play, 0, 0)
 
         self._btn_test_media_pause = QPushButton("Pause")
         self._set_button_role(self._btn_test_media_pause, "utility")
+        self._btn_test_media_pause.setToolTip("Pause test video playback at the current frame.")
         self._btn_test_media_pause.clicked.connect(self._pause_test_media)
         media_ctrl_grid.addWidget(self._btn_test_media_pause, 0, 1)
 
         self._btn_test_media_step = QPushButton("Step")
         self._set_button_role(self._btn_test_media_step, "utility")
+        self._btn_test_media_step.setToolTip("Advance the test video by exactly one frame while paused.")
         self._btn_test_media_step.clicked.connect(self._step_test_media_frame)
         media_ctrl_grid.addWidget(self._btn_test_media_step, 1, 0)
 
         self._btn_test_media_restart = QPushButton("Restart")
         self._set_button_role(self._btn_test_media_restart, "utility")
+        self._btn_test_media_restart.setToolTip("Restart the current test image/video from the beginning.")
         self._btn_test_media_restart.clicked.connect(self._restart_test_media)
         media_ctrl_grid.addWidget(self._btn_test_media_restart, 1, 1)
 
         self._chk_test_media_loop = QCheckBox("Loop")
         self._chk_test_media_loop.setChecked(True)
+        self._chk_test_media_loop.setToolTip("When enabled, test video playback restarts automatically at end-of-file.")
         self._chk_test_media_loop.toggled.connect(self._on_test_media_loop_toggled)
         self._style_button_row(
             [self._btn_test_media_play, self._btn_test_media_pause, self._btn_test_media_step, self._btn_test_media_restart],
@@ -6718,6 +6839,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         library_grp = QGroupBox("Prompted Target Library")
         library_lay = QVBoxLayout(library_grp)
         self._prompted_target_list = QListWidget()
+        self._prompted_target_list.setIconSize(QSize(72, 72))
+        self._prompted_target_list.setSpacing(6)
         self._prompted_target_list.itemChanged.connect(self._on_prompted_target_item_changed)
         self._prompted_target_list.itemSelectionChanged.connect(self._on_prompted_target_selected)
         self._apply_tooltip(self._prompted_target_list, "prompted_target_list")
@@ -7509,12 +7632,22 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._spin_target_loss_timeout, "target_loss_timeout")
         advanced_lay.addWidget(self._spin_target_loss_timeout, 10, 1)
 
-        advanced_lay.addWidget(QLabel("Continuous hunt on loss:"), 11, 0)
+        advanced_lay.addWidget(QLabel("Max stationary target hold (s):"), 11, 0)
+        self._spin_stationary_release_hold = QDoubleSpinBox()
+        self._spin_stationary_release_hold.setRange(1.0, 60.0)
+        self._spin_stationary_release_hold.setSingleStep(0.5)
+        self._spin_stationary_release_hold.setDecimals(1)
+        self._spin_stationary_release_hold.setValue(float(getattr(self.config.engagement, "stationary_release_hold_s", 8.0)))
+        self._spin_stationary_release_hold.valueChanged.connect(self._on_engagement_changed)
+        self._apply_tooltip(self._spin_stationary_release_hold, "stationary_release_hold_s")
+        advanced_lay.addWidget(self._spin_stationary_release_hold, 11, 1)
+
+        advanced_lay.addWidget(QLabel("Continuous hunt on loss:"), 12, 0)
         self._chk_continuous_hunt_loss = QCheckBox("Keep hunting on loss")
         self._chk_continuous_hunt_loss.setChecked(bool(getattr(self.config.engagement, "continuous_hunt_on_loss", False)))
         self._chk_continuous_hunt_loss.toggled.connect(self._on_engagement_changed)
         self._apply_tooltip(self._chk_continuous_hunt_loss, "continuous_hunt_on_loss")
-        advanced_lay.addWidget(self._chk_continuous_hunt_loss, 11, 1)
+        advanced_lay.addWidget(self._chk_continuous_hunt_loss, 12, 1)
 
         after_loss_grp = QGroupBox("After Target Loss")
         after_loss_lay = QGridLayout(after_loss_grp)
@@ -7629,6 +7762,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         tuning_lay = QVBoxLayout(tuning_grp)
         self._chk_precision_logging = QCheckBox("Precision tuning logger")
         self._chk_precision_logging.setChecked(False)
+        self._chk_precision_logging.setToolTip(
+            "Enable/disable precision tuning CSV logging during tracking and engagement. "
+            "When ON, more runtime data is recorded for tuning analysis; when OFF, no new precision log rows are written."
+        )
         self._chk_precision_logging.toggled.connect(self._on_precision_logging_toggled)
         tuning_lay.addWidget(self._chk_precision_logging)
         export_row = QHBoxLayout()
@@ -8306,6 +8443,96 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         lay.addWidget(pir_grp)
 
+        acoustic_grp = QGroupBox("Acoustic Guard (USB Microphone)")
+        acoustic_lay = QVBoxLayout(acoustic_grp)
+        acoustic_lay.setSpacing(3)
+
+        self._chk_acoustic_enabled = QCheckBox("Enable adaptive microphone anomaly trigger")
+        self._chk_acoustic_enabled.setChecked(bool(getattr(self.config.acoustic_guard, "enabled", False)))
+        self._chk_acoustic_enabled.toggled.connect(self._on_acoustic_guard_settings_changed)
+        acoustic_lay.addWidget(self._chk_acoustic_enabled)
+
+        device_row = QHBoxLayout()
+        device_row.addWidget(QLabel("Microphone:"))
+        self._combo_acoustic_device = QComboBox()
+        self._combo_acoustic_device.setMinimumContentsLength(22)
+        self._refresh_acoustic_device_dropdown(select_name=str(getattr(self.config.acoustic_guard, "device_name", "") or ""))
+        self._combo_acoustic_device.currentIndexChanged.connect(self._on_acoustic_guard_settings_changed)
+        device_row.addWidget(self._combo_acoustic_device)
+        acoustic_lay.addLayout(device_row)
+
+        threshold_row = QHBoxLayout()
+        threshold_row.addWidget(QLabel("Sensitivity:"))
+        self._combo_acoustic_sensitivity = QComboBox()
+        self._combo_acoustic_sensitivity.addItem("Very High", "very_high")
+        self._combo_acoustic_sensitivity.addItem("High", "high")
+        self._combo_acoustic_sensitivity.addItem("Medium", "medium")
+        self._combo_acoustic_sensitivity.addItem("Low", "low")
+        self._combo_acoustic_sensitivity.addItem("Very Low", "very_low")
+        self._combo_acoustic_sensitivity.currentIndexChanged.connect(self._on_acoustic_sensitivity_preset_changed)
+        threshold_row.addWidget(self._combo_acoustic_sensitivity)
+        threshold_row.addWidget(QLabel("Anomaly Threshold (dB):"))
+        self._spin_acoustic_threshold_db = QDoubleSpinBox()
+        self._spin_acoustic_threshold_db.setRange(2.0, 30.0)
+        self._spin_acoustic_threshold_db.setSingleStep(0.5)
+        self._spin_acoustic_threshold_db.setValue(float(getattr(self.config.acoustic_guard, "anomaly_threshold_db", 8.0)))
+        self._spin_acoustic_threshold_db.valueChanged.connect(self._on_acoustic_guard_settings_changed)
+        threshold_row.addWidget(self._spin_acoustic_threshold_db)
+        threshold_row.addWidget(QLabel("Z-Score:"))
+        self._spin_acoustic_zscore = QDoubleSpinBox()
+        self._spin_acoustic_zscore.setRange(1.0, 8.0)
+        self._spin_acoustic_zscore.setSingleStep(0.1)
+        self._spin_acoustic_zscore.setValue(float(getattr(self.config.acoustic_guard, "anomaly_zscore_threshold", 2.8)))
+        self._spin_acoustic_zscore.valueChanged.connect(self._on_acoustic_guard_settings_changed)
+        threshold_row.addWidget(self._spin_acoustic_zscore)
+        self._sync_acoustic_sensitivity_preset_from_controls()
+        acoustic_lay.addLayout(threshold_row)
+
+        timing_row = QHBoxLayout()
+        timing_row.addWidget(QLabel("Warmup (s):"))
+        self._spin_acoustic_warmup = QDoubleSpinBox()
+        self._spin_acoustic_warmup.setRange(0.5, 20.0)
+        self._spin_acoustic_warmup.setSingleStep(0.5)
+        self._spin_acoustic_warmup.setValue(float(getattr(self.config.acoustic_guard, "warmup_seconds", 3.0)))
+        self._spin_acoustic_warmup.valueChanged.connect(self._on_acoustic_guard_settings_changed)
+        timing_row.addWidget(self._spin_acoustic_warmup)
+        timing_row.addWidget(QLabel("Cooldown (s):"))
+        self._spin_acoustic_cooldown = QDoubleSpinBox()
+        self._spin_acoustic_cooldown.setRange(1.0, 60.0)
+        self._spin_acoustic_cooldown.setSingleStep(0.5)
+        self._spin_acoustic_cooldown.setValue(float(getattr(self.config.acoustic_guard, "event_cooldown_s", 8.0)))
+        self._spin_acoustic_cooldown.valueChanged.connect(self._on_acoustic_guard_settings_changed)
+        timing_row.addWidget(self._spin_acoustic_cooldown)
+        acoustic_lay.addLayout(timing_row)
+
+        behavior_row = QHBoxLayout()
+        behavior_row.addWidget(QLabel("L/R quick check offset (deg):"))
+        self._spin_acoustic_lr_offset = QDoubleSpinBox()
+        self._spin_acoustic_lr_offset.setRange(5.0, 90.0)
+        self._spin_acoustic_lr_offset.setSingleStep(1.0)
+        self._spin_acoustic_lr_offset.setValue(float(getattr(self.config.acoustic_guard, "quick_lr_offset_deg", 22.0)))
+        self._spin_acoustic_lr_offset.valueChanged.connect(self._on_acoustic_guard_settings_changed)
+        behavior_row.addWidget(self._spin_acoustic_lr_offset)
+        behavior_row.addWidget(QLabel("Alert sweep speed (deg/s):"))
+        self._spin_acoustic_sweep_speed = QDoubleSpinBox()
+        self._spin_acoustic_sweep_speed.setRange(2.0, 80.0)
+        self._spin_acoustic_sweep_speed.setSingleStep(0.5)
+        self._spin_acoustic_sweep_speed.setValue(float(getattr(self.config.acoustic_guard, "sweep_speed_dps", 22.0)))
+        self._spin_acoustic_sweep_speed.valueChanged.connect(self._on_acoustic_guard_settings_changed)
+        behavior_row.addWidget(self._spin_acoustic_sweep_speed)
+
+        self._btn_acoustic_test_alert = QPushButton("Trigger Test Alert")
+        self._set_button_role(self._btn_acoustic_test_alert, "utility")
+        self._btn_acoustic_test_alert.clicked.connect(self._on_acoustic_test_alert_clicked)
+        self._btn_acoustic_test_alert.setToolTip("Queue a synthetic acoustic event to verify movement protocol immediately")
+        behavior_row.addWidget(self._btn_acoustic_test_alert)
+        acoustic_lay.addLayout(behavior_row)
+
+        self._lbl_acoustic_status = QLabel("Status: adaptive baseline active when enabled")
+        acoustic_lay.addWidget(self._lbl_acoustic_status)
+
+        lay.addWidget(acoustic_grp)
+
         # Overlay toggles
         self._chk_overlay = QCheckBox("Show overlay")
         self._chk_overlay.setChecked(self.config.show_overlay)
@@ -8868,7 +9095,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._spin_command_rest_pan.setRange(SENTRY_PAN_MIN, SENTRY_PAN_MAX)
         self._spin_command_rest_pan.setSingleStep(1.0)
         self._spin_command_rest_pan.setValue(float(getattr(self.config.guard, "rest_pan", self.config.guard.guard_pan)))
-        self._spin_command_rest_pan.setToolTip("Rest angle used by Go Rest. Wake Up returns to Guard Pan instead.")
+        self._spin_command_rest_pan.setToolTip(
+            "Rest pan angle used by Go Rest. Range: 0 to 270 deg. "
+            "Increasing moves the rest pose farther right. Decreasing moves it farther left. "
+            "Wake Up returns to Guard Pan instead of this value."
+        )
         self._spin_command_rest_pan.valueChanged.connect(self._on_command_rest_position_changed)
         rest_lay.addWidget(self._spin_command_rest_pan, 1, 1)
 
@@ -8877,7 +9108,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._spin_command_rest_tilt.setRange(SENTRY_TILT_MIN, SENTRY_TILT_MAX)
         self._spin_command_rest_tilt.setSingleStep(1.0)
         self._spin_command_rest_tilt.setValue(float(getattr(self.config.guard, "rest_tilt", self.config.guard.guard_tilt)))
-        self._spin_command_rest_tilt.setToolTip("Rest angle used by Go Rest. Wake Up returns to Guard Tilt instead.")
+        self._spin_command_rest_tilt.setToolTip(
+            "Rest tilt angle used by Go Rest. Range: 0 to 110 deg. "
+            "Increasing raises the rest pose toward the upper tilt bound. Decreasing lowers it toward the minimum tilt bound. "
+            "Wake Up returns to Guard Tilt instead of this value."
+        )
         self._spin_command_rest_tilt.valueChanged.connect(self._on_command_rest_position_changed)
         rest_lay.addWidget(self._spin_command_rest_tilt, 1, 3)
 
@@ -10284,6 +10519,48 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             if not self._closing:
                 self._report_runtime_warning("Comm log emit failed", exc)
 
+    def _emit_acoustic_anomaly(self, level_db: float, baseline_db: float) -> None:
+        try:
+            self.acoustic_anomaly_received.emit(float(level_db), float(baseline_db))
+        except Exception as exc:
+            if not self._closing:
+                self._report_runtime_warning("Acoustic anomaly emit failed", exc)
+
+    def _on_acoustic_anomaly_received(self, level_db: float, baseline_db: float) -> None:
+        if self.engine is None:
+            return
+        self.engine.on_sound_anomaly_detected(float(level_db), float(baseline_db), time.time())
+        delta_db = float(level_db) - float(baseline_db)
+        self._set_label_content(
+            self._lbl_acoustic_status,
+            f"Status: anomaly {float(level_db):.1f}dB (baseline {float(baseline_db):.1f}dB, +{delta_db:.1f}dB)",
+        )
+        if self.engine.state != SentryV2State.PAUSED:
+            self._log(f"Acoustic anomaly: {float(level_db):.1f}dB (baseline {float(baseline_db):.1f}dB) -> queued")
+
+    def _sync_acoustic_guard_runtime(self) -> None:
+        cfg = getattr(self.config, "acoustic_guard", None)
+        if cfg is None:
+            return
+        self._acoustic_detector.update_settings(
+            sample_rate_hz=int(getattr(cfg, "sample_rate_hz", 16000)),
+            block_size=int(getattr(cfg, "block_size", 1024)),
+            warmup_seconds=float(getattr(cfg, "warmup_seconds", 3.0)),
+            baseline_adapt_rate=float(getattr(cfg, "baseline_adapt_rate", 0.035)),
+            anomaly_threshold_db=float(getattr(cfg, "anomaly_threshold_db", 8.0)),
+            anomaly_zscore_threshold=float(getattr(cfg, "anomaly_zscore_threshold", 2.8)),
+            cooldown_s=float(getattr(cfg, "event_cooldown_s", 8.0)),
+            device_name=str(getattr(cfg, "device_name", "") or ""),
+        )
+        enabled = bool(getattr(cfg, "enabled", False)) and not self._closing
+        if enabled:
+            self._acoustic_detector.start()
+            detector_error = str(self._acoustic_detector.last_error or "")
+            if detector_error:
+                self._log(f"Acoustic guard unavailable: {detector_error}")
+        else:
+            self._acoustic_detector.stop()
+
     def _on_comm_pir_event_received(self, sensor_id: int, timestamp: float) -> None:
         self._pir_last_event_sensor = int(sensor_id)
         self._pir_last_event_time_s = float(timestamp)
@@ -11577,7 +11854,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._camera_recovery_attempts = 0
         self._camera_recovery_in_progress = False
         self._camera_health_grace_until_s = time.time() + float(self._CAMERA_HEALTH_GRACE_AFTER_OPEN_S)
-        self._cam_timer.start(50)
+        self._cam_timer.start(self._live_capture_interval_ms)
         self._btn_cam.setText("Close Source")
 
         if source_kind == "camera":
@@ -11755,7 +12032,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._test_media_last_frame = None
         self._test_media_paused = False
         self._grab_fail_count = 0
-        self._cam_timer.start(50)
+        self._cam_timer.start(self._live_capture_interval_ms)
         self._btn_cam.setText("Close Source")
         if w > 0 and h > 0:
             self._sync_source_dimensions(w, h)
@@ -13066,6 +13343,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         eg.fire_recenter_pan_tolerance = self._spin_recenter_pan.value()
         eg.fire_recenter_tilt_tolerance = self._spin_recenter_tilt.value()
         eg.target_loss_timeout = self._spin_target_loss_timeout.value()
+        eg.stationary_release_hold_s = self._spin_stationary_release_hold.value()
         eg.continuous_hunt_on_loss = self._chk_continuous_hunt_loss.isChecked()
         eg.adaptive_loss_recovery_enabled = self._chk_adaptive_loss_recovery.isChecked()
         eg.loss_search_style = str(self._combo_loss_search_style.currentData() or "hunting")
@@ -13457,6 +13735,100 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._save_config_quietly()
         self._queue_runtime_trigger_config_if_connected()
         self._note_sound_settings_changed()
+
+    def _on_acoustic_guard_settings_changed(self) -> None:
+        cfg = self.config.acoustic_guard
+        cfg.enabled = bool(self._chk_acoustic_enabled.isChecked())
+        cfg.device_name = str(self._combo_acoustic_device.currentData() or "").strip()
+        cfg.anomaly_threshold_db = float(self._spin_acoustic_threshold_db.value())
+        cfg.anomaly_zscore_threshold = float(self._spin_acoustic_zscore.value())
+        cfg.warmup_seconds = float(self._spin_acoustic_warmup.value())
+        cfg.event_cooldown_s = float(self._spin_acoustic_cooldown.value())
+        cfg.quick_lr_offset_deg = float(self._spin_acoustic_lr_offset.value())
+        cfg.sweep_speed_dps = float(self._spin_acoustic_sweep_speed.value())
+        self._sync_acoustic_sensitivity_preset_from_controls()
+        self._push_config()
+        self._save_config_quietly()
+        detector_error = str(self._acoustic_detector.last_error or "")
+        if detector_error:
+            self._set_label_content(self._lbl_acoustic_status, f"Status: {detector_error}")
+        else:
+            state_text = "ON" if cfg.enabled else "OFF"
+            self._set_label_content(self._lbl_acoustic_status, f"Status: {state_text} • adaptive baseline {'running' if self._acoustic_detector.running else 'stopped'}")
+
+    def _acoustic_sensitivity_profiles(self) -> Dict[str, Tuple[float, float]]:
+        return {
+            "very_high": (2.5, 1.2),
+            "high": (3.5, 1.6),
+            "medium": (5.5, 2.2),
+            "low": (8.0, 2.8),
+            "very_low": (11.0, 3.4),
+        }
+
+    def _sync_acoustic_sensitivity_preset_from_controls(self) -> None:
+        combo = getattr(self, "_combo_acoustic_sensitivity", None)
+        if combo is None:
+            return
+        threshold_db = float(self._spin_acoustic_threshold_db.value())
+        zscore = float(self._spin_acoustic_zscore.value())
+        best_key = "medium"
+        best_dist = float("inf")
+        for key, (thr, z) in self._acoustic_sensitivity_profiles().items():
+            dist = abs(threshold_db - thr) + abs(zscore - z)
+            if dist < best_dist:
+                best_dist = dist
+                best_key = key
+        idx = combo.findData(best_key)
+        combo.blockSignals(True)
+        combo.setCurrentIndex(idx if idx >= 0 else 2)
+        combo.blockSignals(False)
+
+    def _on_acoustic_sensitivity_preset_changed(self) -> None:
+        key = str(self._combo_acoustic_sensitivity.currentData() or "medium")
+        threshold_db, zscore = self._acoustic_sensitivity_profiles().get(key, (5.5, 2.2))
+        self._spin_acoustic_threshold_db.blockSignals(True)
+        self._spin_acoustic_threshold_db.setValue(float(threshold_db))
+        self._spin_acoustic_threshold_db.blockSignals(False)
+        self._spin_acoustic_zscore.blockSignals(True)
+        self._spin_acoustic_zscore.setValue(float(zscore))
+        self._spin_acoustic_zscore.blockSignals(False)
+        self._on_acoustic_guard_settings_changed()
+
+    def _on_acoustic_test_alert_clicked(self) -> None:
+        if self.engine is None:
+            return
+        if not bool(self._chk_acoustic_enabled.isChecked()):
+            self._set_label_content(self._lbl_acoustic_status, "Status: enable Acoustic Guard first, then trigger test")
+            return
+        baseline_db = 40.0
+        level_db = baseline_db + max(6.0, float(self._spin_acoustic_threshold_db.value()) + 1.0)
+        self.engine.on_sound_anomaly_detected(level_db, baseline_db, time.time())
+        self._set_label_content(
+            self._lbl_acoustic_status,
+            f"Status: test event queued ({level_db:.1f}dB vs {baseline_db:.1f}dB baseline)",
+        )
+        self._log(f"Acoustic test alert queued ({level_db:.1f}dB vs {baseline_db:.1f}dB baseline)")
+
+    def _refresh_acoustic_device_dropdown(self, select_name: str = "") -> None:
+        combo = getattr(self, "_combo_acoustic_device", None)
+        if combo is None:
+            return
+        wanted = str(select_name or "").strip()
+        names = USBMicrophoneAnomalyDetector.list_input_devices()
+
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("Default System Microphone", "")
+
+        for name in names:
+            combo.addItem(name, name)
+
+        if wanted and wanted not in names:
+            combo.addItem(f"{wanted} (saved, unavailable)", wanted)
+
+        index = combo.findData(wanted)
+        combo.setCurrentIndex(index if index >= 0 else 0)
+        combo.blockSignals(False)
 
     def _apply_pir_120_layout(self) -> None:
         recommended_pans = [270.0, 150.0, 30.0]
@@ -13948,9 +14320,16 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._startup_rest_completed = True
         pan = self._spin_guard_pan.value()
         tilt = self._spin_guard_tilt.value()
-        # Home is a manual override; cancel any active return/engagement runtime
-        # state first so queued auto-return nudges do not fight the guided move.
-        self.engine.hold_current_guard_position(float(self.engine.current_pan), float(self.engine.current_tilt))
+        # Cancel any active engagement, returning, or patrol by pausing the
+        # engine (→ PAUSED).  PAUSED silences all state-machine move generators
+        # so nothing can fight the guided home transit.
+        #
+        # hold_guard=True in _start_guided_position_move ensures that when the
+        # guided move completes, hold_current_guard_position(home_pan, home_tilt)
+        # is called, which: sets guard to the correct configured home position,
+        # resets all runtime state, sets _last_engage_time = now so detection
+        # starts fresh on arrival, and transitions to GUARDING.
+        self.engine.stop()
         waking_from_rest = self._is_near_rest_position(float(self.engine.current_pan), float(self.engine.current_tilt), tolerance_deg=8.0)
         self._play_home_cue(waking_from_rest=waking_from_rest)
         self._start_guided_position_move(pan, tilt, maneuver="home", hold_guard=True, log_message="Go Home")
@@ -14226,6 +14605,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _save_config(self) -> None:
         try:
+            self._push_config(force=True)
             self._capture_layout_state()
             # Persist connection settings from UI
             cc = self.config.connection
@@ -14263,6 +14643,23 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._log(f"Settings saved: {self.config.config_path}")
         except Exception as e:
             self._log(f"Save error: {e}")
+
+    def _set_runtime_apply_pending_state(self) -> None:
+        button = getattr(self, "_btn_apply_config", None)
+        if button is None:
+            return
+        pending = bool(getattr(self, "_pending_runtime_apply", False))
+        button.setEnabled(pending)
+        button.setText("APPLY SETTINGS *" if pending else "APPLY SETTINGS")
+
+    def _flush_pending_runtime_apply(self) -> None:
+        self._push_config(force=True)
+
+    def _apply_pending_runtime_settings(self) -> None:
+        if not bool(getattr(self, "_pending_runtime_apply", False)):
+            return
+        self._push_config(force=True)
+        self._log("Pending settings applied.")
 
     def _save_config_quietly(self) -> None:
         self._pending_quiet_save = True
@@ -16079,6 +16476,28 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return None
         return self._prompted_target_library.get_profile(target_id)
 
+    def _prompted_profile_thumbnail_icon(self, profile: object) -> Optional[QIcon]:
+        examples = list(getattr(profile, "examples", []) or [])
+        if not examples:
+            return None
+        try:
+            crop = examples[-1].crop_image()
+        except Exception:
+            return None
+        if not isinstance(crop, np.ndarray) or crop.size == 0:
+            return None
+        try:
+            rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+            rgb = np.ascontiguousarray(rgb)
+            h, w, _ = rgb.shape
+            qimg = QImage(rgb.data, w, h, int(rgb.strides[0]), QImage.Format_RGB888).copy()
+            pixmap = QPixmap.fromImage(qimg)
+            if pixmap.isNull():
+                return None
+            return QIcon(pixmap.scaled(72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        except Exception:
+            return None
+
     def _rebuild_prompted_target_list(self) -> None:
         if not hasattr(self, "_prompted_target_list"):
             return
@@ -16087,10 +16506,16 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._prompted_target_list.blockSignals(True)
         self._prompted_target_list.clear()
         for profile in self._prompted_target_library.profiles:
-            item = QListWidgetItem(f"{profile.name} ({len(profile.examples)} examples)")
+            example_count = len(profile.examples)
+            item = QListWidgetItem(f"{profile.name}\n{example_count} examples")
             item.setData(Qt.UserRole, profile.target_id)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable | Qt.ItemIsEnabled)
             item.setCheckState(Qt.Checked if profile.enabled else Qt.Unchecked)
+            item.setToolTip(f"{profile.name}\nExamples: {example_count}")
+            thumbnail_icon = self._prompted_profile_thumbnail_icon(profile)
+            if thumbnail_icon is not None:
+                item.setIcon(thumbnail_icon)
+                item.setSizeHint(QSize(0, 84))
             self._prompted_target_list.addItem(item)
             if selected_id and profile.target_id == selected_id:
                 item.setSelected(True)
@@ -17513,6 +17938,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             (self._spin_recenter_pan, settings["fire_recenter_pan_tolerance"]),
             (self._spin_recenter_tilt, settings["fire_recenter_tilt_tolerance"]),
             (self._spin_target_loss_timeout, settings["target_loss_timeout"]),
+            (self._spin_stationary_release_hold, settings.get("stationary_release_hold_s", self.config.engagement.stationary_release_hold_s)),
         ]
         for widget, value in widgets:
             widget.blockSignals(True)
@@ -17575,6 +18001,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 (self._spin_recenter_pan, settings.get("fire_recenter_pan_tolerance", self.config.engagement.fire_recenter_pan_tolerance)),
                 (self._spin_recenter_tilt, settings.get("fire_recenter_tilt_tolerance", self.config.engagement.fire_recenter_tilt_tolerance)),
                 (self._spin_target_loss_timeout, settings.get("target_loss_timeout", self.config.engagement.target_loss_timeout)),
+                (self._spin_stationary_release_hold, settings.get("stationary_release_hold_s", self.config.engagement.stationary_release_hold_s)),
             ]
             for widget, value in widget_values:
                 widget.blockSignals(True)
@@ -17845,11 +18272,36 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         else:
             self._log(f"{command_name} failed: {detail_text}")
 
-    def _push_config(self) -> None:
-        """Push current config to engine, overlay, and detector."""
-        self.engine.update_config(self.config)
-        self.overlay.update_config(self.config)
-        self._sync_detector_params()
+    def _push_config(self, *, force: bool = False) -> None:
+        """Push current config to engine, overlay, and detector.
+
+        Runtime apply is batched behind a short timer so editing multiple
+        values while the app is live does not hammer the engine on each commit.
+        The pinned Apply button forces an immediate flush.
+        """
+        timer = getattr(self, "_runtime_apply_timer", None)
+        if not force and timer is not None:
+            self._pending_runtime_apply = True
+            self._set_runtime_apply_pending_state()
+            timer.start(180)
+            return
+
+        if self._runtime_apply_in_progress:
+            return
+
+        self._pending_runtime_apply = False
+        if timer is not None:
+            timer.stop()
+        self._set_runtime_apply_pending_state()
+
+        self._runtime_apply_in_progress = True
+        try:
+            self.engine.update_config(self.config)
+            self.overlay.update_config(self.config)
+            self._sync_detector_params()
+            self._sync_acoustic_guard_runtime()
+        finally:
+            self._runtime_apply_in_progress = False
 
     def _sync_detector_params(self) -> None:
         """Synchronize detector parameters from current config."""
@@ -17898,7 +18350,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         # dead-reckoning; pinning to stale 750 ms feedback would stall patrol.
         is_engaging = (self.engine.state == SentryV2State.ENGAGING)
         if is_engaging:
-            if feedback_age_s > 0.28:
+            if feedback_age_s > float(self._engaging_feedback_pose_max_age_s):
                 pan, tilt = self._clamp_manual_angles(
                     float(getattr(self, "_last_commanded_pan", self.engine.current_pan)),
                     float(getattr(self, "_last_commanded_tilt", self.engine.current_tilt)),
@@ -18464,6 +18916,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         # Buzzer (back-sync is handled inside _sync_sound_widgets which includes _btn_buzzer_qa)
         self._btn_buzzer_qa.clicked.connect(self._chk_sound_enabled.setChecked)
 
+        # Acoustic guard QA toggle — bidirectional sync with the guard-tab checkbox
+        self._chk_acoustic_enabled.toggled.connect(lambda c: self._sync_qa_btn(self._btn_acoustic_guard_qa, c))
+        self._btn_acoustic_guard_qa.clicked.connect(self._chk_acoustic_enabled.setChecked)
+
+        # PIR guard QA toggle — bidirectional sync with the guard-tab checkbox
+        self._chk_pir_enabled.toggled.connect(lambda c: self._sync_qa_btn(self._btn_pir_guard_qa, c))
+        self._btn_pir_guard_qa.clicked.connect(self._chk_pir_enabled.setChecked)
+
         # LED / Laser / ACC / Spare
         self._btn_led.toggled.connect(lambda c: self._sync_qa_btn(self._btn_led_qa, c))
         self._btn_led_qa.clicked.connect(self._btn_led.setChecked)
@@ -18534,6 +18994,48 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._spn_settle_qa.blockSignals(True),
             self._spn_settle_qa.setValue(v),
             self._spn_settle_qa.blockSignals(False),
+        ))
+
+        # QA precision-step spinbox ↔ main _spin_prec_step
+        def _qa_prec_step_changed(v: float) -> None:
+            self._spin_prec_step.blockSignals(True)
+            self._spin_prec_step.setValue(v)
+            self._spin_prec_step.blockSignals(False)
+            self._on_engagement_changed()
+
+        self._spn_prec_step_qa.valueChanged.connect(_qa_prec_step_changed)
+        self._spin_prec_step.valueChanged.connect(lambda v: (
+            self._spn_prec_step_qa.blockSignals(True),
+            self._spn_prec_step_qa.setValue(v),
+            self._spn_prec_step_qa.blockSignals(False),
+        ))
+
+        # QA guard sweep speed spinbox ↔ main _spin_sweep_speed
+        def _qa_sweep_speed_changed(v: float) -> None:
+            self._spin_sweep_speed.blockSignals(True)
+            self._spin_sweep_speed.setValue(v)
+            self._spin_sweep_speed.blockSignals(False)
+            self._on_guard_changed()
+
+        self._spn_sweep_speed_qa.valueChanged.connect(_qa_sweep_speed_changed)
+        self._spin_sweep_speed.valueChanged.connect(lambda v: (
+            self._spn_sweep_speed_qa.blockSignals(True),
+            self._spn_sweep_speed_qa.setValue(v),
+            self._spn_sweep_speed_qa.blockSignals(False),
+        ))
+
+        # QA acoustic sweep speed spinbox ↔ main _spin_acoustic_sweep_speed
+        def _qa_acoustic_sweep_speed_changed(v: float) -> None:
+            self._spin_acoustic_sweep_speed.blockSignals(True)
+            self._spin_acoustic_sweep_speed.setValue(v)
+            self._spin_acoustic_sweep_speed.blockSignals(False)
+            self._on_acoustic_guard_settings_changed()
+
+        self._spn_acoustic_sweep_speed_qa.valueChanged.connect(_qa_acoustic_sweep_speed_changed)
+        self._spin_acoustic_sweep_speed.valueChanged.connect(lambda v: (
+            self._spn_acoustic_sweep_speed_qa.blockSignals(True),
+            self._spn_acoustic_sweep_speed_qa.setValue(v),
+            self._spn_acoustic_sweep_speed_qa.blockSignals(False),
         ))
 
         # QA volume slider (back-sync is handled inside _sync_sound_widgets which includes _sld_volume_qa)
@@ -19771,6 +20273,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if stats.get('pir_recent') and pir_note and pir_note != self._last_pir_note_seen:
             self._last_pir_note_seen = pir_note
             self._log(pir_note)
+        sound_alert_note = str(stats.get('sound_alert_note') or '')
+        if stats.get('sound_alert_recent') and sound_alert_note and sound_alert_note != self._last_sound_alert_note_seen:
+            self._last_sound_alert_note_seen = sound_alert_note
+            self._log(sound_alert_note)
         # Update last-command diagnostic in connection tab
         if hasattr(self, "_lbl_last_cmd") and self._last_visible_command_text:
             self._set_label_content(self._lbl_last_cmd, f"Last: {self._last_visible_command_text}", self._compact_status_style("neutral"))
