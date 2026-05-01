@@ -358,32 +358,17 @@ RUNTIME_ROOT_PATH = runtime_root_path()
 
 SMART_SENTRY_RELEASE_VERSION = get_version()
 SMART_SENTRY_RELEASE_VERSION_TOKEN = SMART_SENTRY_RELEASE_VERSION.replace(".", "_")
-CANONICAL_CUSTOM_PRESET_RELATIVE_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_custom_presets.json"
-CANONICAL_SETTINGS_RELATIVE_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_settings.json"
-CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_prompted_targets.json"
-CANONICAL_FACE_LIBRARY_RELATIVE_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_faces.json"
-CANONICAL_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / f"smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_custom_presets.json"
-CANONICAL_SETTINGS_PATH = APP_ROOT_PATH / "config" / f"smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_settings.json"
-CANONICAL_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / f"smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_prompted_targets.json"
-CANONICAL_FACE_LIBRARY_PATH = APP_ROOT_PATH / "config" / f"smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_faces.json"
-
-SMART_SENTRY_V3_5_1_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_5_1_custom_presets.json"
-SMART_SENTRY_V3_5_0_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_5_0_custom_presets.json"
-SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_2_custom_presets.json"
-SMART_SENTRY_V2_3_1_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_1_custom_presets.json"
-LEGACY_SMART_SENTRY_V3_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_custom_presets.json"
-LEGACY_SENTRY_V2_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "sentry_v2_custom_presets.json"
-SMART_SENTRY_V3_5_1_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_5_1_settings.json"
-SMART_SENTRY_V3_5_0_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_5_0_settings.json"
-SMART_SENTRY_V2_3_2_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_2_settings.json"
-SMART_SENTRY_V2_3_1_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_1_settings.json"
-LEGACY_SMART_SENTRY_V3_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_settings.json"
-LEGACY_SENTRY_V2_SETTINGS_PATH = APP_ROOT_PATH / "config" / "sentry_v2_settings.json"
-SMART_SENTRY_V2_3_2_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_2_prompted_targets.json"
-SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_1_prompted_targets.json"
-LEGACY_SMART_SENTRY_V3_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_prompted_targets.json"
-LEGACY_SENTRY_V2_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / "sentry_v2_prompted_targets.json"
-SMART_SENTRY_V2_3_2_FACE_LIBRARY_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_2_faces.json"
+# Versionless canonical config paths — these never change when the version bumps.
+# Legacy versioned files (smart_sentry_v*_*.json) are migrated automatically on
+# first load; see _load_settings_config / _custom_master_preset_path etc.
+CANONICAL_CUSTOM_PRESET_RELATIVE_PATH = "app/config/smart_sentry_custom_presets.json"
+CANONICAL_SETTINGS_RELATIVE_PATH = "app/config/smart_sentry_settings.json"
+CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH = "app/config/smart_sentry_prompted_targets.json"
+CANONICAL_FACE_LIBRARY_RELATIVE_PATH = "app/config/smart_sentry_faces.json"
+CANONICAL_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_custom_presets.json"
+CANONICAL_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_settings.json"
+CANONICAL_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_prompted_targets.json"
+CANONICAL_FACE_LIBRARY_PATH = APP_ROOT_PATH / "config" / "smart_sentry_faces.json"
 SMART_SENTRY_SHORTCUT_KEYS_DOC_PATH = APP_ROOT_PATH.parent / "SMART_SENTRY_SHORTCUT_KEYS.md"
 SENTRY_V2_SNAPSHOT_DIR = RUNTIME_ROOT_PATH / "snapshots"
 SENTRY_V2_LOG_EXPORT_DIR = SENTRY_V2_SNAPSHOT_DIR / "serial_log_exports"
@@ -3544,37 +3529,43 @@ class SentryV2TabWidget(QWidget):
         self._schedule_startup_tasks()
 
     def _load_settings_config(self) -> SentryV2Config:
-        """Load settings from the active release path and migrate older aliases forward."""
+        """Load settings from the versionless canonical path, migrating from any older
+        versioned file on first run.  Version bumps no longer create new blank settings."""
         canonical = CANONICAL_SETTINGS_PATH
         selected = canonical
-        for candidate in [
-            CANONICAL_SETTINGS_PATH,
-            SMART_SENTRY_V3_5_1_SETTINGS_PATH,
-            SMART_SENTRY_V3_5_0_SETTINGS_PATH,
-            SMART_SENTRY_V2_3_2_SETTINGS_PATH,
-            SMART_SENTRY_V2_3_1_SETTINGS_PATH,
-            LEGACY_SMART_SENTRY_V3_SETTINGS_PATH,
-            LEGACY_SENTRY_V2_SETTINGS_PATH,
-        ]:
-            if candidate.exists():
-                selected = candidate
-                break
+        if not canonical.exists():
+            # Pick the most-recently-modified versioned settings file in the config dir.
+            config_dir = APP_ROOT_PATH / "config"
+            versioned = sorted(
+                config_dir.glob("smart_sentry_v*_settings.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            if versioned:
+                selected = versioned[0]
 
         cfg = SentryV2Config.load(str(selected))
         cfg.config_path = CANONICAL_SETTINGS_RELATIVE_PATH
+        # Normalise prompted_library_path: any old versioned name -> versionless canonical.
+        import re as _re
         prompted_value = str(cfg.prompted_library_path or CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH)
         normalized_prompted = prompted_value.replace("\\", "/")
-        if normalized_prompted.endswith("smart_sentry_v3_prompted_targets.json") or normalized_prompted.endswith("sentry_v2_prompted_targets.json") or normalized_prompted.endswith("smart_sentry_v2_3_1_prompted_targets.json") or normalized_prompted.endswith("smart_sentry_v2_3_2_prompted_targets.json"):
+        if _re.search(
+            r"(smart_sentry_v[\d_]+_prompted_targets\.json"
+            r"|sentry_v2_prompted_targets\.json"
+            r"|smart_sentry_v3_prompted_targets\.json)",
+            normalized_prompted,
+        ):
             cfg.prompted_library_path = CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH
         prompted = Path(str(cfg.prompted_library_path or CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH))
         if prompted.is_absolute():
             cfg.prompted_library_path = self._portable_path_string(prompted)
 
-        if selected != canonical and selected.exists():
+        if selected != canonical:
             try:
                 cfg.save(str(canonical))
             except Exception as exc:
-                print(f"[SENTRY_V2_TAB] Failed to migrate legacy settings to active canonical path: {exc}", flush=True)
+                print(f"[SENTRY_V2_TAB] Failed to migrate settings to versionless path: {exc}", flush=True)
 
         return cfg
 
@@ -3593,18 +3584,20 @@ class SentryV2TabWidget(QWidget):
     def _custom_master_preset_path(self) -> Path:
         if CANONICAL_CUSTOM_PRESET_PATH.exists():
             return CANONICAL_CUSTOM_PRESET_PATH
-        if SMART_SENTRY_V3_5_1_CUSTOM_PRESET_PATH.exists():
-            return SMART_SENTRY_V3_5_1_CUSTOM_PRESET_PATH
-        if SMART_SENTRY_V3_5_0_CUSTOM_PRESET_PATH.exists():
-            return SMART_SENTRY_V3_5_0_CUSTOM_PRESET_PATH
-        if SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH.exists():
-            return SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH
-        if SMART_SENTRY_V2_3_1_CUSTOM_PRESET_PATH.exists():
-            return SMART_SENTRY_V2_3_1_CUSTOM_PRESET_PATH
-        if LEGACY_SMART_SENTRY_V3_CUSTOM_PRESET_PATH.exists():
-            return LEGACY_SMART_SENTRY_V3_CUSTOM_PRESET_PATH
-        if LEGACY_SENTRY_V2_CUSTOM_PRESET_PATH.exists():
-            return LEGACY_SENTRY_V2_CUSTOM_PRESET_PATH
+        # First run after version bump or fresh install: migrate most-recently-modified
+        # versioned custom-preset file to the versionless canonical path.
+        config_dir = APP_ROOT_PATH / "config"
+        versioned = sorted(
+            config_dir.glob("smart_sentry_v*_custom_presets.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if versioned:
+            import shutil as _shutil
+            try:
+                _shutil.copy2(str(versioned[0]), str(CANONICAL_CUSTOM_PRESET_PATH))
+            except Exception:
+                return versioned[0]
         return CANONICAL_CUSTOM_PRESET_PATH
 
     def _schedule_startup_tasks(self) -> None:
@@ -15545,7 +15538,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             },
             "external_file_references": {
                 "settings_json": _path_entry(CANONICAL_SETTINGS_PATH),
-                "legacy_settings_json": _path_entry(LEGACY_SMART_SENTRY_V3_SETTINGS_PATH if LEGACY_SMART_SENTRY_V3_SETTINGS_PATH.exists() else LEGACY_SENTRY_V2_SETTINGS_PATH),
+                "legacy_settings_json": _path_entry(next(iter(sorted((APP_ROOT_PATH / "config").glob("smart_sentry_v*_settings.json"), key=lambda p: p.stat().st_mtime, reverse=True)), None)),
                 "custom_master_presets": _path_entry(self._custom_master_preset_path()),
                 "prompted_target_library": _path_entry(self._resolved_prompted_library_path()),
                 "snapshot_dir": _path_entry(SENTRY_V2_SNAPSHOT_DIR),
@@ -15779,23 +15772,33 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _resolved_prompted_library_path(self) -> Path:
         configured = Path(str(self.config.prompted_library_path or CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH))
-        known_relative_prompted_paths = {
-            Path(CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH),
-            Path("app/config/smart_sentry_v2_3_2_prompted_targets.json"),
-            Path("app/config/smart_sentry_v2_3_1_prompted_targets.json"),
-            Path("app/config/smart_sentry_v3_prompted_targets.json"),
-            Path("app/config/sentry_v2_prompted_targets.json"),
-        }
-        if configured in known_relative_prompted_paths:
-            for candidate in [
-                CANONICAL_PROMPTED_TARGETS_PATH,
-                SMART_SENTRY_V2_3_2_PROMPTED_TARGETS_PATH,
-                SMART_SENTRY_V2_3_1_PROMPTED_TARGETS_PATH,
-                LEGACY_SMART_SENTRY_V3_PROMPTED_TARGETS_PATH,
-                LEGACY_SENTRY_V2_PROMPTED_TARGETS_PATH,
+        # Accept the versionless canonical name OR any old versioned name as "use the canonical".
+        import re as _re
+        is_canonical = (
+            configured == Path(CANONICAL_PROMPTED_TARGETS_RELATIVE_PATH)
+            or _re.search(
+                r"(smart_sentry_v[\d_]+_prompted_targets\.json"
+                r"|sentry_v2_prompted_targets\.json"
+                r"|smart_sentry_v3_prompted_targets\.json)",
+                configured.name,
+            )
+        )
+        if is_canonical:
+            if CANONICAL_PROMPTED_TARGETS_PATH.exists():
+                return CANONICAL_PROMPTED_TARGETS_PATH.resolve()
+            config_dir = APP_ROOT_PATH / "config"
+            for candidate in sorted(
+                config_dir.glob("smart_sentry_v*_prompted_targets.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            ):
+                return candidate.resolve()
+            for legacy in [
+                APP_ROOT_PATH / "config" / "smart_sentry_v3_prompted_targets.json",
+                APP_ROOT_PATH / "config" / "sentry_v2_prompted_targets.json",
             ]:
-                if candidate.exists():
-                    return candidate.resolve()
+                if legacy.exists():
+                    return legacy.resolve()
         if configured.is_absolute():
             return configured
         return (self._repo_root_path() / configured).resolve()
@@ -15811,11 +15814,21 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _resolved_face_library_path(self) -> Path:
         configured = Path(str(self.config.face_recognition.library_path or CANONICAL_FACE_LIBRARY_RELATIVE_PATH))
-        if configured in {Path(CANONICAL_FACE_LIBRARY_RELATIVE_PATH), Path("app/config/smart_sentry_v2_3_2_faces.json")}:
+        # Accept versionless canonical OR any old versioned face file as "use the canonical".
+        is_canonical = (
+            configured == Path(CANONICAL_FACE_LIBRARY_RELATIVE_PATH)
+            or (configured.name.startswith("smart_sentry_v") and configured.name.endswith("_faces.json"))
+        )
+        if is_canonical:
             if CANONICAL_FACE_LIBRARY_PATH.exists():
                 return CANONICAL_FACE_LIBRARY_PATH.resolve()
-            if SMART_SENTRY_V2_3_2_FACE_LIBRARY_PATH.exists():
-                return SMART_SENTRY_V2_3_2_FACE_LIBRARY_PATH.resolve()
+            config_dir = APP_ROOT_PATH / "config"
+            for candidate in sorted(
+                config_dir.glob("smart_sentry_v*_faces.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            ):
+                return candidate.resolve()
         if configured.is_absolute():
             return configured
         return (self._repo_root_path() / configured).resolve()
