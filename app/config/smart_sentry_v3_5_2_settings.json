@@ -1,9 +1,9 @@
 {
   "connection": {
-    "connection_type": 3,
-    "esp32_port": "",
+    "connection_type": 1,
+    "esp32_port": "COM27",
     "esp32_baud": 115200,
-    "debug_port": "",
+    "debug_port": "COM31",
     "debug_baud": 115200,
     "udp_host": "192.168.4.1",
     "udp_port": 9000,
@@ -264,7 +264,7 @@
     "auto_sample_interval_frames": 8
   },
   "sound": {
-    "enabled": true,
+    "enabled": false,
     "volume_pct": 100,
     "personality": "sentinel",
     "attitude_pct": 60,
@@ -340,7 +340,7 @@
     "contrast_pct": 100
   },
   "show_overlay": true,
-  "overlay_display_mode": "show_all",
+  "overlay_display_mode": "minimal",
   "show_threat_scores": false,
   "show_engagement_zone": false,
   "show_guard_crosshair": true,
