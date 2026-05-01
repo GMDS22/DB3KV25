@@ -112,6 +112,60 @@ If a red box is present and the turret stays visibly off-target without attempti
 
 ---
 
+## 5a. Acoustic Guard Protocol
+
+Acoustic Guard is a sound-triggered non-visual cueing system. It is subordinate to both active visual engagement and active PIR cues.
+
+### Acoustic Guard Contract
+
+When the USB microphone anomaly detector fires:
+
+1. An anomaly event is queued (not acted on immediately).
+2. The queue is only consumed when the engine is in `GUARDING` state with no active visual target and no PIR cue in progress.
+3. Once started, the acoustic alert executes a two-phase movement sequence while keeping visual detection active.
+4. If a visual target is found **at any point** during acoustic movement, the sequence is immediately cancelled and normal engagement takes over.
+
+### Phase 1 — Initial Quick Search
+
+Quick smooth movement through three fixed pan waypoints at the current guard tilt level:
+
+- **45°** → **135°** → **230°**
+
+Movement is smooth and continuous (uses `_patrol_move_toward`, not snap/jump). Speed is high (approximately 2.8× normal guard sweep speed). The intent is a fast but controlled scan that gives the detector a chance to find a target at each zone.
+
+### Phase 2 — Secondary Slow Sweep
+
+If no target is found after the initial search:
+
+- Full-range pan sweep from `pan_min` to `pan_max` at `sweep_speed_dps`.
+- Tilt varies ±7° during the sweep to improve vertical coverage.
+- This phase is deliberately slow to maximize detection opportunity.
+- After the sweep completes, the turret returns to guard position and patrol resumes.
+
+### Acoustic Guard Must Not Behave Like This
+
+- It must not snap-jump to waypoints — movement must be smooth.
+- It must not interrupt an active visual engagement.
+- It must not interrupt an active PIR cue.
+- It must not leave the turret parked at a search waypoint if the sequence ends without a target.
+- It must not fire — acoustic events only trigger search movement, not fire gating.
+
+### Acoustic Guard Settings That Matter Most
+
+- `anomaly_threshold_db`: dB above baseline to flag (lower = more sensitive)
+- `anomaly_zscore_threshold`: standard deviations above rolling mean (lower = more sensitive)
+- `event_cooldown_s`: minimum gap between alert executions
+- `sweep_speed_dps`: secondary sweep speed (lower = slower/more thorough)
+
+### Implementation Ownership
+
+- `app/sentry_v2/acoustic_guard.py`: background mic thread, EWMA baseline, anomaly firing
+- `app/sentry_v2/sentry_v2_engine.py`: `on_sound_anomaly_detected()`, `_start_sound_alert_sequence()`, `_update_sound_alert_sequence()`, `_build_sound_initial_points()`
+- `app/sentry_v2/sentry_v2_config.py`: `AcousticGuardConfig` schema
+- `app/sentry_v2/sentry_v2_tab.py`: signal bridge, Guard tab UI group, QA bar toggle button
+
+---
+
 ## 5. PIR Cue And Hunt Protocol
 
 PIR is a blind-spot cueing system. It is not a higher-priority authority than a live camera-confirmed active target.
@@ -267,6 +321,15 @@ Historical clarification:
 - archived Waveshare single-board bridge docs are different: that on-hold path explicitly leaves trigger-servo PWM unassigned and may report `trigger_servo_assigned=false`
 - if projectile mode is selected while the active bridge has no assigned trigger-servo output, that is a topology or capability mismatch, not a target-selection or fire-gate failure
 - keep trigger transport authority in `app/sentry_v2/sentry_v2_comm.py`; do not move mode-specific fire semantics into the engine
+
+### Safety And Fire Sync Note
+
+Current fire-path contract in `app/sentry_v2/sentry_v2_tab.py`:
+
+- `auto` fire and `manual` fire both support a pre-arm synchronization path through `_apply_safety_arm_sync(...)`
+- when runtime safety is reported as locked (`S1`) and a fire request is valid, software can arm (`S0`) and proceed without silently consuming the fire cycle
+- this is intentionally a reliability behavior for active runtime operation, not a bypass of fire-gate conditions
+- fire still obeys target centering/tolerance/hold/no-fire-mask rules for auto fire
 
 ---
 
@@ -573,6 +636,20 @@ Check in this order:
 
 **Default fix:** Increase `target_loss_timeout` to 2.0, `loss_search_rounds` to 6.
 
+### "Turret stays locked on one stationary person forever; PIR/acoustic guard never runs"
+
+This happens in single-target mode when the only visible target stops moving. The ENGAGING loop cycles through aim→precision→fire repeatedly and never re-enters GUARDING, so PIR and acoustic guard workflows are unreachable.
+
+Check in this order:
+
+1. Is `stationary_release_enabled` ON in config? (must be true)
+2. Is `Max stationary target hold (s)` set in the Engage tab? (default 8.0 s; try 4–6 s)
+3. Has the target actually been visible and tracked continuously? (the timer only counts while the track is held and low-motion criteria pass)
+
+**Default fix:** Enable stationary release, set `stationary_release_hold_s` to 5.0, leave `stationary_release_min_fire_cycles` at default (3). The turret will force a return/queue-advance after the criteria are met so GUARDING can re-enter and consume PIR/acoustic cues.
+
+**Important:** `target_loss_timeout` is not the right setting for this — it applies only when the target has *disappeared* (no detection box), not when it is still visibly tracked and stationary.
+
 ---
 
 ## 13. Known Editor Trap Areas (Simplified)
@@ -678,6 +755,23 @@ Possible mismatch worth tracking:
 - current overlay code still draws a center dot in the guard crosshair path
 
 This does not change the tracking math, but it is an editor-facing documentation consistency risk and should be treated carefully if overlay documentation is revised again.
+
+### 10. Overlay Display Mode Contract
+
+The live video pane now has a 3-state display mode cycle button under the panel:
+
+- `SHOW ALL`: full overlay rendering path (`overlay.draw(...)` + identity labels + optional scope view + mask/status overlays)
+- `MINIMAL`: thin crosshair + thin target boxes only (no full HUD labels/panels/scope rendering)
+- `NO OVERLAY`: raw video frame copy with all overlay drawing bypassed
+
+Current ownership points:
+
+- `app/sentry_v2/sentry_v2_tab.py`: mode constants, mode-cycle UI, render branch (`_build_display_frame`), minimal renderer (`_draw_minimal_overlay`)
+- `app/sentry_v2/sentry_v2_config.py`: persisted `overlay_display_mode` with `show_all` default
+
+Required rule:
+
+- per-overlay settings toggles remain preserved in config and must not be destroyed when mode is switched; display mode is a runtime visibility layer, not a destructive settings rewrite
 
 ---
 

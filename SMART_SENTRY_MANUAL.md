@@ -1,9 +1,9 @@
 # SMART SENTRY V2 — COMPLETE REFERENCE MANUAL
 
-> **Version:** 3.5.0  
+> **Version:** 3.5.1  
 > **Module Path:** `app/sentry_v2/`  
-> **Last Updated:** 2026-04-29  
-> **Status:** Verified against the current standalone Smart Sentry v3.5.0 release candidate. The canonical runtime settings file is `app/config/smart_sentry_v3_5_0_settings.json`; older settings paths remain compatibility fallbacks only. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`, and the full settings system still defines 13 tabs while `Facial Recognition` and `AI Assistant` remain temporarily hidden by release hold for the active release line.
+> **Last Updated:** 2026-05-01  
+> **Status:** Verified against the current standalone Smart Sentry v3.5.1 release candidate. The canonical runtime settings file is version-resolved as `app/config/smart_sentry_v<release_version>_settings.json` (currently `app/config/smart_sentry_v3_5_1_settings.json`); older settings paths remain compatibility fallbacks only. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`, and the full settings system still defines 13 tabs while `Facial Recognition` and `AI Assistant` remain temporarily hidden by release hold for the active release line.
 
 Primary behavior-contract note: for the current authoritative tracking, PIR, target-loss, center-aim, and fire-gating blueprint, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md` first before changing engine or preset behavior.
 
@@ -40,7 +40,7 @@ Smart Sentry v2 is a standalone turret control application launched from the DB3
 Pinned firmware note: the current live app contract uses the Arduino Nano USB IO + Debug Board USB path with `arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino` as the active IO firmware. Waveshare single-board firmware files remain in the repo for archived bench work only and are not part of the current app.
 
 - **Standalone camera ownership:** Smart Sentry opens and owns its own camera or stream source
-- **Separate runtime settings:** Smart Sentry persists to `app/config/smart_sentry_v3_0_0_settings.json` and accepts older files only as migration fallbacks
+- **Separate runtime settings:** Smart Sentry persists to the version-resolved canonical settings file `app/config/smart_sentry_v<release_version>_settings.json` (currently `...v3_5_1...`) and accepts older files only as migration fallbacks
 - **One-app-at-a-time workflow:** Smart Sentry and the main app may use the same COM values, but never at the same time
 
 On single-camera systems, Smart Sentry should normally use camera index `0` unless the operator explicitly selects another camera or stream source.
@@ -54,9 +54,13 @@ On single-camera systems, Smart Sentry should normally use camera index `0` unle
 - **Runtime diagnostics:** the status area now includes pinned hardware-monitor cards plus a live sound-link readout
 - **Runtime data export:** the Controls page can write timestamped JSON and Markdown runtime captures under the repo snapshot folder and expose a direct open-folder action for the saved files
 - **Preview resiliency:** local camera preview now keeps a reduced-overlay live fallback active when detector callbacks lag and records blackout-frame counts in runtime snapshots; sustained successful-but-near-black webcam frames now trigger source recovery instead of silently remaining black
-- **Operator expansion:** the underlying settings system still includes Facial Recognition, Shortcut Keys, and AI Assistant surfaces plus a pinned top-row `Quick Keys` action, with Facial Recognition and AI Assistant currently held out of the v3.0.0 release through the documented release-hold workflow
+- **Operator expansion:** the underlying settings system still includes Facial Recognition, Shortcut Keys, and AI Assistant surfaces plus a pinned top-row `Quick Keys` action, with Facial Recognition and AI Assistant currently held out of the active release line through the documented release-hold workflow
 - **Known-face support:** Smart Sentry can now load and persist a lightweight face library, register new identities from images or the current live frame, label recognized faces in the preview, and optionally keep friendly known faces out of the engagement path
 - **Settings compatibility:** the canonical runtime settings file remains authoritative while the legacy nested settings file is kept synchronized for compatibility
+- **Acoustic Guard:** USB microphone anomaly detection now runs as a background thread using adaptive EWMA baseline tracking; on anomaly, the turret performs a quick smooth three-point initial search (45° → 135° → 230°) followed by a slow full-range secondary sweep with slight tilt bobbing; visual target detection stays active during acoustic movement and immediately takes priority if a target is found
+- **QA bar sensor toggles:** the Quick Access chip bar under the video panel now includes dedicated one-click toggle buttons for Acoustic Guard (🎤) and PIR Sensors (🟥), bidirectionally synced with their corresponding Guard tab checkboxes
+- **Acoustic sensitivity presets:** the Guard tab Acoustic Guard group now exposes a Sensitivity dropdown (Very High / High / Medium / Low / Very Low) that live-applies matched threshold and z-score values for fast tuning without manual number entry
+- **Acoustic test trigger:** a Trigger Test Alert button in the Acoustic Guard group injects a synthetic anomaly event immediately, so operators can verify the movement protocol without needing real microphone input
 
 ### Verified Current Integration Notes
 
@@ -142,7 +146,7 @@ All configuration in `@dataclass` structures with JSON save/load.
 | `DetectionModeConfig` | Detection algorithm settings | `detection_mode`, contour area, YOLO area, color preset, custom HSV, motion gate |
 | `TargetFilterConfig` | Class/size/zone filtering | `allowed_classes`, `class_priority`, `min_confidence`, `engagement_zone` |
 | `ThreatScoringConfig` | Threat score weights | 7 weights (proximity, size, confidence, class, speed, persistence, approach) |
-| `EngagementConfig` | Fire/trigger/timing | `min_threat_score`, burst settings, cooldowns, PID gains, auto-trigger, adaptive after-loss recovery tuning |
+| `EngagementConfig` | Fire/trigger/timing | `min_threat_score`, burst settings, cooldowns, PID gains, auto-trigger, adaptive after-loss recovery tuning, stationary-release hold and suppress fields |
 | `GuardConfig` | Guard, rest, patrol, and guided move behavior | `guard_pan/tilt`, `rest_pan/tilt`, startup/close rest timing, home/rest move speeds, FOV, 4 guard modes, sweep/waypoint/random params |
 | `SoundConfig` | Procedural and spoken audio behavior | buzzer enable, human voice enable, voice selection, voice rate/pitch/volume, rest cues, identity announce cooldown |
 | `FaceRecognitionConfig` | Known-face runtime rules | enable, library path, threshold, min size, friendly suppression, announce, gesture |
@@ -152,7 +156,7 @@ All configuration in `@dataclass` structures with JSON save/load.
 | `ConnectionConfig` | Hardware topology | `connection_type`, ports/bauds, UDP host/port, `wifi_interface` (dedicated Windows WiFi adapter), servo IDs, camera, inversions |
 | `SentryV2Config` | Top-level container | All sub-configs + overlay flags + `save()`/`load()` |
 
-**Persistence:** `app/config/smart_sentry_v3_0_0_settings.json` (canonical runtime file, auto-created). Compatibility fallbacks may also exist at `app/config/smart_sentry_v2_3_2_settings.json`, `app/config/smart_sentry_v2_3_1_settings.json`, `app/config/smart_sentry_v3_settings.json`, and `app/config/sentry_v2_settings.json`, but those are not the authoritative live file.
+**Persistence:** `app/config/smart_sentry_v<release_version>_settings.json` (canonical runtime file, auto-created; currently `app/config/smart_sentry_v3_5_1_settings.json`). Compatibility fallbacks may also exist at `app/config/smart_sentry_v2_3_2_settings.json`, `app/config/smart_sentry_v2_3_1_settings.json`, `app/config/smart_sentry_v3_settings.json`, and `app/config/sentry_v2_settings.json`, but those are not the authoritative live file.
 
 ---
 
@@ -185,18 +189,18 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 5. **Target Filter** — Class whitelist, confidence threshold, size filter, engagement zone
 6. **Threat AI** — threat-weight tuning and optional ML refinement controls
 7. **Engage** — Burst/cooldown/PID settings, auto-trigger, trigger mode, aim-lock presets, After Target Loss recovery tuning
-8. **Guard** — Guard position, rest position, startup/close rest behavior, PIR guard controls, patrol mode, sweep/waypoint/random parameters, guided home/rest motion tuning
+8. **Guard** — Guard position, rest position, startup/close rest behavior, PIR guard controls, Acoustic Guard (USB microphone anomaly detection with sensitivity presets and test trigger), patrol mode, sweep/waypoint/random parameters, guided home/rest motion tuning
 9. **Theme** — visual preset selection plus live accent, transparency, contrast, radius, and contrast tuning; panel font zoom remains supported through the hidden Shift+wheel shortcut rather than a visible slider
 10. **Controls** — Manual pan/tilt matrix, visible `Wake Up` / `Go Rest` actions, sound controls, runtime data export and open-folder actions, LED/laser/safety toggles, Auto Lighting Control group (auto enable toggle, manual PWM slider, dark threshold, min/max PWM range, live scene luma readout)
-11. **Facial Recognition** — visible release-held tab for the unfinished known-face workflow; kept in the UI but disabled for the v3.0.0 release
+11. **Facial Recognition** — visible release-held tab for the unfinished known-face workflow; kept in the UI but disabled for the active release line
 12. **Shortcut Keys** — live shortcut status, assigned key summary, and quick-reference access
-13. **AI Assistant** — visible release-held tab for the unfinished local assistant workflow; kept in the UI but disabled for the v3.0.0 release
+13. **AI Assistant** — visible release-held tab for the unfinished local assistant workflow; kept in the UI but disabled for the active release line
 
-**Verified current layout note:** the underlying settings architecture still defines 13 icon-forward settings tabs inside a full-height right-side panel, with a pinned header and top-row `Quick Keys` button above the tabs and compact Status/Log areas below the video rather than as separate tabs. For the v3.0.0 release target, the Facial Recognition and AI Assistant tabs are temporarily hidden through the documented release-hold convention and restored by removing their hold entries.
+**Verified current layout note:** the underlying settings architecture still defines 13 icon-forward settings tabs inside a full-height right-side panel, with a pinned header and top-row `Quick Keys` button above the tabs and compact Status/Log areas below the video rather than as separate tabs. For the active release line, the Facial Recognition and AI Assistant tabs are temporarily hidden through the documented release-hold convention and restored by removing their hold entries.
 
 **Verified current runtime note:** the Controls page now includes persisted Sound ON/OFF and volume controls, visible `Wake Up` / `Go Rest` buttons, read-only runtime data export controls, and an open-folder shortcut for saved exports, while the Status area surfaces live sound-link transport state alongside the hardware monitor. The Serial Output panel now also supports timestamped log export plus a direct open-folder action for AI analysis and troubleshooting.
 
-**Verified current identity note:** the underlying Facial Recognition implementation still persists its face library separately at `app/config/smart_sentry_v2_3_2_faces.json` and keeps the lightweight Haar-cascade plus embedding workflow in the codebase, but the tab is intentionally on release hold for v3.0.0 and is not part of the active release surface.
+**Verified current identity note:** the underlying Facial Recognition implementation still persists its face library separately at `app/config/smart_sentry_v<release_version>_faces.json` (currently `app/config/smart_sentry_v3_5_1_faces.json`) and keeps the lightweight Haar-cascade plus embedding workflow in the codebase, but the tab is intentionally on release hold for the active release line and is not part of the active release surface.
 
 **Verified current shortcut note:** the top-row `Quick Keys` button and the Shortcut Keys tab both point operators to `SMART_SENTRY_SHORTCUT_KEYS.md`, and the live shortcut runtime stays window-focused so hotkeys only fire while the Smart Sentry window is active. Manual movement now accepts both `W/A/S/D` and `Left/Right/Up/Down` arrows when the manual keyboard toggle is enabled.
 
@@ -206,7 +210,7 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 
 **Verified current WiFi adapter note:** the Connection tab WiFi UDP panel includes a `WiFi Adapter` dropdown that lists all Windows WiFi interfaces detected via `netsh`. Setting it to a dedicated USB dongle (e.g. `SMART SENTRY CON`) locks the auto-reconnect watchdog to that adapter for all `netsh wlan connect` calls, preventing the app from accidentally joining the ESP32 SSID on the wrong adapter. The selection is saved to `ConnectionConfig.wifi_interface`.
 
-**Verified current AI assistant note:** the underlying local Ollama-backed assistant implementation remains in the codebase with deterministic runtime analysis and fallback behavior, but the AI Assistant tab is intentionally on release hold for v3.0.0 and is not part of the active release surface.
+**Verified current AI assistant note:** the underlying local Ollama-backed assistant implementation remains in the codebase with deterministic runtime analysis and fallback behavior, but the AI Assistant tab is intentionally on release hold for the active release line and is not part of the active release surface.
 
 **Verified current Threat AI note:** the Threat AI page now shows saved-data and model status text, exposes an `Open ML Folder` action only when real saved data or model artifacts exist, and includes an operator-facing description of how logged training examples and optional ML refinement interact with the weighted threat scorer.
 
@@ -1031,6 +1035,44 @@ The overlay shows:
 
 Once the underlying `cleanup()` call completes the overlay transitions to **"All systems safe \u2014 Goodbye"**, the bar fills to 100 %, and the window closes after a 900 ms pause. The overlay has no effect on the rest-return or hardware shutdown sequence — those are unchanged and governed by `rest_on_close_enabled` and `rest_close_timeout_ms`.
 
+### Acoustic Guard Behavior
+
+Acoustic Guard is a USB microphone anomaly detection system that runs independently of the camera pipeline as a background thread. It uses an adaptive EWMA (exponential weighted moving average) baseline that continuously tracks the ambient noise floor. A sound event is flagged when the RMS level exceeds either the configured `anomaly_threshold_db` above baseline or the configured `anomaly_zscore_threshold` standard deviations above the rolling mean — whichever fires first.
+
+On detection the event is queued. The alert only executes when the engine is in GUARDING state with no active visual target or PIR cue. If a visual target appears at any point during the acoustic sequence, the sequence is cancelled immediately and engagement takes priority.
+
+**Acoustic alert movement protocol:**
+
+1. **Initial quick search** — smooth rapid movement visiting three fixed pan waypoints at the guard tilt level: 45° → 135° → 230°. Movement uses `_patrol_move_toward` so it is smooth and continuous, not a snap jump. Visual detection is active during this entire phase.
+2. **Secondary sweep scan** — if no target is found after the initial search, the turret performs a slow full-range sweep from `pan_min` to `pan_max` at `sweep_speed_dps`, with slight tilt variation (±7°) to improve vertical coverage. Visual detection remains active.
+3. **Resume guard** — after the sweep completes without finding a target, the turret returns to guard position and patrol resumes normally.
+
+**Key Acoustic Guard settings:**
+
+| Setting | What it controls |
+|---|---|
+| `anomaly_threshold_db` | Minimum dB above baseline to flag as anomaly (lower = more sensitive) |
+| `anomaly_zscore_threshold` | Minimum standard-deviation spike above rolling mean (lower = more sensitive) |
+| `event_cooldown_s` | Minimum gap between consecutive acoustic alerts |
+| `sweep_speed_dps` | Speed of secondary sweep in degrees per second (lower = slower/more thorough) |
+| `warmup_seconds` | Baseline adaptation warmup time before anomalies can be triggered |
+
+**Sensitivity presets (available in Guard tab):**
+
+| Preset | Threshold (dB) | Z-score | Best for |
+|---|---|---|---|
+| Very High | 2.5 | 1.2 | Lab/bench testing, near silence |
+| High | 3.5 | 1.6 | Quiet indoor environments |
+| Medium | 5.5 | 2.2 | Normal indoor |
+| Low | 8.0 | 2.8 | Noisy environments |
+| Very Low | 11.0 | 3.4 | High background noise |
+
+**Quick access toggles:** the QA bar under the video panel includes 🎤 (Acoustic Guard) and 🟥 (PIR Sensors) toggle buttons. Both are bidirectionally synced with the Guard tab checkboxes.
+
+**Trigger Test Alert:** the Guard tab includes a one-click test button that injects a synthetic anomaly event so operators can verify the full movement protocol without needing real microphone noise.
+
+---
+
 ### PIR Guard Behavior
 
 Current PIR guard behavior is cue-first and scan-second:
@@ -1062,11 +1104,11 @@ The pinned header and Controls page now share the operator workflow for explicit
 
 ### Facial Recognition Tab
 
-For the v3.0.0 release target, the Facial Recognition tab is intentionally hidden from the active tab strip through the release-hold convention. Removing its hold entry restores the normal tab.
+For the active release line, the Facial Recognition tab is intentionally hidden from the active tab strip through the release-hold convention. Removing its hold entry restores the normal tab.
 
 - The unfinished face-library workflow stays in the codebase for later release activation.
 - The tab stays visible so operators and editors can see that the feature exists.
-- The disabled state prevents the unfinished workflow from affecting normal v3.0.0 runtime behavior.
+- The disabled state prevents the unfinished workflow from affecting normal active-release runtime behavior.
 
 ### Shortcut Keys Tab
 
@@ -1079,17 +1121,17 @@ The Shortcut Keys tab is now the runtime status page for operator hotkeys.
 
 ### AI Assistant Tab
 
-For the v3.0.0 release target, the AI Assistant tab is intentionally hidden from the active tab strip through the release-hold convention. Removing its hold entry restores the normal tab.
+For the active release line, the AI Assistant tab is intentionally hidden from the active tab strip through the release-hold convention. Removing its hold entry restores the normal tab.
 
 - The unfinished local assistant workflow stays in the codebase for later release activation.
 - The tab stays visible so operators and editors can see that the feature exists.
-- The disabled state prevents unfinished assistant workflows from affecting normal v3.0.0 runtime behavior.
+- The disabled state prevents unfinished assistant workflows from affecting normal active-release runtime behavior.
 
 ### Engage Tab
 
-The Engage tab now includes an `After Target Loss` group in the advanced engagement area.
+The Engage tab now includes an `After Target Loss` group and a `Max stationary target hold (s)` control in the advanced engagement area.
 
-That group is the operator-facing contract for the adaptive recovery system. It currently exposes:
+The `After Target Loss` group is the operator-facing contract for the adaptive recovery system. It currently exposes:
 
 - adaptive loss recovery enable or disable
 - rapid handoff pursuit time
@@ -1103,6 +1145,21 @@ That group is the operator-facing contract for the adaptive recovery system. It 
 - recovery velocity bias
 
 This section is intended to let operators tune how quickly Smart Sentry hands off in dense scenes versus how stubbornly it searches in sparse scenes. Any future UI simplification must preserve the scene-dependent behavior distinction rather than flattening it into one generic timeout control.
+
+#### Stationary Target Release
+
+The `Max stationary target hold (s)` spinbox (range 1.0–60.0 s, default 8.0 s, backed by `stationary_release_hold_s`) controls how long Smart Sentry may hold a continuous ENGAGING lock on a single stationary visible target before the stationary-release protocol becomes eligible to trigger.
+
+The release triggers when **all three** of the following are true simultaneously:
+1. The target has been visibly tracked and held without significant pixel-space movement for at least `stationary_release_hold_s` seconds.
+2. At least `stationary_release_min_fire_cycles` fire cycles have completed on the same track.
+3. The target centroid has moved fewer than `stationary_release_motion_px` pixels since the hold began.
+
+When released the engine advances the queue (or forces a return if no next target exists) so GUARDING re-enters, PIR cues are consumed, and acoustic guard workflows can run normally. The same target is suppressed for `stationary_release_suppress_s` seconds to avoid immediate re-lock.
+
+**Important distinctions:**
+- `Max stationary target hold (s)` applies to a *visible*, continuously tracked target that has stopped moving.
+- `target_loss_timeout` applies after the target has *disappeared* (no detection box). Do not conflate these two controls.
 
 ### Detection Tab
 
@@ -1136,8 +1193,16 @@ This section is intended to let operators tune how quickly Smart Sentry hands of
 ### Scope View
 
 - The toggleable scope overlay is display-only; it does not change detector geometry or fire logic.
-- The current reticle intentionally avoids a filled center marker so the aim point stays unobstructed during live tracking.
+- Scope-view crosshair arms intentionally keep a center gap; guard crosshair rendering still includes a center dot marker.
 - Normal scope styling is monochrome for visibility: white outer ring, black inner ring, black crosshair arms, and black short tick marks. A temporary fire-flash accent may still appear during active firing feedback.
+
+### Overlay Display Modes (Under Video Panel)
+
+- The button under the video pane cycles 3 display states: `SHOW ALL` -> `MINIMAL` -> `NO OVERLAY`.
+- `SHOW ALL` uses the full overlay/HUD rendering path.
+- `MINIMAL` keeps only a thin crosshair and thin target boxes.
+- `NO OVERLAY` shows raw video without overlay drawing.
+- Mode selection is persisted in config as `overlay_display_mode` and does not erase individual overlay-toggle settings.
 
 ---
 
@@ -1508,6 +1573,8 @@ These are current implementation risks verified during documentation review and 
 | PIR search starts too late or seems to sit on one cue | `Cue Hold` is too high for the behavior you want | Reduce `Cue Hold` first. Use `Fast Reacquire` if you want the turret to leave the cue earlier and widen sooner. |
 | PIR hunt finishes but the turret stays parked at the last hunt point | Older builds could clear PIR state without issuing an explicit return-home command | Current builds command the configured guard/home position when a no-target PIR hunt completes. If you still see a post-hunt stall, update the build rather than trying to tune around it. |
 | PIR events feel merged across two zones | Cross-sensor lockout is suppressing near-simultaneous overlaps | Reduce `cross_sensor_lockout_ms` only if your sensors are mounted far enough apart to avoid duplicate-trigger churn. |
+| Turret stays locked on one stationary visible person and PIR/acoustic guard never runs | When a single visible target stops moving and single-target mode is on, the ENGAGING loop repeats indefinitely and GUARDING is never re-entered | Enable stationary-release (`stationary_release_enabled = true`), then tune `Max stationary target hold (s)` in the Engage tab to a shorter hold (e.g. 5 s). The engine will force a return/queue-advance after the hold+fire-cycle criteria are met so guard workflows can execute. |
+| Turret released the stationary target but immediately re-locked it | Suppress window is too short | Increase `stationary_release_suppress_s` in config (default 12 s). |
 
 ### UI and Sound Issues
 

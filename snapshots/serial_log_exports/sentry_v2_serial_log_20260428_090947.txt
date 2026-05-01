@@ -1,0 +1,2387 @@
+# SMART SENTRY V3.5.0 Serial Log Export
+# Exported: 2026-04-28 09:09:47
+[09:07:27] [ACCESSORY] Quick startup enabled: starting background camera open, deferring auto-connect, and scheduling lazy YOLO model load.
+[09:07:28] [SAFETY] [WARN] YOLO detection active but no model loaded — load a model in the Detection tab
+[09:07:28] [ACCESSORY] [CAM-DEBUG] _auto_open_camera_on_startup called: retry=0, closing=False, has_source=False
+[09:07:28] [SYSTEM] [CAM-DEBUG] Starting background open for index 0 (1280x720)
+[09:07:30] [CAMERA] YOLO runtime diagnostic captured: logs/yolo_runtime_diag.log
+[09:07:30] [CAMERA] YOLO runtime diagnostic captured: logs/yolo_runtime_diag.log
+[09:07:30] [CAMERA] YOLO model loaded: yolov8l.pt
+[09:07:32] [SYSTEM] Scan (esp32): 3 port(s) found
+[09:07:33] [SYSTEM] Scan (debug): 3 port(s) found
+[09:07:38] [CAMERA] [CAM-DEBUG] Reopening camera on UI thread with backend MSMF
+[09:08:00] [CAMERA] Camera opened: 0 (1280x720)
+[09:08:00] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:01] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=PAUSED
+[09:08:01] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:01] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:01] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:01] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:01] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:01] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:02] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:02] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:02] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=PAUSED
+[09:08:02] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:02] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:02] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:02] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:02] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:02] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:02] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:03] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:03] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=PAUSED
+[09:08:03] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:03] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:03] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:03] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:03] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:03] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:03] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:04] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:04] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=PAUSED
+[09:08:04] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:04] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:04] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:04] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:04] [CAMERA] Detection mode: YOLO Object Detection
+[09:08:04] [CAMERA] [COLOR DETECTION] YOLO Object Detection - Color: ANY | Area: 160-1280px
+[09:08:04] [MOVEMENT] State: PAUSED -> GUARDING
+[09:08:04] [ACCESSORY] Smart Sentry ENABLED
+[09:08:04] [SYSTEM] Sound link unavailable
+[09:08:04] [MOVEMENT] Move skipped: hardware is not connected yet
+[09:08:04] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:04] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:05] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:05] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:05] [MOVEMENT] Move skipped: hardware is not connected yet
+[09:08:05] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:05] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:05] [MOVEMENT] Move skipped: hardware is not connected yet
+[09:08:05] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:05] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:05] [MOVEMENT] Move skipped: hardware is not connected yet
+[09:08:05] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:05] [SYSTEM] Connecting...
+[09:08:05] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:05] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:05] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:06] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:06] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:06] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:06] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:06] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:06] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:06] [SYSTEM] Connected: Disconnected
+[09:08:06] [SAFETY] Fire config: mode=Water (MOSFET) | safety=LOCKED | auto-trigger=ON
+[09:08:06] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:06] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:06] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:07] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:07] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:07] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:07] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:07] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:07] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:07] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:07] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:07] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:08] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:08] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:08] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:08] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:08] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:08] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:08] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:08] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:08] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:08] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:09] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:09] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:09] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:09] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:09] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:09] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:09] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:09] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:09] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:10] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:10] [SYSTEM] Sound link unavailable
+[09:08:10] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:10] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:10] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:10] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:10] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:10] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:10] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:10] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:11] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:11] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:11] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:11] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:11] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:11] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:11] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:11] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:11] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:12] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:12] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:12] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:12] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:12] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:12] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:12] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:12] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:12] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:13] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:13] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:13] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:13] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:13] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:13] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:13] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:13] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:13] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:13] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:14] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:14] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:14] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:14] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:14] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:14] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:14] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:14] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:14] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:15] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:15] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:15] [SYSTEM] Sound link unavailable
+[09:08:15] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:15] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:15] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:15] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:15] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:15] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:15] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:16] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:16] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:16] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:16] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:16] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:16] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:16] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:16] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:16] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:17] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:17] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:17] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:17] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:17] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:17] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:17] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:17] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:17] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:18] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:18] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:18] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:18] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:18] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:18] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:18] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:18] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:18] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:18] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:18] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:19] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:19] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:19] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:19] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:19] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:19] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:19] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:19] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:19] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:20] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:20] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:20] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:20] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:20] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:20] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:20] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:20] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:20] [SYSTEM] Sound link unavailable
+[09:08:20] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:21] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:21] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:21] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:21] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:21] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:21] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:21] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:21] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:21] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:22] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:22] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:22] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:22] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:22] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:22] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:22] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:22] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:22] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:23] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:23] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:23] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:23] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:23] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:23] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:23] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:23] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:23] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:23] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:24] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:24] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:24] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:24] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:24] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:24] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:24] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:24] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:25] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:25] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:25] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:25] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:25] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:25] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:25] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:25] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:25] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:25] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:26] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:26] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:26] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:26] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:26] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:26] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:26] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:26] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:26] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:26] [SYSTEM] Sound link unavailable
+[09:08:27] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:27] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:27] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:27] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:27] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:27] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:27] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:27] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:27] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:28] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:28] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:28] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:28] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:28] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:28] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:28] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:28] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:28] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:29] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:29] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:29] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:29] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:29] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:29] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:29] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:29] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:29] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:29] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:29] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:30] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:30] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:30] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:30] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:30] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:30] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:30] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:30] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:30] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:31] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:31] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:31] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:31] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:31] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:31] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:31] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:31] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:31] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:32] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:32] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:32] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:32] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:32] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:32] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:32] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:32] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:32] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:32] [SYSTEM] Sound link unavailable
+[09:08:33] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:33] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:33] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:33] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:33] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:33] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:33] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:33] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:33] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:34] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:34] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:34] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:34] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:34] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:34] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:34] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:34] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:34] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:35] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:35] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:35] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:35] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:35] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:35] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:35] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:35] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:35] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:35] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:36] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:36] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:36] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:36] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:36] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:36] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:36] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:36] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:36] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:37] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:37] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:37] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:37] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:37] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:37] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:37] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:37] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:37] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:38] [SYSTEM] Sound link unavailable
+[09:08:38] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:38] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:38] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:38] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:38] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:38] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:38] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:38] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:38] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:39] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:39] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:39] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:39] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:39] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:39] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:39] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:39] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:39] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:40] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:40] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:40] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:40] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:40] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:40] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:40] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:40] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:40] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:41] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:41] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:41] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:41] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:41] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:41] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:41] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:41] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:41] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:41] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:42] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:42] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:42] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:42] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:42] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:42] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:42] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:42] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:42] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:43] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:43] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:43] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:43] [SYSTEM] Sound link unavailable
+[09:08:43] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:43] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:43] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:43] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:43] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:43] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:44] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:44] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:44] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:44] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:44] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:44] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:44] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:44] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:44] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:45] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:45] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:45] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:45] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:45] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:45] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:45] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:45] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:45] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:46] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:46] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:46] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:46] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:46] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:46] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:46] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:46] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:46] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:46] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:47] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:47] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:47] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:47] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:47] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:47] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:47] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:47] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:47] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:48] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:48] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:48] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:48] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:48] [SYSTEM] Sound link unavailable
+[09:08:48] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:48] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:48] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:48] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:48] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:49] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:49] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:49] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:49] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:49] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:49] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:49] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:49] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:49] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:50] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:50] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:50] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:50] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:50] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:50] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:50] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:50] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:50] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:50] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:51] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:51] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:51] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:51] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:51] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:51] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:51] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:51] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:51] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:51] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:52] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:52] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:52] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:52] [SYSTEM] Connecting...
+[09:08:52] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:52] [MOVEMENT] Move skipped: hardware is not connected yet
+[09:08:52] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:52] [SYSTEM] Connected: USB IO: COM27 | Debug: COM31
+[09:08:52] [SAFETY] Fire config: mode=Water (MOSFET) | safety=LOCKED | auto-trigger=ON
+[09:08:52] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:52] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:52] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:52] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:53] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:53] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:53] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:53] [PIR] USB IO RX [BOOT] PIR support enabled on A0/A1/A2
+[09:08:53] [PIR] USB IO RX [BOOT] SMART_SENTRY_V3_0_NANO_USB_IO_PIR ready
+[09:08:53] [SYSTEM] USB IO RX [BOOT] Select this Nano COM port as the Smart Sentry IO/ESP32 port
+[09:08:53] [SYSTEM] USB IO RX [BOOT] Host tokens: S/M/F/L/R/G/A/J/K/N/U/V/H/B/P plus SOUND:<freq>:<ms>[:<volume>]
+[09:08:53] [SYSTEM] USB IO RX RECV: SOUND:532:24:2
+[09:08:53] [SYSTEM] USB IO RX ACK SOUND freq=532 duration=24 volume=2
+[09:08:53] [SYSTEM] USB IO RX RECV: SOUND:701:22:2
+[09:08:53] [SYSTEM] USB IO RX ACK SOUND freq=701 duration=22 volume=2
+[09:08:53] [SYSTEM] USB IO RX RECV: SOUND:664:24:2
+[09:08:53] [SYSTEM] USB IO RX ACK SOUND freq=664 duration=24 volume=2
+[09:08:53] [SYSTEM] USB IO RX RECV: SOUND:869:116:2
+[09:08:53] [SYSTEM] USB IO RX ACK SOUND freq=869 duration=116 volume=2
+[09:08:53] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:53] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:53] [SYSTEM] USB IO RX RECV: S1
+[09:08:53] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:53] [SYSTEM] USB IO RX RECV: M0
+[09:08:53] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:53] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:08:53] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:53] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:53] [SYSTEM] USB IO RX RECV: SOUND:997:26:2
+[09:08:53] [SYSTEM] USB IO RX ACK SOUND freq=997 duration=26 volume=2
+[09:08:53] [SYSTEM] USB IO RX RECV: SOUND:1023:41:2
+[09:08:53] [SYSTEM] USB IO RX ACK SOUND freq=1023 duration=41 volume=2
+[09:08:53] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:53] [SYSTEM] USB IO RX RECV: SOUND:962:26:2
+[09:08:53] [SYSTEM] USB IO RX ACK SOUND freq=962 duration=26 volume=2
+[09:08:53] [SYSTEM] USB IO RX RECV: S1
+[09:08:53] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:53] [SYSTEM] USB IO RX RECV: M0
+[09:08:53] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:53] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:54] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:08:54] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:54] [SYSTEM] USB IO RX RECV: SOUND:1013:41:2
+[09:08:54] [SYSTEM] USB IO RX ACK SOUND freq=1013 duration=41 volume=2
+[09:08:54] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:54] [SYSTEM] USB IO RX RECV: SOUND:967:26:2
+[09:08:54] [SYSTEM] USB IO RX ACK SOUND freq=967 duration=26 volume=2
+[09:08:54] [SYSTEM] USB IO RX RECV: S1
+[09:08:54] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:54] [SYSTEM] USB IO RX RECV: M0
+[09:08:54] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:54] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:08:54] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:54] [SYSTEM] USB IO RX RECV: SOUND:1063:41:2
+[09:08:54] [SYSTEM] USB IO RX ACK SOUND freq=1063 duration=41 volume=2
+[09:08:54] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:54] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:54] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:54] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:54] [SYSTEM] USB IO RX RECV: SOUND:950:26:2
+[09:08:54] [SYSTEM] USB IO RX ACK SOUND freq=950 duration=26 volume=2
+[09:08:54] [SYSTEM] USB IO RX RECV: S1
+[09:08:54] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:54] [SYSTEM] USB IO RX RECV: M0
+[09:08:54] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:54] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:08:54] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:54] [SYSTEM] USB IO RX RECV: SOUND:1066:41:2
+[09:08:54] [SYSTEM] USB IO RX ACK SOUND freq=1066 duration=41 volume=2
+[09:08:54] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:54] [SYSTEM] USB IO RX RECV: SOUND:621:24:2
+[09:08:54] [SYSTEM] USB IO RX ACK SOUND freq=621 duration=24 volume=2
+[09:08:54] [SYSTEM] USB IO RX RECV: SOUND:797:24:2
+[09:08:54] [SYSTEM] USB IO RX ACK SOUND freq=797 duration=24 volume=2
+[09:08:54] [SYSTEM] USB IO RX RECV: SOUND:955:39:2
+[09:08:54] [SYSTEM] USB IO RX ACK SOUND freq=955 duration=39 volume=2
+[09:08:54] [SYSTEM] USB IO RX RECV: SOUND:754:124:2
+[09:08:54] [SYSTEM] USB IO RX ACK SOUND freq=754 duration=124 volume=2
+[09:08:54] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:55] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:55] [SYSTEM] USB IO RX RECV: S1
+[09:08:55] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:55] [SYSTEM] USB IO RX RECV: M0
+[09:08:55] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:55] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:08:55] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:55] [SYSTEM] USB IO RX RECV: SOUND:919:26:2
+[09:08:55] [SYSTEM] USB IO RX ACK SOUND freq=919 duration=26 volume=2
+[09:08:55] [SYSTEM] USB IO RX RECV: SOUND:1026:41:2
+[09:08:55] [SYSTEM] USB IO RX ACK SOUND freq=1026 duration=41 volume=2
+[09:08:55] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:55] [SYSTEM] USB IO RX RECV: SOUND:914:26:2
+[09:08:55] [SYSTEM] USB IO RX ACK SOUND freq=914 duration=26 volume=2
+[09:08:55] [SYSTEM] USB IO RX RECV: S1
+[09:08:55] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:55] [SYSTEM] USB IO RX RECV: M0
+[09:08:55] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:55] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:08:55] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:55] [SYSTEM] USB IO RX RECV: SOUND:1028:41:2
+[09:08:55] [SYSTEM] USB IO RX ACK SOUND freq=1028 duration=41 volume=2
+[09:08:55] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:55] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:55] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:55] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:55] [SYSTEM] USB IO RX RECV: SOUND:959:26:2
+[09:08:55] [SYSTEM] USB IO RX ACK SOUND freq=959 duration=26 volume=2
+[09:08:55] [SYSTEM] USB IO RX RECV: S1
+[09:08:55] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:55] [SYSTEM] USB IO RX RECV: M0
+[09:08:55] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:55] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:08:55] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:55] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:55] [SYSTEM] USB IO RX RECV: SOUND:1011:41:2
+[09:08:55] [SYSTEM] USB IO RX ACK SOUND freq=1011 duration=41 volume=2
+[09:08:55] [SYSTEM] USB IO RX RECV: SOUND:522:24:2
+[09:08:55] [SYSTEM] USB IO RX ACK SOUND freq=522 duration=24 volume=2
+[09:08:55] [SYSTEM] USB IO RX RECV: SOUND:720:22:2
+[09:08:55] [SYSTEM] USB IO RX ACK SOUND freq=720 duration=22 volume=2
+[09:08:55] [SYSTEM] USB IO RX RECV: SOUND:666:24:2
+[09:08:55] [SYSTEM] USB IO RX ACK SOUND freq=666 duration=24 volume=2
+[09:08:55] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:55] [SYSTEM] USB IO RX RECV: SOUND:840:116:2
+[09:08:55] [SYSTEM] USB IO RX ACK SOUND freq=840 duration=116 volume=2
+[09:08:56] [SYSTEM] USB IO RX RECV: S1
+[09:08:56] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:56] [SYSTEM] USB IO RX RECV: M0
+[09:08:56] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:56] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:08:56] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:56] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:56] [SYSTEM] USB IO RX RECV: SOUND:962:26:2
+[09:08:56] [SYSTEM] USB IO RX ACK SOUND freq=962 duration=26 volume=2
+[09:08:56] [SYSTEM] USB IO RX RECV: SOUND:1007:38:2
+[09:08:56] [SYSTEM] USB IO RX ACK SOUND freq=1007 duration=38 volume=2
+[09:08:56] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:56] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:56] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:56] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:56] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:56] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:56] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:56] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:56] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:57] [SYSTEM] USB IO RX RECV: SOUND:589:24:2
+[09:08:57] [SYSTEM] USB IO RX ACK SOUND freq=589 duration=24 volume=2
+[09:08:57] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:57] [SYSTEM] USB IO RX RECV: SOUND:764:24:2
+[09:08:57] [SYSTEM] USB IO RX ACK SOUND freq=764 duration=24 volume=2
+[09:08:57] [SYSTEM] USB IO RX RECV: SOUND:955:39:2
+[09:08:57] [SYSTEM] USB IO RX ACK SOUND freq=955 duration=39 volume=2
+[09:08:57] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:57] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:57] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:57] [SYSTEM] USB IO RX RECV: SOUND:709:124:2
+[09:08:57] [SYSTEM] USB IO RX ACK SOUND freq=709 duration=124 volume=2
+[09:08:57] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:57] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:57] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:57] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:57] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:57] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:58] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:58] [SYSTEM] USB IO RX RECV: SOUND:594:24:2
+[09:08:58] [SYSTEM] USB IO RX ACK SOUND freq=594 duration=24 volume=2
+[09:08:58] [SYSTEM] USB IO RX RECV: SOUND:794:24:2
+[09:08:58] [SYSTEM] USB IO RX ACK SOUND freq=794 duration=24 volume=2
+[09:08:58] [SYSTEM] USB IO RX RECV: SOUND:934:39:2
+[09:08:58] [SYSTEM] USB IO RX ACK SOUND freq=934 duration=39 volume=2
+[09:08:58] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:58] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:58] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:58] [SYSTEM] USB IO RX RECV: SOUND:733:124:2
+[09:08:58] [SYSTEM] USB IO RX ACK SOUND freq=733 duration=124 volume=2
+[09:08:58] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:58] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:58] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:58] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:58] [SYSTEM] USB IO RX RECV: SOUND:906:26:2
+[09:08:58] [SYSTEM] USB IO RX ACK SOUND freq=906 duration=26 volume=2
+[09:08:58] [SYSTEM] USB IO RX RECV: S1
+[09:08:58] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:58] [SYSTEM] USB IO RX RECV: M0
+[09:08:58] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:58] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:08:58] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:58] [SYSTEM] USB IO RX RECV: SOUND:1081:39:2
+[09:08:58] [SYSTEM] USB IO RX ACK SOUND freq=1081 duration=39 volume=2
+[09:08:58] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:59] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:59] [SYSTEM] USB IO RX RECV: S1
+[09:08:59] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:59] [SYSTEM] USB IO RX RECV: M0
+[09:08:59] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:59] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:08:59] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:59] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:59] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:59] [SAFETY] [TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state=GUARDING
+[09:08:59] [SYSTEM] [PREVIEW] render_mode=full
+[09:08:59] [SYSTEM] USB IO RX RECV: S1
+[09:08:59] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:59] [SYSTEM] USB IO RX RECV: M0
+[09:08:59] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:59] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:08:59] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:08:59] [SYSTEM] USB IO RX RECV: SOUND:639:24:2
+[09:08:59] [SYSTEM] USB IO RX ACK SOUND freq=639 duration=24 volume=2
+[09:08:59] [SYSTEM] USB IO RX RECV: SOUND:754:24:2
+[09:08:59] [SYSTEM] USB IO RX ACK SOUND freq=754 duration=24 volume=2
+[09:08:59] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:59] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:08:59] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:08:59] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:00] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:00] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=0 engaged=0 state=GUARDING lead_track=1 conf=0.42 reason=semantic_confirm_pending (confirm=0/2 conf=0.42<0.56)
+[09:09:00] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:936:39:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=936 duration=39 volume=2
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:705:124:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=705 duration=124 volume=2
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:991:26:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=991 duration=26 volume=2
+[09:09:00] [SYSTEM] USB IO RX RECV: S1
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: M0
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:983:41:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=983 duration=41 volume=2
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:930:26:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=930 duration=26 volume=2
+[09:09:00] [SYSTEM] USB IO RX RECV: S1
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: M0
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:989:41:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=989 duration=41 volume=2
+[09:09:00] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:1049:33:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=1049 duration=33 volume=2
+[09:09:00] [SYSTEM] USB IO RX RECV: S1
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: M0
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:1227:39:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=1227 duration=39 volume=2
+[09:09:00] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:1198:116:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=1198 duration=116 volume=2
+[09:09:00] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:00] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:645:24:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=645 duration=24 volume=2
+[09:09:00] [SYSTEM] USB IO RX RECV: S1
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: M0
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:00] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:782:24:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=782 duration=24 volume=2
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:983:39:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=983 duration=39 volume=2
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:734:124:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=734 duration=124 volume=2
+[09:09:00] [SYSTEM] USB IO RX RECV: SOUND:1073:33:2
+[09:09:00] [SYSTEM] USB IO RX ACK SOUND freq=1073 duration=33 volume=2
+[09:09:01] [SYSTEM] USB IO RX RECV: SOUND:1192:39:2
+[09:09:01] [SYSTEM] USB IO RX ACK SOUND freq=1192 duration=39 volume=2
+[09:09:01] [SYSTEM] USB IO RX RECV: SOUND:1084:116:2
+[09:09:01] [SYSTEM] USB IO RX ACK SOUND freq=1084 duration=116 volume=2
+[09:09:01] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=0 engaged=0 state=GUARDING lead_track=2 conf=0.87 reason=semantic_confirm_pending (confirm=1/2 conf=0.87)
+[09:09:01] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:01] [SYSTEM] USB IO RX RECV: S1
+[09:09:01] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:01] [SYSTEM] USB IO RX RECV: M0
+[09:09:01] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:01] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:01] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:01] [SYSTEM] USB IO RX RECV: SOUND:1067:33:2
+[09:09:01] [SYSTEM] USB IO RX ACK SOUND freq=1067 duration=33 volume=2
+[09:09:01] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:01] [SYSTEM] USB IO RX RECV: SOUND:1242:39:2
+[09:09:01] [SYSTEM] USB IO RX ACK SOUND freq=1242 duration=39 volume=2
+[09:09:01] [SYSTEM] USB IO RX RECV: SOUND:1080:116:2
+[09:09:01] [SYSTEM] USB IO RX ACK SOUND freq=1080 duration=116 volume=2
+[09:09:01] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:01] [SAFETY] State: GUARDING -> ENGAGING
+[09:09:01] [SAFETY] Scope view: ON (ENGAGING display mode)
+[09:09:01] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.94 active_track=2
+[09:09:01] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:01] [SYSTEM] USB IO RX RECV: SOUND:781:33:2
+[09:09:01] [SYSTEM] USB IO RX ACK SOUND freq=781 duration=33 volume=2
+[09:09:01] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:01] [SYSTEM] USB IO RX RECV: S1
+[09:09:01] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:01] [SYSTEM] USB IO RX RECV: M0
+[09:09:01] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:01] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:01] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:01] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:01] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:01] [SYSTEM] USB IO RX RECV: SOUND:874:39:2
+[09:09:01] [SYSTEM] USB IO RX ACK SOUND freq=874 duration=39 volume=2
+[09:09:01] [SYSTEM] USB IO RX RECV: SOUND:878:68:2
+[09:09:01] [SYSTEM] USB IO RX ACK SOUND freq=878 duration=68 volume=2
+[09:09:01] [SYSTEM] USB IO RX RECV: SOUND:838:22:2
+[09:09:01] [SYSTEM] USB IO RX ACK SOUND freq=838 duration=22 volume=2
+[09:09:01] [SYSTEM] USB IO RX RECV: SOUND:965:27:2
+[09:09:01] [SYSTEM] USB IO RX ACK SOUND freq=965 duration=27 volume=2
+[09:09:01] [SYSTEM] USB IO RX RECV: SOUND:922:33:2
+[09:09:01] [SYSTEM] USB IO RX ACK SOUND freq=922 duration=33 volume=2
+[09:09:01] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:02] [SYSTEM] USB IO RX RECV: SOUND:1101:116:2
+[09:09:02] [SYSTEM] USB IO RX ACK SOUND freq=1101 duration=116 volume=2
+[09:09:02] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.92 active_track=2
+[09:09:02] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:02] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:02] [SYSTEM] USB IO RX RECV: SOUND:697:26:2
+[09:09:02] [SYSTEM] USB IO RX ACK SOUND freq=697 duration=26 volume=2
+[09:09:02] [SYSTEM] USB IO RX RECV: S1
+[09:09:02] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:02] [SYSTEM] USB IO RX RECV: M0
+[09:09:02] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:02] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:02] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:02] [SYSTEM] USB IO RX RECV: SOUND:778:46:2
+[09:09:02] [SYSTEM] USB IO RX ACK SOUND freq=778 duration=46 volume=2
+[09:09:02] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:02] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:02] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:02] [SYSTEM] USB IO RX RECV: SOUND:688:26:2
+[09:09:02] [SYSTEM] USB IO RX ACK SOUND freq=688 duration=26 volume=2
+[09:09:02] [SYSTEM] USB IO RX RECV: S1
+[09:09:02] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:02] [SYSTEM] USB IO RX RECV: M0
+[09:09:02] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:02] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:02] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:02] [SYSTEM] USB IO RX RECV: SOUND:784:32:2
+[09:09:02] [SYSTEM] USB IO RX ACK SOUND freq=784 duration=32 volume=2
+[09:09:02] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:02] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.94 active_track=2
+[09:09:02] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:02] [SYSTEM] USB IO RX RECV: S1
+[09:09:02] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:02] [SYSTEM] USB IO RX RECV: M0
+[09:09:02] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:02] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:02] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:02] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:03] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.94 active_track=2
+[09:09:03] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:03] [SYSTEM] USB IO RX RECV: S1
+[09:09:03] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:03] [SYSTEM] USB IO RX RECV: M0
+[09:09:03] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:03] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:03] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:03] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:03] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:03] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:03] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:03] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:03] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:03] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:03] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:03] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:03] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:03] [SYSTEM] USB IO RX RECV: S1
+[09:09:03] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:03] [SYSTEM] USB IO RX RECV: M0
+[09:09:03] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:03] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:03] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:03] [SYSTEM] USB IO RX RECV: SOUND:706:26:2
+[09:09:03] [SYSTEM] USB IO RX ACK SOUND freq=706 duration=26 volume=2
+[09:09:03] [SYSTEM] USB IO RX RECV: S1
+[09:09:03] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:03] [SYSTEM] USB IO RX RECV: M0
+[09:09:03] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:03] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:03] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] USB IO RX RECV: SOUND:770:35:2
+[09:09:04] [SYSTEM] USB IO RX ACK SOUND freq=770 duration=35 volume=2
+[09:09:04] [SYSTEM] USB IO RX RECV: S1
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] USB IO RX RECV: M0
+[09:09:04] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.94 active_track=2
+[09:09:04] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:04] [SYSTEM] USB IO RX RECV: S1
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] USB IO RX RECV: M0
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:04] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:04] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:04] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:04] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:04] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:04] [SYSTEM] USB IO RX RECV: S1
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] USB IO RX RECV: M0
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:04] [SYSTEM] USB IO RX RECV: S1
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] USB IO RX RECV: M0
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:04] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:04] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:05] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:05] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:05] [SYSTEM] USB IO RX RECV: S1
+[09:09:05] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:05] [SYSTEM] USB IO RX RECV: M0
+[09:09:05] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:05] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:05] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:05] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:05] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:05] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.92 active_track=2
+[09:09:05] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:05] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:05] [SYSTEM] USB IO RX RECV: S1
+[09:09:05] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:05] [SYSTEM] USB IO RX RECV: M0
+[09:09:05] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:05] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:05] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:05] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:05] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:05] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:05] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:05] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:05] [SYSTEM] USB IO RX RECV: S1
+[09:09:05] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SYSTEM] USB IO RX RECV: M0
+[09:09:06] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:06] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:06] [SYSTEM] USB IO RX RECV: S1
+[09:09:06] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SYSTEM] USB IO RX RECV: M0
+[09:09:06] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:06] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:06] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:06] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:06] [SYSTEM] USB IO RX RECV: S1
+[09:09:06] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SYSTEM] USB IO RX RECV: M0
+[09:09:06] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:06] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:06] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:06] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:06] [SYSTEM] USB IO RX RECV: S1
+[09:09:06] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SYSTEM] USB IO RX RECV: M0
+[09:09:06] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:06] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:06] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.94 active_track=2
+[09:09:06] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:06] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:07] [SYSTEM] USB IO RX RECV: SOUND:690:26:2
+[09:09:07] [SYSTEM] USB IO RX ACK SOUND freq=690 duration=26 volume=2
+[09:09:07] [SYSTEM] USB IO RX RECV: S1
+[09:09:07] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:07] [SYSTEM] USB IO RX RECV: M0
+[09:09:07] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:07] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:07] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:07] [SYSTEM] USB IO RX RECV: SOUND:796:37:2
+[09:09:07] [SYSTEM] USB IO RX ACK SOUND freq=796 duration=37 volume=2
+[09:09:07] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:07] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:07] [SYSTEM] USB IO RX RECV: SOUND:655:26:2
+[09:09:07] [SYSTEM] USB IO RX ACK SOUND freq=655 duration=26 volume=2
+[09:09:07] [SYSTEM] USB IO RX RECV: S1
+[09:09:07] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:07] [SYSTEM] USB IO RX RECV: M0
+[09:09:07] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:07] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:07] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:07] [SYSTEM] USB IO RX RECV: SOUND:786:37:2
+[09:09:07] [SYSTEM] USB IO RX ACK SOUND freq=786 duration=37 volume=2
+[09:09:07] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:07] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:07] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:07] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:07] [SYSTEM] USB IO RX RECV: SOUND:669:26:2
+[09:09:07] [SYSTEM] USB IO RX ACK SOUND freq=669 duration=26 volume=2
+[09:09:07] [SYSTEM] USB IO RX RECV: S1
+[09:09:07] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:07] [SYSTEM] USB IO RX RECV: M0
+[09:09:07] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:07] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:07] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:07] [SYSTEM] USB IO RX RECV: SOUND:745:37:2
+[09:09:07] [SYSTEM] USB IO RX ACK SOUND freq=745 duration=37 volume=2
+[09:09:07] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:07] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.94 active_track=2
+[09:09:07] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:07] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:07] [SYSTEM] USB IO RX RECV: SOUND:677:26:2
+[09:09:07] [SYSTEM] USB IO RX ACK SOUND freq=677 duration=26 volume=2
+[09:09:08] [SYSTEM] USB IO RX RECV: S1
+[09:09:08] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:08] [SYSTEM] USB IO RX RECV: M0
+[09:09:08] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:08] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:08] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:08] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:08] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:08] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:08] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:08] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:08] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:08] [SYSTEM] USB IO RX RECV: SOUND:804:37:2
+[09:09:08] [SYSTEM] USB IO RX ACK SOUND freq=804 duration=37 volume=2
+[09:09:08] [SYSTEM] USB IO RX RECV: SOUND:765:33:2
+[09:09:08] [SYSTEM] USB IO RX ACK SOUND freq=765 duration=33 volume=2
+[09:09:08] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:08] [SYSTEM] USB IO RX RECV: S1
+[09:09:08] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:08] [SYSTEM] USB IO RX RECV: M0
+[09:09:08] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:08] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:08] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:08] [SYSTEM] USB IO RX RECV: SOUND:873:39:2
+[09:09:08] [SYSTEM] USB IO RX ACK SOUND freq=873 duration=39 volume=2
+[09:09:08] [SYSTEM] USB IO RX RECV: S1
+[09:09:08] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:08] [SYSTEM] USB IO RX RECV: M0
+[09:09:08] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:08] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:08] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:08] [SYSTEM] USB IO RX RECV: SOUND:813:67:2
+[09:09:08] [SYSTEM] USB IO RX ACK SOUND freq=813 duration=67 volume=2
+[09:09:08] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:08] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:08] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:09] [SYSTEM] USB IO RX RECV: SOUND:709:26:2
+[09:09:09] [SYSTEM] USB IO RX ACK SOUND freq=709 duration=26 volume=2
+[09:09:09] [SYSTEM] USB IO RX RECV: S1
+[09:09:09] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SYSTEM] USB IO RX RECV: M0
+[09:09:09] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:09] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:09] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:09] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:09] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SYSTEM] USB IO RX RECV: SOUND:762:44:2
+[09:09:09] [SYSTEM] USB IO RX ACK SOUND freq=762 duration=44 volume=2
+[09:09:09] [SYSTEM] USB IO RX RECV: S1
+[09:09:09] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SYSTEM] USB IO RX RECV: M0
+[09:09:09] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:09] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:09] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:09] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:09] [SYSTEM] USB IO RX RECV: S1
+[09:09:09] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SYSTEM] USB IO RX RECV: M0
+[09:09:09] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:09] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:09] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:09] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:09] [SYSTEM] USB IO RX RECV: S1
+[09:09:09] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SYSTEM] USB IO RX RECV: M0
+[09:09:09] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:09] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:10] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:10] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.94 active_track=2
+[09:09:10] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:10] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:10] [SYSTEM] USB IO RX RECV: S1
+[09:09:10] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:10] [SYSTEM] USB IO RX RECV: M0
+[09:09:10] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:10] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:10] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:10] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:10] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:10] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:10] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:10] [SYSTEM] USB IO RX RECV: S1
+[09:09:10] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:10] [SYSTEM] USB IO RX RECV: M0
+[09:09:10] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:10] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:10] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:10] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:10] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:10] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:10] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:10] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:10] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:11] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:11] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:11] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:11] [SYSTEM] USB IO RX RECV: S1
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SYSTEM] USB IO RX RECV: M0
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SYSTEM] USB IO RX RECV: S1
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SYSTEM] USB IO RX RECV: M0
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SYSTEM] USB IO RX RECV: S1
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SYSTEM] USB IO RX RECV: M0
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.96 active_track=2
+[09:09:11] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:11] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:11] [SYSTEM] USB IO RX RECV: S1
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SYSTEM] USB IO RX RECV: M0
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:11] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:11] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.94 active_track=2
+[09:09:11] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:11] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:11] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] USB IO RX RECV: S1
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] USB IO RX RECV: M0
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.94 active_track=2
+[09:09:12] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:12] [SYSTEM] USB IO RX RECV: S1
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] USB IO RX RECV: M0
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:12] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:12] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.92 active_track=2
+[09:09:12] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:12] [SAFETY] FIRE! Burst: 5
+[09:09:12] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.92 active_track=2
+[09:09:12] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:12] [SYSTEM] USB IO RX RECV: S1
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] USB IO RX RECV: M0
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:12] [SYSTEM] USB IO RX RECV: S1
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] USB IO RX RECV: M0
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:12] [SYSTEM] USB IO RX RECV: F1L0R0G0A0
+[09:09:12] [SAFETY] USB IO RX WARN FIRE_BLOCKED_SAFETY S=1 (send S0 to arm)
+[09:09:12] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: SOUND:1206:24:2
+[09:09:13] [SYSTEM] USB IO RX ACK SOUND freq=1206 duration=24 volume=2
+[09:09:13] [SYSTEM] USB IO RX RECV: SOUND:1317:61:2
+[09:09:13] [SYSTEM] USB IO RX ACK SOUND freq=1317 duration=61 volume=2
+[09:09:13] [SYSTEM] USB IO RX RECV: SOUND:1164:24:2
+[09:09:13] [SYSTEM] USB IO RX ACK SOUND freq=1164 duration=24 volume=2
+[09:09:13] [SYSTEM] USB IO RX RECV: SOUND:1341:61:2
+[09:09:13] [SYSTEM] USB IO RX ACK SOUND freq=1341 duration=61 volume=2
+[09:09:13] [SYSTEM] USB IO RX RECV: SOUND:1258:24:2
+[09:09:13] [SYSTEM] USB IO RX ACK SOUND freq=1258 duration=24 volume=2
+[09:09:13] [SYSTEM] USB IO RX RECV: S1
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: M0
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: SOUND:1398:61:2
+[09:09:13] [SYSTEM] USB IO RX ACK SOUND freq=1398 duration=61 volume=2
+[09:09:13] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:13] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:13] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:13] [SYSTEM] USB IO RX RECV: S1
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: M0
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: F1L0R0G0A0
+[09:09:13] [SAFETY] USB IO RX WARN FIRE_BLOCKED_SAFETY S=1 (send S0 to arm)
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: SOUND:689:26:2
+[09:09:13] [SYSTEM] USB IO RX ACK SOUND freq=689 duration=26 volume=2
+[09:09:13] [SYSTEM] USB IO RX RECV: S1
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: M0
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: SOUND:797:34:2
+[09:09:13] [SYSTEM] USB IO RX ACK SOUND freq=797 duration=34 volume=2
+[09:09:13] [SYSTEM] USB IO RX RECV: S1
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: M0
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:13] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:13] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:13] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:13] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:13] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.95 active_track=2
+[09:09:13] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:14] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:14] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.92 active_track=2
+[09:09:14] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:14] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:14] [SYSTEM] USB IO RX RECV: S1
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: M0
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: F1L0R0G0A0
+[09:09:14] [SAFETY] USB IO RX WARN FIRE_BLOCKED_SAFETY S=1 (send S0 to arm)
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: S1
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: M0
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: SOUND:716:26:2
+[09:09:14] [SYSTEM] USB IO RX ACK SOUND freq=716 duration=26 volume=2
+[09:09:14] [SYSTEM] USB IO RX RECV: S1
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: M0
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: SOUND:739:39:2
+[09:09:14] [SYSTEM] USB IO RX ACK SOUND freq=739 duration=39 volume=2
+[09:09:14] [SYSTEM] USB IO RX RECV: S1
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: M0
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: F1L0R0G0A0
+[09:09:14] [SAFETY] USB IO RX WARN FIRE_BLOCKED_SAFETY S=1 (send S0 to arm)
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: S1
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: M0
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: S1
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: M0
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:14] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:14] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.91 active_track=2
+[09:09:14] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:14] [SYSTEM] USB IO RX RECV: S1
+[09:09:14] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:14] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=2 conf=0.93 active_track=2
+[09:09:15] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: M0
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: F1L0R0G0A0
+[09:09:15] [SAFETY] USB IO RX WARN FIRE_BLOCKED_SAFETY S=1 (send S0 to arm)
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: S1
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: M0
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: S1
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: M0
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: SOUND:642:26:2
+[09:09:15] [SYSTEM] USB IO RX ACK SOUND freq=642 duration=26 volume=2
+[09:09:15] [SYSTEM] USB IO RX RECV: S1
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: M0
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: SOUND:788:36:2
+[09:09:15] [SYSTEM] USB IO RX ACK SOUND freq=788 duration=36 volume=2
+[09:09:15] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:15] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=0 engaged=1 state=ENGAGING lead_track=2 conf=0.53 active_track=2
+[09:09:15] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:15] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:15] [SYSTEM] USB IO RX RECV: SOUND:1080:31:2
+[09:09:15] [SYSTEM] USB IO RX ACK SOUND freq=1080 duration=31 volume=2
+[09:09:15] [SYSTEM] USB IO RX RECV: S1
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: M0
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:15] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:15] [SYSTEM] USB IO RX RECV: SOUND:879:29:2
+[09:09:15] [SYSTEM] USB IO RX ACK SOUND freq=879 duration=29 volume=2
+[09:09:15] [SYSTEM] USB IO RX RECV: SOUND:989:33:2
+[09:09:15] [SYSTEM] USB IO RX ACK SOUND freq=989 duration=33 volume=2
+[09:09:15] [SYSTEM] USB IO RX RECV: SOUND:789:122:2
+[09:09:15] [SYSTEM] USB IO RX ACK SOUND freq=789 duration=122 volume=2
+[09:09:15] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=0 engaged=1 state=ENGAGING lead_track=2 conf=0.85 active_track=2
+[09:09:15] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:15] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:16] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=0 engaged=1 state=ENGAGING lead_track=3 conf=0.60 active_track=3
+[09:09:16] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:16] [SYSTEM] USB IO RX RECV: S1
+[09:09:16] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:16] [SYSTEM] USB IO RX RECV: M0
+[09:09:16] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:16] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:16] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:16] [SYSTEM] USB IO RX RECV: S1
+[09:09:16] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:16] [SYSTEM] USB IO RX RECV: M0
+[09:09:16] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:16] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:16] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:16] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:16] [MOVEMENT] Tracking reacquire 2->3
+[09:09:16] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:16] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:16] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:16] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:16] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:16] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:16] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:16] [SYSTEM] USB IO RX RECV: SOUND:970:26:2
+[09:09:16] [SYSTEM] USB IO RX ACK SOUND freq=970 duration=26 volume=2
+[09:09:16] [SYSTEM] USB IO RX RECV: S1
+[09:09:16] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:16] [SYSTEM] USB IO RX RECV: M0
+[09:09:16] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:16] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:16] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:16] [SYSTEM] USB IO RX RECV: SOUND:857:24:2
+[09:09:16] [SYSTEM] USB IO RX ACK SOUND freq=857 duration=24 volume=2
+[09:09:16] [SYSTEM] USB IO RX RECV: SOUND:1036:35:2
+[09:09:17] [SYSTEM] USB IO RX ACK SOUND freq=1036 duration=35 volume=2
+[09:09:17] [SYSTEM] USB IO RX RECV: SOUND:1108:122:2
+[09:09:17] [SYSTEM] USB IO RX ACK SOUND freq=1108 duration=122 volume=2
+[09:09:17] [SYSTEM] USB IO RX RECV: S1
+[09:09:17] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:17] [SYSTEM] USB IO RX RECV: M0
+[09:09:17] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:17] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:17] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:17] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:17] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:17] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:17] [SYSTEM] USB IO RX RECV: S1
+[09:09:17] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:17] [SYSTEM] USB IO RX RECV: M0
+[09:09:17] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:17] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:17] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:17] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:17] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:17] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:17] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:17] [SYSTEM] USB IO RX RECV: S1
+[09:09:17] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:17] [SYSTEM] USB IO RX RECV: M0
+[09:09:17] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:17] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:17] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:17] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:17] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:17] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:18] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:18] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:18] [SYSTEM] USB IO RX RECV: S1
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SYSTEM] USB IO RX RECV: M0
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SYSTEM] USB IO RX RECV: S1
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SYSTEM] USB IO RX RECV: M0
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:18] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:18] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:18] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SYSTEM] USB IO RX RECV: S1
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SYSTEM] USB IO RX RECV: M0
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:18] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:18] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:18] [SYSTEM] USB IO RX RECV: S1
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SYSTEM] USB IO RX RECV: M0
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:18] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:18] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:18] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:19] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:19] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:19] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:19] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:19] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:19] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:19] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:19] [SYSTEM] USB IO RX RECV: S1
+[09:09:19] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:19] [SYSTEM] USB IO RX RECV: M0
+[09:09:19] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:19] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:19] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:19] [SYSTEM] USB IO RX RECV: S1
+[09:09:19] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:19] [SYSTEM] USB IO RX RECV: M0
+[09:09:19] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:19] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:19] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:19] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:19] [SYSTEM] USB IO RX RECV: S1
+[09:09:19] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:19] [SYSTEM] USB IO RX RECV: M0
+[09:09:19] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:19] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:19] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:19] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:19] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:19] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:19] [SYSTEM] USB IO RX RECV: S1
+[09:09:20] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:20] [SYSTEM] USB IO RX RECV: M0
+[09:09:20] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:20] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:20] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:20] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:20] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:20] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:20] [SYSTEM] USB IO RX RECV: S1
+[09:09:20] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:20] [SYSTEM] USB IO RX RECV: M0
+[09:09:20] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:20] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:20] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:20] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.91 active_track=3
+[09:09:20] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:20] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:20] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:20] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:20] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:20] [SYSTEM] USB IO RX RECV: S1
+[09:09:20] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:20] [SYSTEM] USB IO RX RECV: M0
+[09:09:20] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:20] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:20] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:20] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:20] [SYSTEM] USB IO RX RECV: S1
+[09:09:21] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:21] [SYSTEM] USB IO RX RECV: M0
+[09:09:21] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:21] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:21] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:21] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:21] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:21] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:21] [SYSTEM] USB IO RX RECV: S1
+[09:09:21] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:21] [SYSTEM] USB IO RX RECV: M0
+[09:09:21] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:21] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:21] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:21] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:21] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:21] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:21] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:21] [SYSTEM] USB IO RX RECV: S1
+[09:09:21] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:21] [SYSTEM] USB IO RX RECV: M0
+[09:09:21] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:21] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:21] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:21] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:21] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:21] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:21] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:21] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:22] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:22] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:22] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:22] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:22] [SYSTEM] USB IO RX RECV: S1
+[09:09:22] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SYSTEM] USB IO RX RECV: M0
+[09:09:22] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:22] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SYSTEM] USB IO RX RECV: S1
+[09:09:22] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SYSTEM] USB IO RX RECV: M0
+[09:09:22] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:22] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SYSTEM] USB IO RX RECV: S1
+[09:09:22] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SYSTEM] USB IO RX RECV: M0
+[09:09:22] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:22] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.91 active_track=3
+[09:09:22] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:22] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:22] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:22] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:22] [SYSTEM] USB IO RX RECV: S1
+[09:09:22] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SYSTEM] USB IO RX RECV: M0
+[09:09:22] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:22] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:23] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:23] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:23] [SYSTEM] USB IO RX RECV: S1
+[09:09:23] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:23] [SYSTEM] USB IO RX RECV: M0
+[09:09:23] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:23] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:23] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:23] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:23] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:23] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:23] [SYSTEM] USB IO RX RECV: S1
+[09:09:23] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:23] [SYSTEM] USB IO RX RECV: M0
+[09:09:23] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:23] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:23] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:23] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:23] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:23] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:23] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:23] [SYSTEM] USB IO RX RECV: S1
+[09:09:23] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:23] [SYSTEM] USB IO RX RECV: M0
+[09:09:23] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:23] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:23] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:23] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:23] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:23] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:23] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:23] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:23] [SYSTEM] USB IO RX RECV: S1
+[09:09:23] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:24] [SYSTEM] USB IO RX RECV: M0
+[09:09:24] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:24] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:24] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:24] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:24] [SYSTEM] USB IO RX RECV: S1
+[09:09:24] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:24] [SYSTEM] USB IO RX RECV: M0
+[09:09:24] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:24] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:24] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:24] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.88 active_track=3
+[09:09:24] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:24] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:24] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.90 active_track=3
+[09:09:24] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:24] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:24] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.86 active_track=3
+[09:09:24] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:25] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:25] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SYSTEM] USB IO RX RECV: S1
+[09:09:25] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SYSTEM] USB IO RX RECV: M0
+[09:09:25] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:25] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SYSTEM] USB IO RX RECV: S1
+[09:09:25] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SYSTEM] USB IO RX RECV: M0
+[09:09:25] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:25] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.65 active_track=3
+[09:09:25] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:25] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:25] [SYSTEM] USB IO RX RECV: SOUND:682:26:2
+[09:09:25] [SYSTEM] USB IO RX ACK SOUND freq=682 duration=26 volume=2
+[09:09:25] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SYSTEM] USB IO RX RECV: S1
+[09:09:25] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SYSTEM] USB IO RX RECV: M0
+[09:09:25] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:25] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:25] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:25] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SYSTEM] USB IO RX RECV: SOUND:763:33:2
+[09:09:25] [SYSTEM] USB IO RX ACK SOUND freq=763 duration=33 volume=2
+[09:09:25] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:25] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.91 active_track=3
+[09:09:25] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:25] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:25] [SYSTEM] USB IO RX RECV: S1
+[09:09:25] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:25] [SYSTEM] USB IO RX RECV: M0
+[09:09:26] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:26] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SYSTEM] USB IO RX RECV: S1
+[09:09:26] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SYSTEM] USB IO RX RECV: M0
+[09:09:26] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:26] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:26] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:26] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:26] [SYSTEM] USB IO RX RECV: S1
+[09:09:26] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SYSTEM] USB IO RX RECV: M0
+[09:09:26] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:26] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:26] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:26] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:26] [SYSTEM] USB IO RX RECV: S1
+[09:09:26] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SYSTEM] USB IO RX RECV: M0
+[09:09:26] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:26] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:26] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:26] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:26] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:27] [SYSTEM] USB IO RX RECV: S1
+[09:09:27] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:27] [SYSTEM] USB IO RX RECV: M0
+[09:09:27] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:27] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:27] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:27] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:27] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:27] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:27] [SYSTEM] USB IO RX RECV: S1
+[09:09:27] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:27] [SYSTEM] USB IO RX RECV: M0
+[09:09:27] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:27] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:27] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:27] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:27] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:27] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:27] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:27] [SYSTEM] USB IO RX RECV: S1
+[09:09:27] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:27] [SYSTEM] USB IO RX RECV: M0
+[09:09:27] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:27] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:27] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:27] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:27] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:27] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:27] [SYSTEM] USB IO RX RECV: S1
+[09:09:27] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:27] [SYSTEM] USB IO RX RECV: M0
+[09:09:28] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:28] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:28] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:28] [SYSTEM] USB IO RX RECV: SOUND:691:26:2
+[09:09:28] [SYSTEM] USB IO RX ACK SOUND freq=691 duration=26 volume=2
+[09:09:28] [SYSTEM] USB IO RX RECV: SOUND:782:37:2
+[09:09:28] [SYSTEM] USB IO RX ACK SOUND freq=782 duration=37 volume=2
+[09:09:28] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.91 active_track=3
+[09:09:28] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:28] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:28] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.91 active_track=3
+[09:09:28] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:28] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:28] [SYSTEM] USB IO RX RECV: SOUND:693:26:2
+[09:09:28] [SYSTEM] USB IO RX ACK SOUND freq=693 duration=26 volume=2
+[09:09:28] [SYSTEM] USB IO RX RECV: S1
+[09:09:28] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:28] [SYSTEM] USB IO RX RECV: M0
+[09:09:28] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:28] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:28] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:28] [SYSTEM] USB IO RX RECV: SOUND:767:37:2
+[09:09:28] [SYSTEM] USB IO RX ACK SOUND freq=767 duration=37 volume=2
+[09:09:28] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:28] [SYSTEM] USB IO RX RECV: S1
+[09:09:28] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:28] [SYSTEM] USB IO RX RECV: M0
+[09:09:28] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:28] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:28] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:28] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:28] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:28] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:29] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:29] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:29] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:29] [SYSTEM] USB IO RX RECV: SOUND:736:26:2
+[09:09:29] [SYSTEM] USB IO RX ACK SOUND freq=736 duration=26 volume=2
+[09:09:29] [SYSTEM] USB IO RX RECV: S1
+[09:09:29] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SYSTEM] USB IO RX RECV: M0
+[09:09:29] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:29] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SYSTEM] USB IO RX RECV: SOUND:766:48:2
+[09:09:29] [SYSTEM] USB IO RX ACK SOUND freq=766 duration=48 volume=2
+[09:09:29] [SYSTEM] USB IO RX RECV: S1
+[09:09:29] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SYSTEM] USB IO RX RECV: M0
+[09:09:29] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:29] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:29] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:29] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:29] [SYSTEM] USB IO RX RECV: S1
+[09:09:29] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SYSTEM] USB IO RX RECV: M0
+[09:09:29] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:29] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:29] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:29] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:29] [SYSTEM] USB IO RX RECV: S1
+[09:09:29] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SYSTEM] USB IO RX RECV: M0
+[09:09:29] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:29] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:30] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:30] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:30] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:30] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:30] [SYSTEM] USB IO RX RECV: S1
+[09:09:30] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:30] [SYSTEM] USB IO RX RECV: M0
+[09:09:30] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:30] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:30] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:30] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:30] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:30] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:30] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:30] [SYSTEM] USB IO RX RECV: S1
+[09:09:30] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:30] [SYSTEM] USB IO RX RECV: M0
+[09:09:30] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:30] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:30] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:30] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:30] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:30] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:30] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:30] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX RECV: S1
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX RECV: M0
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX RECV: S1
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX RECV: M0
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:31] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:31] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:31] [SYSTEM] USB IO RX RECV: S1
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX RECV: M0
+[09:09:31] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:31] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:31] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX RECV: S1
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX RECV: M0
+[09:09:31] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:31] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:31] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:31] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:32] [SYSTEM] USB IO RX RECV: S1
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] USB IO RX RECV: M0
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:32] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:32] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:32] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] USB IO RX RECV: S1
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] USB IO RX RECV: M0
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:32] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:32] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:32] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:32] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:32] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:32] [SYSTEM] USB IO RX RECV: S1
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] USB IO RX RECV: M0
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] USB IO RX RECV: S1
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] USB IO RX RECV: M0
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:32] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:32] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:33] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:33] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:33] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:33] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.82 active_track=3
+[09:09:33] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:33] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:33] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:33] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:33] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:33] [SYSTEM] USB IO RX RECV: S1
+[09:09:33] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:33] [SYSTEM] USB IO RX RECV: M0
+[09:09:33] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:33] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:33] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:33] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:33] [SYSTEM] USB IO RX RECV: S1
+[09:09:33] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:33] [SYSTEM] USB IO RX RECV: M0
+[09:09:33] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:33] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:33] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:33] [SYSTEM] USB IO RX RECV: S1
+[09:09:33] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:33] [SYSTEM] USB IO RX RECV: M0
+[09:09:33] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:33] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:33] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:34] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.82 active_track=3
+[09:09:34] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:34] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:34] [SYSTEM] USB IO RX RECV: S1
+[09:09:34] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:34] [SYSTEM] USB IO RX RECV: M0
+[09:09:34] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:34] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:34] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:34] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:34] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:34] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:34] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:34] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:34] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:34] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:34] [SYSTEM] USB IO RX RECV: S1
+[09:09:34] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:34] [SYSTEM] USB IO RX RECV: M0
+[09:09:34] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:34] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:34] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:34] [SYSTEM] USB IO RX RECV: S1
+[09:09:34] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:34] [SYSTEM] USB IO RX RECV: M0
+[09:09:34] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:34] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:34] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:34] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.79 active_track=3
+[09:09:34] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:35] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:35] [SYSTEM] USB IO RX RECV: S1
+[09:09:35] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:35] [SYSTEM] USB IO RX RECV: M0
+[09:09:35] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:35] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:35] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:35] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.91 active_track=3
+[09:09:35] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:35] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:35] [SYSTEM] USB IO RX RECV: S1
+[09:09:35] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:35] [SYSTEM] USB IO RX RECV: M0
+[09:09:35] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:35] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:35] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:35] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:35] [SAFETY] FIRE! Burst: 5
+[09:09:35] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.89 active_track=3
+[09:09:35] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:35] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:35] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:35] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:35] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:36] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.91 active_track=3
+[09:09:36] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:36] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:36] [SYSTEM] USB IO RX RECV: S1
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: M0
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: F1L0R0G0A0
+[09:09:36] [SAFETY] USB IO RX WARN FIRE_BLOCKED_SAFETY S=1 (send S0 to arm)
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: SOUND:1254:24:2
+[09:09:36] [SYSTEM] USB IO RX ACK SOUND freq=1254 duration=24 volume=2
+[09:09:36] [SYSTEM] USB IO RX RECV: SOUND:1348:61:2
+[09:09:36] [SYSTEM] USB IO RX ACK SOUND freq=1348 duration=61 volume=2
+[09:09:36] [SYSTEM] USB IO RX RECV: SOUND:1321:24:2
+[09:09:36] [SYSTEM] USB IO RX ACK SOUND freq=1321 duration=24 volume=2
+[09:09:36] [SYSTEM] USB IO RX RECV: SOUND:1352:61:2
+[09:09:36] [SYSTEM] USB IO RX ACK SOUND freq=1352 duration=61 volume=2
+[09:09:36] [SYSTEM] USB IO RX RECV: S1
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: M0
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: SOUND:1401:24:2
+[09:09:36] [SYSTEM] USB IO RX ACK SOUND freq=1401 duration=24 volume=2
+[09:09:36] [SYSTEM] USB IO RX RECV: SOUND:1425:61:2
+[09:09:36] [SYSTEM] USB IO RX ACK SOUND freq=1425 duration=61 volume=2
+[09:09:36] [SYSTEM] USB IO RX RECV: S1
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: M0
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: F1L0R0G0A0
+[09:09:36] [SAFETY] USB IO RX WARN FIRE_BLOCKED_SAFETY S=1 (send S0 to arm)
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: S1
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: M0
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: SOUND:740:26:2
+[09:09:36] [SYSTEM] USB IO RX ACK SOUND freq=740 duration=26 volume=2
+[09:09:36] [SYSTEM] USB IO RX RECV: S1
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: M0
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: SOUND:755:46:2
+[09:09:36] [SYSTEM] USB IO RX ACK SOUND freq=755 duration=46 volume=2
+[09:09:36] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: S1
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: M0
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SYSTEM] USB IO RX RECV: F1L0R0G0A0
+[09:09:36] [SAFETY] USB IO RX WARN FIRE_BLOCKED_SAFETY S=1 (send S0 to arm)
+[09:09:36] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:36] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:37] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:37] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:37] [SYSTEM] USB IO RX RECV: S1
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: M0
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:37] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:37] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:37] [SYSTEM] USB IO RX RECV: S1
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: M0
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: S1
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:37] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:37] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:37] [SYSTEM] USB IO RX RECV: M0
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: F1L0R0G0A0
+[09:09:37] [SAFETY] USB IO RX WARN FIRE_BLOCKED_SAFETY S=1 (send S0 to arm)
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: S1
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: M0
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: S1
+[09:09:37] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:37] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: M0
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:37] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:37] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: S1
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: M0
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:38] [SYSTEM] USB IO RX RECV: S1
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: M0
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: F1L0R0G0A0
+[09:09:38] [SAFETY] USB IO RX WARN FIRE_BLOCKED_SAFETY S=1 (send S0 to arm)
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: S1
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: M0
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:38] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:38] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:38] [SYSTEM] USB IO RX RECV: S1
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: M0
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: SOUND:676:26:2
+[09:09:38] [SYSTEM] USB IO RX ACK SOUND freq=676 duration=26 volume=2
+[09:09:38] [SYSTEM] USB IO RX RECV: S1
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: M0
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:38] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:38] [SYSTEM] USB IO RX RECV: SOUND:716:31:2
+[09:09:38] [SYSTEM] USB IO RX ACK SOUND freq=716 duration=31 volume=2
+[09:09:38] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:38] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:38] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:38] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:38] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:39] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:39] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:39] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:39] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:39] [SYSTEM] USB IO RX RECV: S1
+[09:09:39] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX RECV: M0
+[09:09:39] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:39] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX RECV: S1
+[09:09:39] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX RECV: M0
+[09:09:39] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:39] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX RECV: S1
+[09:09:39] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX RECV: M0
+[09:09:39] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.90 active_track=3
+[09:09:39] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:39] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:39] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:39] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX RECV: S1
+[09:09:39] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX RECV: M0
+[09:09:39] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:39] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:39] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.90 active_track=3
+[09:09:40] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:40] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:40] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:40] [SYSTEM] USB IO RX RECV: S1
+[09:09:40] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:40] [SYSTEM] USB IO RX RECV: M0
+[09:09:40] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:40] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:40] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.91 active_track=3
+[09:09:40] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:40] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:40] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:40] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.91 active_track=3
+[09:09:40] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:40] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:40] [SYSTEM] USB IO RX RECV: S1
+[09:09:40] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:40] [SYSTEM] USB IO RX RECV: M0
+[09:09:40] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:40] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:40] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:40] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:40] [SYSTEM] USB IO RX RECV: S1
+[09:09:40] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:40] [SYSTEM] USB IO RX RECV: M0
+[09:09:40] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:40] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:40] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.90 active_track=3
+[09:09:41] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:41] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:41] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:41] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.92 active_track=3
+[09:09:41] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:41] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:41] [SYSTEM] USB IO RX RECV: S1
+[09:09:41] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:41] [SYSTEM] USB IO RX RECV: M0
+[09:09:41] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:41] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:41] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:41] [SYSTEM] USB IO RX RECV: S1
+[09:09:41] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:41] [SYSTEM] USB IO RX RECV: M0
+[09:09:41] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:41] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:41] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:41] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:41] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:41] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:41] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:41] [SYSTEM] USB IO RX RECV: S1
+[09:09:41] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:41] [SYSTEM] USB IO RX RECV: M0
+[09:09:41] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:41] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:41] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:41] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:41] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:42] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:42] [SYSTEM] USB IO RX RECV: S1
+[09:09:42] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:42] [SYSTEM] USB IO RX RECV: M0
+[09:09:42] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:42] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:42] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:42] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:42] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:42] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:42] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:42] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:42] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:42] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:42] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:42] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:42] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:42] [SYSTEM] USB IO RX RECV: S1
+[09:09:42] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:42] [SYSTEM] USB IO RX RECV: M0
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: S1
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: M0
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: S1
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: M0
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:43] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:43] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:43] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: S1
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: M0
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:43] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:43] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:43] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: S1
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: M0
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:43] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:43] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:43] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:43] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:43] [SYSTEM] USB IO RX RECV: S1
+[09:09:44] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:44] [SYSTEM] USB IO RX RECV: M0
+[09:09:44] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:44] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:44] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:44] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:44] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:44] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:44] [SYSTEM] USB IO RX RECV: S1
+[09:09:44] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:44] [SYSTEM] USB IO RX RECV: M0
+[09:09:44] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:44] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:44] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:44] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:44] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:44] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:44] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:44] [SYSTEM] USB IO RX RECV: S1
+[09:09:44] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:44] [SYSTEM] USB IO RX RECV: M0
+[09:09:44] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:44] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:44] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:44] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:44] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:44] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:44] [SYSTEM] USB IO RX RECV: S1
+[09:09:44] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:44] [SYSTEM] USB IO RX RECV: M0
+[09:09:44] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:45] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:45] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:45] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.93 active_track=3
+[09:09:45] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:45] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:45] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:45] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:45] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:45] [SYSTEM] USB IO RX RECV: S1
+[09:09:45] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:45] [SYSTEM] USB IO RX RECV: M0
+[09:09:45] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:45] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:45] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:45] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:45] [SYSTEM] USB IO RX RECV: S1
+[09:09:45] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:45] [SYSTEM] USB IO RX RECV: M0
+[09:09:45] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:45] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:45] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:45] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:45] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:45] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:45] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:45] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:46] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:46] [SYSTEM] USB IO RX RECV: S1
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SYSTEM] USB IO RX RECV: M0
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SYSTEM] USB IO RX RECV: S1
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SYSTEM] USB IO RX RECV: M0
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.95 active_track=3
+[09:09:46] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:46] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:46] [SYSTEM] USB IO RX RECV: S1
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SYSTEM] USB IO RX RECV: M0
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:46] [SYSTEM] [PREVIEW] render_mode=full
+[09:09:46] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:46] [SYSTEM] USB IO RX RECV: S1
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SYSTEM] USB IO RX RECV: M0
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:46] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:46] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:47] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:47] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:47] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:47] [SAFETY] [TRACKDBG] person pipeline: visible=1 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:47] [ACCESSORY] [PREVIEW] render_mode=throttled
+[09:09:47] [SYSTEM] [PREVIEW] render_mode=busy-lite
+[09:09:47] [SYSTEM] USB IO RX RECV: S1
+[09:09:47] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:47] [SYSTEM] USB IO RX RECV: M0
+[09:09:47] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:47] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:47] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:47] [SYSTEM] USB IO RX STAT S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:47] [SYSTEM] USB IO RX RECV: S1
+[09:09:47] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:47] [SYSTEM] USB IO RX RECV: M0
+[09:09:47] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:47] [SYSTEM] USB IO RX RECV: F0L0R0G0A0
+[09:09:47] [SYSTEM] USB IO RX ACK S=1 M=0 F=0 L=0 R=0 G=0 A=0 J=120 K=1 N=50 U=0 V=45 H=360 B=0 P=0
+[09:09:47] [SAFETY] [TRACKDBG] person pipeline: visible=2 qualified=1 engaged=1 state=ENGAGING lead_track=3 conf=0.94 active_track=3
+[09:09:47] [ACCESSORY] [PREVIEW] render_mode=throttled

@@ -3,10 +3,13 @@
 
 from __future__ import annotations
 
+import ctypes
 import os
 import sys
 from pathlib import Path
 from typing import Any
+
+from ctypes import wintypes
 
 
 def _configure_ml_runtime_env() -> None:
@@ -146,6 +149,18 @@ QT_EVENT_WINDOW_STATE_CHANGE = _qt_attr(
     "WindowStateChange",
     _qt_attr(getattr(QEvent, "Type", None), "WindowStateChange", None),
 )
+
+WM_NCHITTEST = 0x0084
+HTCLIENT = 1
+HTLEFT = 10
+HTRIGHT = 11
+HTTOP = 12
+HTTOPLEFT = 13
+HTTOPRIGHT = 14
+HTBOTTOM = 15
+HTBOTTOMLEFT = 16
+HTBOTTOMRIGHT = 17
+FRAMELESS_RESIZE_BORDER = 8
 
 
 class FramelessControlStrip(QWidget):
@@ -405,9 +420,47 @@ class SmartSentryV2_3_2StandaloneWindow(QMainWindow):
             self._control_strip.sync_window_state()
         super().changeEvent(event)
 
+    def nativeEvent(self, eventType, message):  # type: ignore[override]
+        if sys.platform == "win32" and eventType == b"windows_generic_MSG" and not self.isMaximized():
+            msg = wintypes.MSG.from_address(int(message))
+            if msg.message == WM_NCHITTEST:
+                hit = self._hit_test_resize_border(msg.lParam)
+                if hit != HTCLIENT:
+                    return True, hit
+        return super().nativeEvent(eventType, message)
+
     def resizeEvent(self, a0) -> None:  # type: ignore[override]
         super().resizeEvent(a0)
         self._reposition_exit_overlay()
+
+    def _hit_test_resize_border(self, l_param: int) -> int:
+        x = ctypes.c_short(l_param & 0xFFFF).value
+        y = ctypes.c_short((l_param >> 16) & 0xFFFF).value
+        pos = self.mapFromGlobal(QPoint(x, y))
+        rect = self.rect()
+        border = FRAMELESS_RESIZE_BORDER
+        left = pos.x() <= border
+        right = pos.x() >= rect.width() - border
+        top = pos.y() <= border
+        bottom = pos.y() >= rect.height() - border
+
+        if top and left:
+            return HTTOPLEFT
+        if top and right:
+            return HTTOPRIGHT
+        if bottom and left:
+            return HTBOTTOMLEFT
+        if bottom and right:
+            return HTBOTTOMRIGHT
+        if left:
+            return HTLEFT
+        if right:
+            return HTRIGHT
+        if top:
+            return HTTOP
+        if bottom:
+            return HTBOTTOM
+        return HTCLIENT
 
     def _reposition_exit_overlay(self) -> None:
         overlay = getattr(self, "_exit_overlay", None)

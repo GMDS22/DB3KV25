@@ -1107,7 +1107,7 @@ class SentryV2Engine:
             # Scale acquire/settle time with engagement speed — fast presets
             # still get a real startup settle window before precision begins.
             speed_ratio = float(max(10, min(100, int(getattr(self.cfg.engagement, "engagement_speed", 80) or 80))) - 10) / 90.0
-            aim_settle_time = max(0.06, 0.35 * (1.0 - speed_ratio * 0.75))
+            aim_settle_time = max(0.02, 0.20 * (1.0 - speed_ratio * 0.92))
             if self._acquire_phase_ready(now, aim_settle_time):
                 if self.cfg.engagement.precision_aim_enabled:
                     self._enter_precision_phase(now, order)
@@ -1612,8 +1612,8 @@ class SentryV2Engine:
         if remaining_error <= 0.85:
             return 1.0
 
-        progress_scale = max(0.15, min(1.0, command_age_s / max(0.06, settle_window_s)))
-        remaining_scale = max(0.18, min(1.0, 1.0 - ((remaining_error - 0.85) / 3.25)))
+        progress_scale = max(0.50, min(1.0, command_age_s / max(0.04, settle_window_s)))
+        remaining_scale = max(0.60, min(1.0, 1.0 - ((remaining_error - 0.85) / 1.8)))
         return min(progress_scale, remaining_scale)
 
     def _safe_log_precision_frame(self, **kwargs: object) -> None:
@@ -1682,9 +1682,17 @@ class SentryV2Engine:
         if target is not None:
             # Initial acquire must be derived from live target position, but keep
             # the first jump bounded to avoid abrupt moves from stale queue plans.
-            err_pan, err_tilt = self._compute_tracking_angle_error(target, now, for_fire=False)
-            max_step_pan = max(2.0, float(getattr(self.cfg.engagement, "precision_max_pan_step", 0.0) or 0.0) * 3.0)
-            max_step_tilt = max(1.6, float(getattr(self.cfg.engagement, "precision_max_tilt_step", 0.0) or 0.0) * 3.0)
+            # Use raw (non-predictive) target error for the first acquire move;
+            # predictive lead can overshoot during guard->engage handoff.
+            err_pan, err_tilt = self._compute_target_angle_error(target.det)
+            max_step_pan = max(1.9, float(getattr(self.cfg.engagement, "precision_max_pan_step", 0.0) or 0.0) * 2.35)
+            max_step_tilt = max(1.5, float(getattr(self.cfg.engagement, "precision_max_tilt_step", 0.0) or 0.0) * 2.35)
+            # Large first errors get a slightly softer cap to reduce initial overshoot,
+            # while still keeping acquisition noticeably quick.
+            if abs(float(err_pan)) >= 8.0:
+                max_step_pan *= 0.82
+            if abs(float(err_tilt)) >= 6.0:
+                max_step_tilt *= 0.82
             step_pan = max(-max_step_pan, min(max_step_pan, float(err_pan)))
             step_tilt = max(-max_step_tilt, min(max_step_tilt, float(err_tilt)))
             self._move_turret(self.current_pan + step_pan, self.current_tilt + step_tilt)
@@ -2700,11 +2708,11 @@ class SentryV2Engine:
             precision_tilt_limit = float(eng.precision_max_tilt_step) if float(eng.precision_max_tilt_step) > 0.0 else float(eng.precision_max_step)
             pan_limit = max(
                 fire_pan_limit,
-                min(precision_pan_limit * 0.55, fire_pan_limit + ((abs(lock_pan) / fire_window_pan) * 0.22)),
+                min(precision_pan_limit * 0.92, fire_pan_limit + ((abs(lock_pan) / fire_window_pan) * 0.60)),
             )
             tilt_limit = max(
                 fire_tilt_limit,
-                min(precision_tilt_limit * 0.55, fire_tilt_limit + ((abs(lock_tilt) / fire_window_tilt) * 0.18)),
+                min(precision_tilt_limit * 0.92, fire_tilt_limit + ((abs(lock_tilt) / fire_window_tilt) * 0.50)),
             )
         else:
             pan_limit = float(eng.precision_max_pan_step) if float(eng.precision_max_pan_step) > 0.0 else float(eng.precision_max_step)

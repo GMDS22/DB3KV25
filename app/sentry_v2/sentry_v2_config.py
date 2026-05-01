@@ -288,6 +288,14 @@ class EngagementConfig:
     loss_search_style: str = "hunting"
     # Shared hunt pass count for target-loss and PIR no-detect searches.
     loss_search_rounds: int = 1
+    # Stationary-target release protocol: after repeated fire cycles on a
+    # near-static target, temporarily suppress re-engaging that same track so
+    # guard-mode PIR/acoustic workflows can run.
+    stationary_release_enabled: bool = True
+    stationary_release_min_fire_cycles: int = 3
+    stationary_release_hold_s: float = 8.0
+    stationary_release_suppress_s: float = 10.0
+    stationary_release_motion_px: float = 36.0
 
     def __post_init__(self) -> None:
         normalize_auto_trigger_engagement(self)
@@ -545,6 +553,27 @@ class SoundConfig:
 
 
 @dataclass
+class AcousticGuardConfig:
+    """Adaptive USB microphone anomaly detection and alert-sweep behavior."""
+    enabled: bool = False
+    source: str = "usb_microphone"
+    device_name: str = ""
+    sample_rate_hz: int = 16000
+    block_size: int = 1024
+    warmup_seconds: float = 3.0
+    baseline_adapt_rate: float = 0.035
+    anomaly_threshold_db: float = 3.5
+    anomaly_zscore_threshold: float = 1.6
+    event_cooldown_s: float = 8.0
+    queue_ttl_s: float = 14.0
+    home_hold_s: float = 0.35
+    pir_check_hold_s: float = 0.30
+    quick_lr_hold_s: float = 0.26
+    quick_lr_offset_deg: float = 22.0
+    sweep_speed_dps: float = 12.0
+
+
+@dataclass
 class FaceRecognitionConfig:
     """Known-face identification and friendly-recognition behavior."""
     enabled: bool = False
@@ -665,6 +694,7 @@ class SentryV2Config:
     pir_guard: PIRGuardConfig = field(default_factory=PIRGuardConfig)
     lighting: LightingConfig = field(default_factory=LightingConfig)
     sound: SoundConfig = field(default_factory=SoundConfig)
+    acoustic_guard: AcousticGuardConfig = field(default_factory=AcousticGuardConfig)
     face_recognition: FaceRecognitionConfig = field(default_factory=FaceRecognitionConfig)
     ai_assistant: AIAssistantConfig = field(default_factory=AIAssistantConfig)
     shortcuts: ShortcutConfig = field(default_factory=ShortcutConfig)
@@ -672,6 +702,7 @@ class SentryV2Config:
 
     # --- Overlay / HUD ---
     show_overlay: bool = True
+    overlay_display_mode: str = "show_all"
     show_threat_scores: bool = False
     show_engagement_zone: bool = False
     show_guard_crosshair: bool = True
@@ -797,6 +828,7 @@ class SentryV2Config:
         pir_cfg = PIRGuardConfig(sensors=sensors, **pir_raw)
         lighting_cfg = LightingConfig(**dict(d.get("lighting", {})))
         sound_cfg = SoundConfig(**dict(d.get("sound", {})))
+        acoustic_cfg = AcousticGuardConfig(**dict(d.get("acoustic_guard", {})))
         face_cfg = FaceRecognitionConfig(**dict(d.get("face_recognition", {})))
         ai_cfg = AIAssistantConfig(**dict(d.get("ai_assistant", {})))
         shortcut_cfg = ShortcutConfig(**dict(d.get("shortcuts", {})))
@@ -813,11 +845,13 @@ class SentryV2Config:
             pir_guard=pir_cfg,
             lighting=lighting_cfg,
             sound=sound_cfg,
+            acoustic_guard=acoustic_cfg,
             face_recognition=face_cfg,
             ai_assistant=ai_cfg,
             shortcuts=shortcut_cfg,
             theme=theme_cfg,
             show_overlay=d.get("show_overlay", True),
+            overlay_display_mode=str(d.get("overlay_display_mode", "show_all") or "show_all"),
             show_threat_scores=d.get("show_threat_scores", False),
             show_engagement_zone=d.get("show_engagement_zone", False),
             show_guard_crosshair=d.get("show_guard_crosshair", True),

@@ -52,6 +52,33 @@ Based on the saved keyboard images (D-pad + media cluster + side Home/Pg keys), 
 | `WWW` or `.com` | `Ctrl+Alt+Q` (Quick keys) | Good candidate for opening this reference quickly |
 | Media play/pause | Optional: map to `Ctrl+Alt+E` (enable/disable sentry) | Recommended only if you do not use media keys during operation |
 
+## Quick Access (QA) Bar — Under Video Panel
+
+The QA chip bar under the video panel provides one-click toggle buttons for the most common runtime controls without navigating to a settings tab.
+
+| Button | Label | Action |
+|---|---|---|
+| 🎯 | Auto Trigger | Enable / disable automatic firing |
+| 🛑 | Safety | Arm / lock fire safety |
+| 🔥 | Manual Fire | Single fire button (non-checkable); runtime path can pre-arm safety then fire |
+| Overlay button (under video pane) | Overlay Mode | Cycle `SHOW ALL` -> `MINIMAL` -> `NO OVERLAY` |
+| 🏠 | Go Home | Move to guard home position (non-checkable) |
+| 🔊 | Buzzer | Sound system ON / OFF |
+| 🎤 | Acoustic Guard | Acoustic Guard USB mic trigger ON / OFF — bidirectional sync with Guard tab checkbox |
+| 🟥 | PIR Sensors | PIR Guard ON / OFF — bidirectional sync with Guard tab "Enable PIR sensors" checkbox |
+| 💡 | LED | LED accessory output ON / OFF |
+| 📍 | Laser | Laser output ON / OFF |
+| AC | ACC Output | ACC accessory output ON / OFF |
+| SP | Spare Output | Spare accessory output ON / OFF |
+| 🌗 | Auto Lighting | Auto LED brightness control ON / OFF |
+| KB | Keyboard Controls | Manual keyboard pan/tilt/fire enable — defaults OFF for safety |
+| SET | Settings | Expand movement and tracking tune flyout panel |
+| 👁️ | Watchful behaviour | Follow any mover; switch to valid target immediately |
+| ❓ | Curious Guard | Periodic glance at movers; only engage valid targets |
+| ✅ | Strict behaviour | Only move for validated targets |
+
+**Note on Acoustic Guard and PIR toggles:** toggling 🎤 or 🟥 in the QA bar is exactly the same as toggling the checkbox in the Guard settings tab. Both paths call the same handler, save config, and apply immediately.
+
 ## Operator Notes
 
 - The shortcut system is enabled or disabled from the `Shortcut Keys` tab.
@@ -60,5 +87,9 @@ Based on the saved keyboard images (D-pad + media cluster + side Home/Pg keys), 
 - Manual movement shortcuts respect the same motion limits as the on-screen controls.
 - Arrow keys and `W/A/S/D` share the same manual movement path (pan/tilt).
 - `Space` uses the same safety and trigger path as the on-screen `FIRE` button.
+- In water mode (`M0`), press/release behaves as hold-to-fire over the MOSFET path.
+- In projectile mode (`M1`), the fire path is edge-triggered and auto-released by a short latch timer to produce one trigger-servo pulse per fire action.
+- In standalone comm-controlled modes, if software safety is still locked at fire request time, the runtime can pre-arm safety and proceed (`S1` -> `S0`) so manual fire does not fail silently.
 - `Ctrl+Alt+L` toggles Auto Lighting. When auto lighting is ON it drives LED PWM directly from scene brightness; the LED button is only the manual LED toggle when auto mode is OFF.
+- Acoustic Guard and PIR can both be toggled from the QA bar without opening the Guard tab.
 - Friendly face recognition, AI Assistant commands, and preview overlays do not require shortcuts, but this key map is intended to keep the common setup and control actions reachable without leaving the video view.

@@ -115,6 +115,20 @@ from .assistant import AssistantReply, LocalAssistantService, OllamaClient
 
 MANUAL_TRIGGER_SERVO_LATCH_MS = 160
 
+OVERLAY_MODE_SHOW_ALL = "show_all"
+OVERLAY_MODE_MINIMAL = "minimal"
+OVERLAY_MODE_NONE = "none"
+OVERLAY_MODE_SEQUENCE = [
+    OVERLAY_MODE_SHOW_ALL,
+    OVERLAY_MODE_MINIMAL,
+    OVERLAY_MODE_NONE,
+]
+OVERLAY_MODE_LABELS = {
+    OVERLAY_MODE_SHOW_ALL: "SHOW ALL",
+    OVERLAY_MODE_MINIMAL: "MINIMAL",
+    OVERLAY_MODE_NONE: "NO OVERLAY",
+}
+
 
 class NoWheelScrollFilter(QObject):
     """Event filter to block mouse wheel scrolling on spinboxes and sliders."""
@@ -220,6 +234,75 @@ class ResponsiveIconTabBar(QTabBar):
             icon.paint(painter, icon_rect, Qt.AlignCenter, mode, state)
 
 
+class CollapsibleSection(QWidget):
+    """A settings section that can be collapsed / expanded by clicking its header.
+
+    Usage::
+        section = CollapsibleSection("Advanced Options", collapsed=True)
+        inner_lay = QVBoxLayout(section.content)
+        inner_lay.addWidget(...)
+        parent_layout.addWidget(section)
+
+    The *content* attribute is a plain ``QFrame`` that holds the real widgets.
+    The header button carries the ``collapseHeader`` objectName so the
+    stylesheet can style it independently.
+    """
+
+    def __init__(self, title: str, collapsed: bool = False, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self._title = title
+        self._collapsed = collapsed
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # ── header toggle button ──────────────────────────────────────────
+        self._toggle_btn = QPushButton()
+        self._toggle_btn.setObjectName("collapseHeader")
+        self._toggle_btn.setCheckable(True)
+        self._toggle_btn.setChecked(not collapsed)
+        self._toggle_btn.setFlat(True)
+        self._toggle_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._toggle_btn.setMinimumHeight(26)
+        self._toggle_btn.clicked.connect(self._on_toggle)
+        outer.addWidget(self._toggle_btn)
+
+        # ── content frame ─────────────────────────────────────────────────
+        self.content = QFrame()
+        self.content.setObjectName("collapseSectionContent")
+        self.content.setFrameShape(QFrame.NoFrame)
+        self.content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        outer.addWidget(self.content)
+
+        self._refresh_header()
+        if collapsed:
+            self.content.setVisible(False)
+
+    # ------------------------------------------------------------------
+    def _refresh_header(self) -> None:
+        arrow = "▶" if self._collapsed else "▼"
+        self._toggle_btn.setText(f"  {arrow}  {self._title}")
+
+    def _on_toggle(self, checked: bool) -> None:
+        self._collapsed = not checked
+        self.content.setVisible(checked)
+        self._refresh_header()
+
+    @property
+    def title(self) -> str:
+        return self._title
+
+    def is_collapsed(self) -> bool:
+        return self._collapsed
+
+    def set_collapsed(self, collapsed: bool) -> None:
+        self._collapsed = collapsed
+        self._toggle_btn.setChecked(not collapsed)
+        self.content.setVisible(not collapsed)
+        self._refresh_header()
+
+
 # Detection mode list (same indices as main app)
 DETECTION_MODES: List[str] = [
     "Frame Difference",            # 0
@@ -284,10 +367,14 @@ CANONICAL_SETTINGS_PATH = APP_ROOT_PATH / "config" / f"smart_sentry_v{SMART_SENT
 CANONICAL_PROMPTED_TARGETS_PATH = APP_ROOT_PATH / "config" / f"smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_prompted_targets.json"
 CANONICAL_FACE_LIBRARY_PATH = APP_ROOT_PATH / "config" / f"smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_faces.json"
 
+SMART_SENTRY_V3_5_1_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_5_1_custom_presets.json"
+SMART_SENTRY_V3_5_0_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_5_0_custom_presets.json"
 SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_2_custom_presets.json"
 SMART_SENTRY_V2_3_1_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_1_custom_presets.json"
 LEGACY_SMART_SENTRY_V3_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_custom_presets.json"
 LEGACY_SENTRY_V2_CUSTOM_PRESET_PATH = APP_ROOT_PATH / "config" / "sentry_v2_custom_presets.json"
+SMART_SENTRY_V3_5_1_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_5_1_settings.json"
+SMART_SENTRY_V3_5_0_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_5_0_settings.json"
 SMART_SENTRY_V2_3_2_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_2_settings.json"
 SMART_SENTRY_V2_3_1_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v2_3_1_settings.json"
 LEGACY_SMART_SENTRY_V3_SETTINGS_PATH = APP_ROOT_PATH / "config" / "smart_sentry_v3_settings.json"
@@ -3332,6 +3419,9 @@ class SentryV2TabWidget(QWidget):
         self._prompted_list_syncing: bool = False
         self._prompted_detail_syncing: bool = False
         self._show_video_feed: bool = True  # Toggle to hide video display
+        self._overlay_display_mode: str = self._normalize_overlay_display_mode(
+            getattr(self.config, "overlay_display_mode", OVERLAY_MODE_SHOW_ALL)
+        )
         self._applying_master_preset: bool = False
         self._applying_servo_preset: bool = False
         self._applying_detection_preset: bool = False
@@ -3459,6 +3549,8 @@ class SentryV2TabWidget(QWidget):
         selected = canonical
         for candidate in [
             CANONICAL_SETTINGS_PATH,
+            SMART_SENTRY_V3_5_1_SETTINGS_PATH,
+            SMART_SENTRY_V3_5_0_SETTINGS_PATH,
             SMART_SENTRY_V2_3_2_SETTINGS_PATH,
             SMART_SENTRY_V2_3_1_SETTINGS_PATH,
             LEGACY_SMART_SENTRY_V3_SETTINGS_PATH,
@@ -3501,6 +3593,10 @@ class SentryV2TabWidget(QWidget):
     def _custom_master_preset_path(self) -> Path:
         if CANONICAL_CUSTOM_PRESET_PATH.exists():
             return CANONICAL_CUSTOM_PRESET_PATH
+        if SMART_SENTRY_V3_5_1_CUSTOM_PRESET_PATH.exists():
+            return SMART_SENTRY_V3_5_1_CUSTOM_PRESET_PATH
+        if SMART_SENTRY_V3_5_0_CUSTOM_PRESET_PATH.exists():
+            return SMART_SENTRY_V3_5_0_CUSTOM_PRESET_PATH
         if SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH.exists():
             return SMART_SENTRY_V2_3_2_CUSTOM_PRESET_PATH
         if SMART_SENTRY_V2_3_1_CUSTOM_PRESET_PATH.exists():
@@ -4101,6 +4197,18 @@ class SentryV2TabWidget(QWidget):
         _video_container_lay.setSpacing(0)
         _video_container_lay.addWidget(self._video_label, 1)
 
+        self._btn_overlay_mode = QPushButton()
+        self._set_button_role(self._btn_overlay_mode, "utility")
+        self._btn_overlay_mode.setToolTip(
+            "Cycle overlay display mode:\n"
+            "SHOW ALL: full overlay rendering\n"
+            "MINIMAL: thin crosshair + thin detection boxes only\n"
+            "NO OVERLAY: raw video"
+        )
+        self._btn_overlay_mode.clicked.connect(self._cycle_overlay_display_mode)
+        _video_container_lay.addWidget(self._btn_overlay_mode)
+        self._sync_overlay_display_mode_button()
+
         # Quick-access chip bar
         _qa_chip_bar = QWidget()
         _qa_chip_bar.setObjectName("sentryV2QAChipBar")
@@ -4290,9 +4398,9 @@ class SentryV2TabWidget(QWidget):
         _lbl_settle.setObjectName("qaTuneLabel")
         _tf_lay.addWidget(_lbl_settle)
         self._spn_settle_qa = QDoubleSpinBox()
-        self._spn_settle_qa.setRange(0.1, 3.0)
-        self._spn_settle_qa.setSingleStep(0.1)
-        self._spn_settle_qa.setDecimals(1)
+        self._spn_settle_qa.setRange(0.02, 3.0)
+        self._spn_settle_qa.setSingleStep(0.01)
+        self._spn_settle_qa.setDecimals(2)
         self._spn_settle_qa.setValue(self.config.engagement.precision_settle_time)
         self._spn_settle_qa.setFixedWidth(62)
         self._spn_settle_qa.setToolTip(SENTRY_V2_TOOLTIPS.get("precision_settle", ""))
@@ -4953,6 +5061,36 @@ QWidget#sentryV2Root QPushButton[buttonRole="dpadArrow"]:pressed {{
     background-color: {tokens['primary_button_pressed']};
     border-color: {tokens['accent_soft']};
 }}
+QWidget#sentryV2Root QPushButton#collapseHeader {{
+    background-color: {tokens['surface_alt_rgba']};
+    color: {tokens['accent']};
+    border: none;
+    border-bottom: 1px solid {tokens['border']};
+    border-radius: 0px;
+    text-align: left;
+    font-weight: 700;
+    font-size: {max(base_font - 0.3, 8.0):.2f}pt;
+    padding: 3px 6px;
+    min-height: 22px;
+}}
+QWidget#sentryV2Root QPushButton#collapseHeader:hover {{
+    background-color: {tokens['accent_faint']};
+    color: {tokens['hero_text']};
+}}
+QWidget#sentryV2Root QPushButton#collapseHeader:checked {{
+    background-color: {tokens['surface_alt_rgba']};
+    color: {tokens['accent']};
+    border-color: {tokens['border']};
+}}
+QWidget#sentryV2Root QFrame#collapseSectionContent {{
+    border: 1px solid {tokens['border']};
+    border-top: none;
+    border-radius: 0px;
+    border-bottom-left-radius: {radius_small}px;
+    border-bottom-right-radius: {radius_small}px;
+    background-color: transparent;
+    padding: 0px;
+}}
 QWidget#sentryV2Root QPushButton[buttonRole="mode"] {{
     background-color: {tokens['mode_button_bg']};
     border-color: {tokens['mode_button_border']};
@@ -5285,6 +5423,22 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         scroll.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
         scroll.setWidget(content)
         return scroll
+
+    def _collapsible(self, group: QGroupBox, collapsed: bool = False) -> CollapsibleSection:
+        """Wrap a QGroupBox inside a CollapsibleSection toggle widget.
+
+        The group box is nested intact inside the section's content frame so
+        all existing widget references remain valid.  The group's own title is
+        hidden (cleared) to avoid a duplicate heading; the section header button
+        shows it instead.
+        """
+        section = CollapsibleSection(group.title(), collapsed=collapsed)
+        group.setTitle("")
+        inner_lay = QVBoxLayout(section.content)
+        inner_lay.setContentsMargins(0, 0, 0, 0)
+        inner_lay.setSpacing(0)
+        inner_lay.addWidget(group)
+        return section
 
     def _disable_wheel_scroll(self, widget: QWidget) -> None:
         """Disable mouse wheel scrolling on spinboxes, sliders, and comboboxes."""
@@ -5883,7 +6037,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_master_profile.setWordWrap(True)
         self._set_theme_role(self._lbl_master_profile, "mutedCompact")
         preset_lay.addWidget(self._lbl_master_profile)
-        lay.addWidget(preset_grp)
+        lay.addWidget(self._collapsible(preset_grp, collapsed=False))
 
         save_grp = QGroupBox("Manage Custom Presets")
         save_lay = QVBoxLayout(save_grp)
@@ -5931,7 +6085,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_custom_master_info.setWordWrap(True)
         self._set_theme_role(self._lbl_custom_master_info, "mutedCompact")
         save_lay.addWidget(self._lbl_custom_master_info)
-        lay.addWidget(save_grp)
+        lay.addWidget(self._collapsible(save_grp, collapsed=True))
 
         summary_grp = QGroupBox("Current Stack")
         summary_lay = QVBoxLayout(summary_grp)
@@ -5940,7 +6094,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_master_stack.setWordWrap(True)
         self._set_theme_role(self._lbl_master_stack, "summary")
         summary_lay.addWidget(self._lbl_master_stack)
-        lay.addWidget(summary_grp)
+        lay.addWidget(self._collapsible(summary_grp, collapsed=True))
 
         lay.addStretch()
         self._update_master_stack_summary()
@@ -5995,7 +6149,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_theme_preset_desc.setWordWrap(True)
         self._set_theme_role(self._lbl_theme_preset_desc, "mutedCompact")
         preset_lay.addWidget(self._lbl_theme_preset_desc)
-        lay.addWidget(preset_grp)
+        lay.addWidget(self._collapsible(preset_grp, collapsed=False))
 
         tune_grp = QGroupBox("Fine Tuning")
         tune_lay = QGridLayout(tune_grp)
@@ -6041,7 +6195,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         note.setWordWrap(True)
         self._set_theme_role(note, "subtleBody")
         tune_lay.addWidget(note, 8, 0, 1, 3)
-        lay.addWidget(tune_grp)
+        lay.addWidget(self._collapsible(tune_grp, collapsed=False))
 
         interface_grp = QGroupBox("Interface Settings")
         interface_lay = QGridLayout(interface_grp)
@@ -6074,12 +6228,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         interface_lay.addLayout(width_buttons, 1, 0, 1, 3)
 
         interface_note = QLabel(
-            "Panel width is saved with the current operator profile. Use it to make the settings column denser on smaller screens or wider on touch-friendly benches."
+            "Panel width is saved with the current operator profile. Use it to make the settings column denser on smaller screens or wider on touch-friendly benches. The main app window can still be resized independently."
         )
         interface_note.setWordWrap(True)
         self._set_theme_role(interface_note, "subtleBody")
         interface_lay.addWidget(interface_note, 2, 0, 1, 3)
-        lay.addWidget(interface_grp)
+        lay.addWidget(self._collapsible(interface_grp, collapsed=False))
 
         summary_grp = QGroupBox("Theme Summary")
         summary_lay = QVBoxLayout(summary_grp)
@@ -6095,7 +6249,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         btn_theme_reset.clicked.connect(self._reset_theme_defaults)
         button_row.addWidget(btn_theme_reset)
         summary_lay.addLayout(button_row)
-        lay.addWidget(summary_grp)
+        lay.addWidget(self._collapsible(summary_grp, collapsed=True))
 
         lay.addStretch()
         self._sync_theme_widgets()
@@ -6297,7 +6451,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._on_source_zoom_changed()
         self._update_test_media_controls()
 
-        lay.addWidget(cam_grp)
+        lay.addWidget(self._collapsible(cam_grp, collapsed=False))
 
         # Connect / disconnect
         btn_row = QHBoxLayout()
@@ -6327,7 +6481,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._btn_wifi_pinout.clicked.connect(self._show_full_wifi_pinout)
         self._apply_tooltip(self._btn_wifi_pinout, "wifi_pinout")
         type_lay.addWidget(self._btn_wifi_pinout)
-        lay.addWidget(type_grp)
+        lay.addWidget(self._collapsible(type_grp, collapsed=False))
 
         # --- Arduino Nano / USB IO serial settings (modes 0, 1) ---
         self._grp_esp32_serial = QGroupBox("Arduino Nano / USB IO Serial")
@@ -6359,7 +6513,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._spin_esp32_baud, "esp32_baud")
         esp_lay.addWidget(self._spin_esp32_baud, 2, 1, 1, 2)
 
-        lay.addWidget(self._grp_esp32_serial)
+        self._section_esp32_serial = self._collapsible(self._grp_esp32_serial, collapsed=False)
+        lay.addWidget(self._section_esp32_serial)
 
         # --- Debug Board Serial settings (modes 1, 2) ---
         self._grp_debug_serial = QGroupBox("Debug Board Serial (USB)")
@@ -6391,7 +6546,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._spin_debug_baud, "debug_baud")
         dbg_lay.addWidget(self._spin_debug_baud, 2, 1, 1, 2)
 
-        lay.addWidget(self._grp_debug_serial)
+        self._section_debug_serial = self._collapsible(self._grp_debug_serial, collapsed=False)
+        lay.addWidget(self._section_debug_serial)
 
         # --- Servo settings (modes 1, 2) ---
         self._grp_servo = QGroupBox("Bus Servo")
@@ -6433,7 +6589,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         srv_lay.addWidget(self._lbl_servo_time_preset, 4, 0, 1, 2)
         self._set_servo_time_preset_label(self._match_servo_time_preset_name())
 
-        lay.addWidget(self._grp_servo)
+        self._section_servo = self._collapsible(self._grp_servo, collapsed=False)
+        lay.addWidget(self._section_servo)
 
         # --- WiFi UDP settings (modes 2, 3) ---
         self._grp_udp = QGroupBox("WiFi UDP")
@@ -6478,7 +6635,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._combo_wifi_adapter.setCurrentIndex(_target_idx)
         udp_lay.addWidget(self._combo_wifi_adapter, 2, 1)
 
-        lay.addWidget(self._grp_udp)
+        self._section_udp = self._collapsible(self._grp_udp, collapsed=False)
+        lay.addWidget(self._section_udp)
 
         # --- Secondary ESP32 WiFi settings (mode 4) ---
         self._grp_servo_udp = QGroupBox("Secondary ESP32 WiFi")
@@ -6496,7 +6654,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._spin_servo_udp_port, "servo_udp_port")
         servo_udp_lay.addWidget(self._spin_servo_udp_port, 1, 1)
 
-        lay.addWidget(self._grp_servo_udp)
+        self._section_servo_udp = self._collapsible(self._grp_servo_udp, collapsed=False)
+        lay.addWidget(self._section_servo_udp)
 
         # Direction inversion
         inv_grp = QGroupBox("Direction")
@@ -6511,7 +6670,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._chk_invert_tilt.toggled.connect(self._on_invert_changed)
         self._apply_tooltip(self._chk_invert_tilt, "invert_tilt")
         inv_lay.addWidget(self._chk_invert_tilt)
-        lay.addWidget(inv_grp)
+        lay.addWidget(self._collapsible(inv_grp, collapsed=False))
 
         # Status
         self._lbl_conn_status = QLabel("Disconnected")
@@ -6585,7 +6744,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._set_theme_role(self._lbl_detection_preset, "mutedCompact")
         preset_lay.addWidget(self._lbl_detection_preset)
 
-        lay.addWidget(preset_grp)
+        lay.addWidget(self._collapsible(preset_grp, collapsed=False))
 
         # --- Contour settings (modes 0,1,3,7,8) ---
         self._grp_contour = QGroupBox("Contour Settings")
@@ -6615,7 +6774,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._set_theme_role(self._lbl_contour_ratio, "mutedCompact")
         contour_lay.addWidget(self._lbl_contour_ratio, 2, 0, 1, 2)
 
-        lay.addWidget(self._grp_contour)
+        self._section_contour = self._collapsible(self._grp_contour, collapsed=False)
+        lay.addWidget(self._section_contour)
 
         # --- YOLO settings (modes 2,4,5,9,10) ---
         self._grp_yolo = QGroupBox("YOLO Settings")
@@ -6679,7 +6839,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         yolo_lay.addWidget(self._lbl_yolo_status, 5, 0, 1, 4)
         self._set_yolo_status("info", "Model not loaded yet")
 
-        lay.addWidget(self._grp_yolo)
+        self._section_yolo = self._collapsible(self._grp_yolo, collapsed=False)
+        lay.addWidget(self._section_yolo)
 
         # --- Color settings (modes 6,7,8,9) ---
         self._grp_color = QGroupBox("Color Detection Settings")
@@ -6733,7 +6894,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._spin_fusion_overlap, "fusion_overlap")
         color_lay.addWidget(self._spin_fusion_overlap, 4, 1)
 
-        lay.addWidget(self._grp_color)
+        self._section_color = self._collapsible(self._grp_color, collapsed=False)
+        lay.addWidget(self._section_color)
 
         # --- Motion gate threshold (modes 4,5) ---
         self._grp_motion = QGroupBox("Motion Gate")
@@ -6748,7 +6910,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         motion_lay.addWidget(self._spin_motion_thresh)
         self._register_responsive_box_layout(motion_lay, "compact_row")
 
-        lay.addWidget(self._grp_motion)
+        self._section_motion = self._collapsible(self._grp_motion, collapsed=False)
+        lay.addWidget(self._section_motion)
 
         self._grp_motion_recovery = QGroupBox("Motion Recovery")
         motion_recovery_lay = QHBoxLayout(self._grp_motion_recovery)
@@ -6762,7 +6925,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._spin_motion_ignore, "motion_ignore_after_move_s")
         motion_recovery_lay.addWidget(self._spin_motion_ignore)
         self._register_responsive_box_layout(motion_recovery_lay, "compact_row")
-        lay.addWidget(self._grp_motion_recovery)
+        self._section_motion_recovery = self._collapsible(self._grp_motion_recovery, collapsed=False)
+        lay.addWidget(self._section_motion_recovery)
 
         lay.addStretch()
 
@@ -6801,7 +6965,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._chk_prompted_append_selected = QCheckBox("Append imports to selected target")
         self._apply_tooltip(self._chk_prompted_append_selected, "prompted_append_selected")
         runtime_lay.addWidget(self._chk_prompted_append_selected)
-        lay.addWidget(runtime_grp)
+        lay.addWidget(self._collapsible(runtime_grp, collapsed=False))
 
         naming_grp = QGroupBox("Target Naming")
         naming_lay = QHBoxLayout(naming_grp)
@@ -6811,7 +6975,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._edit_prompted_name, "prompted_name")
         naming_lay.addWidget(self._edit_prompted_name, 1)
         self._register_responsive_box_layout(naming_lay, "compact_row")
-        lay.addWidget(naming_grp)
+        lay.addWidget(self._collapsible(naming_grp, collapsed=False))
 
         import_grp = QGroupBox("Create Targets")
         import_lay = QGridLayout(import_grp)
@@ -6834,7 +6998,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_prompted_status.setWordWrap(True)
         self._set_theme_role(self._lbl_prompted_status, "mutedCompact")
         import_lay.addWidget(self._lbl_prompted_status, 1, 0, 1, 3)
-        lay.addWidget(import_grp)
+        lay.addWidget(self._collapsible(import_grp, collapsed=False))
 
         library_grp = QGroupBox("Prompted Target Library")
         library_lay = QVBoxLayout(library_grp)
@@ -6909,7 +7073,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         button_row.addWidget(self._btn_prompted_remove)
         self._register_responsive_box_layout(button_row, "action_row")
         library_lay.addLayout(button_row)
-        lay.addWidget(library_grp, 1)
+        lay.addWidget(self._collapsible(library_grp, collapsed=False), 1)
 
         self._rebuild_prompted_target_list()
         return w
@@ -6946,7 +7110,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_filter_preset.setWordWrap(True)
         self._set_theme_role(self._lbl_filter_preset, "mutedCompact")
         preset_lay.addWidget(self._lbl_filter_preset)
-        lay.addWidget(preset_grp)
+        lay.addWidget(self._collapsible(preset_grp, collapsed=False))
 
         # Class whitelist
         grp = QGroupBox("Allowed YOLO Classes")
@@ -6979,7 +7143,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         btn_row.addWidget(btn_all)
         btn_row.addWidget(btn_none)
         g_lay.addLayout(btn_row)
-        lay.addWidget(grp)
+        lay.addWidget(self._collapsible(grp, collapsed=False))
 
         # Confidence
         conf_row = QHBoxLayout()
@@ -7055,9 +7219,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_threat_preset.setWordWrap(True)
         self._set_theme_role(self._lbl_threat_preset, "mutedCompact")
         preset_lay.addWidget(self._lbl_threat_preset)
-        lay.addWidget(preset_grp)
+        lay.addWidget(self._collapsible(preset_grp, collapsed=False))
 
-        lay.addWidget(QLabel("Threat Score Weights (higher = more important):"))
+        # ── Threat Score Weights ──────────────────────────────────────────
+        weights_grp = QGroupBox("Threat Score Weights")
+        weights_grp_lay = QVBoxLayout(weights_grp)
+        weights_grp_lay.setSpacing(3)
+        weights_grp_lay.addWidget(QLabel("Higher = more important:"))
 
         self._weight_sliders = {}
         self._weight_value_labels = {}
@@ -7099,14 +7267,21 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             row.addWidget(val_lbl)
             self._weight_sliders[key] = slider
             self._weight_value_labels[key] = val_lbl
-            lay.addLayout(row)
+            weights_grp_lay.addLayout(row)
+
+        lay.addWidget(self._collapsible(weights_grp, collapsed=False))
+
+        # ── ML Scoring Refinement ─────────────────────────────────────────
+        ml_grp = QGroupBox("ML Scoring Refinement")
+        ml_grp_lay = QVBoxLayout(ml_grp)
+        ml_grp_lay.setSpacing(4)
 
         # ML toggle
         self._chk_ml = QCheckBox("Enable ML scoring refinement (requires sklearn)")
         self._chk_ml.setChecked(self.config.threat_scoring.use_ml_model)
         self._chk_ml.toggled.connect(self._on_scoring_changed)
         self._apply_tooltip(self._chk_ml, "ml_refinement")
-        lay.addWidget(self._chk_ml)
+        ml_grp_lay.addWidget(self._chk_ml)
 
         # ML training mode toggle
         self._chk_log_ml_training = QCheckBox("Log for ML Training")
@@ -7116,7 +7291,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             "Enable to capture manual fire events for ML model training. "
             "When enabled, each time you fire, that decision will be logged as training data."
         )
-        lay.addWidget(self._chk_log_ml_training)
+        ml_grp_lay.addWidget(self._chk_log_ml_training)
 
         # ML training buttons
         ml_btn_lay = QHBoxLayout()
@@ -7151,13 +7326,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._style_button_row([btn_clear], "danger")
 
         ml_btn_lay.addStretch()
-        
-        lay.addLayout(ml_btn_lay)
+        ml_grp_lay.addLayout(ml_btn_lay)
 
         self._lbl_ml_status = QLabel("")
         self._lbl_ml_status.setWordWrap(True)
         self._set_theme_role(self._lbl_ml_status, "mutedCompact")
-        lay.addWidget(self._lbl_ml_status)
+        ml_grp_lay.addWidget(self._lbl_ml_status)
 
         self._lbl_ml_description = QLabel(
             "How it works: the hand-tuned threat score always runs first. Optional ML refinement only changes final ranking after "
@@ -7166,7 +7340,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         )
         self._lbl_ml_description.setWordWrap(True)
         self._set_theme_role(self._lbl_ml_description, "mutedCompact")
-        lay.addWidget(self._lbl_ml_description)
+        ml_grp_lay.addWidget(self._lbl_ml_description)
+
+        lay.addWidget(self._collapsible(ml_grp, collapsed=True))
 
         self._refresh_ml_feature_status()
 
@@ -7208,7 +7384,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_engagement_preset.setWordWrap(True)
         self._set_theme_role(self._lbl_engagement_preset, "mutedCompact")
         preset_lay.addWidget(self._lbl_engagement_preset)
-        lay.addWidget(preset_grp)
+        lay.addWidget(self._collapsible(preset_grp, collapsed=False))
 
         # Auto-Trigger toggle (prominent)
         self._chk_auto_trigger = QCheckBox("Auto-Trigger")
@@ -7270,7 +7446,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._set_theme_role(self._lbl_trigger_mosfet_status, "statusStrong")
         trigger_mosfet_lay.addWidget(self._lbl_trigger_mosfet_status, 2, 0, 1, 4)
 
-        lay.addWidget(self._grp_trigger_mosfet)
+        self._section_trigger_mosfet = self._collapsible(self._grp_trigger_mosfet, collapsed=False)
+        lay.addWidget(self._section_trigger_mosfet)
 
         self._grp_trigger_servo = QGroupBox("Projectile Trigger Servo")
         trigger_servo_lay = QGridLayout(self._grp_trigger_servo)
@@ -7311,7 +7488,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._set_theme_role(self._lbl_trigger_servo_status, "statusStrong")
         trigger_servo_lay.addWidget(self._lbl_trigger_servo_status, 2, 0, 1, 4)
 
-        lay.addWidget(self._grp_trigger_servo)
+        self._section_trigger_servo = self._collapsible(self._grp_trigger_servo, collapsed=False)
+        lay.addWidget(self._section_trigger_servo)
         self._refresh_trigger_mosfet_summary()
         self._refresh_trigger_servo_summary()
         self._sync_trigger_mode_panel_visibility()
@@ -7421,8 +7599,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         prec_lay.addWidget(QLabel("Settle time (s):"), 1, 0)
         self._spin_prec_settle = QDoubleSpinBox()
-        self._spin_prec_settle.setRange(0.1, 3.0)
-        self._spin_prec_settle.setSingleStep(0.1)
+        self._spin_prec_settle.setRange(0.02, 3.0)
+        self._spin_prec_settle.setSingleStep(0.01)
         self._spin_prec_settle.setValue(self.config.engagement.precision_settle_time)
         self._spin_prec_settle.valueChanged.connect(self._on_engagement_changed)
         self._apply_tooltip(self._spin_prec_settle, "precision_settle")
@@ -7437,7 +7615,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._spin_prec_step, "precision_step")
         prec_lay.addWidget(self._spin_prec_step, 2, 1)
 
-        lay.addWidget(prec_grp)
+        lay.addWidget(self._collapsible(prec_grp, collapsed=True))
 
         advanced_grp = QGroupBox("Advanced Aim Lock And Fire Gate")
         advanced_lay = QGridLayout(advanced_grp)
@@ -7755,7 +7933,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         self._update_center_fire_radius_hint()
 
-        lay.addWidget(advanced_grp)
+        lay.addWidget(self._collapsible(advanced_grp, collapsed=True))
 
         self._set_engagement_preset_label(self._match_engagement_preset_name())
         tuning_grp = QGroupBox("Precision Tuning Data Logger")
@@ -7780,7 +7958,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         export_row.addWidget(btn_summary)
         self._style_button_row([btn_export_csv, btn_export_json, btn_summary], "utility")
         tuning_lay.addLayout(export_row)
-        lay.addWidget(tuning_grp)
+        lay.addWidget(self._collapsible(tuning_grp, collapsed=True))
 
         self._update_size_ratio_hints()
 
@@ -7982,7 +8160,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         btn_set_rest.clicked.connect(self._set_current_as_rest)
         btn_row.addWidget(btn_set_rest)
         static_lay.addLayout(btn_row)
-        lay.addWidget(static_grp)
+        lay.addWidget(self._collapsible(static_grp, collapsed=False))
 
         # --- Sweep settings (mode 1) ---
         self._grp_sweep = QGroupBox("Sweep Settings")
@@ -8023,7 +8201,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._spin_sweep_speed, "sweep_speed")
         sr2.addWidget(self._spin_sweep_speed)
         sweep_lay.addLayout(sr2)
-        lay.addWidget(self._grp_sweep)
+        self._section_sweep = self._collapsible(self._grp_sweep, collapsed=False)
+        lay.addWidget(self._section_sweep)
 
         # --- Waypoint settings (mode 2) ---
         self._grp_waypoint = QGroupBox("Waypoint Patrol")
@@ -8073,7 +8252,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._spin_wp_speed, "waypoint_speed")
         wr1.addWidget(self._spin_wp_speed)
         wp_lay.addLayout(wr1)
-        lay.addWidget(self._grp_waypoint)
+        self._section_waypoint = self._collapsible(self._grp_waypoint, collapsed=False)
+        lay.addWidget(self._section_waypoint)
 
         # --- Random scan settings (mode 3) ---
         self._grp_random = QGroupBox("Random Scan")
@@ -8132,7 +8312,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._spin_rnd_speed, "random_speed")
         rr3.addWidget(self._spin_rnd_speed)
         rnd_lay.addLayout(rr3)
-        lay.addWidget(self._grp_random)
+        self._section_random = self._collapsible(self._grp_random, collapsed=False)
+        lay.addWidget(self._section_random)
 
         # --- Camera FOV ---
         fov_grp = QGroupBox("Camera FOV")
@@ -8157,7 +8338,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._spin_vfov, "camera_vfov")
         row3.addWidget(self._spin_vfov)
         fov_lay.addLayout(row3)
-        lay.addWidget(fov_grp)
+        lay.addWidget(self._collapsible(fov_grp, collapsed=False))
 
         scope_grp = QGroupBox("Scope View")
         scope_lay = QVBoxLayout(scope_grp)
@@ -8191,7 +8372,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         scope_vignette_row.addWidget(self._spin_scope_vignette)
         scope_lay.addLayout(scope_vignette_row)
 
-        lay.addWidget(scope_grp)
+        lay.addWidget(self._collapsible(scope_grp, collapsed=True))
 
         mask_grp = QGroupBox("No-Fire Masks")
         mask_lay = QVBoxLayout(mask_grp)
@@ -8272,7 +8453,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(self._btn_mask_trace_dump, "mask_trace_dump")
         mask_lay.addWidget(self._btn_mask_trace_dump)
 
-        lay.addWidget(mask_grp)
+        lay.addWidget(self._collapsible(mask_grp, collapsed=True))
 
         # --- PIR Guard (Blind-Spot Detection) ---
         pir_grp = QGroupBox("PIR Guard (Blind-Spot Detection)")
@@ -8441,7 +8622,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_pir_status = QLabel("Status: Idle")
         pir_lay.addWidget(self._lbl_pir_status)
 
-        lay.addWidget(pir_grp)
+        lay.addWidget(self._collapsible(pir_grp, collapsed=True))
 
         acoustic_grp = QGroupBox("Acoustic Guard (USB Microphone)")
         acoustic_lay = QVBoxLayout(acoustic_grp)
@@ -8531,7 +8712,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_acoustic_status = QLabel("Status: adaptive baseline active when enabled")
         acoustic_lay.addWidget(self._lbl_acoustic_status)
 
-        lay.addWidget(acoustic_grp)
+        lay.addWidget(self._collapsible(acoustic_grp, collapsed=True))
 
         # Overlay toggles
         self._chk_overlay = QCheckBox("Show overlay")
@@ -8623,7 +8804,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_face_runtime_status.setWordWrap(True)
         self._set_theme_role(self._lbl_face_runtime_status, "mutedCompact")
         runtime_lay.addWidget(self._lbl_face_runtime_status, 6, 0, 1, 2)
-        lay.addWidget(runtime_grp)
+        lay.addWidget(self._collapsible(runtime_grp, collapsed=False))
 
         enroll_grp = QGroupBox("Known Faces")
         enroll_lay = QGridLayout(enroll_grp)
@@ -8667,7 +8848,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._set_button_role(btn_remove_face, "utility")
         btn_remove_face.clicked.connect(self._remove_selected_face_profile)
         enroll_lay.addWidget(btn_remove_face, 6, 2)
-        lay.addWidget(enroll_grp)
+        lay.addWidget(self._collapsible(enroll_grp, collapsed=False))
 
         test_row = QHBoxLayout()
         btn_test = QPushButton("Test Frame")
@@ -8732,7 +8913,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         btn_row.addStretch(1)
         self._register_responsive_box_layout(btn_row, "dense_row")
         global_lay.addLayout(btn_row)
-        lay.addWidget(global_grp)
+        lay.addWidget(self._collapsible(global_grp, collapsed=False))
 
         behavior_grp = QGroupBox("Assigned Keys")
         behavior_lay = QVBoxLayout(behavior_grp)
@@ -8740,7 +8921,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_shortcut_keys.setWordWrap(True)
         self._set_theme_role(self._lbl_shortcut_keys, "subtleBody")
         behavior_lay.addWidget(self._lbl_shortcut_keys)
-        lay.addWidget(behavior_grp)
+        lay.addWidget(self._collapsible(behavior_grp, collapsed=True))
 
         lay.addStretch()
         self._update_shortcut_labels()
@@ -8852,9 +9033,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         btn_check_provider.clicked.connect(self._refresh_ai_provider_status)
         session_lay.addWidget(btn_check_provider, 12, 1)
 
-        lay.addWidget(session_grp)
+        lay.addWidget(self._collapsible(session_grp, collapsed=False))
 
-        lay.addWidget(self._build_ai_voice_validation_group())
+        lay.addWidget(self._collapsible(self._build_ai_voice_validation_group(), collapsed=True))
 
         coach_grp = QGroupBox("Assistant Workspace")
         coach_lay = QVBoxLayout(coach_grp)
@@ -8920,7 +9101,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         self._tabs_ai_workspace.addTab(self._ai_runtime_page, "Runtime Analyst")
         coach_lay.addWidget(self._tabs_ai_workspace)
-        lay.addWidget(coach_grp)
+        lay.addWidget(self._collapsible(coach_grp, collapsed=False))
 
         lay.addStretch()
         self._set_ai_model_tier(str(getattr(self.config.ai_assistant, "preferred_model_tier", "fast") or "fast"), persist=False)
@@ -9076,7 +9257,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._register_responsive_button_grid(quick_lay)
         self._reflow_responsive_button_grid(quick_lay)
 
-        lay.addWidget(quick_grp)
+        lay.addWidget(self._collapsible(quick_grp, collapsed=False))
 
         rest_grp = QGroupBox("Rest Position")
         rest_lay = QGridLayout(rest_grp)
@@ -9123,7 +9304,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._apply_tooltip(btn_set_rest_current, "set_current_rest")
         rest_lay.addWidget(btn_set_rest_current, 2, 0, 1, 2)
 
-        lay.addWidget(rest_grp)
+        lay.addWidget(self._collapsible(rest_grp, collapsed=True))
 
         # --- D-pad manual movement ---
         dpad_grp = QGroupBox("Manual Turret Control")
@@ -9327,7 +9508,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._btn_manual_sweep.setToolTip("Run a slow manual sweep using the configured sweep pan range and tilt limits")
         dpad_lay.addWidget(self._btn_manual_sweep)
 
-        lay.addWidget(dpad_grp)
+        lay.addWidget(self._collapsible(dpad_grp, collapsed=False))
 
         # --- Outputs ---
         acc_grp = QGroupBox("Bridge Outputs")
@@ -9371,7 +9552,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._set_theme_role(self._lbl_optional_outputs_status, "statusStrong")
         acc_lay.addWidget(self._lbl_optional_outputs_status, 2, 0, 1, 3)
 
-        lay.addWidget(acc_grp)
+        lay.addWidget(self._collapsible(acc_grp, collapsed=True))
 
         # --- Auto Lighting Control ---
         lighting_grp = QGroupBox("Auto Lighting Control")
@@ -9437,7 +9618,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._set_theme_role(self._lbl_auto_luma, "mutedCompact")
         lighting_lay.addWidget(self._lbl_auto_luma)
 
-        lay.addWidget(lighting_grp)
+        lay.addWidget(self._collapsible(lighting_grp, collapsed=True))
 
         source_grp = QGroupBox("Source And Interlocks")
         source_lay = QVBoxLayout(source_grp)
@@ -9619,8 +9800,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._refresh_sound_toggle_text()
         self._sync_sound_widgets()
 
-        lay.addWidget(source_grp)
-        lay.addWidget(fire_grp)
+        lay.addWidget(self._collapsible(source_grp, collapsed=True))
+        lay.addWidget(self._collapsible(fire_grp, collapsed=True))
 
         lay.addStretch()
         return w
@@ -10250,6 +10431,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         include_target_boxes: bool = True,
         include_scope_view: bool = True,
     ) -> np.ndarray:
+        if self._overlay_display_mode == OVERLAY_MODE_NONE:
+            return frame.copy()
+        if self._overlay_display_mode == OVERLAY_MODE_MINIMAL:
+            display = frame.copy()
+            self._draw_minimal_overlay(display, include_target_boxes=include_target_boxes)
+            return display
+
         display = frame.copy()
         display = self.overlay.draw(display, self.engine, include_target_boxes=include_target_boxes)
         self._draw_face_identity_overlays(display, list(getattr(self, "_last_face_matches", []) or []))
@@ -10340,15 +10528,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 fault_active = bool(current_fault)
 
             if safety_locked:
-                self._queue_comm_task("set_safety", True, self.engine.current_pan, self.engine.current_tilt)
-                self._safety_armed = True
-                if hasattr(self, "_btn_safety") and self._btn_safety is not None:
-                    self._btn_safety.blockSignals(True)
-                    self._btn_safety.setChecked(True)
-                    self._btn_safety.setText("Safety: ARMED")
-                    self._btn_safety.blockSignals(False)
-                self._log("Auto-fire pre-arm sync: runtime safety LOCKED (S1), sent S0 arm request")
-                return
+                self._apply_safety_arm_sync(
+                    pan=self.engine.current_pan,
+                    tilt=self.engine.current_tilt,
+                    reason_log="Auto-fire pre-arm sync: runtime safety LOCKED (S1), arming now (S0)",
+                )
             if fault_active:
                 self._log(f"Auto-fire blocked: runtime fault active ({current_fault})")
                 return
@@ -10933,15 +11117,15 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_mode_hint.setText(self._MODE_HINTS[m])
         self._btn_wifi_pinout.setText(self._pin_assignment_button_text(m))
         # ESP32 serial panel: modes 0, 1
-        self._grp_esp32_serial.setVisible(m in (0, 1))
+        getattr(self, "_section_esp32_serial", self._grp_esp32_serial).setVisible(m in (0, 1))
         # Debug board serial panel: modes 1, 2
-        self._grp_debug_serial.setVisible(m in (1, 2))
+        getattr(self, "_section_debug_serial", self._grp_debug_serial).setVisible(m in (1, 2))
         # Servo panel: modes 1, 2 (bus servo)
-        self._grp_servo.setVisible(m in (1, 2))
+        getattr(self, "_section_servo", self._grp_servo).setVisible(m in (1, 2))
         # UDP panel: modes 2, 3
-        self._grp_udp.setVisible(m in (2, 3))
+        getattr(self, "_section_udp", self._grp_udp).setVisible(m in (2, 3))
         # Secondary ESP32 UDP panel: mode 4
-        self._grp_servo_udp.setVisible(m == 4)
+        getattr(self, "_section_servo_udp", self._grp_servo_udp).setVisible(m == 4)
 
     def _scan_ports(self, target: str = "esp32") -> None:
         combo = self._combo_esp32_ports if target == "esp32" else self._combo_debug_ports
@@ -13054,11 +13238,15 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         motion_modes = {4, 5}
         motion_sensitive_modes = {0, 1, 3, 4, 5, 7, 8, 10}
 
-        self._grp_contour.setVisible(mode in contour_modes)
-        self._grp_yolo.setVisible(mode in yolo_modes)
-        self._grp_color.setVisible(mode in color_modes)
-        self._grp_motion.setVisible(mode in motion_modes)
-        self._grp_motion_recovery.setVisible(mode in motion_sensitive_modes)
+        # Use section wrappers for visibility so the collapse header also hides
+        for section, modes in [
+            (getattr(self, "_section_contour", self._grp_contour), contour_modes),
+            (getattr(self, "_section_yolo", self._grp_yolo), yolo_modes),
+            (getattr(self, "_section_color", self._grp_color), color_modes),
+            (getattr(self, "_section_motion", self._grp_motion), motion_modes),
+            (getattr(self, "_section_motion_recovery", self._grp_motion_recovery), motion_sensitive_modes),
+        ]:
+            section.setVisible(mode in modes)
 
     def _update_mode_description(self) -> None:
         descs = {
@@ -13612,9 +13800,15 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._log(f"Guard mode: {modes[index]}")
 
     def _update_guard_mode_visibility(self, mode: int) -> None:
-        self._grp_sweep.setVisible(mode == 1)
-        self._grp_waypoint.setVisible(mode == 2)
-        self._grp_random.setVisible(mode == 3)
+        sweep_widget = getattr(self, "_section_sweep", getattr(self, "_grp_sweep", None))
+        waypoint_widget = getattr(self, "_section_waypoint", getattr(self, "_grp_waypoint", None))
+        random_widget = getattr(self, "_section_random", getattr(self, "_grp_random", None))
+        if sweep_widget is not None:
+            sweep_widget.setVisible(mode == 1)
+        if waypoint_widget is not None:
+            waypoint_widget.setVisible(mode == 2)
+        if random_widget is not None:
+            random_widget.setVisible(mode == 3)
 
     def _wp_add_current(self) -> None:
         pan = self.engine.current_pan
@@ -13644,6 +13838,94 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self.config.show_no_fire_masks = self._chk_show_no_fire_masks.isChecked()
         self.overlay.update_config(self.config)
         self._note_sound_settings_changed()
+
+    def _normalize_overlay_display_mode(self, mode: str) -> str:
+        mode_text = str(mode or "").strip().lower()
+        if mode_text not in OVERLAY_MODE_SEQUENCE:
+            return OVERLAY_MODE_SHOW_ALL
+        return mode_text
+
+    def _sync_overlay_display_mode_button(self) -> None:
+        if not hasattr(self, "_btn_overlay_mode") or self._btn_overlay_mode is None:
+            return
+        mode = self._normalize_overlay_display_mode(getattr(self, "_overlay_display_mode", OVERLAY_MODE_SHOW_ALL))
+        self._btn_overlay_mode.setText(f"Overlay: {OVERLAY_MODE_LABELS.get(mode, 'SHOW ALL')}")
+
+    def _set_overlay_display_mode(self, mode: str, *, save: bool = True, log_change: bool = True) -> None:
+        normalized = self._normalize_overlay_display_mode(mode)
+        if normalized == self._overlay_display_mode:
+            self._sync_overlay_display_mode_button()
+            return
+        self._overlay_display_mode = normalized
+        self.config.overlay_display_mode = normalized
+        self._sync_overlay_display_mode_button()
+        self._force_next_display_refresh = True
+        if save:
+            self._save_config_quietly()
+        if log_change:
+            self._log(f"Overlay mode: {OVERLAY_MODE_LABELS.get(normalized, 'SHOW ALL')}")
+
+    def _cycle_overlay_display_mode(self) -> None:
+        current = self._normalize_overlay_display_mode(getattr(self, "_overlay_display_mode", OVERLAY_MODE_SHOW_ALL))
+        try:
+            idx = OVERLAY_MODE_SEQUENCE.index(current)
+        except ValueError:
+            idx = 0
+        next_mode = OVERLAY_MODE_SEQUENCE[(idx + 1) % len(OVERLAY_MODE_SEQUENCE)]
+        self._set_overlay_display_mode(next_mode)
+
+    def _draw_minimal_overlay(self, frame: np.ndarray, *, include_target_boxes: bool) -> None:
+        h, w = frame.shape[:2]
+        cx, cy = w // 2, h // 2
+        crosshair_col = (180, 255, 180)
+        half_gap = max(6, min(w, h) // 80)
+        half_arm = max(16, min(w, h) // 18)
+        cv2.line(frame, (cx - half_arm, cy), (cx - half_gap, cy), crosshair_col, 1, cv2.LINE_AA)
+        cv2.line(frame, (cx + half_gap, cy), (cx + half_arm, cy), crosshair_col, 1, cv2.LINE_AA)
+        cv2.line(frame, (cx, cy - half_arm), (cx, cy - half_gap), crosshair_col, 1, cv2.LINE_AA)
+        cv2.line(frame, (cx, cy + half_gap), (cx, cy + half_arm), crosshair_col, 1, cv2.LINE_AA)
+
+        if not include_target_boxes:
+            return
+
+        max_targets = max(1, int(getattr(self.config.engagement, "max_queue_length", 1) or 1))
+        ordered_targets = []
+        seen_track_ids = set()
+
+        active_order = getattr(self.engine, "active_order", None)
+        active_target = getattr(active_order, "target", None)
+        active_det = getattr(active_target, "det", None)
+        active_track_id = int(getattr(active_det, "track_id", -1) or -1)
+        if active_track_id >= 0:
+            for target in list(getattr(self.engine, "last_targets", []) or []):
+                det = getattr(target, "det", None)
+                track_id = int(getattr(det, "track_id", -1) or -1)
+                if track_id == active_track_id:
+                    ordered_targets.append(target)
+                    seen_track_ids.add(track_id)
+                    break
+            else:
+                ordered_targets.append(active_target)
+                seen_track_ids.add(active_track_id)
+
+        for target in list(getattr(self.engine, "last_targets", []) or []):
+            det = getattr(target, "det", None)
+            track_id = int(getattr(det, "track_id", -1) or -1)
+            if track_id in seen_track_ids:
+                continue
+            ordered_targets.append(target)
+            seen_track_ids.add(track_id)
+            if len(ordered_targets) >= max_targets:
+                break
+
+        for idx, target in enumerate(ordered_targets[:max_targets]):
+            det = getattr(target, "det", None)
+            bbox = getattr(det, "bbox", None)
+            if not bbox or len(bbox) < 4:
+                continue
+            bx, by, bw, bh = [int(v) for v in bbox[:4]]
+            col = (90, 255, 180) if idx == 0 else (255, 210, 90)
+            cv2.rectangle(frame, (bx, by), (bx + bw, by + bh), col, 1, cv2.LINE_AA)
 
     def _populate_camera_resolution_combo(self, width: int, height: int) -> None:
         self._combo_cam_resolution.blockSignals(True)
@@ -14129,10 +14411,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _sync_trigger_mode_panel_visibility(self) -> None:
         is_bb = bool(self._combo_trigger_mode.currentIndex() == 1) if hasattr(self, "_combo_trigger_mode") else bool(self.config.engagement.trigger_mode_bb)
-        if hasattr(self, "_grp_trigger_mosfet"):
-            self._grp_trigger_mosfet.setVisible(not is_bb)
-        if hasattr(self, "_grp_trigger_servo"):
-            self._grp_trigger_servo.setVisible(is_bb)
+        mosfet_widget = getattr(self, "_section_trigger_mosfet", getattr(self, "_grp_trigger_mosfet", None))
+        servo_widget = getattr(self, "_section_trigger_servo", getattr(self, "_grp_trigger_servo", None))
+        if mosfet_widget is not None:
+            mosfet_widget.setVisible(not is_bb)
+        if servo_widget is not None:
+            servo_widget.setVisible(is_bb)
         if hasattr(self, "_combo_trigger_mode_qa"):
             self._combo_trigger_mode_qa.blockSignals(True)
             self._combo_trigger_mode_qa.setCurrentIndex(1 if is_bb else 0)
@@ -14483,22 +14767,37 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _on_safety_toggled(self, checked: bool) -> None:
         self._safety_armed = checked
+        self._comm.safety_armed = bool(checked)
         self._btn_safety.setText(f"Safety: {'ARMED' if checked else 'LOCKED'}")
         if not self._host_controls_hardware():
             self._queue_comm_task("set_safety", checked, self.engine.current_pan, self.engine.current_tilt)
 
+    def _apply_safety_arm_sync(self, *, pan: float, tilt: float, reason_log: str) -> None:
+        """Synchronize local/UI/comm safety state so a fire command can proceed immediately."""
+        self._safety_armed = True
+        self._comm.safety_armed = True
+        if hasattr(self, "_btn_safety") and self._btn_safety is not None:
+            self._btn_safety.blockSignals(True)
+            self._btn_safety.setChecked(True)
+            self._btn_safety.setText("Safety: ARMED")
+            self._btn_safety.blockSignals(False)
+        if hasattr(self, "_btn_safety_qa"):
+            self._sync_qa_btn(self._btn_safety_qa, True)
+        if not self._host_controls_hardware():
+            self._queue_comm_task("set_safety", True, float(pan), float(tilt))
+        self._log(reason_log)
+
     def _on_manual_fire(self, state: int) -> None:
         host_controls_hardware = self._host_controls_hardware()
         if state and not self._safety_armed:
-            self._log("Manual fire blocked: Safety is LOCKED")
-            if not host_controls_hardware:
-                self._queue_comm_task("send_command",
-                    self.engine.current_pan,
-                    self.engine.current_tilt,
-                    fire=0,
-                    move_time_ms=self._get_manual_move_time_ms(),
-                )
-            return
+            if host_controls_hardware:
+                self._log("Manual fire blocked: Safety is LOCKED")
+                return
+            self._apply_safety_arm_sync(
+                pan=self.engine.current_pan,
+                tilt=self.engine.current_tilt,
+                reason_log="Manual fire pre-arm sync: Safety was LOCKED (S1), arming now (S0)",
+            )
         pan = self.engine.current_pan
         tilt = self.engine.current_tilt
         if state and not host_controls_hardware:
