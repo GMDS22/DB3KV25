@@ -41,3 +41,9 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Generated runtime exports and local recovery bundles
+snapshots/change_backups/
+snapshots/serial_log_exports/
+snapshots/sentry_v2_runtime_snapshot_*.json
+snapshots/sentry_v2_runtime_snapshot_*.md
