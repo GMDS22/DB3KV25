@@ -1,6 +1,15 @@
 ﻿{
     "updates":  [
                     {
+                        "version":  "3.5.2",
+                        "fix":  "Hardened release build protocol and helper so every package must include current canonical runtime settings and current canonical custom profiles. Added pre-build canonical file existence checks plus post-build packaged-surface verification with custom-presets parity validation.",
+                        "category":  "Build/Docs",
+                        "date":  "2026-05-01",
+                        "issue":  "ISS-096",
+                        "title":  "Release packaging hardening: always include current settings and custom profiles",
+                        "status":  "Worked"
+                    },
+                    {
                         "version":  "3.5.1",
                         "fix":  "Restored speed tuning lost in regression: engagement_speed 40→82, bus_servo_time_ms 60→48, motion_ignore_after_move_s 0.08→0.05. Fixed overshooting with reversal_brake 0.24→0.15 and reduced step sizes. Loosened fire gate significantly (enter tolerance 2.2→3.5, hold_time 0.1→0.05, min_confidence 0.45→0.4). Extended loss recovery (timeout 1.4→2.0s, search_rounds 4→6). Simplified fire gate logic by removing stability check. Rewrote blueprint sections 3 & 7 for clarity, added troubleshooting guide. Auto-trigger now fires reliably, tracking is responsive, no more overshoot.",
                         "category":  "Engine/Config/Docs",

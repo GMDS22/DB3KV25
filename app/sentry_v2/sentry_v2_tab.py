@@ -3749,9 +3749,16 @@ class SentryV2TabWidget(QWidget):
     def _guided_move_profile(self, maneuver: str, start_pan: float, start_tilt: float) -> Tuple[float, float, float]:
         guard = self.config.guard
         approach_window = float(max(4.0, getattr(guard, "guided_move_approach_window_deg", 18.0) or 18.0))
+
+        def _smoothed_approach(cruise: float, approach: float) -> float:
+            # Keep end-of-move deceleration smooth by preventing a very deep
+            # speed drop that can feel like a second "phase" near the target.
+            return max(1.0, max(float(approach), float(cruise) * 0.78))
+
         if maneuver == "rest":
             cruise_speed = float(max(2.0, getattr(guard, "rest_move_speed_dps", 14.0) or 14.0))
             approach_speed = float(max(1.0, getattr(guard, "rest_move_approach_speed_dps", 5.0) or 5.0))
+            approach_speed = _smoothed_approach(cruise_speed, approach_speed)
             return cruise_speed, min(cruise_speed, approach_speed), approach_window
 
         cruise_speed = float(max(2.0, getattr(guard, "home_move_speed_dps", 24.0) or 24.0))
@@ -3759,6 +3766,7 @@ class SentryV2TabWidget(QWidget):
         if self._is_near_rest_position(start_pan, start_tilt, tolerance_deg=max(6.0, approach_window * 0.45)):
             cruise_speed *= 0.72
             approach_speed *= 0.65
+        approach_speed = _smoothed_approach(cruise_speed, approach_speed)
         return cruise_speed, min(cruise_speed, approach_speed), approach_window
 
     def _build_guided_move_steps(

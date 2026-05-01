@@ -146,6 +146,56 @@ function Assert-RequiredReleaseArtifacts([string]$buildRoot, [string]$exeName, [
     }
 }
 
+function Assert-CanonicalConfigFilesExist([string]$sourceConfigDir, [string[]]$fileNames) {
+    $missing = @()
+    foreach ($name in $fileNames) {
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            continue
+        }
+        $path = Join-Path $sourceConfigDir $name
+        if (-not (Test-Path $path)) {
+            $missing += $path
+        }
+    }
+    if ($missing.Count -gt 0) {
+        $missingList = ($missing | ForEach-Object { " - $_" }) -join [Environment]::NewLine
+        throw "Missing canonical runtime config/profile files. Build must package current saved operator settings and custom profiles:`n$missingList"
+    }
+}
+
+function Assert-PackagedCanonicalConfigFiles(
+    [string]$sourceConfigDir,
+    [string]$packagedConfigDir,
+    [string[]]$requiredFileNames,
+    [string[]]$sourceHashLockedFileNames = @()
+) {
+    foreach ($name in $requiredFileNames) {
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            continue
+        }
+        $packagedPath = Join-Path $packagedConfigDir $name
+        if (-not (Test-Path $packagedPath)) {
+            throw "Packaged config surface is incomplete. Missing required canonical file: $packagedPath"
+        }
+    }
+
+    foreach ($name in $sourceHashLockedFileNames) {
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            continue
+        }
+        $sourcePath = Join-Path $sourceConfigDir $name
+        $packagedPath = Join-Path $packagedConfigDir $name
+        if (-not (Test-Path $sourcePath) -or -not (Test-Path $packagedPath)) {
+            throw "Unable to verify canonical profile parity for: $name"
+        }
+        $sourceHash = (Get-FileHash -Path $sourcePath -Algorithm SHA256).Hash
+        $packagedHash = (Get-FileHash -Path $packagedPath -Algorithm SHA256).Hash
+        if ($sourceHash -ne $packagedHash) {
+            throw "Packaged custom profile does not match current saved source profile: $name"
+        }
+    }
+}
+
 function Assert-PythonModulesAvailable([string]$pythonCommand, [string[]]$moduleNames) {
     foreach ($moduleName in $moduleNames) {
         & $pythonCommand -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('$moduleName') else 1)"
@@ -351,6 +401,15 @@ $canonicalSettingsName = "smart_sentry_settings.json"
 $canonicalPresetsName = "smart_sentry_custom_presets.json"
 $canonicalPromptedTargetsName = "smart_sentry_prompted_targets.json"
 $canonicalFacesName = "smart_sentry_faces.json"
+$canonicalConfigFileNames = @(
+    $canonicalSettingsName,
+    $canonicalPresetsName,
+    $canonicalPromptedTargetsName,
+    $canonicalFacesName
+)
+$sourceHashLockedConfigFileNames = @(
+    $canonicalPresetsName
+)
 $canonicalSettingsRelativePath = "app/config/$canonicalSettingsName"
 $canonicalPromptedTargetsRelativePath = "app/config/$canonicalPromptedTargetsName"
 $canonicalFacesRelativePath = "app/config/$canonicalFacesName"
@@ -392,6 +451,8 @@ $recentUpdatesPath = Join-Path $repoRoot 'RECENT_UPDATES.json'
 $releaseVersionPath = $activeVersionMetadata.MarkerPath
 $db3kVersionPath = Join-Path $repoRoot 'DB3K_VERSION.txt'
 $rootModelsPath = Join-Path $repoRoot 'YOLO_MODELS'
+
+Assert-CanonicalConfigFilesExist -sourceConfigDir $appConfigPath -fileNames $canonicalConfigFileNames
 
 if (-not (Test-Path $activeLauncherPath)) {
     throw "App launcher was not found: $activeLauncherPath"
@@ -596,6 +657,9 @@ Patch-BundledUltralyticsGit -contentsDirPath (Join-Path $releaseDir $releaseCont
 if ($bundleModels) {
     Set-PackagedConfigSurface -configPath (Join-Path $releaseDir "$releaseContentsDirName\app\config\$canonicalSettingsName") -settingsRelativePath $canonicalSettingsRelativePath -promptedRelativePath $canonicalPromptedTargetsRelativePath -faceRelativePath $canonicalFacesRelativePath -modelDir (Join-Path $releaseDir 'YOLO_MODELS') -udpHost $canonicalUdpHost -udpPort $canonicalUdpPort
 }
+
+$packagedCanonicalConfigDir = Join-Path $releaseDir "$releaseContentsDirName\app\config"
+Assert-PackagedCanonicalConfigFiles -sourceConfigDir $appConfigPath -packagedConfigDir $packagedCanonicalConfigDir -requiredFileNames $canonicalConfigFileNames -sourceHashLockedFileNames $sourceHashLockedConfigFileNames
 
 foreach ($path in @($distRoot, $workRoot, $specRoot, $legacyBuildRoot)) {
     if (Test-Path $path) {

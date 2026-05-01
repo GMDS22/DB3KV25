@@ -15,6 +15,7 @@ If any older protocol document conflicts with this file, this file wins.
   - `app/config/smart_sentry_faces.json`
 - Legacy `smart_sentry_v*_*.json` files are migration inputs only.
 - Build output drive remains `F:` unless the build helper is intentionally changed.
+- Every release build must include the current saved canonical runtime settings and current saved canonical custom profile file from source `app/config/`.
 
 ## 2. Source of truth files
 
@@ -60,11 +61,15 @@ Verify release folder `F:\SMART SENTRY V<version>`:
 - `app/config/smart_sentry_prompted_targets.json`
 - `app/config/smart_sentry_faces.json`
 
+2.1 Canonical profile parity rule:
+- Packaged `app/config/smart_sentry_custom_presets.json` must match the source file byte-for-byte (same custom profiles/operators presets).
+
 3. In packaged `smart_sentry_settings.json`, verify:
 - `config_path` is `app/config/smart_sentry_settings.json`
 - `prompted_library_path` is `app/config/smart_sentry_prompted_targets.json`
 - `face_recognition.library_path` is `app/config/smart_sentry_faces.json`
 - `detection_mode.yolo_model_dir` points to release-root `YOLO_MODELS`
+- all operator-tuned values (guard/rest/waypoints and engagement tuning) remain present except intentional packaging overrides above
 
 4. Launch packaged exe once and confirm title identity resolves to `SMART SENTRY V<version>`.
 5. Verify one graceful shutdown pass switches outputs off and safety lock before transport disconnect.

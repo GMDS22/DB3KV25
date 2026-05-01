@@ -25,8 +25,8 @@
     "detection_mode": 2,
     "min_contour_area": 2340.0,
     "max_contour_area": 2341.0,
-    "yolo_model_name": "ratdogcat_last.pt",
-    "yolo_model_dir": "",
+    "yolo_model_name": "yolov8s.pt",
+    "yolo_model_dir": "F:\\SMART SENTRY_v2a\\SMART SENTRY\\YOLO_MODELS",
     "yolo_min_area": 1200,
     "yolo_confidence": 0.44,
     "color_preset": "any",
@@ -188,7 +188,7 @@
     "home_move_approach_speed_dps": 32.0,
     "rest_move_speed_dps": 46.0,
     "rest_move_approach_speed_dps": 26.0,
-    "guided_move_approach_window_deg": 10.0,
+    "guided_move_approach_window_deg": 14.0,
     "pan_min": 0.0,
     "pan_max": 270.0,
     "tilt_min": 50.0,
@@ -197,8 +197,8 @@
     "camera_vfov": 44.0,
     "pan_center_bias_deg": 0.0,
     "tilt_center_bias_deg": 0.0,
-    "frame_width": 1920,
-    "frame_height": 1080,
+    "frame_width": 1280,
+    "frame_height": 720,
     "guard_mode": 2,
     "sweep_pan_min": 0.0,
     "sweep_pan_max": 270.0,
@@ -291,7 +291,7 @@
     "search_rounds": 1
   },
   "lighting": {
-    "auto_lighting_enabled": false,
+    "auto_lighting_enabled": true,
     "led_pwm_value": 255,
     "auto_brightness_threshold": 140,
     "auto_pwm_min": 60,
@@ -315,7 +315,7 @@
     "name_announce_cooldown_s": 18.0
   },
   "acoustic_guard": {
-    "enabled": false,
+    "enabled": true,
     "source": "usb_microphone",
     "device_name": "",
     "sample_rate_hz": 16000,
@@ -383,18 +383,18 @@
   "scope_view_enabled": false,
   "scope_radius_pct": 35,
   "scope_vignette_opacity": 60,
-  "settings_panel_width": 509,
+  "settings_panel_width": 476,
   "main_splitter_sizes": [
-    1387,
-    509
+    1420,
+    476
   ],
   "layout_splitter_sizes": [
     741,
     233
   ],
   "bottom_info_splitter_sizes": [
-    794,
-    585
+    813,
+    599
   ],
   "quick_access_expanded": false,
   "quick_access_pinned": false,

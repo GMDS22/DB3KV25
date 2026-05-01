@@ -53,8 +53,9 @@ Before packaging v3.5.0, confirm all of the following:
 2. `app.smart_sentry_meta.get_version()` resolves `3.5.0`.
 3. The app title resolves to `SMART SENTRY V3.5.0` at runtime.
 4. The canonical versionless settings, presets, prompted-targets, and face-library files all exist.
-5. The close path still sends a real outputs-off state before disconnecting boards.
-6. The build helper still points packaged `detection_mode.yolo_model_dir` at the final release-root `YOLO_MODELS` folder.
+5. Confirm current saved operator settings and current saved custom profiles are present in source canonical files before running the build.
+6. The close path still sends a real outputs-off state before disconnecting boards.
+7. The build helper still points packaged `detection_mode.yolo_model_dir` at the final release-root `YOLO_MODELS` folder.
 
 ## 5. Post-Build Verification
 
@@ -62,9 +63,10 @@ After every successful build, inspect the promoted release at `F:\SMART SENTRY V
 
 1. Confirm the release root contains `SMART_SENTRY_V3.5.0.exe`, `SMART_SENTRY_V3_5_0_FILES\`, and `YOLO_MODELS\`.
 2. Confirm the packaged config directory contains the active `smart_sentry_settings.json` file.
-3. Confirm the packaged active settings file points at `app/config/smart_sentry_settings.json` and `F:\SMART SENTRY V3.5.0\YOLO_MODELS`.
-4. Launch the packaged executable once from the final release folder and confirm the title panel shows the v3.5.0 release identity.
-5. Verify one live shutdown pass closes accessories before transport disconnect.
+3. Confirm the packaged config directory contains the active `smart_sentry_custom_presets.json` file and it matches the current source custom profile file.
+4. Confirm the packaged active settings file points at `app/config/smart_sentry_settings.json` and `F:\SMART SENTRY V3.5.0\YOLO_MODELS`.
+5. Launch the packaged executable once from the final release folder and confirm the title panel shows the v3.5.0 release identity.
+6. Verify one live shutdown pass closes accessories before transport disconnect.
 
 ## 6. Historical Packaging Blockers
 

@@ -888,6 +888,8 @@ class SentryV2Engine:
         Returns True if a tracking move was issued (caller should suppress patrol).
         """
         WATCHFUL_MOVE_INTERVAL = 0.25  # max 4 move commands per second
+        WATCHFUL_DEADZONE_DEG = 0.9
+        WATCHFUL_MAX_STEP_DEG = 4.5
         raw = self.last_detections
         if not raw:
             return False
@@ -904,6 +906,15 @@ class SentryV2Engine:
             float(best.norm_cx), float(best.norm_cy),
             self.current_pan, self.current_tilt,
         )
+        dp = float(target_pan) - float(self.current_pan)
+        dtilt = float(target_tilt) - float(self.current_tilt)
+        max_axis_delta = max(abs(dp), abs(dtilt))
+        if max_axis_delta < WATCHFUL_DEADZONE_DEG:
+            return False
+        if max_axis_delta > WATCHFUL_MAX_STEP_DEG:
+            ratio = WATCHFUL_MAX_STEP_DEG / max_axis_delta
+            target_pan = float(self.current_pan) + (dp * ratio)
+            target_tilt = float(self.current_tilt) + (dtilt * ratio)
         self._behaviour_watchful_last_move = now
         self._move_turret(target_pan, target_tilt)
         return True
@@ -913,6 +924,7 @@ class SentryV2Engine:
 
         Returns True if a glance is currently active (caller should suppress patrol).
         """
+        CURIOUS_MAX_GLANCE_STEP_DEG = 8.0
         g = self.cfg.guard
         if self._behaviour_curious_glance_active:
             # Already glancing — check if dwell time is up
@@ -940,6 +952,13 @@ class SentryV2Engine:
             float(best.norm_cx), float(best.norm_cy),
             self.current_pan, self.current_tilt,
         )
+        dp = float(glance_pan) - float(self.current_pan)
+        dtilt = float(glance_tilt) - float(self.current_tilt)
+        max_axis_delta = max(abs(dp), abs(dtilt))
+        if max_axis_delta > CURIOUS_MAX_GLANCE_STEP_DEG:
+            ratio = CURIOUS_MAX_GLANCE_STEP_DEG / max_axis_delta
+            glance_pan = float(self.current_pan) + (dp * ratio)
+            glance_tilt = float(self.current_tilt) + (dtilt * ratio)
         self._behaviour_curious_glance_active = True
         self._behaviour_curious_glance_start = now
         self._behaviour_curious_glance_pan = glance_pan
