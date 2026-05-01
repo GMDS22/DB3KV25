@@ -12,7 +12,7 @@
     "pan_servo_id": 1,
     "tilt_servo_id": 2,
     "bus_servo_time_ms": 55,
-    "invert_pan": false,
+    "invert_pan": true,
     "invert_tilt": false,
     "wifi_interface": "",
     "camera_source": "0",

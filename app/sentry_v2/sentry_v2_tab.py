@@ -4197,18 +4197,6 @@ class SentryV2TabWidget(QWidget):
         _video_container_lay.setSpacing(0)
         _video_container_lay.addWidget(self._video_label, 1)
 
-        self._btn_overlay_mode = QPushButton()
-        self._set_button_role(self._btn_overlay_mode, "utility")
-        self._btn_overlay_mode.setToolTip(
-            "Cycle overlay display mode:\n"
-            "SHOW ALL: full overlay rendering\n"
-            "MINIMAL: thin crosshair + thin detection boxes only\n"
-            "NO OVERLAY: raw video"
-        )
-        self._btn_overlay_mode.clicked.connect(self._cycle_overlay_display_mode)
-        _video_container_lay.addWidget(self._btn_overlay_mode)
-        self._sync_overlay_display_mode_button()
-
         # Quick-access chip bar
         _qa_chip_bar = QWidget()
         _qa_chip_bar.setObjectName("sentryV2QAChipBar")
@@ -4362,6 +4350,25 @@ class SentryV2TabWidget(QWidget):
         )
         self._chk_auto_export_runtime_qa.toggled.connect(self._on_auto_export_runtime_toggled)
         _qa_chip_bar_lay.addWidget(self._chk_auto_export_runtime_qa)
+
+        _qa_sep_ovl = QFrame()
+        _qa_sep_ovl.setFrameShape(QFrame.VLine)
+        _qa_sep_ovl.setObjectName("qaIconSep")
+        _qa_chip_bar_lay.addWidget(_qa_sep_ovl)
+
+        self._btn_overlay_mode = QPushButton()
+        self._btn_overlay_mode.setFixedHeight(qa_icon_size)
+        self._set_button_role(self._btn_overlay_mode, "utility")
+        self._btn_overlay_mode.setToolTip(
+            "Cycle overlay display mode:\n"
+            "SHOW ALL: full overlay rendering\n"
+            "MINIMAL: thin crosshair + thin detection boxes only\n"
+            "NO OVERLAY: raw video"
+        )
+        self._btn_overlay_mode.clicked.connect(self._cycle_overlay_display_mode)
+        _qa_chip_bar_lay.addWidget(self._btn_overlay_mode)
+        self._sync_overlay_display_mode_button()
+
         _qa_chip_bar_lay.addStretch(1)
 
         _video_container_lay.addWidget(_qa_chip_bar, 0)
