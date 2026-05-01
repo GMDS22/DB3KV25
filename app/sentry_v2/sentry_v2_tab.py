@@ -104,6 +104,8 @@ from .acoustic_guard import USBMicrophoneAnomalyDetector
 from .sentry_v2_tooltips import SENTRY_V2_TOOLTIPS
 from .face_identity import FaceIdentityLibrary, FaceIdentityRuntime, FaceMatchResult
 from .sentry_v2_config import (
+    SENTRY_HOME_PAN,
+    SENTRY_HOME_TILT,
     SENTRY_PAN_MAX,
     SENTRY_PAN_MIN,
     SENTRY_TILT_MAX,
@@ -3533,14 +3535,14 @@ class SentryV2TabWidget(QWidget):
         versioned file on first run.  Version bumps no longer create new blank settings."""
         canonical = CANONICAL_SETTINGS_PATH
         selected = canonical
+        config_dir = APP_ROOT_PATH / "config"
+        versioned = sorted(
+            config_dir.glob("smart_sentry_v*_settings.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
         if not canonical.exists():
             # Pick the most-recently-modified versioned settings file in the config dir.
-            config_dir = APP_ROOT_PATH / "config"
-            versioned = sorted(
-                config_dir.glob("smart_sentry_v*_settings.json"),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True,
-            )
             if versioned:
                 selected = versioned[0]
 
@@ -3561,11 +3563,58 @@ class SentryV2TabWidget(QWidget):
         if prompted.is_absolute():
             cfg.prompted_library_path = self._portable_path_string(prompted)
 
+        # Safety recovery: if canonical guard/home/rest/patrol looks reset to defaults
+        # but a legacy settings file still has meaningful operator positions, recover once.
+        def _is_defaultish_guard(candidate: SentryV2Config) -> bool:
+            g = candidate.guard
+            patrol = list(getattr(g, "patrol_waypoints", []) or [])
+            return (
+                abs(float(g.guard_pan) - float(SENTRY_HOME_PAN)) <= 0.01
+                and abs(float(g.guard_tilt) - float(SENTRY_HOME_TILT)) <= 0.01
+                and abs(float(getattr(g, "rest_pan", g.guard_pan)) - float(SENTRY_HOME_PAN)) <= 0.01
+                and abs(float(getattr(g, "rest_tilt", g.guard_tilt)) - float(SENTRY_HOME_TILT)) <= 0.01
+                and int(getattr(g, "guard_mode", 0)) == 0
+                and len(patrol) == 0
+            )
+
+        def _has_meaningful_guard(candidate: SentryV2Config) -> bool:
+            g = candidate.guard
+            patrol = list(getattr(g, "patrol_waypoints", []) or [])
+            return (
+                len(patrol) > 0
+                or int(getattr(g, "guard_mode", 0)) == 2
+                or abs(float(g.guard_pan) - float(SENTRY_HOME_PAN)) > 2.0
+                or abs(float(g.guard_tilt) - float(SENTRY_HOME_TILT)) > 2.0
+                or abs(float(getattr(g, "rest_pan", g.guard_pan)) - float(SENTRY_HOME_PAN)) > 2.0
+                or abs(float(getattr(g, "rest_tilt", g.guard_tilt)) - float(SENTRY_HOME_TILT)) > 2.0
+            )
+
+        recovered_from: Optional[Path] = None
+        if selected == canonical and canonical.exists() and _is_defaultish_guard(cfg):
+            for legacy_path in versioned:
+                if legacy_path == canonical:
+                    continue
+                try:
+                    legacy_cfg = SentryV2Config.load(str(legacy_path))
+                except Exception:
+                    continue
+                if not _has_meaningful_guard(legacy_cfg):
+                    continue
+                cfg.guard = legacy_cfg.guard
+                recovered_from = legacy_path
+                break
+
         if selected != canonical:
             try:
                 cfg.save(str(canonical))
             except Exception as exc:
                 print(f"[SENTRY_V2_TAB] Failed to migrate settings to versionless path: {exc}", flush=True)
+        elif recovered_from is not None:
+            try:
+                cfg.save(str(canonical))
+                print(f"[SENTRY_V2_TAB] Recovered guard/home/rest/patrol settings from legacy file: {recovered_from.name}", flush=True)
+            except Exception as exc:
+                print(f"[SENTRY_V2_TAB] Failed to persist recovered guard/home/rest/patrol settings: {exc}", flush=True)
 
         return cfg
 
