@@ -7,6 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parent
 
 def read_active_version(default: str = "2.3.2") -> str:
     for version_name in (
+        "SMART_SENTRY_V3_5_2_VERSION.txt",
         "SMART_SENTRY_V3_5_1_VERSION.txt",
         "SMART_SENTRY_V3_5_0_VERSION.txt",
         "SMART_SENTRY_V3_0_VERSION.txt",
@@ -39,6 +40,7 @@ def existing_include_files(include_models: bool) -> list[tuple[str, str]]:
         ("smart_sentry_icon.ico", "smart_sentry_icon.ico"),
         ("requirements-sentry-v2-portable.txt", "requirements-sentry-v2-portable.txt"),
         ("RECENT_UPDATES.json", "RECENT_UPDATES.json"),
+        ("SMART_SENTRY_BUILD_RELEASE_STANDARD.md", "SMART_SENTRY_BUILD_RELEASE_STANDARD.md"),
         ("SMART_SENTRY_V3_5_0_COMPILATION_PROTOCOL.md", "SMART_SENTRY_V3_5_0_COMPILATION_PROTOCOL.md"),
         ("SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md", "SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md"),
         ("SMART_SENTRY_RELEASE_HOLD_CONVENTION.md", "SMART_SENTRY_RELEASE_HOLD_CONVENTION.md"),
@@ -49,6 +51,7 @@ def existing_include_files(include_models: bool) -> list[tuple[str, str]]:
         ("SENTRY_V2_PORTABLE_FIX_LOG_2026-03-24.md", "SENTRY_V2_PORTABLE_FIX_LOG_2026-03-24.md"),
     ]
     for version_marker in (
+        "SMART_SENTRY_V3_5_2_VERSION.txt",
         "SMART_SENTRY_V3_5_1_VERSION.txt",
         "SMART_SENTRY_V3_5_0_VERSION.txt",
         "SMART_SENTRY_V2_3_2_VERSION.txt",

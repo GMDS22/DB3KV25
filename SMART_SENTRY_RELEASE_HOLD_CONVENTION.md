@@ -19,7 +19,7 @@ Use the phrase `release-hold <feature-or-tab-name>` when an unfinished Smart Sen
 1. `app/sentry_v2/sentry_v2_tab.py`
 2. `SMART_SENTRY_MANUAL.md`
 3. `SMART_SENTRY_APP_CHANGE_IMPACT.md`
-4. The active release compilation protocol for the intended release
+4. `SMART_SENTRY_BUILD_RELEASE_STANDARD.md`
 
 ## Implementation Rule
 
@@ -34,7 +34,7 @@ Use the phrase `release-hold <feature-or-tab-name>` when an unfinished Smart Sen
 
 1. Update `SMART_SENTRY_MANUAL.md` so the tab is described as temporarily hidden by release hold.
 2. Update `SMART_SENTRY_APP_CHANGE_IMPACT.md` so reviewers know the tab is intentionally hidden for release but restored by removing the hold entry.
-3. Update the active compilation protocol so release validation checks the held state before packaging.
+3. Update `SMART_SENTRY_BUILD_RELEASE_STANDARD.md` so release validation checks the held state before packaging.
 4. Add a concise entry to `RECENT_UPDATES.json` when the release-hold state changes.
 
 ## Removal Rule

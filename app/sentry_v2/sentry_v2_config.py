@@ -12,9 +12,6 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from app.smart_sentry_meta import get_version
-
-
 SENTRY_PAN_MIN = 0.0
 SENTRY_PAN_MAX = 270.0
 SENTRY_TILT_MIN = 0.0
@@ -27,11 +24,9 @@ SENTRY_RANDOM_PAN_MIN = SENTRY_PAN_MIN
 SENTRY_RANDOM_PAN_MAX = SENTRY_PAN_MAX
 SENTRY_RANDOM_TILT_MIN = SENTRY_TILT_MIN
 SENTRY_RANDOM_TILT_MAX = SENTRY_TILT_MAX
-SMART_SENTRY_RELEASE_VERSION = get_version()
-SMART_SENTRY_RELEASE_VERSION_TOKEN = SMART_SENTRY_RELEASE_VERSION.replace(".", "_")
-CANONICAL_FACE_LIBRARY_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_faces.json"
-CANONICAL_PROMPTED_TARGETS_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_prompted_targets.json"
-CANONICAL_SETTINGS_PATH = f"app/config/smart_sentry_v{SMART_SENTRY_RELEASE_VERSION_TOKEN}_settings.json"
+CANONICAL_FACE_LIBRARY_PATH = "app/config/smart_sentry_faces.json"
+CANONICAL_PROMPTED_TARGETS_PATH = "app/config/smart_sentry_prompted_targets.json"
+CANONICAL_SETTINGS_PATH = "app/config/smart_sentry_settings.json"
 
 # Older shipped auto-trigger profiles used sub-2 degree gates that do not
 # converge reliably enough for live firing.

@@ -36,9 +36,10 @@ This document defines the intended **portable-only** surface for Smart Sentry v2
 
 ## Required Smart Sentry v2 data/config/assets
 
-- app/config/sentry_v2_settings.json
-- app/config/sentry_v2_custom_presets.json
-- app/config/sentry_v2_prompted_targets.json
+- app/config/smart_sentry_settings.json
+- app/config/smart_sentry_custom_presets.json
+- app/config/smart_sentry_prompted_targets.json
+- app/config/smart_sentry_faces.json
 - app/LOGO.png
 
 ## Required detection model folders
@@ -47,7 +48,7 @@ This document defines the intended **portable-only** surface for Smart Sentry v2
 
 This is the only supported source-side and operator-facing portable-release model folder. Do not mirror models into app/models/ or app/YOLO_MODELS/.
 
-For the packaged release, keep the public drop location at the release root as `F:\SMART SENTRY V3.5.0\YOLO_MODELS`. Bundled fallback weights may also exist under `SMART_SENTRY_V3_5_0_FILES\YOLO_MODELS`, but that support-folder copy is not the operator-facing drop target.
+For the packaged release, keep the public drop location at the release root as `F:\SMART SENTRY V<version>\YOLO_MODELS`. Bundled fallback weights may also exist under `SMART_SENTRY_V<version_token>_FILES\YOLO_MODELS`, but that support-folder copy is not the operator-facing drop target.
 
 Use the interpreter selected by the build helper in this order: `SMART_SENTRY_PYTHON_EXE`, then parent or repo `.venv311`, then parent or repo `.venv`.
 

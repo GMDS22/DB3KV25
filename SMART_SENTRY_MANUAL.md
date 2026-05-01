@@ -1,9 +1,9 @@
 # SMART SENTRY V2 — COMPLETE REFERENCE MANUAL
 
-> **Version:** 3.5.1  
+> **Version:** 3.5.2  
 > **Module Path:** `app/sentry_v2/`  
 > **Last Updated:** 2026-05-01  
-> **Status:** Verified against the current standalone Smart Sentry v3.5.1 release candidate. The canonical runtime settings file is version-resolved as `app/config/smart_sentry_v<release_version>_settings.json` (currently `app/config/smart_sentry_v3_5_1_settings.json`); older settings paths remain compatibility fallbacks only. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`, and the full settings system still defines 13 tabs while `Facial Recognition` and `AI Assistant` remain temporarily hidden by release hold for the active release line.
+> **Status:** Verified against the current standalone Smart Sentry v3.5.2 release candidate. The canonical runtime settings file is versionless at `app/config/smart_sentry_settings.json`; older versioned settings paths remain compatibility fallbacks only and are migrated forward on load. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`, and the full settings system still defines 13 tabs while `Facial Recognition` and `AI Assistant` remain temporarily hidden by release hold for the active release line.
 
 Primary behavior-contract note: for the current authoritative tracking, PIR, target-loss, center-aim, and fire-gating blueprint, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md` first before changing engine or preset behavior.
 
@@ -40,7 +40,7 @@ Smart Sentry v2 is a standalone turret control application launched from the DB3
 Pinned firmware note: the current live app contract uses the Arduino Nano USB IO + Debug Board USB path with `arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino` as the active IO firmware. Waveshare single-board firmware files remain in the repo for archived bench work only and are not part of the current app.
 
 - **Standalone camera ownership:** Smart Sentry opens and owns its own camera or stream source
-- **Separate runtime settings:** Smart Sentry persists to the version-resolved canonical settings file `app/config/smart_sentry_v<release_version>_settings.json` (currently `...v3_5_1...`) and accepts older files only as migration fallbacks
+- **Separate runtime settings:** Smart Sentry persists to the versionless canonical settings file `app/config/smart_sentry_settings.json` and accepts older versioned files only as migration fallbacks
 - **One-app-at-a-time workflow:** Smart Sentry and the main app may use the same COM values, but never at the same time
 
 On single-camera systems, Smart Sentry should normally use camera index `0` unless the operator explicitly selects another camera or stream source.
@@ -156,7 +156,7 @@ All configuration in `@dataclass` structures with JSON save/load.
 | `ConnectionConfig` | Hardware topology | `connection_type`, ports/bauds, UDP host/port, `wifi_interface` (dedicated Windows WiFi adapter), servo IDs, camera, inversions |
 | `SentryV2Config` | Top-level container | All sub-configs + overlay flags + `save()`/`load()` |
 
-**Persistence:** `app/config/smart_sentry_v<release_version>_settings.json` (canonical runtime file, auto-created; currently `app/config/smart_sentry_v3_5_1_settings.json`). Compatibility fallbacks may also exist at `app/config/smart_sentry_v2_3_2_settings.json`, `app/config/smart_sentry_v2_3_1_settings.json`, `app/config/smart_sentry_v3_settings.json`, and `app/config/sentry_v2_settings.json`, but those are not the authoritative live file.
+**Persistence:** `app/config/smart_sentry_settings.json` (canonical runtime file, auto-created). Compatibility fallbacks may also exist as older versioned files such as `app/config/smart_sentry_v3_5_2_settings.json`, `app/config/smart_sentry_v3_5_1_settings.json`, and earlier `smart_sentry_v*_settings.json` files; these are migration sources and are not the authoritative live file.
 
 ---
 
@@ -200,7 +200,7 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 
 **Verified current runtime note:** the Controls page now includes persisted Sound ON/OFF and volume controls, visible `Wake Up` / `Go Rest` buttons, read-only runtime data export controls, and an open-folder shortcut for saved exports, while the Status area surfaces live sound-link transport state alongside the hardware monitor. The Serial Output panel now also supports timestamped log export plus a direct open-folder action for AI analysis and troubleshooting.
 
-**Verified current identity note:** the underlying Facial Recognition implementation still persists its face library separately at `app/config/smart_sentry_v<release_version>_faces.json` (currently `app/config/smart_sentry_v3_5_1_faces.json`) and keeps the lightweight Haar-cascade plus embedding workflow in the codebase, but the tab is intentionally on release hold for the active release line and is not part of the active release surface.
+**Verified current identity note:** the underlying Facial Recognition implementation persists its face library at the versionless canonical path `app/config/smart_sentry_faces.json`, still supports legacy versioned face-library files as migration fallbacks, and keeps the lightweight Haar-cascade plus embedding workflow in the codebase; the tab is intentionally on release hold for the active release line and is not part of the active release surface.
 
 **Verified current shortcut note:** the top-row `Quick Keys` button and the Shortcut Keys tab both point operators to `SMART_SENTRY_SHORTCUT_KEYS.md`, and the live shortcut runtime stays window-focused so hotkeys only fire while the Smart Sentry window is active. Manual movement now accepts both `W/A/S/D` and `Left/Right/Up/Down` arrows when the manual keyboard toggle is enabled.
 

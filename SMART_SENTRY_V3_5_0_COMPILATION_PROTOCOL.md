@@ -1,6 +1,8 @@
-# Smart Sentry v3.5.0 Compilation Protocol
+# Smart Sentry v3.5.0 Compilation Protocol (Historical Snapshot)
 
-This document is the active release-prep checklist for the Smart Sentry v3.5.0 release.
+This file is retained as a historical release snapshot only.
+
+For all current and future releases, use `SMART_SENTRY_BUILD_RELEASE_STANDARD.md` as the single authoritative build and release workflow.
 
 ## 1. Release Targets
 
@@ -11,10 +13,10 @@ This document is the active release-prep checklist for the Smart Sentry v3.5.0 r
 - Compiled app output drive: `F:`
 - Compiled app output folder: `F:\SMART SENTRY V3.5.0`
 - Final packaged executable: `F:\SMART SENTRY V3.5.0\SMART_SENTRY_V3.5.0.exe`
-- Canonical runtime settings file: `app/config/smart_sentry_v3_5_0_settings.json`
-- Canonical custom presets file: `app/config/smart_sentry_v3_5_0_custom_presets.json`
-- Canonical prompted-targets file: `app/config/smart_sentry_v3_5_0_prompted_targets.json`
-- Canonical face-library file: `app/config/smart_sentry_v3_5_0_faces.json`
+- Canonical runtime settings file: `app/config/smart_sentry_settings.json`
+- Canonical custom presets file: `app/config/smart_sentry_custom_presets.json`
+- Canonical prompted-targets file: `app/config/smart_sentry_prompted_targets.json`
+- Canonical face-library file: `app/config/smart_sentry_faces.json`
 
 ## 2. Active Packaging Path
 
@@ -26,7 +28,7 @@ Use the current version-aware portable build helper from repository root:
 
 Notes:
 
-1. The helper script name is historical, but it now resolves the active release from `SMART_SENTRY_V3_5_0_VERSION.txt` first.
+1. The helper script name is historical, and now resolves the active release from the highest-priority available version marker.
 2. `run.py` remains the canonical launcher entrypoint.
 3. The release package must still keep the executable as the only root-level file in the release folder.
 4. `YOLO_MODELS` at the release root remains the operator-facing packaged-model drop folder.
@@ -50,7 +52,7 @@ Before packaging v3.5.0, confirm all of the following:
 1. `SMART_SENTRY_V3_5_0_VERSION.txt` contains `3.5.0`.
 2. `app.smart_sentry_meta.get_version()` resolves `3.5.0`.
 3. The app title resolves to `SMART SENTRY V3.5.0` at runtime.
-4. The canonical `v3_5_0` settings, presets, prompted-targets, and face-library files all exist.
+4. The canonical versionless settings, presets, prompted-targets, and face-library files all exist.
 5. The close path still sends a real outputs-off state before disconnecting boards.
 6. The build helper still points packaged `detection_mode.yolo_model_dir` at the final release-root `YOLO_MODELS` folder.
 
@@ -59,8 +61,8 @@ Before packaging v3.5.0, confirm all of the following:
 After every successful build, inspect the promoted release at `F:\SMART SENTRY V3.5.0`.
 
 1. Confirm the release root contains `SMART_SENTRY_V3.5.0.exe`, `SMART_SENTRY_V3_5_0_FILES\`, and `YOLO_MODELS\`.
-2. Confirm the packaged config directory contains the active `smart_sentry_v3_5_0_settings.json` file.
-3. Confirm the packaged active settings file points at `app/config/smart_sentry_v3_5_0_settings.json` and `F:\SMART SENTRY V3.5.0\YOLO_MODELS`.
+2. Confirm the packaged config directory contains the active `smart_sentry_settings.json` file.
+3. Confirm the packaged active settings file points at `app/config/smart_sentry_settings.json` and `F:\SMART SENTRY V3.5.0\YOLO_MODELS`.
 4. Launch the packaged executable once from the final release folder and confirm the title panel shows the v3.5.0 release identity.
 5. Verify one live shutdown pass closes accessories before transport disconnect.
 

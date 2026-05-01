@@ -14,20 +14,22 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 
 ### App identity
 
-- Active desktop app family: Smart Sentry version-resolved release target with legacy compatibility launchers retained
-- Current documented desktop release target: Smart Sentry v3.5.1 (`SMART_SENTRY_V3_5_1_VERSION.txt`)
+- Active desktop app family: Smart Sentry release-identity versioning with legacy compatibility launchers retained
+- Current documented desktop release target: Smart Sentry v3.5.2 (`SMART_SENTRY_V3_5_2_VERSION.txt`)
 - Main launcher from this repo: `run.py`
 
 ### Canonical settings path
 
-- Canonical runtime settings file: `app/config/smart_sentry_v<release_version>_settings.json` (resolved in code from `get_version()`, currently `app/config/smart_sentry_v3_5_1_settings.json`)
-- Canonical runtime preset file: `app/config/smart_sentry_v<release_version>_custom_presets.json` (currently `app/config/smart_sentry_v3_5_1_custom_presets.json`)
-- Legacy compatibility fallbacks: `app/config/smart_sentry_v2_3_2_settings.json`, `app/config/smart_sentry_v2_3_1_settings.json`, `app/config/smart_sentry_v3_settings.json`, `app/config/sentry_v2_settings.json`
-- Rule: make runtime-setting changes against the canonical version-resolved file only; if load/save sync logic changes, review the fallback chain in the same change.
+- Canonical runtime settings file: `app/config/smart_sentry_settings.json`
+- Canonical runtime preset file: `app/config/smart_sentry_custom_presets.json`
+- Canonical prompted-targets file: `app/config/smart_sentry_prompted_targets.json`
+- Canonical face-library file: `app/config/smart_sentry_faces.json`
+- Legacy compatibility fallbacks: older `app/config/smart_sentry_v*_*.json` files remain migration sources only.
+- Rule: make runtime-setting changes against versionless canonical files only; if migration logic changes, review fallback discovery and migration behavior in the same change.
 
 ### Current release identity deltas
 
-- The active title panel now resolves `SMART SENTRY V3.5.1` with the subtitle `NANO BOARD USB + DEBUG BOARD USB`.
+- The active title panel now resolves `SMART SENTRY V3.5.2` with the subtitle `NANO BOARD USB + DEBUG BOARD USB`.
 - The active release includes theme font-scale and settings-panel-width controls in the theme tab.
 - Graceful shutdown now sends an outputs-off state and safety lock before transport disconnect.
 
@@ -123,11 +125,11 @@ When changing any one of the areas below, review the whole grouped set before co
 
 ### Runtime settings schema changes
 
-- `app/config/smart_sentry_v3_5_1_settings.json`
-- `app/config/smart_sentry_v2_3_2_settings.json`
-- `app/config/smart_sentry_v2_3_1_settings.json`
-- `app/config/smart_sentry_v3_settings.json`
-- `app/config/sentry_v2_settings.json`
+- `app/config/smart_sentry_settings.json`
+- `app/config/smart_sentry_custom_presets.json`
+- `app/config/smart_sentry_prompted_targets.json`
+- `app/config/smart_sentry_faces.json`
+- Any existing legacy migration inputs under `app/config/smart_sentry_v*_*.json`
 - Settings load and save logic in `app/sentry_v2/sentry_v2_tab.py`
 - Any documentation that still names old settings files as canonical
 
@@ -150,9 +152,9 @@ Rule: do not change after-target-loss behavior in only one of these places. Engi
 - `app/sentry_v2/sentry_v2_tab.py`
 - `app/sentry_v2/sentry_v2_overlay.py`
 - `app/sentry_v2/sound_engine.py`
-- `app/config/smart_sentry_v3_5_1_settings.json`
-- `app/config/smart_sentry_v2_3_2_settings.json`
-- `app/config/smart_sentry_v2_3_2_faces.json`
+- `app/config/smart_sentry_settings.json`
+- `app/config/smart_sentry_faces.json`
+- Any legacy migration inputs under `app/config/smart_sentry_v*_settings.json` and `app/config/smart_sentry_v*_faces.json`
 - `SMART_SENTRY_MANUAL.md`
 - `SMART_SENTRY_SHORTCUT_KEYS.md` when shortcut-facing identity workflows change
 - `SMART_SENTRY_ISSUE_LOG.md`
@@ -191,6 +193,7 @@ Rule: treat guard-home behavior, rest-position behavior, PIR cue-confirm-scan be
 - Packaging specs and generated output naming
 - Release-root `YOLO_MODELS/` folder contract versus bundled support-folder defaults
 - Release notes and compilation protocol docs
+- `SMART_SENTRY_BUILD_RELEASE_STANDARD.md` (single authoritative editor workflow)
 - `SMART_SENTRY_RELEASE_HOLD_CONVENTION.md` when unfinished tabs are intentionally kept visible but inactive
 
 ## 4. Workspace Canonical Vendor Folders
@@ -231,12 +234,13 @@ Before calling a firmware or runtime change complete, verify all of the followin
 
 - The active sketch path is correct in `ESP32_CURRENT_SKETCH.md`.
 - Flash examples in `ESP32_UDP_FLASH.md` still match the active firmware.
-- Runtime settings still load from the version-resolved canonical settings file (`app/config/smart_sentry_v<release_version>_settings.json`, currently `...v3_5_1...`) with older aliases accepted only as migration fallbacks.
+- Runtime settings still load from the versionless canonical settings file (`app/config/smart_sentry_settings.json`) with older versioned files accepted only as migration fallbacks.
 - UI wording matches the real connection topology.
 - Version marker files and launcher text match the intended release.
 - `RECENT_UPDATES.json` includes a concise summary entry when behavior or release identity changed.
 - `SMART_SENTRY_ISSUE_LOG.md` records each Smart Sentry issue and fix attempt that materially changed runtime behavior.
 - Any release-held unfinished tab is documented and still disabled before packaging.
+- The build and release checklist was followed from `SMART_SENTRY_BUILD_RELEASE_STANDARD.md` (single standard for all editors).
 
 ## 7. Naming Standard
 
