@@ -10,6 +10,21 @@ from .ollama_client import OllamaClient
 from .runtime_analyzer import RuntimeAnalyzer
 
 
+_DETECTION_MODE_ACTIONS = (
+    (10, "Motion-Locked Filtered Target", ("motion-locked filtered target", "motion locked filtered target", "filtered target", "motion-locked", "motion locked")),
+    (9, "Hybrid: Color + YOLO", ("color + yolo", "color yolo", "hybrid color yolo", "color plus yolo")),
+    (8, "Hybrid: Color + BackSub", ("color + backsub", "color backsub", "color + background subtraction", "color plus backsub")),
+    (7, "Hybrid: Color + Frame Diff", ("color + frame diff", "color frame diff", "color + frame difference", "color plus frame diff")),
+    (6, "Color Detection", ("color detection", "color mode", "color tracking")),
+    (5, "Hybrid: BackSub + YOLO (Best)", ("backsub + yolo", "background subtraction + yolo", "hybrid backsub yolo", "best mode", "best detection mode")),
+    (4, "Hybrid: Frame Diff + YOLO", ("frame diff + yolo", "frame difference + yolo", "motion + yolo", "frame diff yolo")),
+    (3, "Hybrid: Frame Diff + BackSub", ("frame diff + backsub", "frame difference + backsub", "frame difference + background subtraction", "motion + backsub")),
+    (2, "YOLO Object Detection", ("yolo object detection", "yolo mode", "object detection", "yolo")),
+    (1, "Background Subtraction", ("background subtraction", "backsub", "background mode")),
+    (0, "Frame Difference", ("frame difference", "frame diff", "motion mode", "motion detection")),
+)
+
+
 class LocalAssistantService:
     def __init__(self, client: OllamaClient | None = None, analyzer: RuntimeAnalyzer | None = None, knowledge_base: AppKnowledgeBase | None = None):
         self._client = client or OllamaClient()
@@ -21,6 +36,9 @@ class LocalAssistantService:
 
     def list_models(self) -> List[str]:
         return self._client.list_models()
+
+    def _request_timeout_s(self) -> float:
+        return max(5.0, float(getattr(self._client, "timeout_s", 45.0) or 45.0))
 
     def analyze_runtime(self, snapshot: Dict[str, Any], *, model: str, include_logs: bool = True) -> AssistantReply:
         findings, recommendations, summary = self._analyzer.analyze(snapshot)
@@ -37,7 +55,7 @@ class LocalAssistantService:
                 model=model,
                 prompt=prompt,
                 system=self._system_prompt(),
-                timeout_s=min(float(self._client.timeout_s), 28.0),
+                timeout_s=self._request_timeout_s(),
                 options=self._llm_options(max_output_tokens=220, temperature=0.15),
             )
             return AssistantReply(
@@ -78,7 +96,7 @@ class LocalAssistantService:
                 model=model,
                 prompt=prompt,
                 system=self._system_prompt(),
-                timeout_s=min(float(self._client.timeout_s), 34.0),
+                timeout_s=self._request_timeout_s(),
                 options=self._llm_options(max_output_tokens=260, temperature=0.15),
             )
             return AssistantReply(
@@ -115,7 +133,7 @@ class LocalAssistantService:
                 model=model,
                 prompt=prompt,
                 system=self._system_prompt(),
-                timeout_s=min(float(self._client.timeout_s), 30.0),
+                timeout_s=self._request_timeout_s(),
                 options=self._llm_options(max_output_tokens=220, temperature=0.15),
             )
             return AssistantReply(
@@ -151,8 +169,15 @@ class LocalAssistantService:
         seen: set[str] = set()
 
         def _append(action: AssistantAction) -> None:
-            if action.action_type not in seen:
-                seen.add(action.action_type)
+            dedupe_key = str(action.action_type)
+            if action.payload:
+                try:
+                    payload_key = json.dumps(action.payload, sort_keys=True, default=str)
+                except Exception:
+                    payload_key = repr(sorted(action.payload.items()))
+                dedupe_key = f"{action.action_type}:{payload_key}"
+            if dedupe_key not in seen:
+                seen.add(dedupe_key)
                 actions.append(action)
 
         if self._matches_action_request(lower_prompt, ("wake", "return", "go", "move"), ("home", "guard home", "home position")):
@@ -162,14 +187,11 @@ class LocalAssistantService:
         position_action = self._extract_position_action(prompt_text)
         if position_action is not None:
             _append(position_action)
-        if self._matches_action_request(lower_prompt, ("switch", "set", "change", "use"), ("color detection", "color mode", "color tracking")):
-            _append(AssistantAction("set_detection_mode", "Switch to Color Detection mode", {"mode_index": 6}, True))
-        if self._matches_action_request(lower_prompt, ("switch", "set", "change", "use"), ("yolo", "yolo mode", "object detection")):
-            _append(AssistantAction("set_detection_mode", "Switch to YOLO Object Detection mode", {"mode_index": 2}, True))
-        if self._matches_action_request(lower_prompt, ("switch", "set", "change", "use"), ("motion mode", "frame difference mode", "motion detection")):
-            _append(AssistantAction("set_detection_mode", "Switch to Motion mode", {"mode_index": 0}, True))
-        if self._matches_action_request(lower_prompt, ("switch", "set", "change", "use"), ("filtered target", "motion-locked", "motion locked")):
-            _append(AssistantAction("set_detection_mode", "Switch to Motion-Locked Filtered Target mode", {"mode_index": 10}, True))
+        detection_mode_action = self._extract_detection_mode_action(lower_prompt)
+        if detection_mode_action is not None:
+            _append(detection_mode_action)
+        for draft_action in self._extract_setting_draft_actions(prompt_text):
+            _append(draft_action)
         if self._matches_action_request(lower_prompt, ("enable", "turn on"), ("face recognition",)):
             _append(AssistantAction("toggle_face_recognition", "Enable face recognition", {"enabled": True}, False))
         if self._matches_action_request(lower_prompt, ("disable", "turn off"), ("face recognition",)):
@@ -223,6 +245,69 @@ class LocalAssistantService:
             labels.append(f"tilt {payload['tilt']:.1f}")
         label = "Move turret to " + " and ".join(labels)
         return AssistantAction("move_position", label, payload, False)
+
+    def _extract_detection_mode_action(self, prompt_text: str) -> AssistantAction | None:
+        normalized = re.sub(r"\s+", " ", str(prompt_text or "").strip().lower())
+        if not normalized:
+            return None
+        if not any(token in normalized for token in ("switch", "set", "change", "use")):
+            return None
+        for mode_index, mode_label, phrases in _DETECTION_MODE_ACTIONS:
+            if any(phrase in normalized for phrase in phrases):
+                return AssistantAction(
+                    "set_detection_mode",
+                    f"Switch to {mode_label} mode",
+                    {"mode_index": int(mode_index)},
+                    True,
+                )
+        return None
+
+    def _extract_setting_draft_actions(self, prompt_text: str) -> List[AssistantAction]:
+        normalized = re.sub(r"\s+", " ", str(prompt_text or "").strip().lower())
+        if not normalized:
+            return []
+        if not any(token in normalized for token in ("set", "change", "adjust", "tune", "lower", "raise", "increase", "decrease", "reduce")):
+            return []
+
+        actions: List[AssistantAction] = []
+
+        confidence_match = re.search(r"\b(?:yolo\s+)?confidence\s*(?:to|=)?\s*(0(?:\.\d+)?|1(?:\.0+)?)\b", normalized)
+        if confidence_match is not None:
+            value = float(confidence_match.group(1))
+            actions.append(
+                AssistantAction(
+                    "draft_setting_change",
+                    f"Draft YOLO confidence -> {value:.2f}",
+                    {"setting_path": "detection_mode.yolo_confidence", "value": value},
+                    False,
+                )
+            )
+
+        min_area_match = re.search(r"\b(?:yolo\s+)?(?:min(?:imum)?\s+)?area\s*(?:to|=)?\s*(\d{1,7})\b", normalized)
+        if min_area_match is not None:
+            value = int(min_area_match.group(1))
+            actions.append(
+                AssistantAction(
+                    "draft_setting_change",
+                    f"Draft YOLO minimum area -> {value}",
+                    {"setting_path": "detection_mode.yolo_min_area", "value": value},
+                    False,
+                )
+            )
+
+        threat_match = re.search(r"\b(?:min(?:imum)?\s+)?(?:threat score|engagement threshold|threat threshold)\s*(?:to|=)?\s*(0(?:\.\d+)?|1(?:\.0+)?)\b", normalized)
+        if threat_match is not None:
+            value = float(threat_match.group(1))
+            actions.append(
+                AssistantAction(
+                    "draft_setting_change",
+                    f"Draft minimum threat score -> {value:.2f}",
+                    {"setting_path": "engagement.min_threat_score", "value": value},
+                    False,
+                )
+            )
+
+        return actions
 
     def _extract_voice_style_action(self, prompt_text: str) -> AssistantAction | None:
         if "voice style" not in prompt_text and "speech style" not in prompt_text:
@@ -413,8 +498,19 @@ class LocalAssistantService:
 
     def _fallback_chat_text(self, prompt_text: str, snapshot: Dict[str, Any], findings: List[Any], recommendations: List[str], actions: List[AssistantAction]) -> str:
         if actions:
-            action_text = "; ".join(action.label for action in actions)
-            return f"I recognized supported local actions related to your request: {action_text}. The local model was unavailable, so I am returning the deterministic action parse and local execution path instead."
+            executable_actions = [action for action in actions if action.action_type != "draft_setting_change"]
+            draft_actions = [action for action in actions if action.action_type == "draft_setting_change"]
+            segments: List[str] = []
+            if executable_actions:
+                segments.append("recognized supported local actions: " + "; ".join(action.label for action in executable_actions))
+            if draft_actions:
+                segments.append("drafted setting changes: " + "; ".join(action.label for action in draft_actions))
+            if segments:
+                return (
+                    "I could not reach the local model, but I "
+                    + " and ".join(segments)
+                    + ". Supported live actions still route through the existing deterministic UI handlers."
+                )
         subsystem_fallback = self._targeted_subsystem_fallback(prompt_text, snapshot)
         if subsystem_fallback:
             return subsystem_fallback

@@ -275,6 +275,12 @@ class SentryV2Engine:
         """Export autotracking logs to CSV."""
         return self._autotrack_logger.export_csv(session_id or "")
 
+    def get_autotracking_summary(self) -> Dict:
+        """Return structured autotracking summary statistics for runtime consumers."""
+        summary = dict(self._autotrack_logger.get_summary())
+        summary["logging_enabled"] = bool(self._log_autotracking)
+        return summary
+
     def print_autotracking_summary(self) -> None:
         """Print autotracking summary to console."""
         self._autotrack_logger.print_summary()

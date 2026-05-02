@@ -21,7 +21,15 @@ class RuntimeAnalyzer:
         ai_cfg = config.get("ai_assistant") or {}
 
         state = str(engine.get("state") or "UNKNOWN")
-        visible_targets = len(engine.get("visible_targets") or [])
+        visible_targets = int(engine.get("targets_visible", len(engine.get("visible_targets") or [])) or 0)
+        targets_detected = int(engine.get("targets_detected") or 0)
+        targets_qualified = int(engine.get("targets_qualified") or engine.get("qualified_count") or 0)
+        aim_lock_frames = int(engine.get("aim_lock_frames") or 0)
+        last_err_pan_deg = float(engine.get("last_err_pan_deg") or 0.0)
+        last_err_tilt_deg = float(engine.get("last_err_tilt_deg") or 0.0)
+        loss_recovery_phase = str(engine.get("loss_recovery_phase") or "")
+        filter_rejections = list(engine.get("filter_rejections") or [])
+        autotracking = engine.get("autotracking") or {}
 
         if not bool(comm.get("is_connected")):
             findings.append(AssistantFinding("high", "Controller link offline", "The sentry is not currently connected to its controller link."))
@@ -76,8 +84,36 @@ class RuntimeAnalyzer:
         if state == "GUARDING" and visible_targets == 0 and bool(camera.get("capture_open")):
             findings.append(AssistantFinding("low", "Idle guard state", "The system is guarding with no currently visible qualified targets."))
 
+        if targets_detected > 0 and targets_qualified <= 0 and filter_rejections:
+            top_rejection = filter_rejections[0]
+            findings.append(
+                AssistantFinding(
+                    "medium",
+                    "Targets rejected before engagement",
+                    f"Detections are reaching the engine, but the top rejection is {top_rejection.get('class_name', 'unknown')} via {top_rejection.get('reason', 'filter')}.",
+                )
+            )
+            recommendations.append("Review allowed classes, confirmation hits, and the current detection mode before lowering threat thresholds.")
+
         if state == "ENGAGING" and visible_targets == 0:
             findings.append(AssistantFinding("medium", "Engaging without visible target", "The engine is still in engaging state even though no visible targets are reported right now."))
+
+        if state == "ENGAGING" and visible_targets > 0 and aim_lock_frames <= 0 and (abs(last_err_pan_deg) > 0.75 or abs(last_err_tilt_deg) > 0.75):
+            findings.append(AssistantFinding("medium", "Tracking is not yet locked", "The engine is engaging with visible targets, but aim lock has not accumulated and tracking error is still elevated."))
+            recommendations.append("Check tracking error, detection mode stability, and aim-lock thresholds before assuming the current target can be held cleanly.")
+
+        if loss_recovery_phase:
+            findings.append(AssistantFinding("low", "Loss recovery active", f"The engine is currently in loss recovery phase: {loss_recovery_phase}."))
+
+        if bool(autotracking.get("logging_enabled")):
+            loss_events = int(autotracking.get("loss_events") or 0)
+            reacquisitions = int(autotracking.get("reacquisitions") or 0)
+            avg_tracking_error_deg = autotracking.get("avg_tracking_error_deg")
+            if loss_events >= 3 and loss_events > (reacquisitions + 1):
+                findings.append(AssistantFinding("medium", "Repeated target-loss churn", "Autotracking logs show repeated loss events without matching reacquisition recovery."))
+                recommendations.append("Use the current mode and rejection data to reduce churn before widening engagement or fire settings.")
+            if avg_tracking_error_deg is not None and float(avg_tracking_error_deg) >= 1.5:
+                findings.append(AssistantFinding("low", "Tracking corrections remain large", f"Average logged tracking error is {float(avg_tracking_error_deg):.2f} degrees."))
 
         if not recommendations:
             recommendations.append("Runtime looks stable enough for local assistant coaching. No immediate corrective action stands out from the current snapshot.")

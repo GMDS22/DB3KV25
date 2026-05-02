@@ -544,7 +544,13 @@ class SoundConfig:
     human_voice_rate_pct: int = 100
     human_voice_pitch_pct: int = 100
     human_voice_volume_pct: int = 85
+    human_voice_cleanup_enabled: bool = True
+    known_face_hello_once_per_session: bool = True
     name_announce_cooldown_s: float = 18.0
+    autotracking_voice_reports_enabled: bool = False
+    pir_voice_alerts_enabled: bool = False
+    acoustic_voice_alerts_enabled: bool = False
+    autotracking_voice_report_cooldown_s: float = 8.0
 
 
 @dataclass
@@ -598,7 +604,7 @@ class AIAssistantConfig:
     allow_setting_drafts: bool = True
     allow_runtime_analysis: bool = True
     allow_action_execution: bool = True
-    auto_speak_responses: bool = True
+    auto_speak_responses: bool = False
 
 
 @dataclass

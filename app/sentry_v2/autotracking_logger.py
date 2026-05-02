@@ -295,6 +295,79 @@ class AutotrackingLogger:
         """Increment frame counter (call once per video frame)."""
         self.frame_id += 1
 
+    def get_summary(self, recent_limit: int = 5) -> Dict[str, Any]:
+        """Return compact autotracking summary statistics for runtime analysis."""
+        event_counts: Dict[str, int] = {}
+        promoted: List[AutotrackingEvent] = []
+        lost: List[AutotrackingEvent] = []
+        reacq: List[AutotrackingEvent] = []
+        tracking: List[AutotrackingEvent] = []
+        threshold_hits = 0
+
+        for evt in self.events:
+            event_counts[evt.event_type] = event_counts.get(evt.event_type, 0) + 1
+            if evt.event_type == "engagement_promoted":
+                promoted.append(evt)
+            elif evt.event_type == "loss_event":
+                lost.append(evt)
+            elif evt.event_type == "reacquisition":
+                reacq.append(evt)
+            elif evt.event_type == "tracking_frame":
+                tracking.append(evt)
+            elif evt.event_type == "yolo_detection" and bool(evt.meets_threshold):
+                threshold_hits += 1
+
+        avg_promoted_threat_score = None
+        if promoted:
+            avg_promoted_threat_score = round(
+                sum(float(evt.threat_score) for evt in promoted) / max(1, len(promoted)),
+                3,
+            )
+
+        avg_tracking_error_deg = None
+        avg_move_magnitude = None
+        max_aim_lock_frames = 0
+        if tracking:
+            avg_tracking_error_deg = round(
+                sum(float(evt.error_magnitude) for evt in tracking) / max(1, len(tracking)),
+                3,
+            )
+            avg_move_magnitude = round(
+                sum(float(evt.move_magnitude) for evt in tracking) / max(1, len(tracking)),
+                3,
+            )
+            max_aim_lock_frames = max(int(evt.aim_lock_frames) for evt in tracking)
+
+        recent_events: List[Dict[str, Any]] = []
+        for evt in self.events[-max(0, int(recent_limit)):]:
+            recent_events.append({
+                "event_type": str(evt.event_type),
+                "target_id": int(evt.target_id),
+                "class_name": str(evt.class_name),
+                "phase": str(evt.phase_transition_to or evt.phase_transition_from or ""),
+                "threat_score": round(float(evt.threat_score), 3) if evt.threat_score else 0.0,
+                "error_magnitude": round(float(evt.error_magnitude), 3) if evt.error_magnitude else 0.0,
+                "aim_lock_frames": int(evt.aim_lock_frames),
+                "notes": str(evt.notes or "")[:120],
+            })
+
+        return {
+            "session_duration_s": round(max(0.0, time.time() - self.session_started), 2),
+            "total_events": int(len(self.events)),
+            "total_frames": int(self.frame_id),
+            "event_counts": event_counts,
+            "detections_meeting_threshold": int(threshold_hits),
+            "promoted_targets": int(len(promoted)),
+            "loss_events": int(len(lost)),
+            "reacquisitions": int(len(reacq)),
+            "tracking_frames": int(len(tracking)),
+            "avg_promoted_threat_score": avg_promoted_threat_score,
+            "avg_tracking_error_deg": avg_tracking_error_deg,
+            "avg_move_magnitude": avg_move_magnitude,
+            "max_aim_lock_frames": int(max_aim_lock_frames),
+            "recent_events": recent_events,
+        }
+
     def export_csv(self, session_id: str = "") -> str:
         """Export events to CSV and return path."""
         if not session_id:
