@@ -2,6 +2,24 @@
     "updates":  [
                     {
                         "version":  "3.5.2",
+                        "fix":  "Refined known-face/autotracking integration and operator quick-controls. Friendly recognized identities now keep engagement suppression more stable between face-match refresh cycles via centroid fallback matching. Face enrollment save now auto-clears preview overlays and returns from photo preview to live camera. Added compact video-panel QA controls: face-recognition toggle icon, auto-export icon toggle, and an auto-lighting flyout toggle that reveals auto-light checkbox plus live luma/threshold/PWM telemetry.",
+                        "category":  "Engine/UI",
+                        "date":  "2026-05-02",
+                        "issue":  "ISS-101",
+                        "title":  "Face/autotracking suppression stability and compact video quick-control refinement",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.5.2",
+                        "fix":  "Facial Recognition tab is now active in the runtime surface with a top video-panel quick toggle, photo-browse enrollment flow, per-face name fields, per-face target/non-target flags, and live preview overlays for detected enrollment faces. Runtime recognition remains integrated with person-body engagement so recognized targets stay engageable while recognized non-targets can be suppressed from engagement.",
+                        "category":  "UI/Runtime",
+                        "date":  "2026-05-02",
+                        "issue":  "ISS-097",
+                        "title":  "Facial recognition workflow activated with preview enrollment and target/non-target assignment",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.5.2",
                         "fix":  "Hardened release build protocol and helper so every package must include current canonical runtime settings and current canonical custom profiles. Added pre-build canonical file existence checks plus post-build packaged-surface verification with custom-presets parity validation.",
                         "category":  "Build/Docs",
                         "date":  "2026-05-01",
@@ -118,5 +136,5 @@
                         "status":  "Worked"
                     }
                 ],
-    "max_items":  12
+    "max_items":  14
 }

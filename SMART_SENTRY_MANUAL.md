@@ -2,8 +2,8 @@
 
 > **Version:** 3.5.2  
 > **Module Path:** `app/sentry_v2/`  
-> **Last Updated:** 2026-05-01  
-> **Status:** Verified against the current standalone Smart Sentry v3.5.2 release candidate. The canonical runtime settings file is versionless at `app/config/smart_sentry_settings.json`; older versioned settings paths remain compatibility fallbacks only and are migrated forward on load. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`, and the full settings system still defines 13 tabs while `Facial Recognition` and `AI Assistant` remain temporarily hidden by release hold for the active release line.
+> **Last Updated:** 2026-05-02  
+> **Status:** Verified against the current standalone Smart Sentry v3.5.2 release candidate. The canonical runtime settings file is versionless at `app/config/smart_sentry_settings.json`; older versioned settings paths remain compatibility fallbacks only and are migrated forward on load. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`. The full settings system defines 13 tabs, with `Facial Recognition` active in the runtime surface and `AI Assistant` still temporarily hidden by release hold for the current release line.
 
 Primary behavior-contract note: for the current authoritative tracking, PIR, target-loss, center-aim, and fire-gating blueprint, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md` first before changing engine or preset behavior.
 
@@ -54,8 +54,8 @@ On single-camera systems, Smart Sentry should normally use camera index `0` unle
 - **Runtime diagnostics:** the status area now includes pinned hardware-monitor cards plus a live sound-link readout
 - **Runtime data export:** the Controls page can write timestamped JSON and Markdown runtime captures under the repo snapshot folder and expose a direct open-folder action for the saved files
 - **Preview resiliency:** local camera preview now keeps a reduced-overlay live fallback active when detector callbacks lag and records blackout-frame counts in runtime snapshots; sustained successful-but-near-black webcam frames now trigger source recovery instead of silently remaining black
-- **Operator expansion:** the underlying settings system still includes Facial Recognition, Shortcut Keys, and AI Assistant surfaces plus a pinned top-row `Quick Keys` action, with Facial Recognition and AI Assistant currently held out of the active release line through the documented release-hold workflow
-- **Known-face support:** Smart Sentry can now load and persist a lightweight face library, register new identities from images or the current live frame, label recognized faces in the preview, and optionally keep friendly known faces out of the engagement path
+- **Operator expansion:** the runtime surface now includes active Facial Recognition and Shortcut Keys surfaces plus a pinned top-row `Quick Keys` action; the AI Assistant surface remains available in code but is still hidden by release hold for the current release line
+- **Known-face support:** Smart Sentry can now load and persist a lightweight face library, register new identities from images or the current live frame, label recognized faces in the preview, automatically clear enrollment overlays after save, return from enrollment photos to live camera, and suppress recognized friendly identities from engagement in the autotracking path
 - **Settings compatibility:** the canonical runtime settings file remains authoritative while the legacy nested settings file is kept synchronized for compatibility
 - **Acoustic Guard:** USB microphone anomaly detection now runs as a background thread using adaptive EWMA baseline tracking; on anomaly, the turret performs a quick smooth three-point initial search (45° → 135° → 230°) followed by a slow full-range secondary sweep with slight tilt bobbing; visual target detection stays active during acoustic movement and immediately takes priority if a target is found
 - **QA bar sensor toggles:** the Quick Access chip bar under the video panel now includes dedicated one-click toggle buttons for Acoustic Guard (🎤) and PIR Sensors (🟥), bidirectionally synced with their corresponding Guard tab checkboxes
@@ -192,15 +192,15 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 8. **Guard** — Guard position, rest position, startup/close rest behavior, PIR guard controls, Acoustic Guard (USB microphone anomaly detection with sensitivity presets and test trigger), patrol mode, sweep/waypoint/random parameters, guided home/rest motion tuning
 9. **Theme** — visual preset selection plus live accent, transparency, contrast, radius, and contrast tuning; panel font zoom remains supported through the hidden Shift+wheel shortcut rather than a visible slider
 10. **Controls** — Manual pan/tilt matrix, visible `Wake Up` / `Go Rest` actions, sound controls, runtime data export and open-folder actions, LED/laser/safety toggles, Auto Lighting Control group (auto enable toggle, manual PWM slider, dark threshold, min/max PWM range, live scene luma readout)
-11. **Facial Recognition** — visible release-held tab for the unfinished known-face workflow; kept in the UI but disabled for the active release line
+11. **Facial Recognition** — active known-face workflow with photo-browse enrollment, per-face naming, per-face target/non-target tagging, preview overlays, and live suppression support
 12. **Shortcut Keys** — live shortcut status, assigned key summary, and quick-reference access
-13. **AI Assistant** — visible release-held tab for the unfinished local assistant workflow; kept in the UI but disabled for the active release line
+13. **AI Assistant** — local Ollama assistant workflow remains implemented in code but is still hidden by release hold for the active release line
 
-**Verified current layout note:** the underlying settings architecture still defines 13 icon-forward settings tabs inside a full-height right-side panel, with a pinned header and top-row `Quick Keys` button above the tabs and compact Status/Log areas below the video rather than as separate tabs. For the active release line, the Facial Recognition and AI Assistant tabs are temporarily hidden through the documented release-hold convention and restored by removing their hold entries.
+**Verified current layout note:** the underlying settings architecture still defines 13 icon-forward settings tabs inside a full-height right-side panel, with a pinned header and top-row `Quick Keys` button above the tabs and compact Status/Log areas below the video rather than as separate tabs. For the active release line, Facial Recognition is active while AI Assistant remains temporarily hidden through the documented release-hold convention.
 
 **Verified current runtime note:** the Controls page now includes persisted Sound ON/OFF and volume controls, visible `Wake Up` / `Go Rest` buttons, read-only runtime data export controls, and an open-folder shortcut for saved exports, while the Status area surfaces live sound-link transport state alongside the hardware monitor. The Serial Output panel now also supports timestamped log export plus a direct open-folder action for AI analysis and troubleshooting.
 
-**Verified current identity note:** the underlying Facial Recognition implementation persists its face library at the versionless canonical path `app/config/smart_sentry_faces.json`, still supports legacy versioned face-library files as migration fallbacks, and keeps the lightweight Haar-cascade plus embedding workflow in the codebase; the tab is intentionally on release hold for the active release line and is not part of the active release surface.
+**Verified current identity note:** the Facial Recognition implementation persists its face library at the versionless canonical path `app/config/smart_sentry_faces.json`, still supports legacy versioned face-library files as migration fallbacks, and uses a lightweight Haar-cascade plus embedding workflow. The tab is active in the current runtime surface and includes preview enrollment, save/update profile flows, friendly/target tagging, and engagement suppression controls.
 
 **Verified current shortcut note:** the top-row `Quick Keys` button and the Shortcut Keys tab both point operators to `SMART_SENTRY_SHORTCUT_KEYS.md`, and the live shortcut runtime stays window-focused so hotkeys only fire while the Smart Sentry window is active. Manual movement now accepts both `W/A/S/D` and `Left/Right/Up/Down` arrows when the manual keyboard toggle is enabled.
 
@@ -211,6 +211,11 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 **Verified current WiFi adapter note:** the Connection tab WiFi UDP panel includes a `WiFi Adapter` dropdown that lists all Windows WiFi interfaces detected via `netsh`. Setting it to a dedicated USB dongle (e.g. `SMART SENTRY CON`) locks the auto-reconnect watchdog to that adapter for all `netsh wlan connect` calls, preventing the app from accidentally joining the ESP32 SSID on the wrong adapter. The selection is saved to `ConnectionConfig.wifi_interface`.
 
 **Verified current AI assistant note:** the underlying local Ollama-backed assistant implementation remains in the codebase with deterministic runtime analysis and fallback behavior, but the AI Assistant tab is intentionally on release hold for the active release line and is not part of the active release surface.
+
+**AI + Speech readiness summary (current app):**
+- **Text-to-speech (Qt / Windows SAPI):** implemented and wired for identity announcements, AI spoken replies, test/fallback phrases, voice style/rate/pitch/volume control, diagnostics, and speech-state tracking.
+- **AI local assistant:** implemented with local Ollama connectivity checks, model listing, runtime-analysis/recommendation/prompt tasks, deterministic fallback when Ollama is unavailable, and a bounded set of supported local actions (mode switching, camera/link toggles, face-recognition toggle, shortcuts toggle, voice toggles, home/rest/position commands).
+- **Release state:** AI tab remains under release hold; implementation is present but not part of the active release surface until the hold is removed and validation is completed.
 
 **Verified current Threat AI note:** the Threat AI page now shows saved-data and model status text, exposes an `Open ML Folder` action only when real saved data or model artifacts exist, and includes an operator-facing description of how logged training examples and optional ML refinement interact with the weighted threat scorer.
 

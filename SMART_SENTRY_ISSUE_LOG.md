@@ -161,6 +161,17 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
+### ISS-101 | 2026-05-02 | v3.5.2 | Engine/UI | Worked
+**Friendly Face Still Treated as Target + Enrollment Preview Not Clearing**
+
+- **Symptoms**: A saved friendly/non-target face could still be tracked as a normal body target between face-refresh cycles, and enrollment face boxes could remain on the preview after save. Operators also needed a faster way to close enrollment photos and return to live feed.
+- **Root Cause**: Face-to-body annotation relied on IoU-only matching. Between face-match refresh intervals, moving subjects could drop below overlap threshold and lose friendly annotation for that frame. Enrollment candidates were not always cleared after save, so preview overlays could persist.
+- **Fix/Solution**: Added centroid-distance fallback for face-to-body association when IoU is low, preserving friendly annotation and suppression stability while subjects move. Save flow now clears enrollment candidates/overlays and returns test-image preview to live camera. Added compact quick controls on the video QA bar for face-recognition toggle, auto-export toggle, and auto-lighting flyout.
+- **Files Modified**: `app/sentry_v2/sentry_v2_tab.py`, `RECENT_UPDATES.json`, `SMART_SENTRY_MANUAL.md`, `SMART_SENTRY_ISSUE_LOG.md`
+- **Notes**: This change improves suppression continuity without changing threat-score math. Final suppression still depends on `face_recognition.enabled` and `suppress_known_faces_from_engagement`.
+
+---
+
 ### ISS-100 | 2026-04-30 | v3.5.1 | Engine/Camera/UI | Worked
 **Aiming/Tracking Slowness from Stale ENGAGING Pose Gate and Conservative Live Preview Cadence**
 

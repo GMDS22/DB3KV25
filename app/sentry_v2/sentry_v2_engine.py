@@ -189,6 +189,7 @@ class SentryV2Engine:
         self._sound_alert_points: List[Tuple[float, float]] = []
         self._sound_alert_point_index: int = 0
         self._sound_alert_step_started: bool = False
+        self._sound_alert_step_arrived_time: float = 0.0
         self._sound_alert_sweep_stage: int = 0
         self._sound_alert_note: str = ""
         self._sound_alert_note_time: float = 0.0
@@ -349,6 +350,7 @@ class SentryV2Engine:
         self._sound_alert_points = []
         self._sound_alert_point_index = 0
         self._sound_alert_step_started = False
+        self._sound_alert_step_arrived_time = 0.0
         self._sound_alert_sweep_stage = 0
         self._sound_alert_note = ""
         self._sound_alert_note_time = 0.0
@@ -685,6 +687,7 @@ class SentryV2Engine:
         self._sound_alert_points = []
         self._sound_alert_point_index = 0
         self._sound_alert_step_started = False
+        self._sound_alert_step_arrived_time = 0.0
         self._sound_alert_sweep_stage = 0
         if reason:
             self._set_sound_alert_note(reason)
@@ -699,14 +702,17 @@ class SentryV2Engine:
         self._sound_alert_points = self._build_sound_initial_points()
         self._sound_alert_point_index = 0
         self._sound_alert_step_started = False
+        self._sound_alert_step_arrived_time = 0.0
         self._sound_alert_sweep_stage = 0
         self._sound_alert_last_started = now
         self._set_sound_alert_note("Acoustic alert: initial search pattern")
 
     def _build_sound_initial_points(self) -> List[Tuple[float, float]]:
         guard_tilt = self._clamp_tilt(float(self.cfg.guard.guard_tilt))
-        # Requested quick-search pattern for sound events: left cue -> center -> right cue.
-        raw_points = (45.0, 135.0, 230.0)
+        guard_pan = float(self.cfg.guard.guard_pan)
+        offset = max(5.0, float(getattr(self.cfg.acoustic_guard, "quick_lr_offset_deg", 22.0) or 22.0))
+        # Quick-search pattern anchored to guard pan: left -> center -> right.
+        raw_points = (guard_pan - offset, guard_pan, guard_pan + offset)
         points: List[Tuple[float, float]] = []
         for pan in raw_points:
             points.append((self._clamp_pan(float(pan)), guard_tilt))
@@ -736,17 +742,25 @@ class SentryV2Engine:
 
             target_pan, target_tilt = self._sound_alert_points[self._sound_alert_point_index]
             quick_speed = max(45.0, float(getattr(self.cfg.guard, "sweep_speed", 22.0)) * 2.8)
-            arrived = self._patrol_move_toward(target_pan, target_tilt, quick_speed, dt)
             if not self._sound_alert_step_started:
                 self._sound_alert_step_started = True
                 self._sound_alert_phase_started = now
+                self._sound_alert_step_arrived_time = 0.0
                 self._set_sound_alert_note(
-                    f"Acoustic alert: quick search {self._sound_alert_point_index + 1}/3 -> pan {target_pan:.1f}",
+                    f"Acoustic alert: quick search {self._sound_alert_point_index + 1}/{len(self._sound_alert_points)} -> pan {target_pan:.1f}",
                     when=now,
                 )
+            # If already at this waypoint, dwell before advancing.
+            if self._sound_alert_step_arrived_time > 0.0:
+                hold_s = self._sound_alert_hold_s("quick_lr_hold_s", 0.26)
+                if (now - self._sound_alert_step_arrived_time) >= hold_s:
+                    self._sound_alert_point_index += 1
+                    self._sound_alert_step_started = False
+                    self._sound_alert_step_arrived_time = 0.0
+                return
+            arrived = self._patrol_move_toward(target_pan, target_tilt, quick_speed, dt)
             if arrived:
-                self._sound_alert_point_index += 1
-                self._sound_alert_step_started = False
+                self._sound_alert_step_arrived_time = now
             return
 
         if phase == "sweep":

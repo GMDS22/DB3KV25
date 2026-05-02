@@ -625,10 +625,6 @@ SETTINGS_TAB_NAV_LABELS = {
 
 # Release-hold convention: keep unfinished tabs out of the active release UI until validated.
 SETTINGS_TAB_RELEASE_HOLDS: Dict[str, Dict[str, str]] = {
-    "Facial Recognition": {
-        "badge": "Release Hold",
-        "message": f"Temporarily disabled for the Smart Sentry v{SMART_SENTRY_RELEASE_VERSION} release while the face-recognition workflow completes release validation.",
-    },
     "AI Assistant": {
         "badge": "Release Hold",
         "message": f"Temporarily disabled for the Smart Sentry v{SMART_SENTRY_RELEASE_VERSION} release while the local assistant workflow completes release validation.",
@@ -3390,6 +3386,7 @@ class SentryV2TabWidget(QWidget):
         self._last_face_match_eval_s: float = 0.0
         self._last_face_person_boxes: List[Tuple[int, int, int, int]] = []
         self._last_face_runtime_status_text: str = ""
+        self._face_registration_candidates: List[Dict[str, object]] = []
         self._last_announced_identity_at: Dict[str, float] = {}
         self._last_gesture_identity_at: Dict[str, float] = {}
         self._shortcut_bindings: List[QShortcut] = []
@@ -4386,19 +4383,27 @@ class SentryV2TabWidget(QWidget):
         self._btn_behaviour_curious_qa.setChecked(_beh_init == 1)
         self._btn_behaviour_strict_qa.setChecked(_beh_init == 2)
 
-        self._lbl_auto_luma_qa = QLabel("")
-        self._set_theme_role(self._lbl_auto_luma_qa, "mutedCompact")
-        _qa_chip_bar_lay.addWidget(self._lbl_auto_luma_qa)
+        # Auto-lighting info button (toggles flyout)
+        self._btn_auto_light_flyout_qa = _mk_qa_btn("\U0001f4ca", "Auto Lighting — click to show luma / PWM info", checkable=True)
+        self._btn_auto_light_flyout_qa.setChecked(False)
+        _qa_chip_bar_lay.addWidget(self._btn_auto_light_flyout_qa)
 
-        self._chk_auto_export_runtime_qa = QCheckBox("Auto Export Logs + Snapshot")
-        self._chk_auto_export_runtime_qa.setObjectName("qaAutoExportCheck")
+        # Face recognition toggle
+        self._btn_face_qa = _mk_qa_btn("\U0001f9b6", "Face Recognition ON/OFF", checkable=True)
+        self._btn_face_qa.setChecked(bool(self.config.face_recognition.enabled))
+        self._btn_face_qa.setToolTip(
+            "Face Recognition ON/OFF.\nToggle known-face recognition in the live detection pipeline."
+        )
+        _qa_chip_bar_lay.addWidget(self._btn_face_qa)
+
+        # Auto-export logs icon button (replaces checkbox)
+        self._chk_auto_export_runtime_qa = _mk_qa_btn("\U0001f4be", "Auto Export Logs + Snapshot ON/OFF", checkable=True)
         self._chk_auto_export_runtime_qa.setChecked(
             bool(getattr(self.config, "auto_export_logs_and_snapshot_on_close", False))
         )
-        self._chk_auto_export_runtime_qa.setToolTip(
-            "Automatically export serial logs and runtime snapshot when closing the app"
+        self._chk_auto_export_runtime_qa.clicked.connect(
+            lambda checked: self._on_auto_export_runtime_toggled(checked)
         )
-        self._chk_auto_export_runtime_qa.toggled.connect(self._on_auto_export_runtime_toggled)
         _qa_chip_bar_lay.addWidget(self._chk_auto_export_runtime_qa)
 
         _qa_sep_ovl = QFrame()
@@ -4513,6 +4518,27 @@ class SentryV2TabWidget(QWidget):
         self._qa_tune_flyout.setVisible(False)
         _video_container_lay.addWidget(self._qa_tune_flyout, 0)
 
+        # ---- Auto-lighting info flyout (hidden by default, toggled by _btn_auto_light_flyout_qa) ----
+        self._qa_autolight_flyout = QWidget()
+        self._qa_autolight_flyout.setObjectName("qaTuneFlyout")
+        _al_lay = QHBoxLayout(self._qa_autolight_flyout)
+        _al_lay.setContentsMargins(6, 4, 6, 4)
+        _al_lay.setSpacing(12)
+
+        self._chk_auto_lighting_flyout = QCheckBox("Auto Lighting")
+        self._chk_auto_lighting_flyout.setChecked(bool(getattr(self.config.lighting, "auto_lighting_enabled", False)))
+        self._chk_auto_lighting_flyout.setToolTip("Enable automatic LED brightness control based on scene luminance.")
+        self._chk_auto_lighting_flyout.toggled.connect(self._on_auto_lighting_toggled)
+        _al_lay.addWidget(self._chk_auto_lighting_flyout)
+
+        self._lbl_auto_luma_qa = QLabel("luma: —")
+        self._set_theme_role(self._lbl_auto_luma_qa, "mutedCompact")
+        _al_lay.addWidget(self._lbl_auto_luma_qa)
+
+        _al_lay.addStretch(1)
+        self._qa_autolight_flyout.setVisible(False)
+        _video_container_lay.addWidget(self._qa_autolight_flyout, 0)
+
         self._layout_splitter.addWidget(_video_container)
 
         self._bottom_info_splitter = QSplitter(Qt.Horizontal)
@@ -4616,6 +4642,13 @@ class SentryV2TabWidget(QWidget):
         self._chk_show_video.toggled.connect(self._on_show_video_toggled)
         self._chk_show_video.setToolTip("Toggle video display on/off (detection continues running)")
         toggle_row_layout.addWidget(self._chk_show_video)
+
+        self._chk_face_quick_toggle = QCheckBox("Face Recognition")
+        self._set_theme_role(self._chk_face_quick_toggle, "headlineToggle")
+        self._chk_face_quick_toggle.setChecked(bool(self.config.face_recognition.enabled))
+        self._chk_face_quick_toggle.toggled.connect(self._on_face_runtime_settings_changed)
+        self._chk_face_quick_toggle.setToolTip("Toggle known-face recognition in the live detection pipeline")
+        toggle_row_layout.addWidget(self._chk_face_quick_toggle)
         toggle_row_layout.addStretch(1)
 
         self._btn_quick_keys = QPushButton("Quick Keys")
@@ -8813,7 +8846,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         lay.setSpacing(6)
 
         intro = QLabel(
-            "Identify known faces from imported images or the live camera feed. Friendly profiles can be announced and optionally excluded from engagement."
+            "Load a photo into the video panel, let Smart Sentry detect each face, then assign a name and whether that person is a target or a non-target. Recognized non-targets can be kept out of engagement, while recognized targets continue through the normal aim-and-fire body tracking path."
         )
         intro.setWordWrap(True)
         self._set_theme_role(intro, "subtleBody")
@@ -8842,7 +8875,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._spin_face_min_size.valueChanged.connect(self._on_face_runtime_settings_changed)
         runtime_lay.addWidget(self._spin_face_min_size, 2, 1)
 
-        self._chk_face_suppress = QCheckBox("Suppress friendly known faces from engagement")
+        self._chk_face_suppress = QCheckBox("Suppress recognized non-targets from engagement")
         self._chk_face_suppress.setChecked(bool(self.config.face_recognition.suppress_known_faces_from_engagement))
         self._chk_face_suppress.toggled.connect(self._on_face_runtime_settings_changed)
         runtime_lay.addWidget(self._chk_face_suppress, 3, 0, 1, 2)
@@ -8852,7 +8885,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._chk_face_announce.toggled.connect(self._on_face_runtime_settings_changed)
         runtime_lay.addWidget(self._chk_face_announce, 4, 0, 1, 2)
 
-        self._chk_face_gesture = QCheckBox("Friendly reaction gesture for recognized family")
+        self._chk_face_gesture = QCheckBox("Greeting gesture for recognized non-targets")
         self._chk_face_gesture.setChecked(bool(self.config.face_recognition.cute_gesture_enabled))
         self._chk_face_gesture.toggled.connect(self._on_face_runtime_settings_changed)
         runtime_lay.addWidget(self._chk_face_gesture, 5, 0, 1, 2)
@@ -8861,9 +8894,83 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_face_runtime_status.setWordWrap(True)
         self._set_theme_role(self._lbl_face_runtime_status, "mutedCompact")
         runtime_lay.addWidget(self._lbl_face_runtime_status, 6, 0, 1, 2)
-        lay.addWidget(self._collapsible(runtime_grp, collapsed=False))
+        lay.addWidget(self._collapsible(runtime_grp, collapsed=True))
 
-        enroll_grp = QGroupBox("Known Faces")
+        import_grp = QGroupBox("Photo Enrollment")
+        import_lay = QVBoxLayout(import_grp)
+        import_note = QLabel(
+            "Browse a photo and it will open on the main video panel. Smart Sentry will detect faces from that preview and list one editable row per face below."
+        )
+        import_note.setWordWrap(True)
+        self._set_theme_role(import_note, "mutedCompact")
+        import_lay.addWidget(import_note)
+
+        import_actions = QHBoxLayout()
+        btn_browse_photo = QPushButton("Browse Photo")
+        self._set_button_role(btn_browse_photo, "utility")
+        btn_browse_photo.clicked.connect(self._browse_face_registration_photo)
+        import_actions.addWidget(btn_browse_photo)
+
+        btn_detect_preview = QPushButton("Detect Faces In Preview")
+        self._set_button_role(btn_detect_preview, "utility")
+        btn_detect_preview.clicked.connect(self._detect_faces_from_current_preview)
+        import_actions.addWidget(btn_detect_preview)
+
+        btn_detect_live = QPushButton("Detect Faces From Live Frame")
+        self._set_button_role(btn_detect_live, "utility")
+        btn_detect_live.clicked.connect(self._detect_faces_from_live_frame)
+        import_actions.addWidget(btn_detect_live)
+
+        btn_close_preview = QPushButton("\u2716 Close Photo")
+        self._set_button_role(btn_close_preview, "utility")
+        btn_close_preview.setToolTip("Close the enrollment photo and return to the live camera feed.")
+        btn_close_preview.clicked.connect(self._face_close_enrollment_preview)
+        import_actions.addWidget(btn_close_preview)
+        import_actions.addStretch(1)
+        import_lay.addLayout(import_actions)
+
+        self._lbl_face_import_status = QLabel("")
+        self._lbl_face_import_status.setWordWrap(True)
+        self._set_theme_role(self._lbl_face_import_status, "mutedCompact")
+        import_lay.addWidget(self._lbl_face_import_status)
+        lay.addWidget(self._collapsible(import_grp, collapsed=True))
+
+        candidates_grp = QGroupBox("Detected Faces In Preview")
+        candidates_lay = QVBoxLayout(candidates_grp)
+        candidates_note = QLabel(
+            "Enter a name for each detected face and mark whether it should be treated as a target. Saving updates the local face library used by the live runtime."
+        )
+        candidates_note.setWordWrap(True)
+        self._set_theme_role(candidates_note, "mutedCompact")
+        candidates_lay.addWidget(candidates_note)
+
+        self._face_candidate_scroll = QScrollArea()
+        self._face_candidate_scroll.setWidgetResizable(True)
+        self._face_candidate_scroll.setFrameShape(QFrame.NoFrame)
+        self._face_candidate_scroll.setMinimumHeight(320)
+        self._face_candidate_container = QWidget()
+        self._face_candidate_layout = QVBoxLayout(self._face_candidate_container)
+        self._face_candidate_layout.setContentsMargins(0, 0, 0, 0)
+        self._face_candidate_layout.setSpacing(8)
+        self._face_candidate_layout.addStretch(1)
+        self._face_candidate_scroll.setWidget(self._face_candidate_container)
+        candidates_lay.addWidget(self._face_candidate_scroll, 1)
+
+        candidate_actions = QHBoxLayout()
+        btn_save_detected = QPushButton("Save Detected Faces")
+        self._set_button_role(btn_save_detected, "primary")
+        btn_save_detected.clicked.connect(self._save_detected_face_candidates)
+        candidate_actions.addWidget(btn_save_detected)
+
+        btn_clear_detected = QPushButton("Clear")
+        self._set_button_role(btn_clear_detected, "utility")
+        btn_clear_detected.clicked.connect(self._clear_face_registration_candidates)
+        candidate_actions.addWidget(btn_clear_detected)
+        candidate_actions.addStretch(1)
+        candidates_lay.addLayout(candidate_actions)
+        lay.addWidget(self._collapsible(candidates_grp, collapsed=False))
+
+        enroll_grp = QGroupBox("Saved Face Profiles")
         enroll_lay = QGridLayout(enroll_grp)
         enroll_lay.addWidget(QLabel("Profile Name:"), 0, 0)
         self._edit_face_profile_name = QLineEdit()
@@ -8875,15 +8982,15 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._edit_face_profile_notes.setPlaceholderText("Optional note about this face profile")
         enroll_lay.addWidget(self._edit_face_profile_notes, 1, 1, 1, 2)
 
-        self._chk_face_profile_friendly = QCheckBox("Friendly / family profile")
-        self._chk_face_profile_friendly.setChecked(True)
-        enroll_lay.addWidget(self._chk_face_profile_friendly, 2, 0, 1, 3)
+        self._chk_face_profile_target = QCheckBox("Treat this recognized person as a target")
+        self._chk_face_profile_target.setChecked(False)
+        enroll_lay.addWidget(self._chk_face_profile_target, 2, 0, 1, 3)
 
         self._chk_face_profile_announce = QCheckBox("Announce this name when recognized")
         self._chk_face_profile_announce.setChecked(True)
         enroll_lay.addWidget(self._chk_face_profile_announce, 3, 0, 1, 3)
 
-        self._chk_face_profile_gesture = QCheckBox("Allow friendly reaction gesture")
+        self._chk_face_profile_gesture = QCheckBox("Allow greeting gesture when this person is a non-target")
         self._chk_face_profile_gesture.setChecked(True)
         enroll_lay.addWidget(self._chk_face_profile_gesture, 4, 0, 1, 3)
 
@@ -8891,10 +8998,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._face_profile_list.currentItemChanged.connect(self._on_face_profile_selected)
         enroll_lay.addWidget(self._face_profile_list, 5, 0, 1, 3)
 
-        btn_import_faces = QPushButton("Add Images")
-        self._set_button_role(btn_import_faces, "utility")
-        btn_import_faces.clicked.connect(self._register_face_from_images)
-        enroll_lay.addWidget(btn_import_faces, 6, 0)
+        btn_update_face = QPushButton("Update Selected")
+        self._set_button_role(btn_update_face, "utility")
+        btn_update_face.clicked.connect(self._update_selected_face_profile)
+        enroll_lay.addWidget(btn_update_face, 6, 0)
 
         btn_capture_face = QPushButton("Add Live")
         self._set_button_role(btn_capture_face, "utility")
@@ -8917,6 +9024,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         lay.addStretch()
         self._rebuild_face_profile_list()
+        self._rebuild_face_registration_candidates_ui()
         self._update_face_runtime_status()
         return w
 
@@ -10498,6 +10606,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         display = frame.copy()
         display = self.overlay.draw(display, self.engine, include_target_boxes=include_target_boxes)
         self._draw_face_identity_overlays(display, list(getattr(self, "_last_face_matches", []) or []))
+        self._draw_face_registration_preview_overlays(display)
         if include_scope_view and self._scope_view_active():
             display = self.overlay.apply_scope_view(display, self.engine)
         self._draw_no_fire_mask_draft(display)
@@ -15924,7 +16033,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._face_profile_list.blockSignals(True)
         self._face_profile_list.clear()
         for profile in self._face_library.profiles:
-            suffix = "friendly" if bool(profile.friendly) else "watch"
+            suffix = "non-target" if bool(profile.friendly) else "target"
             item = QListWidgetItem(f"{profile.name} ({len(profile.embeddings)} samples, {suffix})")
             item.setData(Qt.UserRole, str(profile.profile_id))
             self._face_profile_list.addItem(item)
@@ -15942,15 +16051,291 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if profile is None:
             self._edit_face_profile_name.clear()
             self._edit_face_profile_notes.clear()
-            self._chk_face_profile_friendly.setChecked(True)
+            self._chk_face_profile_target.setChecked(False)
             self._chk_face_profile_announce.setChecked(True)
             self._chk_face_profile_gesture.setChecked(True)
             return
         self._edit_face_profile_name.setText(str(profile.name))
         self._edit_face_profile_notes.setText(str(profile.notes or ""))
-        self._chk_face_profile_friendly.setChecked(bool(profile.friendly))
+        self._chk_face_profile_target.setChecked(not bool(profile.friendly))
         self._chk_face_profile_announce.setChecked(bool(profile.announce_name))
         self._chk_face_profile_gesture.setChecked(bool(profile.cute_gesture))
+
+    def _set_checkbox_checked_silently(self, checkbox: Optional[QCheckBox], checked: bool) -> None:
+        if checkbox is None:
+            return
+        checkbox.blockSignals(True)
+        checkbox.setChecked(bool(checked))
+        checkbox.blockSignals(False)
+
+    def _current_face_registration_frame(self) -> Optional[np.ndarray]:
+        if self._local_source_kind == "test_image":
+            image_frame = getattr(self, "_test_media_image_frame", None)
+            if isinstance(image_frame, np.ndarray) and image_frame.size > 0:
+                return image_frame.copy()
+        frame = getattr(self, "_last_raw_frame", None)
+        if isinstance(frame, np.ndarray) and frame.size > 0:
+            return frame.copy()
+        image_frame = getattr(self, "_test_media_image_frame", None)
+        if isinstance(image_frame, np.ndarray) and image_frame.size > 0:
+            return image_frame.copy()
+        last_frame = getattr(self, "_test_media_last_frame", None)
+        if isinstance(last_frame, np.ndarray) and last_frame.size > 0:
+            return last_frame.copy()
+        return None
+
+    def _set_face_import_status(self, text: str) -> None:
+        if hasattr(self, "_lbl_face_import_status"):
+            self._lbl_face_import_status.setText(str(text or ""))
+
+    def _browse_face_registration_photo(self) -> None:
+        start_dir = Path.cwd()
+        current_source = str(self._local_source_label or "").strip()
+        if current_source:
+            try:
+                candidate = Path(current_source).expanduser()
+                if candidate.exists():
+                    start_dir = candidate.parent if candidate.is_file() else candidate
+            except Exception:
+                pass
+        selected_path, _selected_filter = QFileDialog.getOpenFileName(
+            self,
+            "Open Face Registration Photo",
+            str(start_dir),
+            "Image Files (*.jpg *.jpeg *.png *.bmp *.tif *.tiff *.webp);;All Files (*.*)",
+        )
+        if not selected_path:
+            return
+        self._open_test_media(selected_path)
+        image_frame = cv2.imread(str(Path(selected_path)))
+        if image_frame is not None and getattr(image_frame, "size", 0) > 0:
+            self._detect_faces_from_frame(image_frame, source_label=Path(selected_path).name)
+            return
+        self._detect_faces_from_current_preview()
+
+    def _detect_faces_from_live_frame(self) -> None:
+        frame = getattr(self, "_last_raw_frame", None)
+        if frame is None or getattr(frame, "size", 0) == 0:
+            self._log("Face detection unavailable: no live frame captured yet")
+            self._set_face_import_status("No live frame available yet. Open a camera or load a photo first.")
+            return
+        self._detect_faces_from_frame(frame.copy(), source_label="live frame")
+
+    def _detect_faces_from_current_preview(self) -> None:
+        frame = self._current_face_registration_frame()
+        if frame is None:
+            self._log("Face detection unavailable: no preview frame or photo is loaded")
+            self._set_face_import_status("No preview frame available. Browse a photo or open a camera first.")
+            return
+        source_label = "preview"
+        if self._local_source_kind == "test_image" and self._local_source_label:
+            source_label = Path(str(self._local_source_label)).name
+        elif self._local_source_kind == "camera":
+            source_label = "camera preview"
+        self._detect_faces_from_frame(frame, source_label=source_label)
+
+    def _detect_faces_from_frame(self, frame: np.ndarray, *, source_label: str) -> None:
+        face_boxes = self._face_runtime.detect_faces(
+            frame,
+            min_face_size_px=int(self.config.face_recognition.min_face_size_px),
+        )
+        if not face_boxes:
+            self._face_registration_candidates = []
+            self._rebuild_face_registration_candidates_ui()
+            self._force_next_display_refresh = True
+            self._set_face_import_status(f"No faces detected in {source_label}.")
+            self._log(f"No faces detected in {source_label}")
+            return
+        embeddings = self._face_runtime.extract_embeddings_from_bboxes(frame, face_boxes)
+        known_matches = self._face_runtime.match_known_faces(
+            frame,
+            min_face_size_px=int(self.config.face_recognition.min_face_size_px),
+            threshold=float(self.config.face_recognition.recognition_threshold),
+        )
+        candidates: List[Dict[str, object]] = []
+        for index, (bbox, embedding) in enumerate(zip(face_boxes, embeddings), start=1):
+            if embedding is None:
+                continue
+            x, y, w, h = [int(v) for v in bbox]
+            crop = frame[y:y + h, x:x + w]
+            preview = None
+            if crop.size > 0:
+                preview_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                preview = np.ascontiguousarray(preview_rgb)
+            matched = None
+            matched_score = 0.0
+            for match in known_matches:
+                score = self._bbox_iou(tuple(bbox), tuple(match.bbox))
+                if score > matched_score:
+                    matched = match
+                    matched_score = score
+            is_target = False
+            candidate_name = f"Face {index}"
+            announce = True
+            gesture = True
+            if matched is not None and matched_score >= 0.10:
+                candidate_name = str(matched.name or candidate_name)
+                is_target = not bool(matched.friendly)
+                announce = bool(matched.announce_name)
+                gesture = bool(matched.cute_gesture)
+            candidates.append({
+                "bbox": tuple(bbox),
+                "embedding": embedding,
+                "name": candidate_name,
+                "is_target": is_target,
+                "announce": announce,
+                "gesture": gesture,
+                "preview": preview,
+            })
+        self._face_registration_candidates = candidates
+        self._rebuild_face_registration_candidates_ui()
+        self._force_next_display_refresh = True
+        self._set_face_import_status(f"Detected {len(candidates)} face(s) in {source_label}. Name each one and save.")
+        self._log(f"Detected {len(candidates)} face(s) in {source_label}")
+
+    def _rebuild_face_registration_candidates_ui(self) -> None:
+        if not hasattr(self, "_face_candidate_layout"):
+            return
+        while self._face_candidate_layout.count():
+            item = self._face_candidate_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        for index, candidate in enumerate(self._face_registration_candidates, start=1):
+            row = QFrame()
+            row.setFrameShape(QFrame.StyledPanel)
+            row_lay = QHBoxLayout(row)
+            row_lay.setContentsMargins(8, 8, 8, 8)
+            row_lay.setSpacing(10)
+
+            preview_label = QLabel()
+            preview_label.setFixedSize(76, 76)
+            preview_label.setAlignment(Qt.AlignCenter)
+            preview = candidate.get("preview")
+            if isinstance(preview, np.ndarray) and preview.size > 0:
+                ph, pw = preview.shape[:2]
+                bytes_per_line = int(preview.strides[0])
+                qimg = QImage(preview.data, pw, ph, bytes_per_line, QImage.Format_RGB888)
+                pixmap = QPixmap.fromImage(qimg.copy())
+                preview_label.setPixmap(pixmap.scaled(72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            else:
+                preview_label.setText(f"Face\n{index}")
+            row_lay.addWidget(preview_label)
+
+            form = QGridLayout()
+            form.addWidget(QLabel(f"Face {index}"), 0, 0, 1, 2)
+            form.addWidget(QLabel("Name:"), 1, 0)
+            name_edit = QLineEdit(str(candidate.get("name") or ""))
+            form.addWidget(name_edit, 1, 1)
+            target_chk = QCheckBox("Target")
+            target_chk.setChecked(bool(candidate.get("is_target", False)))
+            form.addWidget(target_chk, 2, 0)
+            announce_chk = QCheckBox("Announce")
+            announce_chk.setChecked(bool(candidate.get("announce", True)))
+            form.addWidget(announce_chk, 2, 1)
+            gesture_chk = QCheckBox("Gesture if non-target")
+            gesture_chk.setChecked(bool(candidate.get("gesture", True)))
+            form.addWidget(gesture_chk, 3, 0, 1, 2)
+            row_lay.addLayout(form, 1)
+
+            candidate["name_widget"] = name_edit
+            candidate["target_widget"] = target_chk
+            candidate["announce_widget"] = announce_chk
+            candidate["gesture_widget"] = gesture_chk
+            self._face_candidate_layout.addWidget(row)
+        self._face_candidate_layout.addStretch(1)
+
+    def _face_close_enrollment_preview(self) -> None:
+        """Clear enrollment candidate rows and return to live camera if a photo is still showing."""
+        self._face_registration_candidates = []
+        self._face_registration_frame = None
+        self._rebuild_face_registration_candidates_ui()
+        self._force_next_display_refresh = True
+        if self._local_source_kind == "test_image":
+            self._return_to_camera()
+
+    def _clear_face_registration_candidates(self) -> None:
+        self._face_registration_candidates = []
+        self._rebuild_face_registration_candidates_ui()
+        self._force_next_display_refresh = True
+        self._set_face_import_status("Cleared detected-face registration rows.")
+
+    def _save_detected_face_candidates(self) -> None:
+        if not self._face_registration_candidates:
+            self._log("Face save skipped: detect faces from a photo or live frame first")
+            self._set_face_import_status("Detect faces first, then save them into the library.")
+            return
+        saved = 0
+        skipped = 0
+        for candidate in self._face_registration_candidates:
+            embedding = candidate.get("embedding")
+            if embedding is None:
+                skipped += 1
+                continue
+            name_edit = candidate.get("name_widget")
+            target_widget = candidate.get("target_widget")
+            announce_widget = candidate.get("announce_widget")
+            gesture_widget = candidate.get("gesture_widget")
+            name = str(name_edit.text() if isinstance(name_edit, QLineEdit) else candidate.get("name") or "").strip()
+            if not name:
+                skipped += 1
+                continue
+            is_target = bool(target_widget.isChecked()) if isinstance(target_widget, QCheckBox) else bool(candidate.get("is_target", False))
+            announce = bool(announce_widget.isChecked()) if isinstance(announce_widget, QCheckBox) else bool(candidate.get("announce", True))
+            gesture = bool(gesture_widget.isChecked()) if isinstance(gesture_widget, QCheckBox) else bool(candidate.get("gesture", True))
+            profile = self._face_library.upsert_profile(
+                name,
+                [embedding],
+                friendly=not is_target,
+                announce_name=announce,
+                cute_gesture=(not is_target) and gesture,
+                notes="",
+            )
+            if profile is None:
+                skipped += 1
+                continue
+            saved += 1
+        if saved <= 0:
+            self._log("Face save failed: no detected rows produced a valid profile")
+            self._set_face_import_status("Nothing was saved. Make sure each face row has a name.")
+            return
+        self._face_runtime.refresh_library(self._face_library)
+        self._save_face_identity_library()
+        self._save_config_quietly()
+        self._rebuild_face_profile_list()
+        self._set_face_import_status(f"Saved {saved} detected face(s) to the library" + (f"; skipped {skipped}." if skipped else "."))
+        self._log(f"Saved {saved} detected face profile(s)" + (f"; skipped {skipped}" if skipped else ""))
+
+        # Auto-enable face recognition so the saved profiles take effect immediately
+        if not bool(self.config.face_recognition.enabled):
+            self.config.face_recognition.enabled = True
+            self._set_checkbox_checked_silently(getattr(self, "_chk_face_enabled", None), True)
+            self._set_checkbox_checked_silently(getattr(self, "_chk_face_quick_toggle", None), True)
+            self._log("Face recognition auto-enabled after saving profiles")
+
+        # Clear the enrollment overlay and return to the live camera
+        self._face_close_enrollment_preview()
+
+    def _update_selected_face_profile(self) -> None:
+        profile = self._selected_face_profile()
+        if profile is None:
+            self._log("Face profile update skipped: no saved profile selected")
+            return
+        name = str(self._edit_face_profile_name.text().strip())
+        if not name:
+            self._log("Face profile update aborted: enter a profile name")
+            return
+        profile.name = name
+        profile.notes = str(self._edit_face_profile_notes.text().strip())
+        profile.friendly = not bool(self._chk_face_profile_target.isChecked())
+        profile.announce_name = bool(self._chk_face_profile_announce.isChecked())
+        profile.cute_gesture = bool(self._chk_face_profile_gesture.isChecked()) and bool(profile.friendly)
+        profile.updated_at = time.time()
+        self._face_runtime.refresh_library(self._face_library)
+        self._save_face_identity_library()
+        self._rebuild_face_profile_list()
+        self._save_config_quietly()
+        self._log(f"Face profile updated: {profile.name}")
 
     def _update_face_runtime_status(self) -> None:
         if not hasattr(self, "_lbl_face_runtime_status"):
@@ -15968,8 +16353,20 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_face_runtime_status.setText(status_text)
 
     def _on_face_runtime_settings_changed(self) -> None:
+        sender = self.sender()
+        enabled_source: Optional[bool] = None
+        if sender is getattr(self, "_chk_face_quick_toggle", None):
+            enabled_source = bool(self._chk_face_quick_toggle.isChecked())
+            self._set_checkbox_checked_silently(getattr(self, "_chk_face_enabled", None), enabled_source)
+        elif sender is getattr(self, "_chk_face_enabled", None):
+            enabled_source = bool(self._chk_face_enabled.isChecked())
+            self._set_checkbox_checked_silently(getattr(self, "_chk_face_quick_toggle", None), enabled_source)
+
         cfg = self.config.face_recognition
-        cfg.enabled = bool(self._chk_face_enabled.isChecked())
+        if hasattr(self, "_chk_face_enabled"):
+            cfg.enabled = bool(self._chk_face_enabled.isChecked())
+        elif enabled_source is not None:
+            cfg.enabled = bool(enabled_source)
         cfg.recognition_threshold = float(self._spin_face_threshold.value())
         cfg.min_face_size_px = int(self._spin_face_min_size.value())
         cfg.suppress_known_faces_from_engagement = bool(self._chk_face_suppress.isChecked())
@@ -15999,9 +16396,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         profile = self._face_library.upsert_profile(
             name,
             vectors,
-            friendly=bool(self._chk_face_profile_friendly.isChecked()),
+            friendly=not bool(self._chk_face_profile_target.isChecked()),
             announce_name=bool(self._chk_face_profile_announce.isChecked()),
-            cute_gesture=bool(self._chk_face_profile_gesture.isChecked()),
+            cute_gesture=bool(self._chk_face_profile_gesture.isChecked()) and not bool(self._chk_face_profile_target.isChecked()),
             notes=str(self._edit_face_profile_notes.text().strip()),
         )
         if profile is None:
@@ -16029,9 +16426,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         profile = self._face_library.upsert_profile(
             name,
             [vector],
-            friendly=bool(self._chk_face_profile_friendly.isChecked()),
+            friendly=not bool(self._chk_face_profile_target.isChecked()),
             announce_name=bool(self._chk_face_profile_announce.isChecked()),
-            cute_gesture=bool(self._chk_face_profile_gesture.isChecked()),
+            cute_gesture=bool(self._chk_face_profile_gesture.isChecked()) and not bool(self._chk_face_profile_target.isChecked()),
             notes=str(self._edit_face_profile_notes.text().strip()),
         )
         if profile is None:
@@ -16134,13 +16531,35 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         for match in matches:
             best_det = None
             best_score = 0.0
+            # Primary: IoU overlap
             for det in annotated:
                 score = self._bbox_iou(tuple(det.bbox), tuple(match.bbox))
                 if score > best_score:
                     best_det = det
                     best_score = score
+            # Fallback: centroid proximity — keeps annotation stable between refresh
+            # cycles when the person has moved since the last face-match evaluation.
             if best_det is None or best_score < 0.05:
-                continue
+                mx, my, mw, mh = (int(v) for v in match.bbox)
+                max_dist = max(80.0, ((mw ** 2 + mh ** 2) ** 0.5) * 0.8)
+                mc_x = mx + mw / 2.0
+                mc_y = my + mh / 2.0
+                best_dist = float("inf")
+                best_det_fb = None
+                for det in annotated:
+                    if det.class_name not in ("person", "face"):
+                        continue
+                    dx, dy, dw, dh = det.bbox
+                    dc_x = dx + dw / 2.0
+                    dc_y = dy + dh / 2.0
+                    dist = ((dc_x - mc_x) ** 2 + (dc_y - mc_y) ** 2) ** 0.5
+                    if dist < best_dist and dist < max_dist:
+                        best_dist = dist
+                        best_det_fb = det
+                if best_det_fb is not None:
+                    best_det = best_det_fb
+                else:
+                    continue
             best_det.identity_label = str(match.name)
             best_det.identity_confidence = float(match.confidence)
             best_det.identity_profile_id = str(match.profile_id)
@@ -16248,6 +16667,23 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             ty = max(18, y - 8)
             cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.48, (0, 0, 0), 2, cv2.LINE_AA)
             cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.48, color, 1, cv2.LINE_AA)
+
+    def _draw_face_registration_preview_overlays(self, frame: np.ndarray) -> None:
+        for index, candidate in enumerate(self._face_registration_candidates, start=1):
+            bbox = candidate.get("bbox")
+            if not isinstance(bbox, tuple) or len(bbox) != 4:
+                continue
+            x, y, w, h = [int(v) for v in bbox]
+            target_widget = candidate.get("target_widget")
+            name_widget = candidate.get("name_widget")
+            is_target = bool(target_widget.isChecked()) if isinstance(target_widget, QCheckBox) else bool(candidate.get("is_target", False))
+            name = str(name_widget.text().strip()) if isinstance(name_widget, QLineEdit) else str(candidate.get("name") or f"Face {index}")
+            color = (70, 120, 255) if is_target else (90, 230, 120)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 1, cv2.LINE_AA)
+            label = f"{name} {'TARGET' if is_target else 'NON-TARGET'}"
+            ty = max(18, y + h + 18 if y < 22 else y - 6)
+            cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.42, (0, 0, 0), 2, cv2.LINE_AA)
+            cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.42, color, 1, cv2.LINE_AA)
 
     def _manual_shortcut_definitions(self) -> List[Tuple[str, str, Callable[[], None], str]]:
         if not bool(getattr(self.config.shortcuts, "manual_controls_enabled", False)):
@@ -19262,6 +19698,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._chk_auto_lighting.setChecked(bool(checked))
             self._chk_auto_lighting.setText(f"Auto Lighting: {'ON' if checked else 'OFF'}")
             self._chk_auto_lighting.blockSignals(False)
+        if hasattr(self, "_chk_auto_lighting_flyout"):
+            self._chk_auto_lighting_flyout.blockSignals(True)
+            self._chk_auto_lighting_flyout.setChecked(bool(checked))
+            self._chk_auto_lighting_flyout.blockSignals(False)
         if hasattr(self, "_chk_auto_lighting_qa"):
             self._chk_auto_lighting_qa.blockSignals(True)
             self._chk_auto_lighting_qa.setChecked(bool(checked))
@@ -19319,6 +19759,25 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         # Tune flyout toggle
         self._btn_tune_qa.clicked.connect(lambda checked: self._qa_tune_flyout.setVisible(checked))
+
+        # Auto-lighting flyout toggle
+        self._btn_auto_light_flyout_qa.clicked.connect(
+            lambda checked: self._qa_autolight_flyout.setVisible(checked)
+        )
+
+        # Face recognition QA button ↔ face enabled checkbox + quick toggle
+        def _on_face_qa_clicked(checked: bool) -> None:
+            self.config.face_recognition.enabled = bool(checked)
+            self._set_checkbox_checked_silently(getattr(self, "_chk_face_enabled", None), checked)
+            self._set_checkbox_checked_silently(getattr(self, "_chk_face_quick_toggle", None), checked)
+            self._save_config_quietly()
+            self._update_face_runtime_status()
+        self._btn_face_qa.clicked.connect(_on_face_qa_clicked)
+        # Keep face QA button in sync when settings checkboxes are toggled
+        if hasattr(self, "_chk_face_enabled"):
+            self._chk_face_enabled.toggled.connect(lambda c: self._sync_qa_btn(self._btn_face_qa, c))
+        if hasattr(self, "_chk_face_quick_toggle"):
+            self._chk_face_quick_toggle.toggled.connect(lambda c: self._sync_qa_btn(self._btn_face_qa, c))
 
         # Sentry behaviour buttons (radio-style: only one active at a time)
         def _on_behaviour_btn(mode: int) -> None:

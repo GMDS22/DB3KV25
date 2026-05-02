@@ -205,6 +205,16 @@ class FaceIdentityRuntime:
                 vectors.append(vector)
         return vectors
 
+    def extract_embeddings_from_bboxes(
+        self,
+        frame: np.ndarray,
+        bboxes: Iterable[Tuple[int, int, int, int]],
+    ) -> List[Optional[np.ndarray]]:
+        vectors: List[Optional[np.ndarray]] = []
+        for bbox in bboxes:
+            vectors.append(self._embedding_from_bbox(frame, tuple(int(v) for v in bbox)))
+        return vectors
+
     def extract_primary_embedding(self, frame: np.ndarray, *, min_face_size_px: int = 56) -> Optional[np.ndarray]:
         faces = self.detect_faces(frame, min_face_size_px=min_face_size_px)
         if not faces:
