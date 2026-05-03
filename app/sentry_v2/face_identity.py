@@ -13,11 +13,26 @@ import numpy as np
 from app.runtime_paths import runtime_root_path
 
 
+DEFAULT_FACE_DETECTOR_MODEL_RELATIVE_PATH = "app/models/face/face_detection_yunet_2023mar.onnx"
+DEFAULT_FACE_RECOGNIZER_MODEL_RELATIVE_PATH = "app/models/face/face_recognition_sface_2021dec.onnx"
+
+FACE_EMBEDDING_BACKEND_LEGACY = "legacy_dct"
+FACE_EMBEDDING_BACKEND_SFACE = "opencv_sface"
+
+_YUNET_INPUT_SIZE = (320, 320)
+_YUNET_SCORE_THRESHOLD = 0.88
+_YUNET_NMS_THRESHOLD = 0.3
+_YUNET_TOP_K = 96
+_SFACE_MAX_DETECT_DIM = 640
+_SFACE_RECOMMENDED_COSINE_THRESHOLD = 0.363
+
+
 @dataclass
 class FaceIdentityProfile:
     profile_id: str
     name: str
     embeddings: List[List[float]] = field(default_factory=list)
+    embedding_backend: str = FACE_EMBEDDING_BACKEND_LEGACY
     friendly: bool = True
     announce_name: bool = True
     cute_gesture: bool = True
@@ -35,6 +50,13 @@ class FaceMatchResult:
     friendly: bool = False
     announce_name: bool = False
     cute_gesture: bool = False
+
+
+@dataclass
+class _DetectedFaceEntry:
+    bbox: Tuple[int, int, int, int]
+    landmarks: Optional[np.ndarray] = None
+    score: float = 0.0
 
 
 class FaceIdentityLibrary:
@@ -72,6 +94,7 @@ class FaceIdentityLibrary:
         name: str,
         embeddings: Iterable[np.ndarray],
         *,
+        embedding_backend: str = FACE_EMBEDDING_BACKEND_LEGACY,
         friendly: bool = True,
         announce_name: bool = True,
         cute_gesture: bool = True,
@@ -89,6 +112,7 @@ class FaceIdentityLibrary:
                 profile_id=str(uuid.uuid4()),
                 name=cleaned_name,
                 embeddings=serialized,
+                embedding_backend=str(embedding_backend or FACE_EMBEDDING_BACKEND_LEGACY),
                 friendly=bool(friendly),
                 announce_name=bool(announce_name),
                 cute_gesture=bool(cute_gesture),
@@ -98,6 +122,11 @@ class FaceIdentityLibrary:
             )
             self.profiles.append(profile)
             return profile
+        existing_backend = str(existing.embedding_backend or FACE_EMBEDDING_BACKEND_LEGACY)
+        incoming_backend = str(embedding_backend or FACE_EMBEDDING_BACKEND_LEGACY)
+        if existing_backend != incoming_backend:
+            existing.embeddings = []
+            existing.embedding_backend = incoming_backend
         existing.embeddings.extend(serialized)
         existing.friendly = bool(friendly)
         existing.announce_name = bool(announce_name)
@@ -120,13 +149,35 @@ class FaceIdentityLibrary:
 
 
 class FaceIdentityRuntime:
-    def __init__(self, library: FaceIdentityLibrary):
+    def __init__(
+        self,
+        library: FaceIdentityLibrary,
+        *,
+        preferred_backend: str = FACE_EMBEDDING_BACKEND_SFACE,
+        detector_model_path: Optional[str] = None,
+        recognizer_model_path: Optional[str] = None,
+        allow_legacy_fallback: bool = True,
+    ):
         self.library = library
         cascade_path = self._resolve_cascade_path()
         if cascade_path is None:
             self._cascade = cv2.CascadeClassifier()
         else:
             self._cascade = cv2.CascadeClassifier(str(cascade_path))
+        self._preferred_backend = FACE_EMBEDDING_BACKEND_LEGACY
+        self._active_backend = FACE_EMBEDDING_BACKEND_LEGACY
+        self._backend_status = "legacy_dct ready"
+        self._allow_legacy_fallback = bool(allow_legacy_fallback)
+        self._detector_model_path: Optional[Path] = None
+        self._recognizer_model_path: Optional[Path] = None
+        self._face_detector = None
+        self._face_recognizer = None
+        self.configure_backend(
+            preferred_backend=preferred_backend,
+            detector_model_path=detector_model_path,
+            recognizer_model_path=recognizer_model_path,
+            allow_legacy_fallback=allow_legacy_fallback,
+        )
 
     @staticmethod
     def _resolve_cascade_path() -> Optional[Path]:
@@ -163,6 +214,101 @@ class FaceIdentityRuntime:
     def refresh_library(self, library: FaceIdentityLibrary) -> None:
         self.library = library
 
+    @property
+    def active_backend(self) -> str:
+        return str(self._active_backend)
+
+    @property
+    def preferred_backend(self) -> str:
+        return str(self._preferred_backend)
+
+    def backend_status(self) -> str:
+        return str(self._backend_status)
+
+    def detector_model_path(self) -> Optional[Path]:
+        return self._detector_model_path
+
+    def recognizer_model_path(self) -> Optional[Path]:
+        return self._recognizer_model_path
+
+    def configure_backend(
+        self,
+        *,
+        preferred_backend: str = FACE_EMBEDDING_BACKEND_SFACE,
+        detector_model_path: Optional[str] = None,
+        recognizer_model_path: Optional[str] = None,
+        allow_legacy_fallback: bool = True,
+    ) -> None:
+        preferred = str(preferred_backend or FACE_EMBEDDING_BACKEND_SFACE).strip().lower()
+        if preferred not in {FACE_EMBEDDING_BACKEND_LEGACY, FACE_EMBEDDING_BACKEND_SFACE}:
+            preferred = FACE_EMBEDDING_BACKEND_SFACE
+        self._preferred_backend = preferred
+        self._allow_legacy_fallback = bool(allow_legacy_fallback)
+        self._detector_model_path = self._resolve_runtime_path(
+            detector_model_path or DEFAULT_FACE_DETECTOR_MODEL_RELATIVE_PATH
+        )
+        self._recognizer_model_path = self._resolve_runtime_path(
+            recognizer_model_path or DEFAULT_FACE_RECOGNIZER_MODEL_RELATIVE_PATH
+        )
+        self._face_detector = None
+        self._face_recognizer = None
+
+        if preferred == FACE_EMBEDDING_BACKEND_SFACE:
+            self._configure_sface_backend()
+            if self._active_backend == FACE_EMBEDDING_BACKEND_SFACE:
+                return
+
+        self._active_backend = FACE_EMBEDDING_BACKEND_LEGACY
+        if self._allow_legacy_fallback:
+            suffix = ""
+            if preferred == FACE_EMBEDDING_BACKEND_SFACE and self._backend_status:
+                suffix = f"; fallback to legacy_dct"
+            self._backend_status = (self._backend_status or "legacy_dct ready") + suffix
+        else:
+            self._backend_status = self._backend_status or "legacy_dct forced"
+
+    @staticmethod
+    def _resolve_runtime_path(path_value: str) -> Path:
+        candidate = Path(str(path_value or "")).expanduser()
+        if candidate.is_absolute():
+            return candidate
+        return (runtime_root_path() / candidate).resolve()
+
+    def _configure_sface_backend(self) -> None:
+        self._backend_status = ""
+        detector_path = self._detector_model_path
+        recognizer_path = self._recognizer_model_path
+        missing: List[str] = []
+        if detector_path is None or not detector_path.is_file():
+            missing.append(str(detector_path) if detector_path is not None else DEFAULT_FACE_DETECTOR_MODEL_RELATIVE_PATH)
+        if recognizer_path is None or not recognizer_path.is_file():
+            missing.append(str(recognizer_path) if recognizer_path is not None else DEFAULT_FACE_RECOGNIZER_MODEL_RELATIVE_PATH)
+        if missing:
+            self._backend_status = "opencv_sface unavailable: missing model file(s): " + ", ".join(missing)
+            return
+        try:
+            self._face_detector = cv2.FaceDetectorYN.create(
+                model=str(detector_path),
+                config="",
+                input_size=_YUNET_INPUT_SIZE,
+                score_threshold=float(_YUNET_SCORE_THRESHOLD),
+                nms_threshold=float(_YUNET_NMS_THRESHOLD),
+                top_k=int(_YUNET_TOP_K),
+            )
+            self._face_recognizer = cv2.FaceRecognizerSF.create(
+                model=str(recognizer_path),
+                config="",
+            )
+        except Exception as exc:
+            self._face_detector = None
+            self._face_recognizer = None
+            self._backend_status = f"opencv_sface unavailable: {exc}"
+            return
+        self._active_backend = FACE_EMBEDDING_BACKEND_SFACE
+        self._backend_status = (
+            f"opencv_sface ready ({detector_path.name}, {recognizer_path.name})"
+        )
+
     def detect_faces(
         self,
         frame: np.ndarray,
@@ -170,29 +316,12 @@ class FaceIdentityRuntime:
         min_face_size_px: int = 56,
         roi_boxes: Optional[List[Tuple[int, int, int, int]]] = None,
     ) -> List[Tuple[int, int, int, int]]:
-        if frame is None or frame.size == 0 or self._cascade.empty():
-            return []
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.equalizeHist(gray)
-        boxes: List[Tuple[int, int, int, int]] = []
-        search_rois = roi_boxes or [(0, 0, frame.shape[1], frame.shape[0])]
-        min_size = max(32, int(min_face_size_px))
-        for roi in search_rois:
-            x, y, w, h = [int(max(0, v)) for v in roi]
-            if w < min_size or h < min_size:
-                continue
-            sub = gray[y:y + h, x:x + w]
-            if sub.size == 0:
-                continue
-            detected = self._cascade.detectMultiScale(
-                sub,
-                scaleFactor=1.08,
-                minNeighbors=5,
-                minSize=(min_size, min_size),
-            )
-            for fx, fy, fw, fh in detected:
-                boxes.append((x + int(fx), y + int(fy), int(fw), int(fh)))
-        return self._dedupe_boxes(boxes)
+        entries = self._detect_face_entries(
+            frame,
+            min_face_size_px=min_face_size_px,
+            roi_boxes=roi_boxes,
+        )
+        return [entry.bbox for entry in entries]
 
     def build_embeddings_from_images(self, image_paths: Iterable[str], *, min_face_size_px: int = 56) -> List[np.ndarray]:
         vectors: List[np.ndarray] = []
@@ -216,11 +345,11 @@ class FaceIdentityRuntime:
         return vectors
 
     def extract_primary_embedding(self, frame: np.ndarray, *, min_face_size_px: int = 56) -> Optional[np.ndarray]:
-        faces = self.detect_faces(frame, min_face_size_px=min_face_size_px)
+        faces = self._detect_face_entries(frame, min_face_size_px=min_face_size_px)
         if not faces:
             return None
-        face = max(faces, key=lambda entry: entry[2] * entry[3])
-        return self._embedding_from_bbox(frame, face)
+        face = max(faces, key=lambda entry: entry.bbox[2] * entry.bbox[3])
+        return self._embedding_from_face_entry(frame, face)
 
     def match_known_faces(
         self,
@@ -229,21 +358,25 @@ class FaceIdentityRuntime:
         min_face_size_px: int = 56,
         person_boxes: Optional[List[Tuple[int, int, int, int]]] = None,
         threshold: float = 0.82,
+        min_profile_embeddings: int = 1,
     ) -> List[FaceMatchResult]:
         if frame is None or frame.size == 0:
             return []
-        faces = self.detect_faces(frame, min_face_size_px=min_face_size_px, roi_boxes=person_boxes)
+        faces = self._detect_face_entries(frame, min_face_size_px=min_face_size_px, roi_boxes=person_boxes)
         results: List[FaceMatchResult] = []
-        for bbox in faces:
-            embedding = self._embedding_from_bbox(frame, bbox)
+        for face in faces:
+            embedding = self._embedding_from_face_entry(frame, face)
             if embedding is None:
                 continue
-            profile, confidence = self._match_embedding(embedding)
+            profile, confidence = self._match_embedding(
+                embedding,
+                min_profile_embeddings=max(1, int(min_profile_embeddings)),
+            )
             if profile is None or confidence < float(threshold):
                 continue
             results.append(
                 FaceMatchResult(
-                    bbox=bbox,
+                    bbox=face.bbox,
                     profile_id=str(profile.profile_id),
                     name=str(profile.name),
                     confidence=float(confidence),
@@ -254,10 +387,20 @@ class FaceIdentityRuntime:
             )
         return results
 
-    def _match_embedding(self, embedding: np.ndarray) -> Tuple[Optional[FaceIdentityProfile], float]:
+    def _match_embedding(
+        self,
+        embedding: np.ndarray,
+        *,
+        min_profile_embeddings: int = 1,
+    ) -> Tuple[Optional[FaceIdentityProfile], float]:
         best_profile: Optional[FaceIdentityProfile] = None
         best_score = -1.0
+        required_samples = max(1, int(min_profile_embeddings))
         for profile in self.library.profiles:
+            profile_backend = str(getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY)
+            if profile_backend != self._active_backend:
+                continue
+            scores: List[float] = []
             for raw in profile.embeddings:
                 candidate = np.asarray(raw, dtype=np.float32).flatten()
                 if candidate.size != embedding.size:
@@ -266,13 +409,52 @@ class FaceIdentityRuntime:
                 if denom <= 1e-6:
                     continue
                 score = float(np.dot(embedding, candidate) / denom)
-                if score > best_score:
-                    best_score = score
-                    best_profile = profile
-        confidence = (best_score + 1.0) * 0.5
+                scores.append(score)
+            if len(scores) < required_samples:
+                continue
+            scores.sort(reverse=True)
+            support_count = min(2, len(scores))
+            profile_score = sum(scores[:support_count]) / float(support_count)
+            if profile_score > best_score:
+                best_score = profile_score
+                best_profile = profile
+        confidence = self._score_to_confidence(best_score, self._active_backend) if best_score >= 0.0 else 0.0
         return best_profile, max(0.0, min(1.0, confidence))
 
+    def _score_to_confidence(self, score: float, backend: str) -> float:
+        if backend == FACE_EMBEDDING_BACKEND_SFACE:
+            clamped = max(0.0, min(1.0, float(score)))
+            baseline = float(_SFACE_RECOMMENDED_COSINE_THRESHOLD)
+            if clamped <= baseline:
+                return 0.82 * (clamped / max(1e-6, baseline))
+            return 0.82 + ((clamped - baseline) * (0.18 / max(1e-6, 1.0 - baseline)))
+        return (float(score) + 1.0) * 0.5
+
     def _embedding_from_bbox(self, frame: np.ndarray, bbox: Tuple[int, int, int, int]) -> Optional[np.ndarray]:
+        if self._active_backend == FACE_EMBEDDING_BACKEND_SFACE:
+            face_entry = self._detect_best_face_entry_for_bbox(frame, bbox)
+            if face_entry is not None:
+                vector = self._embedding_from_face_entry(frame, face_entry)
+                if vector is not None:
+                    return vector
+        return self._legacy_embedding_from_bbox(frame, bbox)
+
+    def _embedding_from_face_entry(self, frame: np.ndarray, face: _DetectedFaceEntry) -> Optional[np.ndarray]:
+        if self._active_backend == FACE_EMBEDDING_BACKEND_SFACE and face.landmarks is not None and self._face_recognizer is not None:
+            face_row = self._face_entry_to_sface_row(face)
+            try:
+                aligned = self._face_recognizer.alignCrop(frame, face_row[:-1])
+                features = self._face_recognizer.feature(aligned)
+            except Exception:
+                features = None
+            if features is not None:
+                vector = np.asarray(features, dtype=np.float32).flatten()
+                norm = float(np.linalg.norm(vector))
+                if norm > 1e-6:
+                    return vector / norm
+        return self._legacy_embedding_from_bbox(frame, face.bbox)
+
+    def _legacy_embedding_from_bbox(self, frame: np.ndarray, bbox: Tuple[int, int, int, int]) -> Optional[np.ndarray]:
         x, y, w, h = bbox
         if w <= 0 or h <= 0:
             return None
@@ -291,6 +473,167 @@ class FaceIdentityRuntime:
         if norm <= 1e-6:
             return None
         return vector / norm
+
+    def _detect_face_entries(
+        self,
+        frame: np.ndarray,
+        *,
+        min_face_size_px: int = 56,
+        roi_boxes: Optional[List[Tuple[int, int, int, int]]] = None,
+    ) -> List[_DetectedFaceEntry]:
+        if frame is None or frame.size == 0:
+            return []
+        if self._active_backend == FACE_EMBEDDING_BACKEND_SFACE and self._face_detector is not None:
+            entries = self._detect_face_entries_sface(
+                frame,
+                min_face_size_px=min_face_size_px,
+                roi_boxes=roi_boxes,
+            )
+            if entries:
+                return entries
+        return self._detect_face_entries_legacy(
+            frame,
+            min_face_size_px=min_face_size_px,
+            roi_boxes=roi_boxes,
+        )
+
+    def _detect_face_entries_sface(
+        self,
+        frame: np.ndarray,
+        *,
+        min_face_size_px: int = 56,
+        roi_boxes: Optional[List[Tuple[int, int, int, int]]] = None,
+    ) -> List[_DetectedFaceEntry]:
+        if self._face_detector is None:
+            return []
+        search_rois = roi_boxes or [(0, 0, frame.shape[1], frame.shape[0])]
+        min_size = max(32, int(min_face_size_px))
+        entries: List[_DetectedFaceEntry] = []
+        for roi in search_rois:
+            x, y, w, h = [int(max(0, v)) for v in roi]
+            if w < min_size or h < min_size:
+                continue
+            sub = frame[y:y + h, x:x + w]
+            if sub.size == 0:
+                continue
+            scale = 1.0
+            detect_frame = sub
+            longest_edge = max(int(sub.shape[1]), int(sub.shape[0]))
+            if longest_edge > _SFACE_MAX_DETECT_DIM:
+                scale = float(_SFACE_MAX_DETECT_DIM) / float(longest_edge)
+                resized_w = max(1, int(round(float(sub.shape[1]) * scale)))
+                resized_h = max(1, int(round(float(sub.shape[0]) * scale)))
+                detect_frame = cv2.resize(sub, (resized_w, resized_h), interpolation=cv2.INTER_AREA)
+            try:
+                self._face_detector.setInputSize((int(detect_frame.shape[1]), int(detect_frame.shape[0])))
+                _retval, faces = self._face_detector.detect(detect_frame)
+            except Exception:
+                continue
+            if faces is None:
+                continue
+            inverse_scale = 1.0 / scale if scale > 0.0 else 1.0
+            for row in np.asarray(faces, dtype=np.float32):
+                fx, fy, fw, fh = row[:4] * inverse_scale
+                if fw < min_size or fh < min_size:
+                    continue
+                bbox = (x + int(round(fx)), y + int(round(fy)), int(round(fw)), int(round(fh)))
+                landmarks = (row[4:14].reshape(5, 2).astype(np.float32) * inverse_scale)
+                landmarks[:, 0] += float(x)
+                landmarks[:, 1] += float(y)
+                score = float(row[14]) if row.size >= 15 else 0.0
+                entries.append(
+                    _DetectedFaceEntry(
+                        bbox=bbox,
+                        landmarks=landmarks,
+                        score=score,
+                    )
+                )
+        return self._dedupe_face_entries(entries)
+
+    def _detect_face_entries_legacy(
+        self,
+        frame: np.ndarray,
+        *,
+        min_face_size_px: int = 56,
+        roi_boxes: Optional[List[Tuple[int, int, int, int]]] = None,
+    ) -> List[_DetectedFaceEntry]:
+        if self._cascade.empty():
+            return []
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        gray = cv2.equalizeHist(gray)
+        search_rois = roi_boxes or [(0, 0, frame.shape[1], frame.shape[0])]
+        min_size = max(32, int(min_face_size_px))
+        entries: List[_DetectedFaceEntry] = []
+        for roi in search_rois:
+            x, y, w, h = [int(max(0, v)) for v in roi]
+            if w < min_size or h < min_size:
+                continue
+            sub = gray[y:y + h, x:x + w]
+            if sub.size == 0:
+                continue
+            detected = self._cascade.detectMultiScale(
+                sub,
+                scaleFactor=1.08,
+                minNeighbors=5,
+                minSize=(min_size, min_size),
+            )
+            for fx, fy, fw, fh in detected:
+                entries.append(
+                    _DetectedFaceEntry(
+                        bbox=(x + int(fx), y + int(fy), int(fw), int(fh)),
+                        landmarks=None,
+                        score=1.0,
+                    )
+                )
+        return self._dedupe_face_entries(entries)
+
+    def _detect_best_face_entry_for_bbox(
+        self,
+        frame: np.ndarray,
+        bbox: Tuple[int, int, int, int],
+    ) -> Optional[_DetectedFaceEntry]:
+        candidates = self._detect_face_entries_sface(
+            frame,
+            min_face_size_px=max(32, int(min(bbox[2], bbox[3], 112))),
+            roi_boxes=[bbox],
+        )
+        best_entry: Optional[_DetectedFaceEntry] = None
+        best_score = 0.0
+        for candidate in candidates:
+            score = self._iou(candidate.bbox, bbox)
+            if score > best_score:
+                best_score = score
+                best_entry = candidate
+        return best_entry
+
+    @staticmethod
+    def _face_entry_to_sface_row(face: _DetectedFaceEntry) -> np.ndarray:
+        x, y, w, h = face.bbox
+        row = np.empty((15,), dtype=np.float32)
+        row[0:4] = [float(x), float(y), float(w), float(h)]
+        if face.landmarks is not None:
+            row[4:14] = np.asarray(face.landmarks, dtype=np.float32).reshape(10)
+        else:
+            row[4:14] = 0.0
+        row[14] = float(face.score)
+        return row
+
+    @staticmethod
+    def _dedupe_face_entries(entries: List[_DetectedFaceEntry]) -> List[_DetectedFaceEntry]:
+        deduped: List[_DetectedFaceEntry] = []
+        for candidate in sorted(
+            entries,
+            key=lambda item: (float(item.score), item.bbox[2] * item.bbox[3]),
+            reverse=True,
+        ):
+            keep = True
+            for existing in deduped:
+                if FaceIdentityRuntime._iou(candidate.bbox, existing.bbox) >= 0.35:
+                    keep = False
+                    break
+            if keep:
+                deduped.append(candidate)
+        return deduped
 
     @staticmethod
     def _dedupe_boxes(boxes: List[Tuple[int, int, int, int]]) -> List[Tuple[int, int, int, int]]:

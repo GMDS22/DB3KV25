@@ -25,10 +25,10 @@
     "detection_mode": 2,
     "min_contour_area": 2340.0,
     "max_contour_area": 2341.0,
-    "yolo_model_name": "yolov8s.pt",
+    "yolo_model_name": "ratdogcat_last.pt",
     "yolo_model_dir": "F:\\SMART SENTRY_v2a\\SMART SENTRY\\YOLO_MODELS",
     "yolo_min_area": 1200,
-    "yolo_confidence": 0.44,
+    "yolo_confidence": 0.7,
     "color_preset": "any",
     "color_min_area": 160,
     "color_max_area": 1280,
@@ -45,7 +45,7 @@
   },
   "target_filter": {
     "allowed_classes": [
-      "person"
+      "rat"
     ],
     "class_priority": {
       "person": 5.0,
@@ -54,8 +54,8 @@
       "cat": 2.0,
       "rat": 2.2
     },
-    "min_confidence": 0.5,
-    "min_size_ratio": 0.0015,
+    "min_confidence": 0.7500000000000002,
+    "min_size_ratio": 0.0,
     "max_size_ratio": 0.0,
     "shape_filter_enabled": true,
     "shape_profile_name": "person",
@@ -71,13 +71,13 @@
   },
   "threat_scoring": {
     "w_proximity": 0.38,
-    "w_size": 0.08,
-    "w_confidence": 0.08,
-    "w_class_priority": 0.16,
-    "w_speed": 0.08,
+    "w_size": 0.0,
+    "w_confidence": 0.58,
+    "w_class_priority": 0.51,
+    "w_speed": 0.35,
     "w_persistence": 0.12,
     "w_approach": 0.1,
-    "use_ml_model": false,
+    "use_ml_model": true,
     "ml_model_path": "config/smart_sentry_v3_threat_model.pkl"
   },
   "engagement": {
@@ -252,7 +252,7 @@
   },
   "no_fire_masks": [],
   "pir_guard": {
-    "pir_enabled": false,
+    "pir_enabled": true,
     "pir_event_blink_enabled": false,
     "pir_count": 3,
     "sensors": [
@@ -300,25 +300,25 @@
   },
   "sound": {
     "enabled": true,
-    "volume_pct": 90,
-    "personality": "stealth",
-    "attitude_pct": 60,
+    "volume_pct": 81,
+    "personality": "playful",
+    "attitude_pct": 94,
     "rest_cue_enabled": true,
     "robot_voice_enabled": true,
     "human_voice_enabled": true,
     "mute_buzzer_when_human_voice_enabled": true,
-    "human_voice_name": "Microsoft David Desktop",
-    "human_voice_style": "storyteller",
-    "human_voice_rate_pct": 90,
-    "human_voice_pitch_pct": 104,
-    "human_voice_volume_pct": 84,
+    "human_voice_name": "Microsoft Mark",
+    "human_voice_style": "natural",
+    "human_voice_rate_pct": 101,
+    "human_voice_pitch_pct": 114,
+    "human_voice_volume_pct": 88,
     "human_voice_cleanup_enabled": true,
     "known_face_hello_once_per_session": true,
     "name_announce_cooldown_s": 18.0,
     "autotracking_voice_reports_enabled": true,
     "pir_voice_alerts_enabled": true,
     "acoustic_voice_alerts_enabled": true,
-    "autotracking_voice_report_cooldown_s": 8.0
+    "autotracking_voice_report_cooldown_s": 6.0
   },
   "acoustic_guard": {
     "enabled": true,
@@ -341,13 +341,17 @@
   "face_recognition": {
     "enabled": true,
     "library_path": "app/config/smart_sentry_faces.json",
+    "backend": "opencv_sface",
+    "detector_model_path": "app/models/face/face_detection_yunet_2023mar.onnx",
+    "recognizer_model_path": "app/models/face/face_recognition_sface_2021dec.onnx",
+    "allow_legacy_fallback": true,
     "recognition_threshold": 0.84,
     "min_face_size_px": 56,
     "suppress_known_faces_from_engagement": true,
     "announce_known_faces": true,
     "cute_gesture_enabled": true,
     "gesture_cooldown_s": 30.0,
-    "registration_samples_required": 1
+    "registration_samples_required": 2
   },
   "ai_assistant": {
     "enabled": true,
@@ -371,7 +375,7 @@
     "quick_view_doc_path": "SMART_SENTRY_SHORTCUT_KEYS.md"
   },
   "theme": {
-    "preset": "ember",
+    "preset": "obsidian_gold",
     "accent_strength_pct": 100,
     "surface_opacity_pct": 94,
     "video_panel_opacity_pct": 100,
@@ -381,7 +385,7 @@
     "contrast_pct": 100
   },
   "show_overlay": true,
-  "overlay_display_mode": "show_all",
+  "overlay_display_mode": "minimal",
   "show_threat_scores": false,
   "show_engagement_zone": false,
   "show_guard_crosshair": true,
@@ -410,8 +414,8 @@
   "window_width": 1280,
   "window_height": 860,
   "window_maximized": true,
-  "prompted_targets_enabled": false,
-  "prompted_allow_auto_fire": false,
+  "prompted_targets_enabled": true,
+  "prompted_allow_auto_fire": true,
   "prompted_library_path": "app/config/smart_sentry_prompted_targets.json",
   "quick_startup_enabled": true,
   "auto_export_logs_and_snapshot_on_close": true,

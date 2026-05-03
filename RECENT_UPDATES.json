@@ -1,6 +1,42 @@
 ﻿{
     "updates":  [
                     {
+                        "version":  "3.5.3",
+                        "fix":  "Fixed return-to-guard and Home button bounce-back behavior by ensuring RETURNING state completes into fresh GUARDING without re-engaging visible targets, clearing stale queue/cooldown state on arrival, and properly finalizing direct guard moves after motion completion with token-based callback invalidation.",
+                        "category":  "Engine/Behavior",
+                        "date":  "2026-05-03",
+                        "issue":  "ISS-105",
+                        "title":  "Return/Home bounce-back fix: clean state transitions and proper move finalization",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.5.3",
+                        "fix":  "Optimized camera preview and UI performance during live face recognition by downscaling large ROIs before YuNet inference, lengthening refresh cadences, and reducing jitter-triggered rematching to prevent UI thread stalls with the opencv_sface backend.",
+                        "category":  "Performance/UI",
+                        "date":  "2026-05-03",
+                        "issue":  "ISS-104",
+                        "title":  "Camera/UI slowdown mitigation: reduced live face recognition overhead",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.5.3",
+                        "fix":  "Added model-backed face recognition backend using OpenCV YuNet detector and SFace recognizer with downloaded ONNX models for improved accuracy; backend selection is configurable but requires re-enrollment when switching from legacy Haar-based matcher.",
+                        "category":  "Recognition/Backend",
+                        "date":  "2026-05-03",
+                        "issue":  "ISS-103",
+                        "title":  "OpenCV YuNet + SFace face recognition backend implementation",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "3.5.3",
+                        "fix":  "Enhanced Windows SAPI voice support by bridging OneCore voices into classic SAPI enumeration, enabling Microsoft Mark (male voice) alongside existing Zira and David voices; hardened speech runtime state handling against stale stops and queued interrupts for continuous announcements.",
+                        "category":  "Speech/Voice",
+                        "date":  "2026-05-03",
+                        "issue":  "ISS-102",
+                        "title":  "Microsoft Mark voice support and speech stability improvements",
+                        "status":  "Worked"
+                    },
+                    {
                         "version":  "3.5.2",
                         "fix":  "Refined known-face/autotracking integration and operator quick-controls. Friendly recognized identities now keep engagement suppression more stable between face-match refresh cycles via centroid fallback matching. Face enrollment save now auto-clears preview overlays and returns from photo preview to live camera. Added compact video-panel QA controls: face-recognition toggle icon, auto-export icon toggle, and an auto-lighting flyout toggle that reveals auto-light checkbox plus live luma/threshold/PWM telemetry.",
                         "category":  "Engine/UI",

@@ -2785,24 +2785,6 @@ class SentryV2Engine:
     def _update_returning(self, now: float) -> None:
         """Wait briefly, then return to guard/patrol position."""
         if now - self._return_start >= self.cfg.engagement.return_delay:
-            # If a valid target is visible again while returning, re-enter
-            # engagement directly and avoid ping-ponging between home and
-            # target position.
-            if self.last_targets and (now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown):
-                queue = self._planner.plan(self.last_targets, self.current_pan, self.current_tilt)
-                if queue:
-                    self._queue = queue
-                    self.last_queue = queue
-                    self._queue_index = 0
-                    self._patrol_initialized = False
-                    self._reset_precision_state()
-                    self._change_state(SentryV2State.ENGAGING)
-                    first = self._queue[0]
-                    self.active_order = first
-                    self._remember_active_target(first.target.det)
-                    self._start_order_engagement(first, now)
-                    return
-
             mode = self.cfg.guard.guard_mode
             if mode == 0:
                 # Static guard — move back to guard point
@@ -2810,6 +2792,11 @@ class SentryV2Engine:
                 self._move_turret(gp, gt)
             # Patrol modes intentionally do not force a home nudge here;
             # they should resume patrol naturally from current pose.
+            self._queue.clear()
+            self.last_queue = []
+            self._queue_index = 0
+            self.active_order = None
+            self._last_engage_time = now
             self._patrol_initialized = False  # patrol will re-init on next tick
             self._change_state(SentryV2State.GUARDING)
 

@@ -98,15 +98,36 @@ Mitigation:
 ### 6a. Spoken replies still depend on the local Qt speech path
 
 What happens:
-Spoken assistant replies require the Qt text-to-speech backend to be available, human voice mode to be enabled, and assistant auto-speak to be enabled.
+Spoken assistant replies require the Qt text-to-speech backend to be available, human voice mode to be enabled, and assistant auto-speak to be enabled. On Windows, the current Smart Sentry runtime uses the classic SAPI backend exposed through `QTextToSpeech`.
 
 Impact:
-The assistant can still answer in text while spoken replies remain unavailable, which can make the feature look partially broken if the operator expects voice by default.
+The assistant can still answer in text while spoken replies remain unavailable, which can make the feature look partially broken if the operator expects voice by default. Voice enumeration alone is not enough to prove that speech will actually play.
+
+Confirmed failure modes in the live v3.5.2 runtime:
+- Persisted `sound.enabled = false` mutes the board-sound path at startup.
+- Non-zero Qt pitch offsets can cause Windows SAPI to drop speech silently even while voices still enumerate correctly.
+- A stale interrupt-stop cycle can leave the runtime permanently "busy" and block all later speech until that stale state is released.
+- Repeated paused-state autotracking chatter can hide the real failure and make startup behavior look random.
 
 Mitigation:
 - Surface voice readiness clearly in the AI tab.
 - Use the in-app current-voice and scan-all-voices validation buttons before treating speech as broken.
+- Keep SAPI pitch neutral and tune rate, volume, phrasing, and voice choice instead of Qt pitch on that backend.
 - Keep spoken replies short and summary-focused so the voice path stays usable during live operation.
+- If speech worked and then stopped, inspect stale speech-state / interrupt handling first; do not assume the backend disappeared.
+
+### 6b. Additional voices are OS-level, not app-level
+
+What happens:
+Smart Sentry only sees the voices that `QTextToSpeech` can access through classic Windows SAPI. In the current environment that is `Microsoft Zira Desktop` and `Microsoft David Desktop`. Windows OneCore may have additional voices installed, but QtTextToSpeech does not automatically expose them to the app.
+
+Impact:
+Adding a new in-app preset does not add a new voice. The operating system must provide a voice that the Qt SAPI backend can enumerate.
+
+Mitigation:
+- Install additional Windows desktop SAPI voices, not just in-app presets.
+- Or expose compatible OneCore voices to the classic SAPI layer with an admin-level Windows change.
+- After any OS-level voice change, restart Smart Sentry and use the voice scan tools in the AI tab to confirm visibility.
 
 ### 7. Poor performance if runtime evidence is incomplete
 

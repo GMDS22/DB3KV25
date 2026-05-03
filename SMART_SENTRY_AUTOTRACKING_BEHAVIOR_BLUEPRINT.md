@@ -110,6 +110,22 @@ If a red box is present and the turret stays visibly off-target without attempti
 - over-strict deadzone or aim-lock tolerances
 - preset merge logic
 
+### Return/Home Stability Contract
+
+The `RETURNING` state must complete cleanly into fresh `GUARDING` without re-engaging visible targets. This prevents bounce-back loops where the system returns to guard position, immediately sees a lingering target, and starts returning again.
+
+**Return Completion Rules:**
+
+1. `RETURNING` state finishes into `GUARDING` with cleared queue and cooldown state
+2. No automatic re-engagement of visible targets after return completion
+3. Direct `hold_guard` moves finalize only after commanded motion duration completes
+4. Stale delayed-finalize callbacks are invalidated when newer moves start
+5. Post-return detection starts fresh from `GUARDING` after normal cooldown period
+
+**Implementation Points:**
+- `app/sentry_v2/sentry_v2_engine.py`: `_update_returning()` clears state on arrival
+- `app/sentry_v2/sentry_v2_tab.py`: Token-based callback invalidation for guard moves
+
 ---
 
 ## 5a. Acoustic Guard Protocol

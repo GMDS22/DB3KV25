@@ -389,10 +389,7 @@ class GuardConfig:
     rest_startup_delay_ms: int = 900
     rest_close_timeout_ms: int = 1600
     home_move_speed_dps: float = 24.0
-    home_move_approach_speed_dps: float = 11.0
     rest_move_speed_dps: float = 14.0
-    rest_move_approach_speed_dps: float = 5.0
-    guided_move_approach_window_deg: float = 18.0
     pan_min: float = SENTRY_PAN_MIN
     pan_max: float = SENTRY_PAN_MAX
     tilt_min: float = SENTRY_TILT_MIN
@@ -579,13 +576,17 @@ class FaceRecognitionConfig:
     """Known-face identification and friendly-recognition behavior."""
     enabled: bool = False
     library_path: str = CANONICAL_FACE_LIBRARY_PATH
+    backend: str = "opencv_sface"
+    detector_model_path: str = "app/models/face/face_detection_yunet_2023mar.onnx"
+    recognizer_model_path: str = "app/models/face/face_recognition_sface_2021dec.onnx"
+    allow_legacy_fallback: bool = True
     recognition_threshold: float = 0.82
     min_face_size_px: int = 56
     suppress_known_faces_from_engagement: bool = True
     announce_known_faces: bool = True
     cute_gesture_enabled: bool = True
     gesture_cooldown_s: float = 30.0
-    registration_samples_required: int = 1
+    registration_samples_required: int = 2
 
 
 @dataclass
@@ -762,10 +763,7 @@ class SentryV2Config:
         guard.rest_pan = float(min(pan_max, max(pan_min, guard.rest_pan)))
         guard.rest_tilt = float(min(SENTRY_TILT_MAX, max(SENTRY_TILT_MIN, guard.rest_tilt)))
         guard.home_move_speed_dps = float(max(2.0, guard.home_move_speed_dps))
-        guard.home_move_approach_speed_dps = float(max(1.0, min(guard.home_move_speed_dps, guard.home_move_approach_speed_dps)))
         guard.rest_move_speed_dps = float(max(2.0, guard.rest_move_speed_dps))
-        guard.rest_move_approach_speed_dps = float(max(1.0, min(guard.rest_move_speed_dps, guard.rest_move_approach_speed_dps)))
-        guard.guided_move_approach_window_deg = float(max(4.0, guard.guided_move_approach_window_deg))
         guard.sweep_pan_min = float(min(pan_max, max(pan_min, guard.sweep_pan_min)))
         guard.sweep_pan_max = float(min(pan_max, max(pan_min, guard.sweep_pan_max)))
         if guard.sweep_pan_min > guard.sweep_pan_max:

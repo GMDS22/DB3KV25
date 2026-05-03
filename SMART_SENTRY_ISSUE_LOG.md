@@ -133,10 +133,31 @@
 | Watchful guard mode suppresses patrol while raw detections are on cooldown | [ISS-096](#iss-096) |
 | Patrol mode was forced to home nudge on every return cycle | [ISS-096](#iss-096) |
 
+### Return/Home Ping-Pong
+| Check | Reference |
+|-------|-----------|
+| `RETURNING` re-plans visible targets before guard arrival and swings back toward the previous object | [ISS-105](#iss-105) |
+| Direct `hold_guard` moves enter `GUARDING` before the hardware transit actually finishes | [ISS-105](#iss-105) |
+
 ### Settings Typing Feels Slow
 | Check | Reference |
 |-------|-----------|
 | QSpinBox/QDoubleSpinBox keyboard tracking emits on every keypress | [ISS-096](#iss-096) |
+
+### Camera Preview / UI Slow Again
+| Check | Reference |
+|-------|-----------|
+| Live `opencv_sface` face matching is refreshing too aggressively on the UI thread | [ISS-104](#iss-104) |
+| Large person ROIs are being fed into YuNet at full resolution during live matching | [ISS-104](#iss-104) |
+
+### Human Voice Silent / Spoken Replies Missing
+| Check | Reference |
+|-------|-----------|
+| `sound.enabled` is `false` in saved config, so the board-sound path starts muted | [ISS-102](#iss-102) |
+| Windows SAPI is receiving a non-zero Qt pitch offset and silently dropping speech | [ISS-102](#iss-102) |
+| `_speech_stop_in_progress` is stuck, so `_human_voice_busy()` never clears and all later speech is blocked | [ISS-103](#iss-103) |
+| The app still answers in text because AI/runtime analysis is alive while the speech route is broken | [ISS-102](#iss-102), [ISS-103](#iss-103) |
+| Classic SAPI only exposes David/Zira on this machine; additional Windows voices are not automatically visible to Qt | [ISS-102](#iss-102) |
 
 ### Key Files for Camera Issues
 - `app/sentry_v2/sentry_v2_tab.py` — camera open/close, health checks, recovery, frame pipeline
@@ -161,7 +182,51 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
-### ISS-101 | 2026-05-02 | v3.5.2 | Engine/UI | Worked
+### ISS-105 | 2026-05-03 | v3.5.3 | Engine/UI/Docs | Worked
+**Return-To-Guard And Home Could Bounce Back To The Previous Target Mid-Transit**
+
+- **Symptoms**: After an engagement ended, the turret could begin returning to guard and then immediately swing back toward the last seen object, sometimes multiple times in a row. The same family of behavior could appear on `Home` / `Move to Guard`, where the system could re-enter guard tracking too early and feel like it wanted to go back to the previous target position.
+- **Root Cause**: Two control-path issues combined. (1) `SentryV2Engine._update_returning()` still contained a direct visual re-engage path while the turret was in `RETURNING`, so any still-visible target could pull the state machine back into ENGAGING before guard arrival completed. (2) The direct `hold_guard=True` move path in `sentry_v2_tab.py` finalized `hold_current_guard_position(...)` before the physical move had actually finished, allowing the engine to restart GUARDING semantics mid-transit.
+- **Fix/Solution**: Removed direct target re-engagement from `RETURNING`, cleared stale queue/order state on guard arrival, and reset `_last_engage_time` at actual guard arrival so post-return detection starts fresh from GUARDING after the normal cooldown. For direct `hold_guard` moves, delayed `hold_current_guard_position(...)` until after the commanded move duration completes, and invalidated stale delayed-finalize callbacks whenever a newer manual/guided move starts.
+- **Files Modified**: `app/sentry_v2/sentry_v2_engine.py`, `app/sentry_v2/sentry_v2_tab.py`, `SMART_SENTRY_ISSUE_LOG.md`
+- **Notes**: This intentionally preserves fresh re-detection after arrival. The turret can still engage again later if a target is genuinely still present after the normal cooldown, but it no longer snaps back to the previous active order while it is supposed to be returning home.
+
+---
+
+### ISS-104 | 2026-05-03 | v3.5.3 | Camera/UI/Face Recognition/Docs | Worked
+**Camera Preview And General UI Navigation Slowed After Model-Backed Face Recognition Was Enabled**
+
+- **Symptoms**: Camera preview felt delayed again and general UI/settings interaction felt sluggish while live face recognition was active.
+- **Root Cause**: Live face identity matching runs synchronously inside `process_frame(...)` on the UI thread. After the move to the model-backed `opencv_sface` backend, Smart Sentry was still evaluating large person ROIs at full resolution and refreshing face matches aggressively on box-layout jitter, causing periodic main-thread stalls.
+- **Fix/Solution**: Reduced live face-match cost in two places: (1) YuNet detection now downsizes large person ROIs before inference and scales the face boxes/landmarks back to original coordinates, and (2) the live `opencv_sface` refresh cadence and box-layout-triggered refresh thresholds were intentionally lengthened so cached face matches are reused longer between expensive refreshes.
+- **Files Modified**: `app/sentry_v2/face_identity.py`, `app/sentry_v2/sentry_v2_tab.py`, `SMART_SENTRY_ISSUE_LOG.md`
+- **Notes**: This fix targets UI-thread stalls from live face recognition without reducing raw video preview cadence or changing autotracking math. If stronger responsiveness is still needed later, the next step is moving live face matching fully off the UI thread.
+
+---
+
+### ISS-103 | 2026-05-03 | v3.5.3 | UI/Runtime/Docs | Worked
+**Queued Interrupt Speech Could Leave Human Voice Permanently Busy**
+
+- **Symptoms**: Human voice could work at first and then stop completely. `Test Voice`, spoken AI replies, and autotracking narration could all go silent without a visible backend error, while text responses still continued.
+- **Root Cause**: The queued interrupt path introduced `_speech_stop_in_progress` as a busy-state gate, but unlike `_speech_pending_say` it had no stale-release timeout. If Windows SAPI never completed the expected stop/ready callback sequence, `_human_voice_busy()` stayed `True` forever and every later `say()` request was rejected.
+- **Fix/Solution**: Added `_speech_stop_in_progress_ts`, stale-stop release logic inside `_release_stale_human_speech_state()`, explicit stop-flag cleanup on state changes and exceptions, and queued-speech flush after stale-stop recovery so the route can unblock automatically instead of requiring a restart.
+- **Files Modified**: `app/sentry_v2/sentry_v2_tab.py`, `SMART_SENTRY_ISSUE_LOG.md`
+- **Notes**: Any future interrupt-queue design on Windows SAPI must treat stale stop-state release as a first-class requirement, not an optional cleanup.
+
+---
+
+### ISS-102 | 2026-05-03 | v3.5.3 | UI/Config/Docs | Worked
+**Windows SAPI Speech Could Go Silent Even When Voices Enumerated Correctly**
+
+- **Symptoms**: Human voice could speak once, stop later, or fail immediately. `Test Voice`, spoken AI replies, and autotracking reports could be silent while the assistant still returned text normally. Board sound could also appear dead at startup.
+- **Root Cause**: Three confirmed path-level causes were involved during diagnosis: (1) persisted `sound.enabled = false` muted the board-sound path at startup, (2) Windows SAPI silently dropped `QTextToSpeech.say()` when non-zero Qt pitch offsets were applied even though `availableVoices()` still returned valid voices, and (3) repeated paused-state autotracking narration made startup behavior noisy and masked the real failure during debugging.
+- **Fix/Solution**: Restored the persisted master sound flag, forced neutral `engine.setPitch(0.0)` whenever the backend summary contains `sapi`, kept speech runtime state separate from widget-resync churn, and suppressed automatic paused-state autotracking chatter so only meaningful state changes are announced.
+- **Files Modified**: `app/sentry_v2/sentry_v2_tab.py`, `app/config/smart_sentry_settings.json`, `docs/ai/SMART_SENTRY_LOCAL_AI_LIMITATIONS.md`, `SMART_SENTRY_ISSUE_LOG.md`
+- **Notes**: Additional voices are OS-level, not app-level. In the current environment, classic SAPI exposes only `Microsoft Zira Desktop` and `Microsoft David Desktop`. Windows OneCore also has `Microsoft Mark`, but QtTextToSpeech does not see OneCore voices without an admin-level system change.
+
+---
+
+### ISS-101 | 2026-05-02 | v3.5.3 | Engine/UI | Worked
 **Friendly Face Still Treated as Target + Enrollment Preview Not Clearing**
 
 - **Symptoms**: A saved friendly/non-target face could still be tracked as a normal body target between face-refresh cycles, and enrollment face boxes could remain on the preview after save. Operators also needed a faster way to close enrollment photos and return to live feed.
@@ -1242,3 +1307,5 @@ Issues investigated but **not fixed**. Check before re-attempting the same appro
 | 2026-04-07 | The portable v2.3.1 release could appear unable to load YOLO models because the documented public drop folder and the packaged default-model location diverged, and quick startup deferred YOLO initialization too aggressively. | Updated `app/sentry_v2/sentry_v2_tab.py` so frozen builds prefer the release-root `YOLO_MODELS` folder while still discovering bundled default models and still perform a later lazy auto-load under quick startup, then updated `build_smart_sentry_v2_3_1_portable.ps1` to create the public release-root model folder alongside the bundled support-folder defaults. | Worked |
 | 2026-04-07 | Local Smart Sentry editing and packaging could drift between Python 3.12 and Python 3.11, while PyQt5 reinstalls could reintroduce stale VC runtime DLLs that made source runs unstable. | Standardized the release workflow on `.venv311`, added interpreter override plus `.venv311` preference to `build_smart_sentry_v2_3_1_portable.ps1`, pinned the workspace interpreter to `.venv311`, moved the default release output to `F:`, and documented removal of local Qt-bundled VC runtime overrides after PyQt reinstalls. | Worked |
 | 2026-03-22 | Named color presets were too brittle under moderate shading and desaturation, and some presets still had edge-case misclassification risk in real camera-like footage. | Tightened blue/cyan separation, blocked black full-frame background grabs, broadened dim-shade preset floors, and added a second-pass saturation/value tolerance retry so the selected hue family still tracks under moderate shading without collapsing nearby colors together. | Worked |
+
+

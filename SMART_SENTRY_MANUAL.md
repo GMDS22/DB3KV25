@@ -1,9 +1,9 @@
 # SMART SENTRY V2 — COMPLETE REFERENCE MANUAL
 
-> **Version:** 3.5.2  
+> **Version:** 3.5.3  
 > **Module Path:** `app/sentry_v2/`  
-> **Last Updated:** 2026-05-02  
-> **Status:** Verified against the current standalone Smart Sentry v3.5.2 release candidate. The canonical runtime settings file is versionless at `app/config/smart_sentry_settings.json`; older versioned settings paths remain compatibility fallbacks only and are migrated forward on load. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`. The full settings system defines 13 tabs, with `Facial Recognition` active in the runtime surface and `AI Assistant` still temporarily hidden by release hold for the current release line.
+> **Last Updated:** 2026-05-03  
+> **Status:** Verified against the current standalone Smart Sentry v3.5.3 release candidate. The canonical runtime settings file is versionless at `app/config/smart_sentry_settings.json`; older versioned settings paths remain compatibility fallbacks only and are migrated forward on load. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`. The full settings system defines 13 tabs, with `Facial Recognition` active in the runtime surface and `AI Assistant` still temporarily hidden by release hold for the current release line.
 
 Primary behavior-contract note: for the current authoritative tracking, PIR, target-loss, center-aim, and fire-gating blueprint, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md` first before changing engine or preset behavior.
 
@@ -51,6 +51,10 @@ On single-camera systems, Smart Sentry should normally use camera index `0` unle
 - **Quick startup policy:** launch starts background camera open shortly after startup while still deferring auto-connect and using a later lazy YOLO auto-load, so detection readiness improves without blocking the UI thread
 - **Sound system:** procedural non-blocking buzzer cues now route through `sound_engine.py` and `SentryV2Comm` with transport-aware status and persisted volume
 - **Voice output modes:** Smart Sentry now supports both robot buzzer cues and optional human-like local speech through Qt text-to-speech, so identity alerts and assistant replies can use either path or both together
+- **Enhanced voice support:** Windows SAPI voice enumeration now includes `Microsoft Mark` (male voice) alongside `Microsoft Zira Desktop` and `Microsoft David Desktop` after OneCore-to-classic SAPI registry bridging; speech runtime state handling has been hardened against stale stops and queued interrupts for continuous announcements
+- **Model-backed face recognition:** Facial recognition now supports an optional OpenCV YuNet + SFace backend using downloaded ONNX models for improved accuracy over the legacy Haar-based matcher; backend selection is configurable and requires re-enrollment when switching backends
+- **Return/home behavior stability:** Fixed return-to-guard and Home button bounce-back by ensuring `RETURNING` state completes into fresh `GUARDING` without re-engaging visible targets, clearing stale queue/cooldown state on arrival, and properly finalizing direct guard moves after motion completion
+- **Camera/UI performance optimization:** Reduced live face recognition overhead by downscaling large ROIs before YuNet inference, lengthening refresh cadences, and reducing jitter-triggered rematching to prevent UI thread stalls during `opencv_sface` operation
 - **Runtime diagnostics:** the status area now includes pinned hardware-monitor cards plus a live sound-link readout
 - **Runtime data export:** the Controls page can write timestamped JSON and Markdown runtime captures under the repo snapshot folder and expose a direct open-folder action for the saved files
 - **Preview resiliency:** local camera preview now keeps a reduced-overlay live fallback active when detector callbacks lag and records blackout-frame counts in runtime snapshots; sustained successful-but-near-black webcam frames now trigger source recovery instead of silently remaining black
@@ -86,7 +90,7 @@ SentryV2TabWidget (UI host)
 ├── SentryV2Config        (all settings, persistence)
 ├── SentryV2Comm          (serial/UDP/bus-servo I/O)
 ├── SentryV2Detector      (frame analysis, 11 modes)
-├── FaceIdentityRuntime   (Haar-based face detection + lightweight embeddings)
+├── FaceIdentityRuntime   (configurable face detection: legacy Haar-based or OpenCV YuNet + SFace backend with ONNX models)
 ├── SentryV2Engine        (state machine, engagement logic)
 │   ├── TargetFilter      (class/size/zone filtering)
 │   ├── ThreatScorer      (multi-factor threat ranking)
