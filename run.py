@@ -3,6 +3,9 @@
 
 import os
 import sys
+import time
+import traceback
+import faulthandler
 from pathlib import Path
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
@@ -95,5 +98,62 @@ if not getattr(sys, "frozen", False):
 
 from app.main import main  # noqa: E402
 
+
+_STARTUP_LOG_PATH = Path(__file__).resolve().parent / "logs" / "startup_runtime.log"
+_NATIVE_CRASH_LOG_PATH = Path(__file__).resolve().parent / "logs" / "native_crash.log"
+_NATIVE_CRASH_FH = None
+
+
+def _append_startup_log(message: str) -> None:
+    try:
+        _STARTUP_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with _STARTUP_LOG_PATH.open("a", encoding="utf-8") as fh:
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            fh.write(f"[{ts}] {message}\n")
+    except Exception:
+        # Logging must never crash the launcher.
+        pass
+
+
+def _log_unhandled_exception(exc_type, exc_value, exc_tb) -> None:
+    formatted = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    _append_startup_log("UNHANDLED EXCEPTION in launcher:\n" + formatted.rstrip())
+    sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+
+def _run_main_with_retry() -> int:
+    max_attempts = 2 if os.environ.get("SMART_SENTRY_STARTUP_RETRY", "1") != "0" else 1
+    for attempt in range(1, max_attempts + 1):
+        start_t = time.monotonic()
+        try:
+            _append_startup_log(f"launch attempt={attempt} begin")
+            code = int(main())
+        except Exception:
+            _append_startup_log(
+                f"launch attempt={attempt} raised exception:\n"
+                + traceback.format_exc().rstrip()
+            )
+            code = 1
+        elapsed = time.monotonic() - start_t
+        _append_startup_log(f"launch attempt={attempt} exit_code={code} elapsed_s={elapsed:.3f}")
+
+        # If startup fails quickly with exit code 1, retry once to bypass transient init races.
+        if code == 1 and attempt < max_attempts and elapsed < 20.0:
+            _append_startup_log("quick exit_code=1 detected; retrying once")
+            time.sleep(0.75)
+            continue
+        return code
+    return 1
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.excepthook = _log_unhandled_exception
+    try:
+        _NATIVE_CRASH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _NATIVE_CRASH_FH = _NATIVE_CRASH_LOG_PATH.open("a", encoding="utf-8")
+        _NATIVE_CRASH_FH.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] faulthandler enabled\n")
+        _NATIVE_CRASH_FH.flush()
+        faulthandler.enable(file=_NATIVE_CRASH_FH, all_threads=True)
+    except Exception:
+        _NATIVE_CRASH_FH = None
+    _append_startup_log("launcher bootstrap")
+    raise SystemExit(_run_main_with_retry())

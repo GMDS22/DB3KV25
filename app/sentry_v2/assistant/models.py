@@ -30,6 +30,8 @@ class AssistantReply:
     prompt_used: str = ""
     runtime_excerpt: str = ""
     model: str = ""
+    intent: Dict[str, Any] = field(default_factory=dict)
+    memory_context: Dict[str, List[str]] = field(default_factory=dict)
     error: Optional[str] = None
 
     @property

@@ -6,6 +6,9 @@ requests
 numpy>=1.21.6
 opencv-python>=4.5.5.64
 sounddevice>=0.4.6
+vosk>=0.3.45
+simpleaudio>=1.0.4
+azure-cognitiveservices-speech>=1.41.1
 pyserial>=3.5
 PyQt5>=5.15.9
 ultralytics>=8.0.0

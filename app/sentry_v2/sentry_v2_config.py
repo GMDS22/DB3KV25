@@ -389,7 +389,10 @@ class GuardConfig:
     rest_startup_delay_ms: int = 900
     rest_close_timeout_ms: int = 1600
     home_move_speed_dps: float = 24.0
+    home_move_approach_speed_dps: float = 14.0
     rest_move_speed_dps: float = 14.0
+    rest_move_approach_speed_dps: float = 10.0
+    guided_move_approach_window_deg: float = 14.0
     pan_min: float = SENTRY_PAN_MIN
     pan_max: float = SENTRY_PAN_MAX
     tilt_min: float = SENTRY_TILT_MIN
@@ -536,7 +539,7 @@ class SoundConfig:
     robot_voice_enabled: bool = True
     human_voice_enabled: bool = False
     mute_buzzer_when_human_voice_enabled: bool = True
-    human_voice_name: str = ""
+    human_voice_name: str = "Microsoft Zira Desktop"
     human_voice_style: str = "neutral"
     human_voice_rate_pct: int = 100
     human_voice_pitch_pct: int = 100
@@ -548,6 +551,25 @@ class SoundConfig:
     pir_voice_alerts_enabled: bool = False
     acoustic_voice_alerts_enabled: bool = False
     autotracking_voice_report_cooldown_s: float = 8.0
+    voice_commands_enabled: bool = True
+    voice_wake_word: str = "elion"
+    voice_command_cooldown_s: float = 0.35
+    voice_vosk_model_path: str = "models/vosk"
+    voice_pre_generated_audio_dir: str = "sounds/voice"
+    voice_input_device_name: str = ""
+    neural_tts_enabled: bool = False
+    neural_tts_voice_name: str = "en-US-JennyNeural"
+    # Kokoro offline TTS (primary neural backend — no internet/key required)
+    kokoro_model_path: str = "models/kokoro/kokoro-v1.0.onnx"
+    kokoro_voices_path: str = "models/kokoro/voices-v1.0.bin"
+    kokoro_voice_profile: str = "female_us"
+    kokoro_voice_female_us: str = "af_sarah"
+    kokoro_voice_male_us: str = "am_michael"
+    kokoro_voice_female_uk: str = "bf_emma"
+    kokoro_voice_male_uk: str = "bm_george"
+    # Optional explicit override. Leave empty to use kokoro_voice_profile mapping.
+    kokoro_voice_name: str = ""
+    kokoro_speed: float = 1.0
 
 
 @dataclass
@@ -574,7 +596,7 @@ class AcousticGuardConfig:
 @dataclass
 class FaceRecognitionConfig:
     """Known-face identification and friendly-recognition behavior."""
-    enabled: bool = False
+    enabled: bool = True
     library_path: str = CANONICAL_FACE_LIBRARY_PATH
     backend: str = "opencv_sface"
     detector_model_path: str = "app/models/face/face_detection_yunet_2023mar.onnx"
@@ -586,7 +608,7 @@ class FaceRecognitionConfig:
     announce_known_faces: bool = True
     cute_gesture_enabled: bool = True
     gesture_cooldown_s: float = 30.0
-    registration_samples_required: int = 2
+    registration_samples_required: int = 1
 
 
 @dataclass
@@ -606,6 +628,7 @@ class AIAssistantConfig:
     allow_runtime_analysis: bool = True
     allow_action_execution: bool = True
     auto_speak_responses: bool = False
+    auto_speak_requires_cue_name: bool = True
 
 
 @dataclass
