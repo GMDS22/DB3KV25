@@ -1683,7 +1683,11 @@ class WindowsSpeechCommandListener(VoskCommandListener):
 
     def _powershell_listener_script(self) -> str:
         phrases = self._windows_speech_grammar_phrases()
-        phrase_literals = ", ".join(f"'{phrase.replace("'", "''")}'" for phrase in phrases if phrase and phrase != "[unk]")
+        phrase_literals = ", ".join(
+            "'" + phrase.replace("'", "''") + "'"
+            for phrase in phrases
+            if phrase and phrase != "[unk]"
+        )
         return f"""
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Speech
