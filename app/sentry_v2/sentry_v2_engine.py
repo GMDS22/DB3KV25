@@ -182,6 +182,7 @@ class SentryV2Engine:
         self._sound_alert_pending_level_db: float = 0.0
         self._sound_alert_pending_baseline_db: float = 0.0
         self._sound_alert_active: bool = False
+        self._sound_alert_deferred_until_guard_clear: bool = False
         self._sound_alert_phase: str = ""
         self._sound_alert_phase_started: float = 0.0
         self._sound_alert_last_update: float = 0.0
@@ -350,6 +351,7 @@ class SentryV2Engine:
         self._sound_alert_pending_level_db = 0.0
         self._sound_alert_pending_baseline_db = 0.0
         self._sound_alert_active = False
+        self._sound_alert_deferred_until_guard_clear = False
         self._sound_alert_phase = ""
         self._sound_alert_phase_started = 0.0
         self._sound_alert_last_update = 0.0
@@ -680,10 +682,20 @@ class SentryV2Engine:
         self._sound_alert_pending_since = now
         self._sound_alert_pending_level_db = float(level_db)
         self._sound_alert_pending_baseline_db = float(baseline_db)
+        self._sound_alert_deferred_until_guard_clear = self.state in {SentryV2State.ENGAGING, SentryV2State.RETURNING}
         self._set_sound_alert_note(
             f"Acoustic anomaly queued ({float(level_db):.1f}dB vs {float(baseline_db):.1f}dB baseline)",
             when=now,
         )
+
+    def _defer_sound_alert_until_guard_clear(self, now: float) -> None:
+        if not self._sound_alert_active:
+            return
+        self._cancel_sound_alert(reason="Acoustic alert deferred: visual target acquired")
+        self._sound_alert_pending = True
+        self._sound_alert_pending_since = max(float(now), float(self._sound_alert_pending_since or 0.0))
+        self._sound_alert_deferred_until_guard_clear = True
+        self._set_sound_alert_note("Acoustic alert deferred until guard is clear", when=now)
 
     def _cancel_sound_alert(self, *, reason: str = "") -> None:
         self._sound_alert_active = False
@@ -702,6 +714,7 @@ class SentryV2Engine:
         self._sound_alert_pending = False
         self._sound_alert_pending_since = 0.0
         self._sound_alert_active = True
+        self._sound_alert_deferred_until_guard_clear = False
         self._sound_alert_phase = "initial_search"
         self._sound_alert_phase_started = now
         self._sound_alert_last_update = now
@@ -833,12 +846,13 @@ class SentryV2Engine:
                     self._queue_index = 0
                     self._patrol_initialized = False  # reset patrol on re-entry
                     self._reset_precision_state()
+                    if self._sound_alert_active:
+                        self._defer_sound_alert_until_guard_clear(now)
                     self._change_state(SentryV2State.ENGAGING)
                     first = self._queue[0]
                     self.active_order = first
                     self._remember_active_target(first.target.det)
                     self._start_order_engagement(first, now)
-                    self._cancel_sound_alert(reason="Acoustic alert interrupted: visual target acquired")
                     # Target found — complete active cue but preserve queued
                     # events so other sensor zones are hunted after this engage.
                     self._pir_manager.complete_active_cue()
@@ -878,7 +892,12 @@ class SentryV2Engine:
         acoustic_cfg = getattr(self.cfg, "acoustic_guard", None)
         if acoustic_cfg is not None:
             ttl_s = max(1.0, float(getattr(acoustic_cfg, "queue_ttl_s", 14.0) or 14.0))
-            if self._sound_alert_pending and self._sound_alert_pending_since > 0.0 and (now - self._sound_alert_pending_since) > ttl_s:
+            if (
+                self._sound_alert_pending
+                and not self._sound_alert_deferred_until_guard_clear
+                and self._sound_alert_pending_since > 0.0
+                and (now - self._sound_alert_pending_since) > ttl_s
+            ):
                 self._sound_alert_pending = False
                 self._sound_alert_pending_since = 0.0
                 self._set_sound_alert_note("Acoustic alert expired before execution", when=now)
@@ -3068,6 +3087,7 @@ class SentryV2Engine:
             "pir_status": self._pir_manager.get_status_text(),
             "sound_alert_pending": bool(self._sound_alert_pending),
             "sound_alert_active": bool(self._sound_alert_active),
+            "sound_alert_deferred_until_guard_clear": bool(self._sound_alert_deferred_until_guard_clear),
             "sound_alert_phase": str(self._sound_alert_phase),
             "sound_alert_note": str(self._sound_alert_note),
             "sound_alert_recent": bool(self._sound_alert_note_time and (time.time() - self._sound_alert_note_time) <= 3.0),

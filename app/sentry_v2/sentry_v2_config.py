@@ -190,7 +190,7 @@ class EngagementConfig:
     trigger_mosfet_pulse_ms: int = 120
     trigger_mosfet_cycle_count: int = 1
     trigger_mosfet_cycle_off_ms: int = 50
-    # Projectile trigger-servo tuning pushed to the ESP32 at runtime.
+    # Projectile trigger-servo tuning pushed to the active IO firmware at runtime.
     trigger_servo_rest_deg: int = 0
     trigger_servo_fire_deg: int = 45
     trigger_servo_speed_dps: int = 360
@@ -554,6 +554,13 @@ class SoundConfig:
     voice_commands_enabled: bool = True
     voice_wake_word: str = "elion"
     voice_command_cooldown_s: float = 0.35
+    voice_operator_silence_hold_s: float = 0.45
+    voice_response_delay_s: float = 0.25
+    voice_command_confidence_threshold: float = 0.78
+    voice_command_ambiguous_threshold: float = 0.92
+    voice_brief_responses: bool = False
+    voice_auto_resume_tracking: bool = False
+    voice_auto_resume_delay_s: float = 6.0
     voice_vosk_model_path: str = "models/vosk"
     voice_pre_generated_audio_dir: str = "sounds/voice"
     voice_input_device_name: str = ""
@@ -616,6 +623,7 @@ class AIAssistantConfig:
     """Local assistant controls for Smart Sentry diagnostics and Ollama-backed reasoning."""
     enabled: bool = True
     mode: str = "conversational_voice"
+    personality: str = "sentinel"
     provider: str = "ollama"
     endpoint_url: str = "http://localhost:11434"
     preferred_model_tier: str = "fast"

@@ -1,6 +1,15 @@
 ﻿{
     "updates":  [
                     {
+                        "version":  "4.0.0",
+                        "fix":  "Prepared the Smart Sentry v4.0.0 release line by promoting a dedicated 4.0.0 version marker through runtime and portable-build resolution, keeping canonical settings/custom presets/prompted targets/face-library packaging intact, and simplifying the DADBOT home screen to logo plus title only.",
+                        "category":  "Release/UI",
+                        "date":  "2026-05-05",
+                        "issue":  "ISS-106",
+                        "title":  "v4.0.0 release prep: canonical data preservation and DADBOT home-screen cleanup",
+                        "status":  "Worked"
+                    },
+                    {
                         "version":  "3.5.3",
                         "fix":  "Fixed return-to-guard and Home button bounce-back behavior by ensuring RETURNING state completes into fresh GUARDING without re-engaging visible targets, clearing stale queue/cooldown state on arrival, and properly finalizing direct guard moves after motion completion with token-based callback invalidation.",
                         "category":  "Engine/Behavior",

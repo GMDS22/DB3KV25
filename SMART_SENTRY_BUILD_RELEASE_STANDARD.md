@@ -6,7 +6,7 @@ If any older protocol document conflicts with this file, this file wins.
 
 ## 1. Scope and non-negotiable rules
 
-- One release version marker is authoritative for a build run: the highest-priority existing marker resolved by the app (`SMART_SENTRY_V3_5_3_VERSION.txt`, then older markers).
+- One release version marker is authoritative for a build run: the highest-priority existing marker resolved by the app (`SMART_SENTRY_V4_0_0_VERSION.txt`, then older markers).
 - Only the UI release identity changes per release (`SMART SENTRY V<version>` title and output folder/exe names).
 - Runtime config filenames are versionless and must not be renamed per release:
   - `app/config/smart_sentry_settings.json`

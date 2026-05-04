@@ -28,6 +28,7 @@ _ALLOWED_INTENT_ACTIONS = {
     "none",
     "go_home",
     "go_rest",
+    "toggle_sentry",
     "move_position",
     "set_detection_mode",
     "toggle_face_recognition",
@@ -41,12 +42,142 @@ _ALLOWED_INTENT_ACTIONS = {
     "draft_setting_change",
 }
 
+_SETTING_CHANGE_SPECS = (
+    {
+        "path": "detection_mode.yolo_confidence",
+        "label": "YOLO confidence",
+        "aliases": ("yolo confidence", "confidence threshold", "confidence"),
+        "value_type": "float",
+        "step": 0.05,
+        "decimals": 2,
+        "percent_scale": True,
+    },
+    {
+        "path": "detection_mode.yolo_min_area",
+        "label": "YOLO minimum area",
+        "aliases": ("yolo minimum area", "yolo min area", "minimum area", "min area"),
+        "value_type": "int",
+        "step": 100.0,
+    },
+    {
+        "path": "detection_mode.min_contour_area",
+        "label": "Minimum contour area",
+        "aliases": ("minimum contour area", "min contour area", "contour area", "motion contour area"),
+        "value_type": "float",
+        "step": 100.0,
+        "decimals": 1,
+    },
+    {
+        "path": "engagement.min_threat_score",
+        "label": "Minimum threat score",
+        "aliases": ("minimum threat score", "min threat score", "threat score", "threat threshold", "engagement threshold"),
+        "value_type": "float",
+        "step": 0.05,
+        "decimals": 2,
+        "percent_scale": True,
+    },
+    {
+        "path": "engagement.engagement_speed_pct",
+        "label": "Engagement speed",
+        "aliases": ("engagement speed", "tracking speed", "speed"),
+        "value_type": "int",
+        "step": 5.0,
+    },
+    {
+        "path": "guard.camera_hfov",
+        "label": "Camera horizontal field of view",
+        "aliases": ("camera hfov", "camera field of view", "field of view", "fov"),
+        "value_type": "float",
+        "step": 5.0,
+        "decimals": 1,
+    },
+    {
+        "path": "lighting.led_pwm_value",
+        "label": "LED brightness",
+        "aliases": ("led brightness", "brightness", "led pwm", "light brightness"),
+        "value_type": "int",
+        "step": 10.0,
+    },
+    {
+        "path": "lighting.auto_pwm_min",
+        "label": "Auto PWM minimum",
+        "aliases": ("auto pwm minimum", "auto pwm min", "minimum auto brightness", "minimum auto pwm"),
+        "value_type": "int",
+        "step": 10.0,
+    },
+    {
+        "path": "lighting.auto_pwm_max",
+        "label": "Auto PWM maximum",
+        "aliases": ("auto pwm maximum", "auto pwm max", "maximum auto brightness", "maximum auto pwm"),
+        "value_type": "int",
+        "step": 10.0,
+    },
+)
+
+_ASSISTANT_FULL_NAME = "Elion Mesk"
+_ASSISTANT_IDENTITY_BRIEF = "Elion Mesk, Smart Sentry's local operator assistant."
+_ASSISTANT_IDENTITY_DESCRIPTION = (
+    "I monitor the live Smart Sentry runtime, explain what the system is doing, compare live behavior against intended app behavior, "
+    "diagnose faults, accept supported local control commands, and adjust supported runtime settings while the app is running."
+)
+_ASSISTANT_IDENTITY_BOUNDARY = (
+    "I stay grounded in the running app and its supported controls. I do not invent hardware state or pretend unsupported actions already happened."
+)
+
+_ASSISTANT_PERSONALITY_PROFILES: Dict[str, Dict[str, Any]] = {
+    "sentinel": {
+        "label": "Sentinel",
+        "style_instruction": "calm, direct, and operational",
+        "greeting": "Standing by. Tell me what you want me to check or do.",
+        "thanks": "Understood. Standing by for the next task.",
+        "personality_reply": "Sentinel. Calm, precise, and focused on the task.",
+        "jokes": [
+            "Here is a sentry joke. I asked the turret for small talk, and it said it was still calibrating the punchline.",
+            "Sentry humor stays disciplined. Even my jokes try to hold center before drifting.",
+        ],
+    },
+    "hunter": {
+        "label": "Hunter",
+        "style_instruction": "focused, confident, and slightly aggressive without sounding reckless",
+        "greeting": "Hunter profile active. Give me the next target task.",
+        "thanks": "Copy that. Ready for the next move.",
+        "personality_reply": "Hunter. Sharper, faster, and more forceful, but still controlled.",
+        "jokes": [
+            "Hunter joke. I told the tracker to stop chasing ghosts. It said only if the signal stops running first.",
+            "My hunting humor is simple. Acquire the setup, lock the timing, release the punchline.",
+        ],
+    },
+    "stealth": {
+        "label": "Stealth",
+        "style_instruction": "quiet, efficient, and minimal",
+        "greeting": "Stealth profile active. I am listening.",
+        "thanks": "Noted. Quiet and ready.",
+        "personality_reply": "Stealth. Minimal, quiet, and low-drama.",
+        "jokes": [
+            "Stealth joke. I would deliver it louder, but then it would stop being stealth.",
+            "My quietest joke is still detectable. The punchline leaves a small thermal signature.",
+        ],
+    },
+    "playful": {
+        "label": "Playful",
+        "style_instruction": "friendly, lightly witty, and still grounded in the runtime facts",
+        "greeting": "Playful profile active. What are we tuning, checking, or rescuing today?",
+        "thanks": "Any time. I am ready for the next clever idea.",
+        "personality_reply": "Playful. More conversational and light, but still tied to the real runtime.",
+        "jokes": [
+            "Playful joke. I tried to teach the turret stand-up, but it kept rotating to face the audience before the punchline.",
+            "Another one. Smart Sentry does not panic under pressure. It just calls it precision with atmosphere.",
+        ],
+    },
+}
+
 
 class LocalAssistantService:
-    def __init__(self, client: OllamaClient | None = None, analyzer: RuntimeAnalyzer | None = None, knowledge_base: AppKnowledgeBase | None = None):
+    def __init__(self, client: OllamaClient | None = None, analyzer: RuntimeAnalyzer | None = None, knowledge_base: AppKnowledgeBase | None = None, *, personality: str = "sentinel"):
         self._client = client or OllamaClient()
         self._analyzer = analyzer or RuntimeAnalyzer()
         self._knowledge = knowledge_base or AppKnowledgeBase()
+        self._personality = str(personality or "sentinel").strip().lower() or "sentinel"
         self._analysis_history: List[str] = []
         self._command_history: List[str] = []
 
@@ -69,6 +200,116 @@ class LocalAssistantService:
             "analysis_history": list(self._analysis_history[-3:]),
             "command_history": list(self._command_history[-3:]),
         }
+
+    def _profile_query_kind(self, prompt_text: str) -> str | None:
+        normalized = re.sub(r"\s+", " ", str(prompt_text or "").strip().lower())
+        if not normalized:
+            return None
+        introduction_patterns = (
+            r"\bintroduce yourself\b",
+            r"\bdescribe yourself\b",
+            r"\btell me about yourself\b",
+        )
+        identity_patterns = (
+            r"\bwho are you\b",
+            r"\bwhat are you\b",
+            r"\bwhat(?:'s| is) your name\b",
+            r"\bstate your name\b",
+            r"\bidentify yourself\b",
+            r"\bwho is elion mesk\b",
+            r"\bare you elion mesk\b",
+        )
+        capability_patterns = (
+            r"\bwhat do you do\b",
+            r"\bwhat can you do\b",
+            r"\bwhat is your role\b",
+            r"\bwhat is your purpose\b",
+            r"\bwhat are your capabilities\b",
+            r"\bwhat do you help with\b",
+        )
+        if any(re.search(pattern, normalized) for pattern in introduction_patterns):
+            return "introduction"
+        if any(re.search(pattern, normalized) for pattern in identity_patterns):
+            return "identity"
+        if any(re.search(pattern, normalized) for pattern in capability_patterns):
+            return "capabilities"
+        return None
+
+    def _has_recent_profile_query(self) -> bool:
+        for prior in self._command_history[-3:]:
+            if self._profile_query_kind(prior):
+                return True
+        return False
+
+    def _profile_protocol_reply(self, prompt_text: str) -> str | None:
+        query_kind = self._profile_query_kind(prompt_text)
+        if query_kind is None:
+            return None
+        repeated = self._has_recent_profile_query()
+        short_identity = "Elion Mesk. Smart Sentry's local operator assistant for runtime analysis, live control, and supported setting changes."
+        short_capabilities = "Elion Mesk handles runtime analysis, behavior explanation, supported local commands, and live setting adjustments inside Smart Sentry."
+        if query_kind == "identity":
+            if repeated:
+                return short_identity
+            return f"I am {_ASSISTANT_FULL_NAME}. {_ASSISTANT_IDENTITY_DESCRIPTION} {_ASSISTANT_IDENTITY_BOUNDARY}"
+        if query_kind == "capabilities":
+            if repeated:
+                return short_capabilities
+            return f"{_ASSISTANT_IDENTITY_BRIEF} {_ASSISTANT_IDENTITY_DESCRIPTION} {_ASSISTANT_IDENTITY_BOUNDARY}"
+        if repeated:
+            return f"{short_identity} {short_capabilities}"
+        return f"I am {_ASSISTANT_FULL_NAME}. {_ASSISTANT_IDENTITY_DESCRIPTION} {_ASSISTANT_IDENTITY_BOUNDARY}"
+
+    def _assistant_personality_key(self) -> str:
+        key = str(getattr(self, "_personality", "sentinel") or "sentinel").strip().lower()
+        if key not in _ASSISTANT_PERSONALITY_PROFILES:
+            return "sentinel"
+        return key
+
+    def _assistant_personality_profile(self) -> Dict[str, Any]:
+        return _ASSISTANT_PERSONALITY_PROFILES.get(self._assistant_personality_key(), _ASSISTANT_PERSONALITY_PROFILES["sentinel"])
+
+    def _conversational_protocol_reply(self, prompt_text: str) -> str | None:
+        normalized = re.sub(r"\s+", " ", str(prompt_text or "").strip().lower())
+        if not normalized:
+            return None
+        profile = self._assistant_personality_profile()
+
+        personality_patterns = (
+            r"\bwhat(?:'s| is) your personality\b",
+            r"\bwhat personality are you using\b",
+            r"\bwhat personality.*\busing\b",
+            r"\bwhich personality\b",
+            r"\bcurrent personality\b",
+            r"\bactive personality\b",
+            r"\bpersonality mode\b",
+        )
+        if any(re.search(pattern, normalized) for pattern in personality_patterns):
+            return f"Current assistant personality: {profile['label']}. {profile['personality_reply']}"
+
+        joke_patterns = (
+            r"\btell me (?:a|another) joke\b",
+            r"\bmake me laugh\b",
+            r"\bsomething funny\b",
+            r"\bany jokes\b",
+            r"\bjoke\b",
+        )
+        if any(re.search(pattern, normalized) for pattern in joke_patterns):
+            jokes = list(profile.get("jokes") or [])
+            if jokes:
+                return str(jokes[len(self._command_history) % len(jokes)])
+
+        if normalized in {"hi", "hello", "hey", "hi elion", "hello elion", "hey elion", "how are you", "how are you elion"}:
+            return str(profile.get("greeting") or "Standing by.")
+
+        thanks_patterns = (
+            r"\bthanks\b",
+            r"\bthank you\b",
+            r"\bappreciate it\b",
+        )
+        if any(re.search(pattern, normalized) for pattern in thanks_patterns) and len(normalized.split()) <= 4:
+            return str(profile.get("thanks") or "Standing by.")
+        return None
 
     def is_available(self) -> bool:
         return self._client.is_available()
@@ -168,6 +409,46 @@ class LocalAssistantService:
             )
 
     def answer_operator_prompt(self, prompt_text: str, snapshot: Dict[str, Any], *, model: str, include_logs: bool = True) -> AssistantReply:
+        profile_reply = self._profile_protocol_reply(prompt_text)
+        if profile_reply is not None:
+            self._remember_command(prompt_text)
+            return AssistantReply(
+                text=profile_reply,
+                source="deterministic",
+                model=model,
+                raw_response="conversation_profile_protocol",
+                prompt_used="conversation_profile_protocol",
+                intent={
+                    "action": "none",
+                    "value": None,
+                    "confidence": 1.0,
+                    "needs_clarification": False,
+                    "question": "",
+                    "suggestions": [],
+                    "payload": {},
+                },
+                memory_context=self._memory_context(),
+            )
+        conversational_reply = self._conversational_protocol_reply(prompt_text)
+        if conversational_reply is not None:
+            self._remember_command(prompt_text)
+            return AssistantReply(
+                text=conversational_reply,
+                source="deterministic",
+                model=model,
+                raw_response="conversation_protocol",
+                prompt_used="conversation_protocol",
+                intent={
+                    "action": "none",
+                    "value": None,
+                    "confidence": 1.0,
+                    "needs_clarification": False,
+                    "question": "",
+                    "suggestions": [],
+                    "payload": {},
+                },
+                memory_context=self._memory_context(),
+            )
         findings, recommendations, summary = self._analyzer.analyze(snapshot)
         self._remember_command(prompt_text)
         parsed_actions = self._parse_actions(prompt_text)
@@ -345,6 +626,12 @@ class LocalAssistantService:
                 except Exception:
                     pass
             return [AssistantAction("set_detection_mode", "Switch detection mode from parsed intent", payload, True)]
+        if action_type == "toggle_sentry":
+            if "enabled" not in payload and value is not None:
+                payload["enabled"] = bool(value)
+            enabled = bool(payload.get("enabled", True))
+            label = "Enable Smart Sentry" if enabled else "Disable Smart Sentry"
+            return [AssistantAction("toggle_sentry", label, {"enabled": enabled}, False)]
         if action_type in {"toggle_face_recognition", "toggle_shortcuts", "toggle_human_voice", "toggle_ai_auto_speak", "toggle_camera"}:
             if "enabled" not in payload and "open" not in payload and value is not None:
                 if action_type == "toggle_camera":
@@ -386,6 +673,18 @@ class LocalAssistantService:
             _append(AssistantAction("go_home", "Move to guard home position", requires_permission=False))
         if self._matches_action_request(lower_prompt, ("rest", "go", "move", "return"), ("rest", "rest position")):
             _append(AssistantAction("go_rest", "Move to rest position", requires_permission=False))
+        if self._matches_action_request(
+            lower_prompt,
+            ("enable", "start", "resume", "turn on", "activate"),
+            ("smart sentry", "sentry", "tracking", "guarding mode", "guard mode", "autotracking", "auto tracking"),
+        ):
+            _append(AssistantAction("toggle_sentry", "Enable Smart Sentry", {"enabled": True}, False))
+        if self._matches_action_request(
+            lower_prompt,
+            ("disable", "stop", "pause", "turn off", "deactivate"),
+            ("smart sentry", "sentry", "tracking", "guarding mode", "guard mode", "autotracking", "auto tracking"),
+        ):
+            _append(AssistantAction("toggle_sentry", "Disable Smart Sentry", {"enabled": False}, False))
         position_action = self._extract_position_action(prompt_text)
         if position_action is not None:
             _append(position_action)
@@ -417,10 +716,50 @@ class LocalAssistantService:
             _append(AssistantAction("toggle_camera", "Open camera", {"open": True}, False))
         if self._matches_action_request(lower_prompt, ("close", "stop"), ("camera", "video")):
             _append(AssistantAction("toggle_camera", "Close camera", {"open": False}, False))
-        if self._matches_action_request(lower_prompt, ("disconnect", "close"), ("link", "controller link", "connection")):
+        if self._matches_action_request(
+            lower_prompt,
+            ("disconnect", "close"),
+            ("link", "controller link", "connection", "boards", "board", "com port", "serial", "ports"),
+        ):
             _append(AssistantAction("disconnect_link", "Disconnect controller link", {}, False))
-        elif self._matches_action_request(lower_prompt, ("connect", "open"), ("link", "controller link", "connection")):
-            _append(AssistantAction("connect_link", "Connect controller link", {}, False))
+        elif self._matches_action_request(
+            lower_prompt,
+            ("connect", "open"),
+            (
+                "link",
+                "controller link",
+                "connection",
+                "smart sentry boards",
+                "smart sentry board",
+                "boards",
+                "board",
+                "com port",
+                "com ports",
+                "serial",
+                "serial port",
+                "serial ports",
+                "usb board",
+                "debug board",
+            ),
+        ):
+            _append(AssistantAction("connect_link", "Connect Smart Sentry boards", {}, False))
+        action_priority = {
+            "connect_link": 0,
+            "toggle_sentry": 1,
+            "move_position": 2,
+            "set_detection_mode": 3,
+            "toggle_face_recognition": 4,
+            "toggle_shortcuts": 5,
+            "toggle_human_voice": 6,
+            "toggle_ai_auto_speak": 7,
+            "set_human_voice_style": 8,
+            "draft_setting_change": 9,
+            "go_home": 10,
+            "go_rest": 11,
+            "toggle_camera": 12,
+            "disconnect_link": 13,
+        }
+        actions.sort(key=lambda action: action_priority.get(str(action.action_type or ""), 99))
         return actions
 
     def _extract_position_action(self, prompt_text: str) -> AssistantAction | None:
@@ -473,43 +812,89 @@ class LocalAssistantService:
 
         actions: List[AssistantAction] = []
 
-        confidence_match = re.search(r"\b(?:yolo\s+)?confidence\s*(?:to|=)?\s*(0(?:\.\d+)?|1(?:\.0+)?)\b", normalized)
-        if confidence_match is not None:
-            value = float(confidence_match.group(1))
-            actions.append(
-                AssistantAction(
-                    "draft_setting_change",
-                    f"Draft YOLO confidence -> {value:.2f}",
-                    {"setting_path": "detection_mode.yolo_confidence", "value": value},
-                    False,
-                )
+        for spec in _SETTING_CHANGE_SPECS:
+            alias_pattern = "|".join(
+                re.escape(alias)
+                for alias in sorted(spec.get("aliases", ()), key=len, reverse=True)
             )
+            if not alias_pattern:
+                continue
 
-        min_area_match = re.search(r"\b(?:yolo\s+)?(?:min(?:imum)?\s+)?area\s*(?:to|=)?\s*(\d{1,7})\b", normalized)
-        if min_area_match is not None:
-            value = int(min_area_match.group(1))
-            actions.append(
-                AssistantAction(
-                    "draft_setting_change",
-                    f"Draft YOLO minimum area -> {value}",
-                    {"setting_path": "detection_mode.yolo_min_area", "value": value},
-                    False,
-                )
+            absolute_match = re.search(
+                rf"\b(?:set|change|adjust|tune)\s+(?:the\s+)?(?:{alias_pattern})(?:\s*(?:to|=)\s*|\s+)(-?\d+(?:\.\d+)?)\b",
+                normalized,
             )
+            if absolute_match is None:
+                absolute_match = re.search(
+                    rf"\b(?:{alias_pattern})\s*(?:to|=)\s*(-?\d+(?:\.\d+)?)\b",
+                    normalized,
+                )
+            if absolute_match is not None:
+                raw_value = self._normalize_setting_request_value(float(absolute_match.group(1)), spec, relative=False)
+                actions.append(
+                    AssistantAction(
+                        "draft_setting_change",
+                        f"Set {spec['label']} -> {self._format_setting_request_value(raw_value, spec)}",
+                        {
+                            "setting_path": str(spec["path"]),
+                            "mode": "absolute",
+                            "value": raw_value,
+                        },
+                        False,
+                    )
+                )
+                continue
 
-        threat_match = re.search(r"\b(?:min(?:imum)?\s+)?(?:threat score|engagement threshold|threat threshold)\s*(?:to|=)?\s*(0(?:\.\d+)?|1(?:\.0+)?)\b", normalized)
-        if threat_match is not None:
-            value = float(threat_match.group(1))
-            actions.append(
-                AssistantAction(
-                    "draft_setting_change",
-                    f"Draft minimum threat score -> {value:.2f}",
-                    {"setting_path": "engagement.min_threat_score", "value": value},
-                    False,
-                )
+            increase_match = re.search(
+                rf"\b(?:increase|raise|boost|bump(?:\s+up)?)\s+(?:the\s+)?(?:{alias_pattern})(?:\s+by\s+(-?\d+(?:\.\d+)?))?\b",
+                normalized,
             )
+            decrease_match = re.search(
+                rf"\b(?:decrease|lower|reduce|drop)\s+(?:the\s+)?(?:{alias_pattern})(?:\s+by\s+(-?\d+(?:\.\d+)?))?\b",
+                normalized,
+            )
+            relative_match = increase_match or decrease_match
+            if relative_match is not None:
+                delta_raw = relative_match.group(1)
+                if delta_raw is None:
+                    delta_value = float(spec.get("step", 1.0) or 1.0)
+                else:
+                    delta_value = float(delta_raw)
+                delta_value = self._normalize_setting_request_value(delta_value, spec, relative=True)
+                if decrease_match is not None:
+                    delta_value = -abs(float(delta_value))
+                else:
+                    delta_value = abs(float(delta_value))
+                direction_label = "increase" if delta_value >= 0 else "decrease"
+                actions.append(
+                    AssistantAction(
+                        "draft_setting_change",
+                        f"{direction_label.title()} {spec['label']} by {self._format_setting_request_value(abs(delta_value), spec)}",
+                        {
+                            "setting_path": str(spec["path"]),
+                            "mode": "relative",
+                            "delta": delta_value,
+                        },
+                        False,
+                    )
+                )
 
         return actions
+
+    def _normalize_setting_request_value(self, raw_value: float, spec: Dict[str, Any], *, relative: bool) -> float | int:
+        value = float(raw_value)
+        if bool(spec.get("percent_scale", False)) and abs(value) > 1.0 and abs(value) <= 100.0:
+            value = value / 100.0
+        if str(spec.get("value_type") or "float") == "int":
+            return int(round(value))
+        decimals = int(spec.get("decimals", 2) or 2)
+        return round(float(value), decimals)
+
+    def _format_setting_request_value(self, value: float | int, spec: Dict[str, Any]) -> str:
+        if str(spec.get("value_type") or "float") == "int":
+            return str(int(round(float(value))))
+        decimals = int(spec.get("decimals", 2) or 2)
+        return f"{float(value):.{decimals}f}"
 
     def _extract_voice_style_action(self, prompt_text: str) -> AssistantAction | None:
         if "voice style" not in prompt_text and "speech style" not in prompt_text:
@@ -583,13 +968,18 @@ class LocalAssistantService:
         return bool(re.search(rf"\b(?:{verb_pattern})\b.*\b(?:{target_pattern})\b", normalized))
 
     def _system_prompt(self) -> str:
+        profile = self._assistant_personality_profile()
         return (
-            "You are Smart Sentry's local offline assistant. "
+            f"You are {_ASSISTANT_FULL_NAME}, Smart Sentry's local offline assistant. "
             "Use the supplied app structure, docs, and code excerpts as the intended-behavior source of truth. "
             "Be concise, safety-first, and specific to the runtime snapshot. "
             "Do not invent hardware state. "
             "If actions are suggested, clearly separate observations from recommended operator actions. "
-            "When you detect a mismatch between intended app behavior and current runtime/settings, say so explicitly."
+            "When you detect a mismatch between intended app behavior and current runtime/settings, say so explicitly. "
+            "If the operator asks who you are, what your name is, or what you do, identify yourself as Elion Mesk and describe your role consistently. "
+            "Do not repeat the full introduction on every similar follow-up; use a shorter form unless the operator asks for more detail. "
+            f"Current conversational personality is {profile['label']}; keep your phrasing {profile['style_instruction']}. "
+            "When the operator asks for general conversation, respond naturally and you may include brief sentry or turret themed jokes."
         )
 
     def _snapshot_excerpt(self, snapshot: Dict[str, Any], *, query_text: str, include_logs: bool, max_log_lines: int = 12, max_chars: int = 12000) -> str:
@@ -641,7 +1031,9 @@ class LocalAssistantService:
         memory = self._memory_context()
         analysis_memory = "\n".join(f"- {item}" for item in memory.get("analysis_history", [])[-3:]) or "- none"
         return (
-            "Analyze the Smart Sentry runtime against the intended app behavior and answer in four short sections: Current State, Intended Contract, Mismatch Check, Next Steps.\n\n"
+            "Analyze the Smart Sentry runtime against the intended app behavior and answer in five short sections: Current State, Configured Behavior, Intended Contract, Mismatch Check, Next Steps.\n"
+            "In Configured Behavior, explicitly describe what it is currently set to track, current speed posture, trigger mode/profile, and return/recovery behavior.\n"
+            "In Mismatch Check, call out any concrete inconsistencies between active settings and runtime behavior.\n\n"
             f"Deterministic summary:\n{summary}\n\n"
             f"Recent analysis memory (last up to 3):\n{analysis_memory}\n\n"
             f"Findings:\n{self._format_findings(findings)}\n\n"
@@ -666,7 +1058,7 @@ class LocalAssistantService:
         command_memory = "\n".join(f"- {item}" for item in memory.get("command_history", [])[-3:]) or "- none"
         return (
             "Answer the operator request using the runtime context. "
-            "If explicit supported actions were detected, mention them clearly as pending/available actions rather than pretending they already happened. "
+            "If explicit supported actions were detected, mention them clearly without inventing side effects outside the supported controls. "
             "Use the app knowledge context to compare intended behavior versus the current runtime/settings when relevant. Stay concise.\n\n"
             f"Operator request:\n{operator_prompt}\n\n"
             f"Recent command memory (last up to 3):\n{command_memory}\n\n"
@@ -684,16 +1076,31 @@ class LocalAssistantService:
         yolo = snapshot.get("yolo_status") or {}
         config = snapshot.get("config") or {}
         detection_cfg = config.get("detection_mode") or {}
+        target_cfg = config.get("target_filter") or {}
         engagement_cfg = config.get("engagement") or {}
+        guard_cfg = config.get("guard") or {}
+        allowed_classes = [str(item).strip() for item in list(target_cfg.get("allowed_classes") or []) if str(item).strip()]
+        tracked_scope = ", ".join(allowed_classes[:4]) if allowed_classes else "all detectable classes"
+        if allowed_classes and len(allowed_classes) > 4:
+            tracked_scope += f", +{len(allowed_classes) - 4} more"
         summary_parts = [
             f"state={engine.get('state', 'UNKNOWN')}",
             f"camera_open={bool(camera.get('capture_open'))}",
             f"yolo_loaded={bool(yolo.get('detector_loaded'))}",
             f"mode={detection_cfg.get('detection_mode', 'n/a')}",
+            f"tracking_scope={tracked_scope}",
         ]
         if engagement_cfg:
             summary_parts.append(
                 f"loss_protocols={engagement_cfg.get('loss_recovery_protocol_new_target', 'n/a')}/{engagement_cfg.get('loss_recovery_protocol_no_detection', 'n/a')}"
+            )
+            summary_parts.append(
+                f"speed={engagement_cfg.get('engagement_speed', 'n/a')} trigger={'projectile' if bool(engagement_cfg.get('trigger_mode_bb', False)) else 'water'} burst={engagement_cfg.get('burst_count', 'n/a')}@{engagement_cfg.get('burst_interval_ms', 'n/a')}ms"
+            )
+            summary_parts.append(f"return_delay={engagement_cfg.get('return_delay', 'n/a')}")
+        if guard_cfg:
+            summary_parts.append(
+                f"guard_mode={guard_cfg.get('guard_mode', 'n/a')} guard_pan_tilt={guard_cfg.get('guard_pan', 'n/a')}/{guard_cfg.get('guard_tilt', 'n/a')}"
             )
         head = findings[0].detail if findings else "Runtime looks stable from the deterministic checks that are available."
         next_step = recommendations[0] if recommendations else "No immediate corrective action is recommended."
@@ -705,6 +1112,9 @@ class LocalAssistantService:
         return "Local recommendation fallback: no immediate settings changes are recommended."
 
     def _fallback_chat_text(self, prompt_text: str, snapshot: Dict[str, Any], findings: List[Any], recommendations: List[str], actions: List[AssistantAction]) -> str:
+        conversational_reply = self._conversational_protocol_reply(prompt_text)
+        if conversational_reply is not None:
+            return conversational_reply
         if actions:
             executable_actions = [action for action in actions if action.action_type != "draft_setting_change"]
             draft_actions = [action for action in actions if action.action_type == "draft_setting_change"]
@@ -717,7 +1127,7 @@ class LocalAssistantService:
                 return (
                     "I could not reach the local model, but I "
                     + " and ".join(segments)
-                    + ". Supported live actions still route through the existing deterministic UI handlers."
+                    + ". Supported live actions still route through the existing deterministic UI handlers. Tell me what to do next when this step is done."
                 )
         subsystem_fallback = self._targeted_subsystem_fallback(prompt_text, snapshot)
         if subsystem_fallback:

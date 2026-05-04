@@ -638,7 +638,7 @@ class AICorePanelWidget(QWidget):
         ├──────────────────────────────────────────┤
         │  AI REASONING  ───────────────────────── │
         │  12:34  ◈  Running analysis task         │
-        │  12:35  ✦  Plan ready — 2 actions staged │
+        │  12:35  ✦  Plan auto-applied — 2 actions │
         └──────────────────────────────────────────┘
 
     External API

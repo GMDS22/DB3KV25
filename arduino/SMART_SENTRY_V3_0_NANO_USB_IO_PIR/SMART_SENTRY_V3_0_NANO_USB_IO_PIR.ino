@@ -45,7 +45,7 @@ static const uint8_t PIN_PIR_SENSOR_2 = A2;
 static const int SERVO_REST_DEG_DEFAULT = 0;
 static const int SERVO_FIRE_DEG_DEFAULT = 45;
 static const int SERVO_SPEED_DPS_DEFAULT = 360;
-static const uint32_t TRIGGER_PULSE_MS = 120;         // legacy; projectile mode now uses trigger_mosfet_pulse_ms (J command)
+static const uint32_t TRIGGER_PULSE_MS = 120;         // minimum projectile hold floor; final hold tracks servo travel/speed
 static const uint32_t MOSFET_PULSE_MS_DEFAULT = 120;
 static const uint8_t MOSFET_CYCLE_COUNT_DEFAULT = 1;
 static const uint32_t MOSFET_CYCLE_OFF_MS_DEFAULT = 50;
@@ -378,6 +378,24 @@ static void setTriggerServoTarget(bool fire_state) {
                                                 : clampServoAngle(trigger_servo_rest_deg));
 }
 
+static uint32_t computeProjectileHoldMs() {
+  int travel_deg = trigger_servo_fire_deg - trigger_servo_rest_deg;
+  if (travel_deg < 0) {
+    travel_deg = -travel_deg;
+  }
+
+  float speed_dps = (float)max(10, trigger_servo_speed_dps);
+  uint32_t travel_ms = (uint32_t)((((float)travel_deg) * 1000.0f) / speed_dps + 0.5f);
+  uint32_t hold_ms = travel_ms + 35U;
+  if (hold_ms < (uint32_t)TRIGGER_PULSE_MS) {
+    hold_ms = (uint32_t)TRIGGER_PULSE_MS;
+  }
+  if (hold_ms > 2000U) {
+    hold_ms = 2000U;
+  }
+  return hold_ms;
+}
+
 static void updateTriggerServoMotion() {
   uint32_t now = millis();
   if (trigger_servo_last_step_ms == 0) {
@@ -523,9 +541,9 @@ static void applyOutputs() {
   }
 
   if (projectile_pulse_active) {
-    // Use J-configurable pulse ms for hold time so the servo has enough time
-    // to reach the fire angle before the target reverses.
-    uint32_t hold_ms = (uint32_t)max(10, trigger_mosfet_pulse_ms);
+    // Match the desktop app contract: projectile dwell comes from visible
+    // trigger-servo travel/speed settings, not the hidden water-mode pulse knob.
+    uint32_t hold_ms = computeProjectileHoldMs();
     if ((now_ms - projectile_pulse_start_ms) >= hold_ms) {
       setTriggerServoTarget(false);
       projectile_pulse_active = false;

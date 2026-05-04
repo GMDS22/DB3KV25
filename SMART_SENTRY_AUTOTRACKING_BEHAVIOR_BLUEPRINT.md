@@ -375,6 +375,7 @@ Controls what produces candidate boxes.
 - YOLO families trust class detection more and can keep tracking stationary valid targets
 - color families depend on the chosen color behavior and fusion strategy
 - filtered motion-locked families prefer a single credible mover over raw motion volume
+- protocol addendum: when YOLO-family modes detect a `person` body without a face match, runtime should apply controlled upward tilt nudges until the face detector can evaluate known/unknown identity status
 
 #### Target Filter Preset
 

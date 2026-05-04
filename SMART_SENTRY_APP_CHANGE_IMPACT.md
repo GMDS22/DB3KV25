@@ -15,7 +15,7 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 ### App identity
 
 - Active desktop app family: Smart Sentry release-identity versioning with legacy compatibility launchers retained
-- Current documented desktop release target: Smart Sentry v3.5.2 (`SMART_SENTRY_V3_5_2_VERSION.txt`)
+- Current documented desktop release target: Smart Sentry v4.0.0 (`SMART_SENTRY_V4_0_0_VERSION.txt`)
 - Main launcher from this repo: `run.py`
 
 ### Canonical settings path
@@ -29,7 +29,7 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 
 ### Current release identity deltas
 
-- The active title panel now resolves `SMART SENTRY V3.5.2` with the subtitle `NANO BOARD USB + DEBUG BOARD USB`.
+- The active title panel now resolves `SMART SENTRY V4.0.0` with the subtitle `NANO BOARD USB + DEBUG BOARD USB`.
 - The active release includes theme font-scale and settings-panel-width controls in the theme tab.
 - Graceful shutdown now sends an outputs-off state and safety lock before transport disconnect.
 
@@ -261,6 +261,7 @@ Before calling a firmware or runtime change complete, verify all of the followin
 
 - App-side Smart Sentry Python should be treated as compile-ready only after `app/sentry_v2/sentry_v2_engine.py`, `app/sentry_v2/sentry_v2_overlay.py`, and `app/sentry_v2/sentry_v2_tab.py` pass diagnostics together.
 - Release packaging should ignore generated bench churn under `platformio/**/.pio/**` and runtime exports under `snapshots/`; those are not desktop app release-source inputs.
+- Repository hygiene note for future editors: if git shows mass deletions under `SMART_SENTRY_V2_0/_internal/_tcl_data/encoding/**` during normal Smart Sentry app work, treat that as unrelated packaging/worktree churn unless the current task is specifically about legacy bundle internals.
 - In frozen builds, treat the release-root `YOLO_MODELS/` folder as the public operator drop location and the versioned support-folder `YOLO_MODELS/` copy as bundled defaults only.
 - Quick startup now begins the background camera-open path shortly after launch while still deferring auto-connect and still scheduling a later lazy YOLO auto-load so the packaged app stays responsive and reaches live detection sooner.
 - Before a v3.5.1 package is signed off, verify one fixed-guard loss-recovery pass in Frame Difference mode so the turret returns to the configured guard position after its bounded recovery scan.

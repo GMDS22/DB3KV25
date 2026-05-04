@@ -1,9 +1,9 @@
 # SMART SENTRY V2 — COMPLETE REFERENCE MANUAL
 
-> **Version:** 3.5.3  
+> **Version:** 4.0.0  
 > **Module Path:** `app/sentry_v2/`  
-> **Last Updated:** 2026-05-03  
-> **Status:** Verified against the current standalone Smart Sentry v3.5.3 release candidate. The canonical runtime settings file is versionless at `app/config/smart_sentry_settings.json`; older versioned settings paths remain compatibility fallbacks only and are migrated forward on load. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`. The full settings system defines 13 tabs, with `Facial Recognition` active in the runtime surface and `AI Assistant` still temporarily hidden by release hold for the current release line.
+> **Last Updated:** 2026-05-05  
+> **Status:** Verified against the current standalone Smart Sentry v4.0.0 release candidate. The canonical runtime settings file is versionless at `app/config/smart_sentry_settings.json`; older versioned settings paths remain compatibility fallbacks only and are migrated forward on load. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`. The full settings system defines 13 tabs, with `Facial Recognition` active in the runtime surface and `AI Assistant` still temporarily hidden by release hold for the current release line.
 
 Primary behavior-contract note: for the current authoritative tracking, PIR, target-loss, center-aim, and fire-gating blueprint, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md` first before changing engine or preset behavior.
 
@@ -1082,6 +1082,79 @@ On detection the event is queued. The alert only executes when the engine is in 
 
 ---
 
+### Audio Input Architecture & Microphone Coordination
+
+Smart Sentry uses coordinated microphone management to prevent audio device conflicts between the voice command system and acoustic guard:
+
+**Device Separation Strategy**
+
+By default, the system uses separate microphones:
+- **Voice Listener (Built-in Microphone):** Listens for "ELION" wake word and processes voice commands via Vosk offline speech recognition
+- **Acoustic Guard (USB Microphone):** Monitors for sound anomalies and unusual acoustic signatures
+
+This separation eliminates sounddevice resource conflicts and allows both systems to run independently in parallel.
+
+**Fallback Coordination Protocol**
+
+When a single microphone must be used, the acoustic guard implements intelligent coordination:
+
+1. **Wake-Word Detection** — Acoustic guard monitors the audio stream for the "ELION" wake word while performing anomaly detection
+2. **Coordinator Signal** — When "ELION" is detected, a wake-word event is emitted
+3. **Voice Listener Notification** — The voice listener receives the signal and prepares to capture the full command
+4. **Synchronized Processing** — Both systems remain in sync, preventing conflicts even on shared hardware
+
+**Voice Interaction Protocol (Elion) — Required Runtime Contract**
+
+When the wake word `Elion` is detected, Smart Sentry must enter a temporary voice-interaction window:
+
+1. **Pause autotracking/autodetection immediately** so the operator can speak without continuous re-engagement interruptions.
+2. **Face-the-speaker behavior:** while paused, if a person is visible, turret aim should bias toward that person so command capture remains person-facing.
+3. **No-person fallback:** if no person is visible during the interaction window, return to configured guard/home position.
+4. **Continue listening for follow-up speech** during the active window (operator should not need to repeat the wake word for every phrase).
+5. **Conversational model requirement:** in conversational voice mode, responses should come from live Ollama model output (not deterministic fallback text).
+
+This protocol is intended to keep wake-word UX reliable in active scenes where continuous YOLO detections would otherwise dominate behavior.
+
+**Post-Conversation Decision Workflow (Scenario Contract)**
+
+After Elion finishes a conversational reply while autotracking is paused, Smart Sentry should enter a scenario state that waits for explicit operator direction:
+
+1. Offer a next-action prompt (for example: resume guarding mode, stay paused, or run another task).
+2. Keep autotracking/autodetection paused while waiting for that decision.
+3. Resume only on explicit resume command (such as "resume autotracking" or "resume guarding mode").
+4. If the operator says to stay paused, keep holding and prompt again later.
+5. Treat this as extensible scenario workflow infrastructure so new protocol scenarios can be added without changing core interaction expectations.
+
+**YOLO Human Face-Acquire Protocol — Required Runtime Contract**
+
+When YOLO-family detection modes see a `person` body box but no face recognition match is available, Smart Sentry should apply a controlled upward tilt nudge cycle so the face detector can obtain a usable face crop and classify the person as known/unknown target context.
+
+This protocol is part of the human-tracking contract and should be preserved when editing detection/engagement pipelines.
+
+```
+                    🎤 AUDIO ARCHITECTURE
+                        
+                    Built-in Mic ──┐
+                                   ├──→ Vosk Listener → Commands
+                    USB Mic ───────┤
+                                   └──→ Acoustic Guard → Anomaly Detection
+                                             ↓
+                                        Detects "ELION"?
+                                             ↓
+                                   Wake-Word Coordinator
+                                             ↓
+                                   Signals Voice Listener
+```
+
+**Key Benefits**
+
+- ✅ **No conflicts by default** — Different mics prevent simultaneous sounddevice access
+- ✅ **Dual redundancy** — Wake word detected at both acoustic and voice layers
+- ✅ **Automatic fallback** — Single-mic configurations work seamlessly through coordination
+- ✅ **User configurable** — Both microphone names are adjustable in the Guard tab under "AI Voice Validation"
+
+---
+
 ### PIR Guard Behavior
 
 Current PIR guard behavior is cue-first and scan-second:
@@ -1135,6 +1208,7 @@ For the active release line, the AI Assistant tab is intentionally hidden from t
 - The unfinished local assistant workflow stays in the codebase for later release activation.
 - The tab stays visible so operators and editors can see that the feature exists.
 - The disabled state prevents unfinished assistant workflows from affecting normal active-release runtime behavior.
+- **AI report speech closing protocol:** spoken runtime analysis/report output must end with the phrase `End of analysys report.` so operators get an explicit verbal end-marker.
 
 ### Engage Tab
 

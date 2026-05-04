@@ -477,8 +477,7 @@ class SmartSentryV2_3_2StandaloneWindow(QMainWindow):
         if getattr(self.sentry_v2_tab, "_cleanup_started", False):
             super().closeEvent(event)
             return
-        # Overlay already shown — ignore duplicate close triggers until shutdown completes.
-        if getattr(self, "_exit_overlay", None) is not None:
+        if getattr(self.sentry_v2_tab, "_shutdown_in_progress", False):
             try:
                 if event is not None:
                     event.ignore()
@@ -499,25 +498,8 @@ class SmartSentryV2_3_2StandaloneWindow(QMainWindow):
             self.sentry_v2_tab.close_camera_for_exit()
         except Exception:
             pass
-        # Create and show the exit overlay centered over the window.
-        try:
-            parent = self.centralWidget() or self
-            overlay = ExitSplashOverlay(parent)
-            pw, ph = parent.width(), parent.height()
-            ow, oh = _EXIT_OVERLAY_W, _EXIT_OVERLAY_H
-            overlay.move((pw - ow) // 2, (ph - oh) // 2)
-            overlay.show()
-            overlay.raise_()
-            self._exit_overlay = overlay
-        except Exception:
-            self._exit_overlay = None
         def _on_shutdown_done() -> None:
-            overlay_ref = getattr(self, "_exit_overlay", None)
-            if overlay_ref is not None:
-                overlay_ref.close_ready.connect(self.close)
-                overlay_ref.on_shutdown_complete()
-            else:
-                self.close()
+            self.close()
         try:
             self.sentry_v2_tab.begin_graceful_shutdown(on_complete=_on_shutdown_done)
         except Exception:

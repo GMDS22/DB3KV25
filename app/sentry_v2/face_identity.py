@@ -23,8 +23,11 @@ _YUNET_INPUT_SIZE = (320, 320)
 _YUNET_SCORE_THRESHOLD = 0.88
 _YUNET_NMS_THRESHOLD = 0.3
 _YUNET_TOP_K = 96
+_LEGACY_EMBEDDING_SIZE = 160
 _SFACE_MAX_DETECT_DIM = 640
+_SFACE_EMBEDDING_SIZE = 128
 _SFACE_RECOMMENDED_COSINE_THRESHOLD = 0.363
+_SFACE_AMBIGUITY_MARGIN = 0.015
 
 
 @dataclass
@@ -57,6 +60,38 @@ class _DetectedFaceEntry:
     bbox: Tuple[int, int, int, int]
     landmarks: Optional[np.ndarray] = None
     score: float = 0.0
+
+
+def expected_embedding_size_for_backend(backend: str) -> Optional[int]:
+    normalized = str(backend or "").strip().lower()
+    if normalized == FACE_EMBEDDING_BACKEND_LEGACY:
+        return _LEGACY_EMBEDDING_SIZE
+    if normalized == FACE_EMBEDDING_BACKEND_SFACE:
+        return _SFACE_EMBEDDING_SIZE
+    return None
+
+
+def count_compatible_profile_embeddings(
+    profile: FaceIdentityProfile,
+    *,
+    backend: Optional[str] = None,
+) -> int:
+    profile_backend = str(
+        getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY)
+        or FACE_EMBEDDING_BACKEND_LEGACY
+    ).strip().lower()
+    if backend is not None and profile_backend != str(backend or "").strip().lower():
+        return 0
+    expected_size = expected_embedding_size_for_backend(profile_backend)
+    compatible = 0
+    for raw in getattr(profile, "embeddings", []) or []:
+        candidate = np.asarray(raw, dtype=np.float32).flatten()
+        if candidate.size <= 0:
+            continue
+        if expected_size is not None and candidate.size != expected_size:
+            continue
+        compatible += 1
+    return compatible
 
 
 class FaceIdentityLibrary:
@@ -101,7 +136,11 @@ class FaceIdentityLibrary:
         notes: str = "",
     ) -> Optional[FaceIdentityProfile]:
         cleaned_name = str(name or "").strip()
+        incoming_backend = str(embedding_backend or FACE_EMBEDDING_BACKEND_LEGACY).strip().lower()
+        expected_size = expected_embedding_size_for_backend(incoming_backend)
         vectors = [np.asarray(vector, dtype=np.float32).flatten() for vector in embeddings if vector is not None]
+        if expected_size is not None:
+            vectors = [vector for vector in vectors if vector.size == expected_size]
         if not cleaned_name or not vectors:
             return None
         now = time.time()
@@ -112,7 +151,7 @@ class FaceIdentityLibrary:
                 profile_id=str(uuid.uuid4()),
                 name=cleaned_name,
                 embeddings=serialized,
-                embedding_backend=str(embedding_backend or FACE_EMBEDDING_BACKEND_LEGACY),
+                embedding_backend=incoming_backend,
                 friendly=bool(friendly),
                 announce_name=bool(announce_name),
                 cute_gesture=bool(cute_gesture),
@@ -123,10 +162,15 @@ class FaceIdentityLibrary:
             self.profiles.append(profile)
             return profile
         existing_backend = str(existing.embedding_backend or FACE_EMBEDDING_BACKEND_LEGACY)
-        incoming_backend = str(embedding_backend or FACE_EMBEDDING_BACKEND_LEGACY)
         if existing_backend != incoming_backend:
             existing.embeddings = []
             existing.embedding_backend = incoming_backend
+        elif expected_size is not None:
+            existing.embeddings = [
+                np.asarray(raw, dtype=np.float32).flatten().astype(float).tolist()
+                for raw in existing.embeddings
+                if np.asarray(raw, dtype=np.float32).flatten().size == expected_size
+            ]
         existing.embeddings.extend(serialized)
         existing.friendly = bool(friendly)
         existing.announce_name = bool(announce_name)
@@ -224,6 +268,31 @@ class FaceIdentityRuntime:
 
     def backend_status(self) -> str:
         return str(self._backend_status)
+
+    def supported_profile_backends(self) -> Tuple[str, ...]:
+        backends: List[str] = [str(self._active_backend or FACE_EMBEDDING_BACKEND_LEGACY)]
+        if self._allow_legacy_fallback and self._active_backend == FACE_EMBEDDING_BACKEND_SFACE:
+            backends.append(FACE_EMBEDDING_BACKEND_LEGACY)
+        ordered: List[str] = []
+        for backend in backends:
+            normalized = str(backend or "").strip().lower()
+            if not normalized or normalized in ordered:
+                continue
+            ordered.append(normalized)
+        return tuple(ordered)
+
+    def profile_backend_is_matchable(self, backend: str) -> bool:
+        normalized = str(backend or FACE_EMBEDDING_BACKEND_LEGACY).strip().lower()
+        return normalized in self.supported_profile_backends()
+
+    def matchable_profile_embedding_count(self, profile: FaceIdentityProfile) -> int:
+        profile_backend = str(
+            getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY)
+            or FACE_EMBEDDING_BACKEND_LEGACY
+        ).strip().lower()
+        if not self.profile_backend_is_matchable(profile_backend):
+            return 0
+        return count_compatible_profile_embeddings(profile, backend=profile_backend)
 
     def detector_model_path(self) -> Optional[Path]:
         return self._detector_model_path
@@ -365,13 +434,34 @@ class FaceIdentityRuntime:
         faces = self._detect_face_entries(frame, min_face_size_px=min_face_size_px, roi_boxes=person_boxes)
         results: List[FaceMatchResult] = []
         for face in faces:
+            required_samples = max(1, int(min_profile_embeddings))
+            profile: Optional[FaceIdentityProfile] = None
+            confidence = 0.0
+
             embedding = self._embedding_from_face_entry(frame, face)
-            if embedding is None:
-                continue
-            profile, confidence = self._match_embedding(
-                embedding,
-                min_profile_embeddings=max(1, int(min_profile_embeddings)),
-            )
+            if embedding is not None:
+                profile, confidence = self._match_embedding(
+                    embedding,
+                    backend=self._active_backend,
+                    min_profile_embeddings=required_samples,
+                )
+
+            if (
+                (profile is None or confidence < float(threshold))
+                and self._allow_legacy_fallback
+                and self._active_backend == FACE_EMBEDDING_BACKEND_SFACE
+            ):
+                legacy_embedding = self._legacy_embedding_from_bbox(frame, face.bbox)
+                if legacy_embedding is not None:
+                    legacy_profile, legacy_confidence = self._match_embedding(
+                        legacy_embedding,
+                        backend=FACE_EMBEDDING_BACKEND_LEGACY,
+                        min_profile_embeddings=required_samples,
+                    )
+                    if legacy_profile is not None and legacy_confidence > confidence:
+                        profile = legacy_profile
+                        confidence = legacy_confidence
+
             if profile is None or confidence < float(threshold):
                 continue
             results.append(
@@ -391,14 +481,17 @@ class FaceIdentityRuntime:
         self,
         embedding: np.ndarray,
         *,
+        backend: Optional[str] = None,
         min_profile_embeddings: int = 1,
     ) -> Tuple[Optional[FaceIdentityProfile], float]:
         best_profile: Optional[FaceIdentityProfile] = None
         best_score = -1.0
+        runner_up_score = -1.0
         required_samples = max(1, int(min_profile_embeddings))
+        match_backend = str(backend or self._active_backend or FACE_EMBEDDING_BACKEND_LEGACY).strip().lower()
         for profile in self.library.profiles:
             profile_backend = str(getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY)
-            if profile_backend != self._active_backend:
+            if profile_backend != match_backend:
                 continue
             scores: List[float] = []
             for raw in profile.embeddings:
@@ -413,12 +506,22 @@ class FaceIdentityRuntime:
             if len(scores) < required_samples:
                 continue
             scores.sort(reverse=True)
-            support_count = min(2, len(scores))
+            support_count = min(max(1, required_samples), len(scores), 3)
             profile_score = sum(scores[:support_count]) / float(support_count)
             if profile_score > best_score:
+                runner_up_score = best_score
                 best_score = profile_score
                 best_profile = profile
-        confidence = self._score_to_confidence(best_score, self._active_backend) if best_score >= 0.0 else 0.0
+            elif profile_score > runner_up_score:
+                runner_up_score = profile_score
+        if (
+            match_backend == FACE_EMBEDDING_BACKEND_SFACE
+            and best_profile is not None
+            and runner_up_score >= 0.0
+            and (best_score - runner_up_score) < float(_SFACE_AMBIGUITY_MARGIN)
+        ):
+            return None, 0.0
+        confidence = self._score_to_confidence(best_score, match_backend) if best_score >= 0.0 else 0.0
         return best_profile, max(0.0, min(1.0, confidence))
 
     def _score_to_confidence(self, score: float, backend: str) -> float:
@@ -437,21 +540,28 @@ class FaceIdentityRuntime:
                 vector = self._embedding_from_face_entry(frame, face_entry)
                 if vector is not None:
                     return vector
+            return None
         return self._legacy_embedding_from_bbox(frame, bbox)
 
     def _embedding_from_face_entry(self, frame: np.ndarray, face: _DetectedFaceEntry) -> Optional[np.ndarray]:
-        if self._active_backend == FACE_EMBEDDING_BACKEND_SFACE and face.landmarks is not None and self._face_recognizer is not None:
+        if self._active_backend == FACE_EMBEDDING_BACKEND_SFACE:
+            if face.landmarks is None or self._face_recognizer is None:
+                return None
             face_row = self._face_entry_to_sface_row(face)
             try:
                 aligned = self._face_recognizer.alignCrop(frame, face_row[:-1])
                 features = self._face_recognizer.feature(aligned)
             except Exception:
                 features = None
-            if features is not None:
-                vector = np.asarray(features, dtype=np.float32).flatten()
-                norm = float(np.linalg.norm(vector))
-                if norm > 1e-6:
-                    return vector / norm
+            if features is None:
+                return None
+            vector = np.asarray(features, dtype=np.float32).flatten()
+            if vector.size != _SFACE_EMBEDDING_SIZE:
+                return None
+            norm = float(np.linalg.norm(vector))
+            if norm > 1e-6:
+                return vector / norm
+            return None
         return self._legacy_embedding_from_bbox(frame, face.bbox)
 
     def _legacy_embedding_from_bbox(self, frame: np.ndarray, bbox: Tuple[int, int, int, int]) -> Optional[np.ndarray]:

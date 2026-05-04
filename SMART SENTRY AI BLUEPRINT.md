@@ -100,6 +100,69 @@ Intent classification
 AI reasoning
 ↓
 Execution or response
+
+MANDATORY INTERACTION PROTOCOL (ELION)
+
+- On wake word `Elion`, temporarily pause auto-detection/autotracking so the user can finish speaking.
+- During that window, attempt to face a visible person (speaker-facing behavior).
+- If no person is found, return to home/guard position.
+- Keep listening for follow-up speech in the same interaction window without requiring wake-word repetition.
+- In conversational mode, replies must come from live Ollama model output; deterministic fallback text must not be treated as conversational completion.
+
+📊 AUDIO INPUT ARCHITECTURE
+
+The voice system uses coordinated microphone management to prevent audio device conflicts:
+
+```
+                    🎤 Audio Input Devices
+                              |
+                    __________|__________
+                   |                    |
+        Built-in Microphone    USB Microphone
+        (Voice Listener)       (Acoustic Guard)
+                   |                    |
+                   ▼                    ▼
+          Vosk Listener          Acoustic Monitor
+          Wake-word Detection    Anomaly Detection
+                   |                    |
+                   |                    |
+                   |            ┌──────────────┐
+                   |            │ Detects      │
+                   |            │ "ELION"      │
+                   |            └──────────────┘
+                   |                    |
+                   |         ┌──────────▼──────────┐
+                   |         │ Wake-Word Coordinator│
+                   |         └──────────┬──────────┘
+                   |                    |
+                   └────────────────────┤
+                         signal_wake_word_detected()
+                                   ▼
+                         Command Processing
+                         Full Voice Command
+```
+
+KEY FEATURES:
+
+🔹 **Device Separation** — Voice uses built-in mic, acoustic guard uses USB mic
+  - Prevents sounddevice resource conflicts
+  - Both systems run independently by default
+
+🔹 **Fallback Coordination** — If same mic must be used:
+  - Acoustic guard detects wake word "ELION"
+  - Signals voice listener to capture full command
+  - Ensures both systems stay in sync
+
+🔹 **Dual Redundancy** — Wake word detection at two levels:
+  - Acoustic guard monitors passively
+  - Voice listener actively processes commands
+  - System remains responsive even if one detector fails
+
+🔹 **End-of-Report Voice Marker**
+        - Spoken analysis/report responses must terminate with:
+                `End of analysys report.`
+        - This is a protocol phrase used as an explicit voice completion marker.
+
 🧠 5. COMMAND TYPES
 🟢 TYPE 1 — DIRECT CONTROL
 

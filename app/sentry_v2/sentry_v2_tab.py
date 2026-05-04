@@ -43,6 +43,7 @@ from PyQt5.QtWidgets import (
     QSpacerItem, QScrollArea, QDoubleSpinBox, QSpinBox,
     QComboBox, QListWidget, QListWidgetItem, QAbstractItemView,
     QTabWidget, QTabBar, QTextEdit, QGridLayout, QLineEdit, QSplitter, QMessageBox,
+    QStackedWidget,
     QProgressBar,
     QFileDialog,
     QBoxLayout,
@@ -409,6 +410,14 @@ SOUND_PERSONALITY_OPTIONS: List[Tuple[str, str]] = [
 ]
 SOUND_PERSONALITY_LABELS = {key: label for key, label in SOUND_PERSONALITY_OPTIONS}
 
+AI_PERSONALITY_OPTIONS: List[Tuple[str, str]] = [
+    ("sentinel", "Sentinel"),
+    ("hunter", "Hunter"),
+    ("stealth", "Stealth"),
+    ("playful", "Playful"),
+]
+AI_PERSONALITY_LABELS = {key: label for key, label in AI_PERSONALITY_OPTIONS}
+
 HUMAN_VOICE_STYLE_PRESETS = {
     "neutral":     {"label": "Neutral Assistant",  "rate": 102, "pitch": 100, "volume": 85},
     "operator":    {"label": "Quiet Operator",     "rate": 95,  "pitch": 96,  "volume": 72},
@@ -474,6 +483,30 @@ KOKORO_VOICE_PREFIX_LABELS = {
     "zm": "Mandarin Chinese - Male",
 }
 
+CURATED_NEURAL_VOICE_IDS = [
+    "en-GB-LibbyNeural",
+    "en-GB-RyanNeural",
+    "en-AU-NatashaNeural",
+    "en-AU-WilliamMultilingualNeural",
+    "en-IN-NeerjaNeural",
+    "en-IN-NeerjaExpressiveNeural",
+    "en-IN-PrabhatNeural",
+    "fil-PH-BlessicaNeural",
+    "fil-PH-AngeloNeural",
+    "ru-RU-SvetlanaNeural",
+    "ru-RU-DmitryNeural",
+    "en-US-JennyNeural",
+]
+
+NEURAL_VOICE_LOCALE_LABELS = {
+    "en-US": "English (United States)",
+    "en-GB": "English (United Kingdom)",
+    "en-AU": "English (Australia)",
+    "en-IN": "English (India)",
+    "fil-PH": "Filipino (Philippines)",
+    "ru-RU": "Russian",
+}
+
 
 def format_kokoro_voice_label(voice_name: str) -> str:
     voice_id = str(voice_name or "").strip()
@@ -485,6 +518,34 @@ def format_kokoro_voice_label(voice_name: str) -> str:
     if family_label and display_name:
         return f"{family_label} - {display_name}"
     return display_name or voice_id
+
+
+def format_neural_voice_label(voice_name: str) -> str:
+    voice_id = str(voice_name or "").strip()
+    if not voice_id:
+        return ""
+    match = re.match(r"^(?P<locale>[a-z]{2,3}-[A-Z]{2})-(?P<name>[A-Za-z]+)Neural$", voice_id)
+    if not match:
+        return f"Online Neural - {voice_id}"
+    locale_label = NEURAL_VOICE_LOCALE_LABELS.get(match.group("locale"), match.group("locale"))
+    display_name = re.sub(r"(?<!^)(?=[A-Z])", " ", match.group("name")).strip()
+    return f"Online {locale_label} - {display_name}"
+
+
+def format_human_voice_label(voice_name: str) -> str:
+    voice_id = str(voice_name or "").strip()
+    if not voice_id:
+        return ""
+    if voice_id.endswith("Neural") and re.match(r"^[a-z]{2,3}-[A-Z]{2}-", voice_id):
+        return format_neural_voice_label(voice_id)
+    return format_kokoro_voice_label(voice_id)
+
+
+def _module_spec_available(module_name: str) -> bool:
+    try:
+        return bool(importlib.util.find_spec(module_name))
+    except Exception:
+        return False
 
 APP_ROOT_PATH = app_root_path()
 RUNTIME_ROOT_PATH = runtime_root_path()
@@ -3488,8 +3549,15 @@ class SentryV2TabWidget(QWidget):
         self._assistant_service_key: str = ""
         self._assistant_task_queue: deque[dict[str, object]] = deque()
         self._assistant_active_task: Optional[Dict[str, object]] = None
+        self._assistant_cancelled_task_ids: set[int] = set()
         self._operator_task_sequence: int = 0
         self._connection_task_label: str = ""
+        self._connection_cancel_requested: bool = False
+        self._deferred_enable_sentry_after_connect: bool = False
+        self._deferred_enable_sentry_reason: str = ""
+        self._paused_voice_task: Optional[Dict[str, object]] = None
+        self._last_actionable_voice_command: str = ""
+        self._last_actionable_voice_summary: str = ""
         self._last_operator_task_label: str = ""
         self._last_operator_task_state: str = "idle"
         self._last_operator_task_status_text: str = ""
@@ -3665,7 +3733,13 @@ class SentryV2TabWidget(QWidget):
         self._voice_protocol_last_prompt_s: float = 0.0
         self._voice_protocol_auto_prompt_count: int = 0
         self._voice_protocol_pending_connect_confirmation: bool = False
+        self._voice_protocol_pending_response_token: int = 0
         self._voice_protocol_connect_via_voice_active: bool = False
+        self._voice_protocol_pending_command_clarification: str = ""
+        self._voice_protocol_pending_command_heard_text: str = ""
+        self._voice_protocol_pending_command_confidence: float = -1.0
+        self._voice_last_command_confidence: float = -1.0
+        self._voice_last_partial_before_final_text: str = ""
         self._voice_heard_partial_text: str = ""
         self._voice_heard_final_text: str = ""
         self._voice_heard_status_text: str = "idle"
@@ -3686,6 +3760,7 @@ class SentryV2TabWidget(QWidget):
         self._last_camera_source_text: str = str(self.config.connection.camera_source or "").strip() or "0"
         self._last_camera_width: int = int(self.config.connection.camera_width)
         self._last_camera_height: int = int(self.config.connection.camera_height)
+        self._home_screen_active: bool = True
         self._mask_capture_active: bool = False
         self._mask_draft_vertices: List[NoFireMaskVertex] = []
         self._prompted_capture_active: bool = False
@@ -4299,10 +4374,10 @@ class SentryV2TabWidget(QWidget):
             ]
         )
         if not self._speak_human_phrase(phrase, interrupt=True):
-            QTimer.singleShot(0, on_finished)
+            QTimer.singleShot(850, on_finished)
             return
-        delay_ms = int((self._estimate_human_phrase_duration_s(phrase) * 1000.0) + 260.0)
-        QTimer.singleShot(max(400, delay_ms), on_finished)
+        delay_ms = int((self._estimate_human_phrase_duration_s(phrase) * 1000.0) + 1100.0)
+        QTimer.singleShot(max(900, delay_ms), on_finished)
 
     def begin_graceful_shutdown(self, on_complete: Optional[Callable[[], None]] = None) -> bool:
         if on_complete is not None:
@@ -4350,6 +4425,11 @@ class SentryV2TabWidget(QWidget):
             self.engine.stop()
         except Exception:
             pass
+        try:
+            self.close_camera_for_exit()
+        except Exception:
+            pass
+        self._sync_home_screen_visibility(force_home=True)
 
         def _begin_rest_and_finalize() -> None:
             if bool(getattr(self.config.guard, "rest_on_close_enabled", True)) and self._has_rest_move_transport():
@@ -4558,12 +4638,38 @@ class SentryV2TabWidget(QWidget):
         self._layout_splitter.splitterMoved.connect(self._on_layout_splitter_moved)
 
         # --- Left: video feed ---
+        self._home_screen = QWidget()
+        self._home_screen.setObjectName("sentryV2HomeScreen")
+        home_layout = QVBoxLayout(self._home_screen)
+        home_layout.setContentsMargins(24, 28, 24, 28)
+        home_layout.setSpacing(12)
+        home_layout.addStretch(1)
+
+        self._lbl_home_logo = QLabel()
+        self._lbl_home_logo.setObjectName("sentryV2HomeLogo")
+        self._lbl_home_logo.setAlignment(Qt.AlignCenter)
+        self._lbl_home_logo.setMinimumHeight(160)
+        home_layout.addWidget(self._lbl_home_logo, 0, Qt.AlignHCenter)
+
+        self._lbl_home_title = QLabel("DADBOT 3000")
+        self._lbl_home_title.setObjectName("sentryV2HomeTitle")
+        self._lbl_home_title.setAlignment(Qt.AlignCenter)
+        self._lbl_home_title.setWordWrap(True)
+        home_layout.addWidget(self._lbl_home_title)
+        home_layout.addStretch(1)
+
         self._video_label = SentryV2VideoCanvas("Waiting for video...")
         self._video_label.setObjectName("sentryV2Video")
         self._video_label.setAlignment(Qt.AlignCenter)
         self._video_label.setMinimumSize(SENTRY_V2_VIDEO_MIN_WIDTH, 180)
         self._video_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         logo_path = APP_ROOT_PATH / "LOGO.png"
+        self._home_logo_source_pixmap = QPixmap()
+        if logo_path.is_file():
+            home_pixmap = QPixmap(str(logo_path))
+            if not home_pixmap.isNull():
+                self._home_logo_source_pixmap = home_pixmap
+                self._update_home_screen_logo()
         if logo_path.is_file():
             self._video_label.set_placeholder_pixmap(QPixmap(str(logo_path)))
             self._video_label.set_placeholder_text("Camera Off\nOpen Camera to Start")
@@ -4580,6 +4686,7 @@ class SentryV2TabWidget(QWidget):
 
         # Wrap video label + quick-access chip bar in a container
         _video_container = QWidget()
+        self._video_container = _video_container
         _video_container_lay = QVBoxLayout(_video_container)
         _video_container_lay.setContentsMargins(0, 0, 0, 0)
         _video_container_lay.setSpacing(0)
@@ -4896,7 +5003,11 @@ class SentryV2TabWidget(QWidget):
         self._ai_orb_video = None
         self._ai_orb_overlay_mgr = None
 
-        self._layout_splitter.addWidget(_video_container)
+        self._video_stack = QStackedWidget()
+        self._video_stack.setObjectName("sentryV2VideoStack")
+        self._video_stack.addWidget(self._home_screen)
+        self._video_stack.addWidget(_video_container)
+        self._layout_splitter.addWidget(self._video_stack)
 
         self._bottom_info_splitter = QSplitter(Qt.Horizontal)
         self._bottom_info_splitter.setChildrenCollapsible(False)
@@ -4914,9 +5025,9 @@ class SentryV2TabWidget(QWidget):
         # Log + status panels
         self._bottom_info_splitter.addWidget(self._build_log_group())
         self._bottom_info_splitter.addWidget(self._build_status_group())
-        self._bottom_info_splitter.setStretchFactor(0, 2)
-        self._bottom_info_splitter.setStretchFactor(1, 3)
-        self._bottom_info_splitter.setStretchFactor(2, 2)
+        self._bottom_info_splitter.setStretchFactor(0, 1)
+        self._bottom_info_splitter.setStretchFactor(1, 1)
+        self._bottom_info_splitter.setStretchFactor(2, 1)
         self._layout_splitter.addWidget(self._bottom_info_splitter)
         self._layout_splitter.setStretchFactor(0, 5)
         self._layout_splitter.setStretchFactor(1, 1)
@@ -5005,6 +5116,9 @@ class SentryV2TabWidget(QWidget):
             "Enable or disable Smart Sentry",
             self._on_enable_toggled,
         )
+        self._chk_enable.setProperty("compactStateButton", "true")
+        self._chk_enable.setProperty("compactStateKey", "power")
+        self._set_button_role(self._chk_enable, "utility")
         toggle_row_layout.addWidget(self._chk_enable)
 
         self._chk_show_video = _mk_quick_icon_toggle(
@@ -5014,6 +5128,9 @@ class SentryV2TabWidget(QWidget):
             "Toggle video display on/off (detection continues running)",
             self._on_show_video_toggled,
         )
+        self._chk_show_video.setProperty("compactStateButton", "true")
+        self._chk_show_video.setProperty("compactStateKey", "video")
+        self._set_button_role(self._chk_show_video, "utility")
         toggle_row_layout.addWidget(self._chk_show_video)
 
         toggle_row_layout.addWidget(_mk_toggle_row_separator())
@@ -5025,6 +5142,9 @@ class SentryV2TabWidget(QWidget):
             "Enable or disable the in-app AI assistant runtime",
             self._on_quick_ai_enable_toggled,
         )
+        self._btn_quick_ai_enable.setProperty("compactStateButton", "true")
+        self._btn_quick_ai_enable.setProperty("compactStateKey", "ai")
+        self._set_button_role(self._btn_quick_ai_enable, "utility")
         toggle_row_layout.addWidget(self._btn_quick_ai_enable)
 
         self._btn_quick_ai_report = _mk_quick_icon_action(
@@ -5042,6 +5162,9 @@ class SentryV2TabWidget(QWidget):
             "Enable or disable human voice speech",
             self._on_human_voice_enabled_changed,
         )
+        self._btn_quick_human_voice.setProperty("compactStateButton", "true")
+        self._btn_quick_human_voice.setProperty("compactStateKey", "voice")
+        self._set_button_role(self._btn_quick_human_voice, "utility")
         self._btn_quick_human_voice.setEnabled(self._human_voice_supported())
         toggle_row_layout.addWidget(self._btn_quick_human_voice)
 
@@ -5054,6 +5177,9 @@ class SentryV2TabWidget(QWidget):
             "Toggle known-face recognition in the live detection pipeline",
             self._on_face_runtime_settings_changed,
         )
+        self._chk_face_quick_toggle.setProperty("compactStateButton", "true")
+        self._chk_face_quick_toggle.setProperty("compactStateKey", "face")
+        self._set_button_role(self._chk_face_quick_toggle, "utility")
         toggle_row_layout.addWidget(self._chk_face_quick_toggle)
 
         self._btn_quick_wake = _mk_quick_icon_action(
@@ -5237,6 +5363,7 @@ class SentryV2TabWidget(QWidget):
         QTimer.singleShot(0, self._apply_saved_layout_state)
         QTimer.singleShot(0, self._update_responsive_layout)
         QTimer.singleShot(0, self._reflow_all_responsive_button_grids)
+        QTimer.singleShot(0, self._sync_home_screen_visibility)
 
         self._apply_all_tooltips()
         self._connect_qa_bar_signals()
@@ -5840,6 +5967,31 @@ QWidget#sentryV2Root QCheckBox[themeRole="headlineToggle"] {{
     font-weight: 700;
     font-size: {max(base_font + 0.4, 10.6):.2f}pt;
 }}
+QWidget#sentryV2Root QWidget#sentryV2HomeScreen {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 {tokens['surface_alt_rgba']},
+        stop:0.52 {tokens['surface_rgba']},
+        stop:1 {tokens['surface_alt_rgba']});
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_large}px;
+}}
+QWidget#sentryV2Root QLabel#sentryV2HomeTitle {{
+    color: {tokens['text']};
+    font-size: {max(base_font + 8.8, 22.0):.2f}pt;
+    font-weight: 900;
+    letter-spacing: 1.3px;
+}}
+QWidget#sentryV2Root QLabel#sentryV2HomeSubtitle {{
+    color: {tokens['accent']};
+    font-size: {max(base_font + 2.6, 13.0):.2f}pt;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+}}
+QWidget#sentryV2Root QLabel#sentryV2HomeMessage {{
+    color: {tokens['muted']};
+    font-size: {max(base_font + 0.4, 10.4):.2f}pt;
+    font-weight: 600;
+}}
 QWidget#sentryV2Root QPushButton#qaIconBtn {{
     background-color: {tokens['surface_alt_rgba']};
     border: 1px solid {tokens['button_border']};
@@ -5872,6 +6024,37 @@ QWidget#sentryV2Root QPushButton#qaIconBtn:checked {{
 }}
 QWidget#sentryV2Root QPushButton#qaIconBtn:pressed {{
     background-color: {tokens['button_pressed']};
+}}
+QWidget#sentryV2Root QPushButton[compactStateButton="true"] {{
+    background-color: {tokens['surface_alt_rgba']};
+    border: 1px solid {tokens['button_border']};
+    border-radius: {radius_small}px;
+}}
+QWidget#sentryV2Root QPushButton[compactStateButton="true"]:hover {{
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QPushButton[compactStateButton="true"]:checked {{
+    color: {tokens['hero_text']};
+}}
+QWidget#sentryV2Root QPushButton[compactStateButton="true"][compactStateKey="power"]:checked {{
+    background-color: rgba(45, 128, 86, 0.94);
+    border-color: #79e6a1;
+}}
+QWidget#sentryV2Root QPushButton[compactStateButton="true"][compactStateKey="video"]:checked {{
+    background-color: rgba(38, 103, 138, 0.94);
+    border-color: #84d9ff;
+}}
+QWidget#sentryV2Root QPushButton[compactStateButton="true"][compactStateKey="ai"]:checked {{
+    background-color: rgba(44, 110, 122, 0.94);
+    border-color: #95e3f4;
+}}
+QWidget#sentryV2Root QPushButton[compactStateButton="true"][compactStateKey="voice"]:checked {{
+    background-color: rgba(140, 102, 36, 0.94);
+    border-color: #ffd27a;
+}}
+QWidget#sentryV2Root QPushButton[compactStateButton="true"][compactStateKey="face"]:checked {{
+    background-color: rgba(140, 70, 118, 0.94);
+    border-color: #f6a6db;
 }}
 QWidget#sentryV2Root QFrame#qaIconSep {{
     color: {tokens['border']};
@@ -6281,12 +6464,27 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
     def _update_responsive_layout(self) -> None:
         self._sync_settings_tab_bar_metrics()
         self._update_responsive_header_metrics()
+        self._update_home_screen_logo()
         self._update_settings_nav_controls()
         self._update_manual_control_button_sizes()
         self._update_responsive_lists()
         self._update_responsive_labels()
         self._update_responsive_box_layouts()
         self._reflow_all_responsive_button_grids()
+
+    def _update_home_screen_logo(self) -> None:
+        label = getattr(self, "_lbl_home_logo", None)
+        source = getattr(self, "_home_logo_source_pixmap", None)
+        if label is None or source is None or source.isNull():
+            return
+        home_screen = getattr(self, "_home_screen", None)
+        if home_screen is None:
+            return
+        available_width = max(220, home_screen.width() - 80)
+        available_height = max(220, int(home_screen.height() * 0.50))
+        target_px = _clamp_int_range(min(available_width, available_height), 220, 560)
+        label.setMinimumHeight(max(180, target_px + 12))
+        label.setPixmap(source.scaled(target_px, target_px, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
     def _set_theme_role(self, widget: Optional[QWidget], role: str) -> None:
         if widget is None:
@@ -9597,24 +9795,33 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._combo_ai_mode.currentIndexChanged.connect(self._on_ai_assistant_settings_changed)
         session_lay.addWidget(self._combo_ai_mode, 0, 1, 1, 2)
 
-        session_lay.addWidget(QLabel("Ollama Endpoint:"), 1, 0)
+        session_lay.addWidget(QLabel("Assistant Personality:"), 1, 0)
+        self._combo_ai_personality = QComboBox()
+        for personality_key, personality_label in AI_PERSONALITY_OPTIONS:
+            self._combo_ai_personality.addItem(personality_label, personality_key)
+        personality_index = max(0, self._combo_ai_personality.findData(str(getattr(self.config.ai_assistant, "personality", "sentinel") or "sentinel")))
+        self._combo_ai_personality.setCurrentIndex(personality_index)
+        self._combo_ai_personality.currentIndexChanged.connect(self._on_ai_assistant_settings_changed)
+        session_lay.addWidget(self._combo_ai_personality, 1, 1, 1, 2)
+
+        session_lay.addWidget(QLabel("Ollama Endpoint:"), 2, 0)
         self._edit_ai_endpoint = QLineEdit(str(getattr(self.config.ai_assistant, "endpoint_url", "http://localhost:11434") or "http://localhost:11434"))
         self._edit_ai_endpoint.editingFinished.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._edit_ai_endpoint, 1, 1, 1, 2)
+        session_lay.addWidget(self._edit_ai_endpoint, 2, 1, 1, 2)
 
-        session_lay.addWidget(QLabel("Fast Model:"), 2, 0)
+        session_lay.addWidget(QLabel("Fast Model:"), 3, 0)
         self._combo_ai_model = QComboBox()
         self._combo_ai_model.setEditable(True)
         self._combo_ai_model.currentTextChanged.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._combo_ai_model, 2, 1, 1, 2)
+        session_lay.addWidget(self._combo_ai_model, 3, 1, 1, 2)
 
-        session_lay.addWidget(QLabel("Analyst Model:"), 3, 0)
+        session_lay.addWidget(QLabel("Analyst Model:"), 4, 0)
         self._combo_ai_analyst_model = QComboBox()
         self._combo_ai_analyst_model.setEditable(True)
         self._combo_ai_analyst_model.currentTextChanged.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._combo_ai_analyst_model, 3, 1, 1, 2)
+        session_lay.addWidget(self._combo_ai_analyst_model, 4, 1, 1, 2)
 
-        session_lay.addWidget(QLabel("Model Tier:"), 4, 0)
+        session_lay.addWidget(QLabel("Model Tier:"), 5, 0)
         model_tier_row = QHBoxLayout()
         model_tier_row.setContentsMargins(0, 0, 0, 0)
         model_tier_row.setSpacing(6)
@@ -9631,51 +9838,51 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         model_tier_row.addStretch(1)
         model_tier_host = QWidget()
         model_tier_host.setLayout(model_tier_row)
-        session_lay.addWidget(model_tier_host, 4, 1, 1, 2)
+        session_lay.addWidget(model_tier_host, 5, 1, 1, 2)
 
         self._lbl_ai_provider_status = QLabel("Checking local model service...")
         self._set_theme_role(self._lbl_ai_provider_status, "mutedCompact")
-        session_lay.addWidget(self._lbl_ai_provider_status, 5, 0, 1, 3)
+        session_lay.addWidget(self._lbl_ai_provider_status, 6, 0, 1, 3)
 
         self._chk_ai_enabled = QCheckBox("Enable in-app AI assistant")
         self._chk_ai_enabled.setChecked(bool(self.config.ai_assistant.enabled))
         self._chk_ai_enabled.toggled.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._chk_ai_enabled, 6, 0, 1, 3)
+        session_lay.addWidget(self._chk_ai_enabled, 7, 0, 1, 3)
 
         self._chk_ai_allow_modes = QCheckBox("Allow the assistant to suggest or switch detection modes")
         self._chk_ai_allow_modes.setChecked(bool(self.config.ai_assistant.allow_mode_switch))
         self._chk_ai_allow_modes.toggled.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._chk_ai_allow_modes, 7, 0, 1, 3)
+        session_lay.addWidget(self._chk_ai_allow_modes, 8, 0, 1, 3)
 
         self._chk_ai_allow_tuning = QCheckBox("Allow the assistant to draft tuning or runtime-setting changes")
         self._chk_ai_allow_tuning.setChecked(bool(self.config.ai_assistant.allow_setting_drafts))
         self._chk_ai_allow_tuning.toggled.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._chk_ai_allow_tuning, 8, 0, 1, 3)
+        session_lay.addWidget(self._chk_ai_allow_tuning, 9, 0, 1, 3)
 
         self._chk_ai_allow_analysis = QCheckBox("Allow runtime-state analysis and summaries")
         self._chk_ai_allow_analysis.setChecked(bool(self.config.ai_assistant.allow_runtime_analysis))
         self._chk_ai_allow_analysis.toggled.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._chk_ai_allow_analysis, 9, 0, 1, 3)
+        session_lay.addWidget(self._chk_ai_allow_analysis, 10, 0, 1, 3)
 
         self._chk_ai_allow_actions = QCheckBox("Allow supported local actions to execute from explicit operator requests")
         self._chk_ai_allow_actions.setChecked(bool(getattr(self.config.ai_assistant, "allow_action_execution", True)))
         self._chk_ai_allow_actions.toggled.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._chk_ai_allow_actions, 10, 0, 1, 3)
+        session_lay.addWidget(self._chk_ai_allow_actions, 11, 0, 1, 3)
 
         self._chk_ai_include_logs = QCheckBox("Include recent log lines in local AI prompts")
         self._chk_ai_include_logs.setChecked(bool(getattr(self.config.ai_assistant, "include_recent_logs", True)))
         self._chk_ai_include_logs.toggled.connect(self._on_ai_assistant_settings_changed)
-        session_lay.addWidget(self._chk_ai_include_logs, 11, 0, 1, 3)
+        session_lay.addWidget(self._chk_ai_include_logs, 12, 0, 1, 3)
 
         btn_refresh_models = QPushButton("Refresh")
         self._set_button_role(btn_refresh_models, "utility")
         btn_refresh_models.clicked.connect(self._refresh_ai_provider_status)
-        session_lay.addWidget(btn_refresh_models, 12, 0)
+        session_lay.addWidget(btn_refresh_models, 13, 0)
 
         btn_check_provider = QPushButton("Check Ollama")
         self._set_button_role(btn_check_provider, "utility")
         btn_check_provider.clicked.connect(self._refresh_ai_provider_status)
-        session_lay.addWidget(btn_check_provider, 12, 1)
+        session_lay.addWidget(btn_check_provider, 13, 1)
 
         lay.addWidget(self._collapsible(session_grp, collapsed=True))
         lay.addWidget(self._collapsible(self._build_ai_sound_voice_group(), collapsed=True))
@@ -9959,7 +10166,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         sound_lay.addLayout(human_style_row)
 
         kokoro_profile_row = QHBoxLayout()
-        kokoro_profile_row.addWidget(QLabel("Kokoro Profile:"))
+        kokoro_profile_row.addWidget(QLabel("Offline Profile:"))
         self._combo_kokoro_voice_profile = QComboBox()
         for profile_key, profile_label in KOKORO_VOICE_PROFILE_OPTIONS:
             self._combo_kokoro_voice_profile.addItem(profile_label, profile_key)
@@ -9968,7 +10175,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         sound_lay.addLayout(kokoro_profile_row)
 
         human_voice_row = QHBoxLayout()
-        human_voice_row.addWidget(QLabel("Kokoro Voice:"))
+        human_voice_row.addWidget(QLabel("Voice:"))
         self._combo_human_voice = QComboBox()
         self._combo_human_voice.currentIndexChanged.connect(self._on_human_voice_name_changed)
         human_voice_row.addWidget(self._combo_human_voice, 1)
@@ -10050,7 +10257,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         voice_lay.setSpacing(6)
 
         intro = QLabel(
-            "Validate the speech path used by spoken assistant replies. This checks Qt voice routing, selected voice application, and speech-state transitions before you rely on AI auto-speak."
+            "Validate the speech path used by spoken assistant replies. This checks the active runtime voice backend, selected voice application, and speech-state transitions before you rely on AI auto-speak."
         )
         intro.setWordWrap(True)
         self._set_theme_role(intro, "subtleBody")
@@ -10910,9 +11117,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         total_width = max(1, self._bottom_info_splitter.size().width())
         if total_width <= 1:
             total_width = max(520, int(self.width() * 0.44))
-        log_width = max(220, int(total_width * 0.40))
-        status_width = max(260, total_width - log_width)
-        self._bottom_info_splitter.setSizes([log_width, status_width])
+        panel_count = max(1, self._bottom_info_splitter.count())
+        panel_width = max(1, int(total_width / panel_count))
+        self._bottom_info_splitter.setSizes([panel_width] * panel_count)
 
     def _splitter_sizes_if_ready(self, splitter: QSplitter) -> list[int]:
         sizes = [int(v) for v in splitter.sizes()]
@@ -10977,10 +11184,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._apply_saved_log_panel_height()
 
         bottom_sizes = [int(v) for v in getattr(self.config, "bottom_info_splitter_sizes", []) if int(v) > 0]
-        if len(bottom_sizes) >= 2:
-            self._bottom_info_splitter.setSizes(bottom_sizes[:2])
-        else:
-            self._apply_bottom_info_panel_widths()
+        if len(bottom_sizes) >= self._bottom_info_splitter.count():
+            self._bottom_info_splitter.setSizes(bottom_sizes[:self._bottom_info_splitter.count()])
+        self._apply_bottom_info_panel_widths()
 
         ai_right_sizes = [int(v) for v in getattr(self.config, "ai_right_splitter_sizes", []) if int(v) > 0]
         if len(ai_right_sizes) >= 2 and hasattr(self, "_ai_right_splitter"):
@@ -11118,17 +11324,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._show_frame(display)
             self._mark_display_present(now, mode="full")
         else:
-            # Show black frame with status text
-            black_frame = np.zeros_like(display)
-            hidden_text = "Video Feed Hidden"
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 0.7
-            thickness = 1
-            (tw, th), _ = cv2.getTextSize(hidden_text, font, font_scale, thickness)
-            tx = max(8, (display.shape[1] - tw) // 2)
-            ty = max(th + 8, (display.shape[0] + th) // 2)
-            cv2.putText(black_frame, hidden_text, (tx, ty), font, font_scale, (108, 108, 108), thickness, cv2.LINE_AA)
-            self._show_frame(black_frame)
+            self._sync_home_screen_visibility()
             self._mark_display_present(now, mode="hidden")
 
     def _voice_interaction_window_active(self, now: Optional[float] = None) -> bool:
@@ -11144,25 +11340,44 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if not self._assistant_busy and not self._human_voice_busy():
             self._on_ai_state_update("listening")
 
-    def _voice_operator_silence_delay_s(self, *, now: Optional[float] = None) -> float:
+    def _voice_operator_silence_delay_s(self, *, now: Optional[float] = None, minimum_quiet_s: float = 0.0) -> float:
         current = time.time() if now is None else float(now)
         last_activity = float(getattr(self, "_voice_operator_last_activity_s", 0.0) or 0.0)
         if last_activity <= 0.0:
             return 0.0
-        return max(0.0, 0.45 - max(0.0, current - last_activity))
+        required_quiet_s = max(
+            self._voice_operator_silence_threshold_s(),
+            max(0.0, float(minimum_quiet_s or 0.0)),
+        )
+        return max(0.0, required_quiet_s - max(0.0, current - last_activity))
 
-    def _speak_after_operator_quiet(self, text: str, *, interrupt: bool = False, assistant_output: bool = False) -> bool:
+    def _speak_after_operator_quiet(self, text: str, *, interrupt: bool = False, assistant_output: bool = False, minimum_quiet_s: float = 0.0, _response_delay_applied: bool = False) -> bool:
         cleaned = self._prepare_human_speech_text(text, assistant_output=assistant_output)
         if not cleaned:
             return False
-        delay_s = self._voice_operator_silence_delay_s()
+        delay_s = self._voice_operator_silence_delay_s(minimum_quiet_s=minimum_quiet_s)
         if delay_s > 0.0:
             QTimer.singleShot(
                 int((delay_s + 0.05) * 1000.0),
-                lambda phrase=cleaned, interrupt=interrupt, assistant_output=assistant_output: self._speak_after_operator_quiet(
+                lambda phrase=cleaned, interrupt=interrupt, assistant_output=assistant_output, minimum_quiet_s=minimum_quiet_s: self._speak_after_operator_quiet(
                     phrase,
                     interrupt=interrupt,
                     assistant_output=assistant_output,
+                    minimum_quiet_s=minimum_quiet_s,
+                    _response_delay_applied=False,
+                ),
+            )
+            return True
+        response_delay_s = self._voice_response_delay_s()
+        if not _response_delay_applied and response_delay_s > 0.0:
+            QTimer.singleShot(
+                int(response_delay_s * 1000.0),
+                lambda phrase=cleaned, interrupt=interrupt, assistant_output=assistant_output, minimum_quiet_s=minimum_quiet_s: self._speak_after_operator_quiet(
+                    phrase,
+                    interrupt=interrupt,
+                    assistant_output=assistant_output,
+                    minimum_quiet_s=minimum_quiet_s,
+                    _response_delay_applied=True,
                 ),
             )
             return True
@@ -11190,6 +11405,17 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._voice_protocol_awaiting_next_action = False
         self._voice_protocol_auto_prompt_count = 0
 
+    def _clear_voice_operator_pause_state(self) -> None:
+        self._clear_voice_next_action_prompt()
+        self._voice_interaction_active_until_s = 0.0
+        self._voice_interaction_engine_paused = False
+        self._voice_protocol_hold_paused = False
+        self._clear_voice_command_clarification()
+        self._clear_voice_connect_confirmation()
+        self._set_voice_protocol_scenario("idle")
+        if not self._assistant_busy and not self._human_voice_busy():
+            self._on_ai_state_update("idle")
+
     def _prime_voice_listener_followup_window(self, *, reason: str, hold_s: float, delay_s: float = 0.0) -> None:
         def _prime() -> None:
             if bool(getattr(self, "_closing", False)):
@@ -11214,10 +11440,24 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return
         self._voice_protocol_awaiting_next_action = True
         self._set_voice_protocol_scenario("post_conversation")
-        timer.start(int(max(1200.0, float(delay_s) * 1000.0)))
+        effective_delay_s = float(delay_s)
+        if self._voice_auto_resume_tracking_enabled():
+            effective_delay_s = min(effective_delay_s, self._voice_auto_resume_delay_s())
+        timer.start(int(max(1200.0, effective_delay_s * 1000.0)))
 
     def _on_voice_protocol_next_action_timeout(self) -> None:
         if not bool(getattr(self, "_voice_protocol_awaiting_next_action", False)):
+            return
+        if self._voice_auto_resume_tracking_enabled():
+            self._voice_protocol_awaiting_next_action = False
+            self._voice_interaction_active_until_s = 0.0
+            self._voice_interaction_engine_paused = False
+            self._voice_protocol_hold_paused = False
+            self._set_voice_protocol_scenario("idle")
+            if hasattr(self, "_chk_enable") and bool(self._chk_enable.isChecked()):
+                self.engine.start()
+            self._speak_after_operator_quiet("Resuming guarding mode automatically.", interrupt=False)
+            self._log("Voice protocol: auto-resumed guarding mode after conversation timeout")
             return
         self._start_voice_interaction_window(reason="next-action-prompt", hold_s=12.0)
         prompt = (
@@ -11254,8 +11494,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             "Good to go. Tell me your first command when ready.",
         ]
         phrase = random.choice(opening_lines)
-        if self._speak_human_phrase(phrase, interrupt=False):
-            self._log("Voice protocol: startup greeting spoken (waiting for explicit wake word before focused listening)")
+        if self._speak_after_operator_quiet(phrase, interrupt=False, minimum_quiet_s=1.2):
+            self._log("Voice protocol: startup greeting queued after operator quiet (waiting for explicit wake word before focused listening)")
 
     def _request_voice_connect_confirmation(self) -> str:
         self._clear_voice_next_action_prompt()
@@ -11275,11 +11515,16 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             delay_s=quiet_delay_s + phrase_len_s + 0.35,
             hold_s=max(4.0, 14.0 - phrase_len_s - 0.35),
         )
+        self._arm_voice_pending_response_timeout(
+            kind="connect_confirmation",
+            heard_text="connect Smart Sentry boards",
+            timeout_s=16.0,
+        )
         self._log("Voice protocol: awaiting connect confirmation")
         return "acknowledged"
 
     def _execute_voice_connect_request(self) -> str:
-        self._voice_protocol_pending_connect_confirmation = False
+        self._clear_voice_connect_confirmation()
         self._start_voice_interaction_window(reason="connect-confirmed", hold_s=12.0)
         self._voice_protocol_hold_paused = True
 
@@ -11315,6 +11560,43 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._log("Voice protocol: executing direct board connect request")
         return "acknowledged"
 
+    def _execute_voice_disconnect_request(self) -> str:
+        self._start_voice_interaction_window(reason="disconnect-request", hold_s=12.0)
+        self._voice_protocol_hold_paused = True
+
+        if self._host_controls_hardware():
+            response = "This panel is host-managed right now, so direct board disconnect is disabled here."
+            self._set_operator_task_status("disconnect Smart Sentry boards", "rejected", response)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            self._schedule_voice_next_action_prompt(
+                delay_s=max(3.8, self._estimate_human_phrase_duration_s(response) + 1.0)
+            )
+            return "acknowledged"
+
+        if self._connection_busy:
+            response = "A connection change is already in progress. I will report when it is done."
+            self._set_operator_task_status("disconnect Smart Sentry boards", "running", response)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if not self._comm.is_connected():
+            response = "Smart Sentry boards are already disconnected. What is next?"
+            self._set_operator_task_status("disconnect Smart Sentry boards", "completed", "Smart Sentry boards were already disconnected.")
+            self._speak_after_operator_quiet(response, interrupt=False)
+            self._schedule_voice_next_action_prompt(
+                delay_s=max(3.8, self._estimate_human_phrase_duration_s(response) + 1.0)
+            )
+            return "acknowledged"
+
+        self._voice_protocol_connect_via_voice_active = False
+        self._clear_enable_sentry_after_connect()
+        self._set_voice_protocol_scenario("disconnect_in_progress")
+        self._set_operator_task_status("disconnect Smart Sentry boards", "running", "Running in the background.")
+        self._speak_after_operator_quiet("Disconnecting Smart Sentry boards now.", interrupt=False)
+        self._toggle_connection()
+        self._log("Voice protocol: executing direct board disconnect request")
+        return "acknowledged"
+
     def _consume_voice_connect_confirmation(self, command: str) -> Optional[str]:
         if not bool(getattr(self, "_voice_protocol_pending_connect_confirmation", False)):
             return None
@@ -11338,7 +11620,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         )
 
         if negative:
-            self._voice_protocol_pending_connect_confirmation = False
+            self._clear_voice_connect_confirmation()
             self._set_voice_protocol_scenario("post_conversation")
             self._set_operator_task_status("connect Smart Sentry boards", "rejected", "Connection cancelled by operator.")
             response = "Connection cancelled. What do you want me to do next?"
@@ -11349,6 +11631,18 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return "acknowledged"
 
         if not affirmative:
+            if self._voice_command_can_replace_pending_prompt(cmd):
+                self._clear_voice_connect_confirmation()
+                self._set_operator_task_status(
+                    "connect Smart Sentry boards",
+                    "rejected",
+                    f"Superseded by new voice command: {cmd}.",
+                )
+                self._log(f"Voice protocol: connect confirmation superseded by new command -> {cmd}")
+                return None
+            if self._voice_command_is_low_signal_followup(cmd):
+                self._log(f"Voice protocol: ignored low-signal connect confirmation reply -> {cmd}")
+                return ""
             self._start_voice_interaction_window(reason="connect-confirmation-repeat", hold_s=10.0)
             repeat_phrase = "Please say yes to connect, or no to cancel."
             quiet_delay_s = self._voice_operator_silence_delay_s()
@@ -11358,6 +11652,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 reason="connect-confirmation-repeat",
                 delay_s=quiet_delay_s + repeat_len_s + 0.35,
                 hold_s=max(4.0, 10.0 - repeat_len_s - 0.35),
+            )
+            self._arm_voice_pending_response_timeout(
+                kind="connect_confirmation",
+                heard_text="connect Smart Sentry boards",
+                timeout_s=14.0,
             )
             return "acknowledged"
 
@@ -11369,8 +11668,166 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return None
 
         connect_event = self._consume_voice_connect_confirmation(cmd)
-        if connect_event:
+        if connect_event is not None:
             return connect_event
+
+        cancel_current_tokens = (
+            "stop that",
+            "stop this",
+            "cancel current task",
+            "cancel what you're doing",
+            "cancel what you are doing",
+            "abort current task",
+            "abort that",
+            "stop current task",
+        )
+        resume_last_tokens = (
+            "resume last task",
+            "resume the last task",
+            "resume my last task",
+            "continue last task",
+        )
+        replay_tokens = (
+            "do it again",
+            "do that again",
+            "repeat that",
+            "repeat the last command",
+        )
+        faster_replay_tokens = (
+            "same but faster",
+            "do it again but faster",
+            "repeat that but faster",
+        )
+
+        if any(token in cmd for token in cancel_current_tokens):
+            self._start_voice_interaction_window(reason="cancel-current-task", hold_s=12.0)
+            response = self._cancel_current_operator_task(keep_for_resume=False)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            self._schedule_voice_next_action_prompt(
+                delay_s=max(3.6, self._estimate_human_phrase_duration_s(response) + 1.0)
+            )
+            self._log("Voice protocol: operator cancelled the current task")
+            return "acknowledged"
+
+        if any(token in cmd for token in resume_last_tokens):
+            self._start_voice_interaction_window(reason="resume-last-task", hold_s=12.0)
+            response, resume_command = self._resume_paused_voice_task()
+            if resume_command:
+                self._log(f"Voice protocol: resuming paused command -> {resume_command}")
+                QTimer.singleShot(0, lambda replay_command=resume_command: self._on_voice_command_recognized(replay_command))
+            else:
+                self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if any(token in cmd for token in faster_replay_tokens):
+            replay_command = self._replay_last_actionable_voice_command(faster=True)
+            if replay_command:
+                self._log(f"Voice protocol: replaying faster command -> {replay_command}")
+                QTimer.singleShot(0, lambda replay_text=replay_command: self._on_voice_command_recognized(replay_text))
+            else:
+                self._speak_after_operator_quiet("There is no recent command to repeat faster yet.", interrupt=False)
+            return "acknowledged"
+
+        if any(token in cmd for token in replay_tokens):
+            replay_command = self._replay_last_actionable_voice_command(faster=False)
+            if replay_command:
+                self._log(f"Voice protocol: replaying last command -> {replay_command}")
+                QTimer.singleShot(0, lambda replay_text=replay_command: self._on_voice_command_recognized(replay_text))
+            else:
+                self._speak_after_operator_quiet("There is no recent command to repeat yet.", interrupt=False)
+            return "acknowledged"
+
+        if "increase sensitivity" in cmd:
+            response = self._adjust_voice_listening_sensitivity(increase=True)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if "decrease sensitivity" in cmd:
+            response = self._adjust_voice_listening_sensitivity(increase=False)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if any(token in cmd for token in ("be more strict on commands", "be stricter on commands", "more strict on commands")):
+            response = self._adjust_voice_command_strictness(0.04, label="Command strictness increased")
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if any(token in cmd for token in ("be less strict on commands", "be more relaxed on commands", "less strict on commands")):
+            response = self._adjust_voice_command_strictness(-0.04, label="Command strictness reduced")
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if any(token in cmd for token in ("increase response delay", "wait longer before speaking", "respond slower")):
+            response = self._adjust_voice_response_delay(0.10)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if any(token in cmd for token in ("decrease response delay", "respond faster", "reply faster")):
+            response = self._adjust_voice_response_delay(-0.10)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if any(token in cmd for token in ("increase silence threshold", "wait for more silence", "hold longer before replying")):
+            response = self._adjust_voice_silence_threshold(0.10)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if any(token in cmd for token in ("decrease silence threshold", "wait for less silence", "reply sooner after silence")):
+            response = self._adjust_voice_silence_threshold(-0.10)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if any(token in cmd for token in ("increase tracking priority", "tracking priority higher", "prioritize tracking")):
+            response = self._set_voice_tracking_priority(tracking_first=True)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if any(token in cmd for token in ("decrease tracking priority", "prioritize operator", "operator priority higher")):
+            response = self._set_voice_tracking_priority(tracking_first=False)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        if any(token in cmd for token in ("talk less", "be brief", "keep it short", "shorter replies")):
+            response = self._set_voice_talk_less_mode()
+            self._speak_after_operator_quiet(response, interrupt=False)
+            return "acknowledged"
+
+        cancel_all_tokens = (
+            "cancel all tasks in queue",
+            "cancel all queued tasks",
+            "cancel all tasks",
+            "clear the queue",
+            "clear all tasks in queue",
+            "cancel queue",
+        )
+        cancel_last_tokens = (
+            "cancel the last task",
+            "cancel last task",
+            "cancel the last",
+            "cancel last",
+            "cancel last request",
+            "cancel last command",
+        )
+
+        if any(token in cmd for token in cancel_all_tokens):
+            self._start_voice_interaction_window(reason="cancel-all-tasks", hold_s=12.0)
+            response = self._cancel_operator_tasks(cancel_all=True)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            self._schedule_voice_next_action_prompt(
+                delay_s=max(3.6, self._estimate_human_phrase_duration_s(response) + 1.0)
+            )
+            self._log("Voice protocol: operator cancelled all queued tasks")
+            return "acknowledged"
+
+        if any(token in cmd for token in cancel_last_tokens):
+            self._start_voice_interaction_window(reason="cancel-last-task", hold_s=12.0)
+            response = self._cancel_operator_tasks(cancel_all=False)
+            self._speak_after_operator_quiet(response, interrupt=False)
+            self._schedule_voice_next_action_prompt(
+                delay_s=max(3.6, self._estimate_human_phrase_duration_s(response) + 1.0)
+            )
+            self._log("Voice protocol: operator cancelled the last queued task")
+            return "acknowledged"
 
         connect_tokens = (
             "connect smart sentry",
@@ -11389,6 +11846,29 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             "connect com",
             "connect serial",
         )
+
+        disconnect_tokens = (
+            "disconnect smart sentry",
+            "disconnect the smart sentry",
+            "disconnect smart sentry board",
+            "disconnect smart sentry boards",
+            "disconnect the smart sentry board",
+            "disconnect the smart sentry boards",
+            "disconnect board",
+            "disconnect boards",
+            "disconnect the board",
+            "disconnect the boards",
+            "disconnect the controller link",
+            "disconnect controller link",
+            "disconnect from the com port",
+            "disconnect from com port",
+            "disconnect com port",
+            "disconnect com",
+            "disconnect serial",
+        )
+
+        if any(token in cmd for token in disconnect_tokens):
+            return self._execute_voice_disconnect_request()
 
         if any(token in cmd for token in connect_tokens):
             return self._execute_voice_connect_request()
@@ -11812,6 +12292,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _on_enable_toggled(self, checked: bool) -> None:
         if checked:
+            if (
+                self._voice_protocol_active()
+                or bool(getattr(self, "_voice_protocol_pending_command_clarification", ""))
+                or bool(getattr(self, "_voice_protocol_pending_connect_confirmation", False))
+                or bool(getattr(self, "_voice_protocol_awaiting_next_action", False))
+            ):
+                self._clear_voice_operator_pause_state()
             self._apply_all_config()
             self._detector.reset()
             self._tracker.reset()
@@ -11842,20 +12329,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
     def _on_show_video_toggled(self, checked: bool) -> None:
         """Toggle video display (detection continues running regardless)."""
         self._show_video_feed = checked
-        if not checked:
-            # Show black frame immediately — don't wait for the next detection cycle
-            # (with YOLO that delay can be 100–500 ms, making the toggle feel broken).
-            if self._last_display_frame is not None:
-                black = np.zeros_like(self._last_display_frame)
-                label = "Video Feed Hidden"
-                font, scale, thick = cv2.FONT_HERSHEY_SIMPLEX, 0.7, 1
-                (tw, th), _ = cv2.getTextSize(label, font, scale, thick)
-                tx = max(8, (black.shape[1] - tw) // 2)
-                ty = max(th + 8, (black.shape[0] + th) // 2)
-                cv2.putText(black, label, (tx, ty), font, scale, (108, 108, 108), thick, cv2.LINE_AA)
-                self._show_frame(black)
-            else:
-                self._video_label.clear_frame("Video Feed Hidden")
+        self._sync_home_screen_visibility()
         status = "shown" if checked else "hidden"
         self._log(f"Video feed {status} (detection running)")
 
@@ -12884,7 +13358,22 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._startup_autoconnect_active = False
             self._startup_autoconnect_retry = 0
             self._voice_protocol_connect_via_voice_active = False
+            self._connection_cancel_requested = False
+            self._clear_enable_sentry_after_connect()
             self._set_operator_task_status(completed_label, "completed", "Smart Sentry boards disconnected.")
+            return
+
+        if bool(getattr(self, "_connection_cancel_requested", False)):
+            self._connection_cancel_requested = False
+            self._voice_protocol_connect_via_voice_active = False
+            self._clear_enable_sentry_after_connect()
+            if ok and self._comm.is_connected():
+                self._set_operator_task_status(completed_label, "rejected", "Connection interrupted by operator. Disconnecting safely now.")
+                self._log("Connection completed after operator cancel request; disconnecting safely")
+                self._start_connection_operation("disconnect")
+                return
+            self._set_operator_task_status(completed_label, "rejected", "Connection interrupted by operator.")
+            self._log("Connection result ignored after operator cancel request")
             return
 
         if ok:
@@ -12899,7 +13388,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             )
             self._set_connection_status(conn_text, "warn" if mode2_degraded_io else "ok")
             self._log(f"Connected: {info}")
-            fire_mode = "Projectile (ESP32 GPIO13 Servo)" if self._comm.trigger_mode_bb else "Water (MOSFET)"
+            fire_mode = "Projectile (Trigger Servo)" if self._comm.trigger_mode_bb else "Water (MOSFET)"
             safety_state = "ARMED" if self._safety_armed else "LOCKED"
             auto_trigger_state = "ON" if bool(self.config.engagement.auto_trigger_enabled) else "OFF"
             self._log(f"Fire config: mode={fire_mode} | safety={safety_state} | auto-trigger={auto_trigger_state}")
@@ -12914,13 +13403,24 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._schedule_auto_yolo_load(300)
             self._schedule_startup_rest_move()
             self._set_operator_task_status(completed_label, "completed", "Smart Sentry boards connected.")
+            deferred_enable = bool(getattr(self, "_deferred_enable_sentry_after_connect", False))
+            if deferred_enable and hasattr(self, "_chk_enable") and not bool(self._chk_enable.isChecked()):
+                self._chk_enable.setChecked(True)
+                self._log(
+                    "Deferred Smart Sentry enable applied after connection "
+                    f"({self._deferred_enable_sentry_reason or 'unspecified reason'})"
+                )
+            self._clear_enable_sentry_after_connect()
             if bool(getattr(self, "_voice_protocol_connect_via_voice_active", False)):
                 self._voice_protocol_connect_via_voice_active = False
                 self._start_voice_interaction_window(reason="connect-complete", hold_s=14.0)
-                response = (
-                    "Smart Sentry boards are connected on the C O M link. "
-                    "What is next? You can say enable smart sentry, or tell me another task."
-                )
+                if deferred_enable:
+                    response = "Smart Sentry boards are connected on the C O M link, and Smart Sentry is enabled. What do you want me to do next?"
+                else:
+                    response = (
+                        "Smart Sentry boards are connected on the C O M link. "
+                        "What is next? You can say enable smart sentry, or tell me another task."
+                    )
                 self._speak_human_phrase(response, interrupt=False)
                 self._schedule_voice_next_action_prompt(
                     delay_s=max(4.0, self._estimate_human_phrase_duration_s(response) + 1.2)
@@ -12930,6 +13430,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             failure_text = self._format_connection_details(details, f"FAILED: {err or 'unknown error'}")
             self._set_connection_status(failure_text, "error")
             self._log(f"Connection failed: {err or 'unknown error'}")
+            self._clear_enable_sentry_after_connect()
             self._set_operator_task_status(completed_label, "failed", f"Connection failed: {err or 'unknown error'}")
             if bool(getattr(self, "_voice_protocol_connect_via_voice_active", False)):
                 self._voice_protocol_connect_via_voice_active = False
@@ -13050,6 +13551,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._close_camera(log_close=False)
         self._video_label.set_placeholder_enabled(False)
         self._video_label.clear_frame("Opening URL\u2026")
+        self._sync_home_screen_visibility(force_video=True)
         self._set_camera_status("Resolving URL\u2026", "neutral")
         self._log(f"Resolving video URL: {video_url}")
         # Bump generation so any leftover threads from a previous URL ignore their frames
@@ -13349,6 +13851,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._grab_fail_count = 0
         self._sync_source_dimensions(frame.shape[1], frame.shape[0])
         self._btn_cam.setText("Close Source")
+        self._sync_home_screen_visibility(force_video=True)
         self._set_camera_status(f"Test image: {media_path.name}  ({frame.shape[1]}x{frame.shape[0]})", "ok")
         self._cam_timer.start(250)
         self._update_test_media_controls()
@@ -13370,6 +13873,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._close_camera(log_close=False)
         self._video_label.set_placeholder_enabled(False)
         self._video_label.clear_frame("Opening camera...")
+        self._sync_home_screen_visibility(force_video=True)
         requested_w = int(self.config.connection.camera_width)
         requested_h = int(self.config.connection.camera_height)
 
@@ -13564,6 +14068,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._log(f"Camera opened: {source_text} requested {requested_w}x{requested_h}, actual {actual_w}x{actual_h}")
             else:
                 self._log(f"Camera opened: {source_text} ({actual_w}x{actual_h})")
+        self._sync_home_screen_visibility(force_video=True)
         self._update_test_media_controls()
         self._schedule_auto_yolo_load(300)
 
@@ -13860,6 +14365,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         except RuntimeError as exc:
             if not self._closing:
                 self._report_runtime_warning("Camera close UI update skipped", exc)
+        self._sync_home_screen_visibility(force_home=bool(log_close or self._shutdown_in_progress))
         self._update_test_media_controls()
         if log_close:
             self._log("Camera closed")
@@ -16053,7 +16559,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._update_master_stack_summary()
         self._push_config()
         self._save_config_quietly()
-        mode_name = "Projectile (ESP32 GPIO13 Servo)" if is_bb else "Water (MOSFET)"
+        mode_name = "Projectile (Trigger Servo)" if is_bb else "Water (MOSFET)"
         self._log(f"Trigger mode: {mode_name}")
 
     def _optimize_numeric_entry_performance(self) -> None:
@@ -16367,7 +16873,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         tilt = self.engine.current_tilt
         if state and not host_controls_hardware:
             if not self._comm.trigger_mode_bb:
-                self._log("Manual fire note: trigger mode is Water (MOSFET), not Projectile (ESP32 GPIO13 Servo)")
+                self._log("Manual fire note: trigger mode is Water (MOSFET), not Projectile (Trigger Servo)")
             _comm_mode = getattr(self._comm, "_mode", None)
             _udp_broken = (
                 getattr(self._comm, "_sock", None) is None
@@ -17428,7 +17934,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             f"- Connected: {comm.get('is_connected')}",
             f"- Host managed: {comm.get('host_hardware_managed')}",
             f"- Mode: {comm.get('mode_label', '')}",
-            f"- Trigger mode: {'Projectile (ESP32 GPIO13 Servo)' if comm.get('trigger_mode_bb') else 'Water (MOSFET)'}",
+            f"- Trigger mode: {'Projectile (Trigger Servo)' if comm.get('trigger_mode_bb') else 'Water (MOSFET)'}",
             f"- Last command: {comm.get('last_command', '') or 'none'}",
             f"- Last error: {comm.get('last_error', '') or 'none'}",
         ])
@@ -17738,17 +18244,30 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._face_profile_list.blockSignals(True)
         self._face_profile_list.clear()
         required_samples = self._face_identity_required_samples()
-        runtime_backend = str(getattr(self._face_runtime, "active_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY)
+        runtime = getattr(self, "_face_runtime", None)
+        runtime_backend = str(getattr(runtime, "active_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY)
         for profile in self._face_library.profiles:
             suffix = "non-target" if bool(profile.friendly) else "target"
             stored_sample_count = len(profile.embeddings)
             profile_backend = str(getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY)
             backend_label = "sface" if profile_backend == FACE_EMBEDDING_BACKEND_SFACE else "legacy"
-            usable_sample_count = count_compatible_profile_embeddings(profile, backend=runtime_backend)
-            if profile_backend != runtime_backend:
-                readiness = f"re-enroll for {runtime_backend}"
+            if runtime is not None and hasattr(runtime, "matchable_profile_embedding_count"):
+                usable_sample_count = int(runtime.matchable_profile_embedding_count(profile))
+                profile_matchable = bool(runtime.profile_backend_is_matchable(profile_backend))
             else:
-                readiness = "ready" if usable_sample_count >= required_samples else f"needs {required_samples - usable_sample_count} more"
+                usable_sample_count = count_compatible_profile_embeddings(profile, backend=runtime_backend)
+                profile_matchable = profile_backend == runtime_backend
+            if usable_sample_count >= required_samples:
+                if profile_backend == runtime_backend:
+                    readiness = "ready"
+                elif profile_backend == FACE_EMBEDDING_BACKEND_LEGACY and runtime_backend == FACE_EMBEDDING_BACKEND_SFACE:
+                    readiness = "ready via legacy compatibility"
+                else:
+                    readiness = f"ready via {backend_label}"
+            elif not profile_matchable:
+                readiness = f"backend unavailable in current runtime"
+            else:
+                readiness = f"needs {required_samples - usable_sample_count} more"
             if usable_sample_count < stored_sample_count:
                 readiness += f", {stored_sample_count - usable_sample_count} incompatible"
             if usable_sample_count != stored_sample_count:
@@ -18067,27 +18586,51 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             top = max(self._last_face_matches, key=lambda item: float(item.confidence))
             match_text = f"{top.name} ({top.confidence:.2f})"
         required_samples = self._face_identity_required_samples()
-        runtime_backend = str(getattr(self._face_runtime, "active_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY)
-        backend_status = str(self._face_runtime.backend_status() or runtime_backend)
+        runtime = getattr(self, "_face_runtime", None)
+        runtime_backend = str(getattr(runtime, "active_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY)
+        backend_status = str(runtime.backend_status() or runtime_backend) if runtime is not None else runtime_backend
+        supported_backends = []
+        if runtime is not None and hasattr(runtime, "supported_profile_backends"):
+            supported_backends = [str(item or "").strip() for item in runtime.supported_profile_backends() if str(item or "").strip()]
         ready_profiles = sum(
             1
             for profile in self._face_library.profiles
-            if str(getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY) == runtime_backend
-            and count_compatible_profile_embeddings(profile, backend=runtime_backend) >= required_samples
+            if (
+                int(runtime.matchable_profile_embedding_count(profile)) >= required_samples
+                if runtime is not None and hasattr(runtime, "matchable_profile_embedding_count")
+                else (
+                    str(getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY) == runtime_backend
+                    and count_compatible_profile_embeddings(profile, backend=runtime_backend) >= required_samples
+                )
+            )
         )
-        stale_profiles = sum(
+        unavailable_profiles = sum(
             1
             for profile in self._face_library.profiles
-            if str(getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY) != runtime_backend
+            if (
+                not runtime.profile_backend_is_matchable(
+                    str(getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY)
+                )
+                if runtime is not None and hasattr(runtime, "profile_backend_is_matchable")
+                else str(getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY) != runtime_backend
+            )
         )
         incompatible_profiles = sum(
             1
             for profile in self._face_library.profiles
-            if str(getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY) == runtime_backend
-            and count_compatible_profile_embeddings(profile, backend=runtime_backend) < len(getattr(profile, "embeddings", []) or [])
+            if (
+                int(runtime.matchable_profile_embedding_count(profile)) < len(getattr(profile, "embeddings", []) or [])
+                and int(runtime.matchable_profile_embedding_count(profile)) > 0
+                if runtime is not None and hasattr(runtime, "matchable_profile_embedding_count")
+                else (
+                    str(getattr(profile, "embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY) == runtime_backend
+                    and count_compatible_profile_embeddings(profile, backend=runtime_backend) < len(getattr(profile, "embeddings", []) or [])
+                )
+            )
         )
+        supported_backends_text = ", ".join(supported_backends) if supported_backends else runtime_backend
         status_text = (
-            f"Backend: {runtime_backend} | {backend_status} | known profiles: {len(self._face_library.profiles)} | ready: {ready_profiles} (need {required_samples}+ compatible samples) | backend mismatch: {stale_profiles} | incompatible sample profiles: {incompatible_profiles} | last recognized: {match_text} | file: {self._portable_path_string(self._resolved_face_library_path())}"
+            f"Backend: {runtime_backend} | {backend_status} | supported profile backends: {supported_backends_text} | known profiles: {len(self._face_library.profiles)} | ready: {ready_profiles} (need {required_samples}+ compatible samples) | unavailable backend profiles: {unavailable_profiles} | incompatible sample profiles: {incompatible_profiles} | last recognized: {match_text} | file: {self._portable_path_string(self._resolved_face_library_path())}"
         )
         if status_text == self._last_face_runtime_status_text:
             return
@@ -18673,6 +19216,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._btn_quick_ai_enable.setChecked(cfg.enabled)
             self._btn_quick_ai_enable.blockSignals(False)
         cfg.mode = str(self._combo_ai_mode.currentData() or "guided_tuning")
+        cfg.personality = str(getattr(self, "_combo_ai_personality", QComboBox()).currentData() or "sentinel")
         cfg.endpoint_url = str(getattr(self, "_edit_ai_endpoint", QLineEdit()).text()).strip() or "http://localhost:11434"
         cfg.preferred_model_tier = self._current_ai_model_tier()
         cfg.model = self._current_ai_model(analyst=False)
@@ -18699,11 +19243,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         cfg = self.config.ai_assistant
         host = str(getattr(cfg, "endpoint_url", "http://localhost:11434") or "http://localhost:11434")
         timeout_s = float(getattr(cfg, "request_timeout_s", 45.0) or 45.0)
-        cache_key = f"{host}|{timeout_s:.2f}"
+        personality = str(getattr(cfg, "personality", "sentinel") or "sentinel")
+        cache_key = f"{host}|{timeout_s:.2f}|{personality}"
         if self._assistant_service is not None and self._assistant_service_key == cache_key:
             return self._assistant_service
         client = OllamaClient(host=host, timeout_s=timeout_s)
-        self._assistant_service = LocalAssistantService(client=client)
+        self._assistant_service = LocalAssistantService(client=client, personality=personality)
         self._assistant_service_key = cache_key
         return self._assistant_service
 
@@ -19028,6 +19573,649 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return f"One queued assistant request. Next is {next_label}."
         return f"{count} queued assistant requests. Next is {next_label}."
 
+    def _voice_operator_silence_threshold_s(self) -> float:
+        return max(0.0, min(1.8, float(getattr(self.config.sound, "voice_operator_silence_hold_s", 0.45) or 0.45)))
+
+    def _voice_response_delay_s(self) -> float:
+        return max(0.0, min(1.5, float(getattr(self.config.sound, "voice_response_delay_s", 0.25) or 0.25)))
+
+    def _voice_command_confidence_threshold(self) -> float:
+        return max(0.45, min(0.98, float(getattr(self.config.sound, "voice_command_confidence_threshold", 0.78) or 0.78)))
+
+    def _voice_command_ambiguous_threshold(self) -> float:
+        return max(0.55, min(0.995, float(getattr(self.config.sound, "voice_command_ambiguous_threshold", 0.92) or 0.92)))
+
+    def _voice_brief_responses_enabled(self) -> bool:
+        return bool(getattr(self.config.sound, "voice_brief_responses", False))
+
+    def _voice_auto_resume_tracking_enabled(self) -> bool:
+        return bool(getattr(self.config.sound, "voice_auto_resume_tracking", False))
+
+    def _voice_auto_resume_delay_s(self) -> float:
+        return max(2.0, min(18.0, float(getattr(self.config.sound, "voice_auto_resume_delay_s", 6.0) or 6.0)))
+
+    def _remember_actionable_voice_command(self, command: str, summary: str = "") -> None:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return
+        blocked = {
+            "do it again",
+            "repeat that",
+            "same but faster",
+            "resume last task",
+            "stop that",
+            "cancel current task",
+            "abort current task",
+        }
+        if normalized in blocked:
+            return
+        self._last_actionable_voice_command = normalized
+        self._last_actionable_voice_summary = str(summary or "").strip()
+
+    def _replay_last_actionable_voice_command(self, *, faster: bool = False) -> Optional[str]:
+        last_command = re.sub(r"\s+", " ", str(getattr(self, "_last_actionable_voice_command", "") or "").strip().lower())
+        if not last_command:
+            return None
+        if not faster:
+            return last_command
+        if "speed" in last_command:
+            return "increase speed 10"
+        if any(token in last_command for token in ("go home", "go rest", "enable", "resume", "track", "move")):
+            return "increase speed 10"
+        return "increase speed 10"
+
+    def _store_paused_voice_command(self, command: str, label: str = "") -> None:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return
+        self._paused_voice_task = {
+            "kind": "command",
+            "command": normalized,
+            "label": str(label or normalized).strip() or normalized,
+            "id": self._next_operator_task_id(),
+        }
+
+    def _pause_active_assistant_task(self, *, reason: str, keep_for_resume: bool) -> Optional[str]:
+        task = dict(getattr(self, "_assistant_active_task", {}) or {})
+        if not task:
+            return None
+        task_id = int(task.get("id", 0) or 0)
+        label = str(task.get("label") or self._assistant_task_label(str(task.get("task_kind") or "prompt"), str(task.get("prompt") or "")))
+        if task_id > 0:
+            self._assistant_cancelled_task_ids.add(task_id)
+        if keep_for_resume:
+            task["kind"] = "assistant_task"
+            task["announce_on_start"] = False
+            task["paused_reason"] = str(reason or "override")
+            self._paused_voice_task = task
+        self._assistant_active_task = None
+        self._assistant_set_busy(False, "Assistant task paused." if keep_for_resume else "Assistant task cancelled.")
+        self._ai_current_state = "idle"
+        for _attr in ("_ai_orb_hero", "_ai_orb_video"):
+            _orb = getattr(self, _attr, None)
+            if _orb is not None:
+                _orb.set_state("idle")
+        return label
+
+    def _interrupt_current_operator_task(self, *, keep_for_resume: bool) -> List[str]:
+        interrupted: List[str] = []
+
+        pending_command = str(getattr(self, "_voice_protocol_pending_command_clarification", "") or "").strip().lower()
+        if pending_command:
+            if keep_for_resume:
+                self._store_paused_voice_command(pending_command, label=pending_command)
+            interrupted.append(pending_command)
+            self._clear_voice_command_clarification()
+
+        if bool(getattr(self, "_voice_protocol_pending_connect_confirmation", False)):
+            if keep_for_resume:
+                self._store_paused_voice_command("connect smart sentry boards", label="connect Smart Sentry boards")
+            self._clear_voice_connect_confirmation()
+            interrupted.append("connect Smart Sentry boards")
+
+        assistant_label = self._pause_active_assistant_task(reason="priority override" if keep_for_resume else "cancelled", keep_for_resume=keep_for_resume)
+        if assistant_label:
+            interrupted.append(assistant_label)
+
+        if self._connection_busy:
+            label = str(self._connection_task_label or "connection task")
+            if keep_for_resume:
+                paused_command = "disconnect smart sentry boards" if "disconnect" in label.lower() else "connect smart sentry boards"
+                self._store_paused_voice_command(paused_command, label=label)
+            self._connection_cancel_requested = True
+            self._voice_protocol_connect_via_voice_active = False
+            self._clear_enable_sentry_after_connect()
+            interrupted.append(label)
+
+        self._clear_voice_next_action_prompt()
+        self._stop_human_speech()
+        return interrupted
+
+    def _cancel_current_operator_task(self, *, keep_for_resume: bool = False) -> str:
+        interrupted = self._interrupt_current_operator_task(keep_for_resume=keep_for_resume)
+
+        if not interrupted and hasattr(self, "_chk_enable") and bool(self._chk_enable.isChecked()):
+            self._chk_enable.setChecked(False)
+            self._voice_protocol_hold_paused = True
+            interrupted.append("Smart Sentry guarding mode")
+
+        if interrupted:
+            prefix = "Paused" if keep_for_resume else "Cancelled"
+            summary = ", ".join(interrupted[:3])
+            if len(interrupted) > 3:
+                summary += f", and {len(interrupted) - 3} more"
+            if self._connection_cancel_requested:
+                suffix = " The current connection step will stop as soon as it returns safely."
+            else:
+                suffix = ""
+            if keep_for_resume:
+                return f"{prefix} {summary}.{suffix} You can say resume last task when you want it back."
+            return f"{prefix} {summary}.{suffix} What do you want me to do next?"
+        if keep_for_resume:
+            return "There was no active task to pause."
+        return "There was no active task to cancel."
+
+    def _resume_paused_voice_task(self) -> tuple[str, Optional[str]]:
+        task = dict(getattr(self, "_paused_voice_task", {}) or {})
+        if not task:
+            return "There is no paused task to resume.", None
+
+        self._paused_voice_task = None
+        kind = str(task.get("kind") or "assistant_task")
+        label = str(task.get("label") or "the paused task")
+        if kind == "assistant_task":
+            task["id"] = self._next_operator_task_id()
+            task.pop("kind", None)
+            task.pop("paused_reason", None)
+            if self._assistant_busy:
+                self._assistant_task_queue.appendleft(task)
+                return f"Queued {label} to resume after the current assistant request.", None
+            self._launch_ai_background_task(task)
+            return f"Resuming {label} now.", None
+
+        command = re.sub(r"\s+", " ", str(task.get("command") or "").strip().lower())
+        if not command:
+            return "The paused task could not be resumed because its command was empty.", None
+        return f"Resuming {label} now.", command
+
+    def _adjust_voice_command_strictness(self, delta: float, *, label: str) -> str:
+        cfg = self.config.sound
+        base_conf = float(getattr(cfg, "voice_command_confidence_threshold", 0.78) or 0.78)
+        base_ambiguous = float(getattr(cfg, "voice_command_ambiguous_threshold", 0.92) or 0.92)
+        new_conf = max(0.45, min(0.98, base_conf + float(delta)))
+        new_ambiguous = max(new_conf + 0.04, min(0.995, base_ambiguous + float(delta)))
+        cfg.voice_command_confidence_threshold = round(new_conf, 2)
+        cfg.voice_command_ambiguous_threshold = round(new_ambiguous, 2)
+        self._save_config_quietly()
+        return (
+            f"{label}. Confidence threshold is now {cfg.voice_command_confidence_threshold:.2f} "
+            f"and ambiguous-command threshold is {cfg.voice_command_ambiguous_threshold:.2f}."
+        )
+
+    def _adjust_voice_listening_sensitivity(self, *, increase: bool) -> str:
+        if increase:
+            return self._adjust_voice_command_strictness(-0.03, label="Listening sensitivity increased")
+        return self._adjust_voice_command_strictness(0.03, label="Listening sensitivity decreased")
+
+    def _adjust_voice_response_delay(self, delta: float) -> str:
+        cfg = self.config.sound
+        current = float(getattr(cfg, "voice_response_delay_s", 0.25) or 0.25)
+        cfg.voice_response_delay_s = round(max(0.0, min(1.5, current + float(delta))), 2)
+        self._save_config_quietly()
+        return f"Voice response delay is now {cfg.voice_response_delay_s:.2f} seconds."
+
+    def _adjust_voice_silence_threshold(self, delta: float) -> str:
+        cfg = self.config.sound
+        current = float(getattr(cfg, "voice_operator_silence_hold_s", 0.45) or 0.45)
+        cfg.voice_operator_silence_hold_s = round(max(0.0, min(1.8, current + float(delta))), 2)
+        self._save_config_quietly()
+        return f"Operator silence hold is now {cfg.voice_operator_silence_hold_s:.2f} seconds."
+
+    def _set_voice_tracking_priority(self, *, tracking_first: bool) -> str:
+        cfg = self.config.sound
+        cfg.voice_auto_resume_tracking = bool(tracking_first)
+        self._save_config_quietly()
+        if tracking_first:
+            return "Tracking priority increased. I will auto-resume guarding mode after the voice timeout unless you interrupt me."
+        return "Operator priority increased. I will stay paused until you explicitly tell me to resume guarding mode."
+
+    def _set_voice_talk_less_mode(self) -> str:
+        self.config.sound.voice_brief_responses = True
+        self.config.ai_assistant.auto_speak_responses = False
+        checkbox = self.__dict__.get("_chk_ai_auto_speak", None)
+        if checkbox is not None:
+            checkbox.blockSignals(True)
+            checkbox.setChecked(False)
+            checkbox.blockSignals(False)
+        self._save_config_quietly()
+        return "Understood. I will keep replies shorter and stop automatic assistant speech unless you ask for it."
+
+    def _clear_voice_command_clarification(self) -> None:
+        self._voice_protocol_pending_command_clarification = ""
+        self._voice_protocol_pending_command_heard_text = ""
+        self._voice_protocol_pending_command_confidence = -1.0
+        self._voice_protocol_pending_response_token = int(getattr(self, "_voice_protocol_pending_response_token", 0) or 0) + 1
+
+    def _clear_voice_connect_confirmation(self) -> None:
+        self._voice_protocol_pending_connect_confirmation = False
+        self._voice_protocol_pending_response_token = int(getattr(self, "_voice_protocol_pending_response_token", 0) or 0) + 1
+
+    def _arm_voice_pending_response_timeout(self, *, kind: str, heard_text: str, timeout_s: float) -> None:
+        self._voice_protocol_pending_response_token = int(getattr(self, "_voice_protocol_pending_response_token", 0) or 0) + 1
+        token = int(self._voice_protocol_pending_response_token)
+        safe_kind = str(kind or "").strip().lower()
+        safe_heard_text = re.sub(r"\s+", " ", str(heard_text or "").strip())
+        delay_ms = max(1000, int(max(1.0, float(timeout_s or 0.0)) * 1000))
+
+        def _expire() -> None:
+            if token != int(getattr(self, "_voice_protocol_pending_response_token", 0) or 0):
+                return
+
+            if safe_kind == "command_clarification":
+                pending_command = str(getattr(self, "_voice_protocol_pending_command_clarification", "") or "").strip().lower()
+                if not pending_command:
+                    return
+                heard = str(
+                    getattr(self, "_voice_protocol_pending_command_heard_text", safe_heard_text or pending_command)
+                    or safe_heard_text
+                    or pending_command
+                )
+                self._clear_voice_command_clarification()
+                self._set_operator_task_status(heard, "rejected", "No clarification reply received before timeout.")
+                response = f"No confirmation received. I did not run {heard}."
+            elif safe_kind == "connect_confirmation":
+                if not bool(getattr(self, "_voice_protocol_pending_connect_confirmation", False)):
+                    return
+                self._clear_voice_connect_confirmation()
+                self._set_operator_task_status(
+                    safe_heard_text or "connect Smart Sentry boards",
+                    "rejected",
+                    "No connection confirmation reply received before timeout.",
+                )
+                response = "No confirmation received. I did not connect the Smart Sentry boards."
+            else:
+                return
+
+            self._voice_interaction_active_until_s = 0.0
+            self._set_voice_protocol_scenario("post_conversation")
+            self._log(f"Voice protocol: {safe_kind} timed out")
+            self._speak_after_operator_quiet(response, interrupt=False, minimum_quiet_s=1.1)
+
+        QTimer.singleShot(delay_ms, _expire)
+
+    def _voice_command_is_low_signal_followup(self, command: str) -> bool:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return True
+        if "[unk]" in normalized or "<unk>" in normalized:
+            return True
+        exact_phrases = {
+            "yes",
+            "no",
+            "ok",
+            "okay",
+            "cancel",
+            "cancel that",
+            "never mind",
+            "nevermind",
+            "not now",
+            "do it",
+            "you do it",
+            "what do",
+            "what now",
+            "less",
+            "more",
+            "change",
+            "the last",
+            "that one",
+            "this one",
+            "board lion",
+        }
+        return normalized in exact_phrases
+
+    def _voice_command_can_replace_pending_prompt(self, command: str) -> bool:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized or self._voice_command_is_low_signal_followup(normalized):
+            return False
+        if normalized in {"say it again", "say that again", "repeat that", "repeat it", "not that", "wrong"}:
+            return False
+        token_count = len([token for token in normalized.split(" ") if token])
+        if self._voice_command_looks_actionable(normalized):
+            if token_count >= 3:
+                return True
+            return normalized in {
+                "go home",
+                "go rest",
+                "talk less",
+                "check status",
+                "run diagnostics",
+                "be more strict",
+                "be less strict",
+            }
+        return False
+
+    def _voice_prompt_can_queue_ai(self, prompt_text: str, *, explicit: bool) -> bool:
+        normalized = re.sub(r"\s+", " ", str(prompt_text or "").strip().lower())
+        if not normalized or self._voice_command_is_low_signal_followup(normalized):
+            return False
+        if self._voice_prompt_requests_analysis(normalized):
+            return True
+        if any(token in normalized for token in ("joke", "personality", "who are you", "help", "explain")):
+            return True
+        token_count = len([token for token in normalized.split(" ") if token])
+        if explicit:
+            return token_count >= 2
+        scenario = str(getattr(self, "_voice_protocol_scenario", "idle") or "idle").strip().lower()
+        return scenario == "task_intake" and token_count >= 3
+
+    def _arm_enable_sentry_after_connect(self, reason: str = "") -> None:
+        self._deferred_enable_sentry_after_connect = True
+        self._deferred_enable_sentry_reason = str(reason or "").strip()
+
+    def _clear_enable_sentry_after_connect(self) -> None:
+        self._deferred_enable_sentry_after_connect = False
+        self._deferred_enable_sentry_reason = ""
+
+    def _voice_command_confidence(self) -> Optional[float]:
+        value = float(getattr(self, "_voice_last_command_confidence", -1.0) or -1.0)
+        if value < 0.0:
+            return None
+        return max(0.0, min(1.0, value))
+
+    def _voice_command_looks_actionable(self, command: str) -> bool:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return False
+        cue = self._assistant_cue_name()
+        if cue and cue in normalized:
+            return True
+        actionable_tokens = (
+            "yes",
+            "no",
+            "cancel",
+            "repeat",
+            "again",
+            "connect",
+            "disconnect",
+            "enable",
+            "disable",
+            "start",
+            "stop",
+            "pause",
+            "resume",
+            "guard",
+            "guarding",
+            "tracking",
+            "autotracking",
+            "board",
+            "boards",
+            "com",
+            "port",
+            "serial",
+            "home",
+            "rest",
+            "safety",
+            "fire",
+            "brightness",
+            "speed",
+            "profile",
+            "model",
+            "confidence",
+            "face",
+            "theme",
+            "diagnostic",
+            "diagnostics",
+            "status",
+            "report",
+            "analysis",
+            "analyze",
+            "joke",
+            "personality",
+            "strict",
+            "sensitivity",
+            "delay",
+            "silence",
+            "priority",
+            "queue",
+            "task",
+        )
+        if any(token in normalized for token in actionable_tokens):
+            return True
+        if self._voice_interaction_window_active() and len([token for token in normalized.split(" ") if token]) >= 4:
+            return True
+        return False
+
+    def _voice_command_should_ignore_low_confidence_noise(self, command: str) -> bool:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return True
+        if bool(getattr(self, "_voice_protocol_pending_command_clarification", "")):
+            return False
+        if bool(getattr(self, "_voice_protocol_pending_connect_confirmation", False)):
+            return False
+        confidence = self._voice_command_confidence()
+        if confidence is None or confidence >= 0.45:
+            return False
+        return not self._voice_command_looks_actionable(normalized)
+
+    def _voice_command_is_ambiguous(self, command: str) -> bool:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return False
+        ambiguous_commands = {
+            "start",
+            "stop",
+            "pause",
+            "resume",
+            "enable",
+            "disable",
+            "connect",
+            "disconnect",
+            "cancel",
+            "fire",
+            "home",
+            "rest",
+        }
+        if normalized in ambiguous_commands:
+            return True
+        token_count = len([token for token in normalized.split(" ") if token])
+        if token_count <= 2 and normalized in {"start tracking", "stop tracking", "enable sentry", "disable sentry"}:
+            return True
+        return False
+
+    def _voice_command_should_request_clarification(self, command: str) -> bool:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return False
+        if normalized == self._assistant_cue_name():
+            return False
+        if bool(getattr(self, "_voice_protocol_pending_command_clarification", "")):
+            return False
+        confidence = self._voice_command_confidence()
+        if confidence is not None and confidence < self._voice_command_confidence_threshold():
+            return self._voice_command_looks_actionable(normalized)
+        if self._voice_command_is_ambiguous(normalized):
+            if confidence is None:
+                return True
+            return confidence < self._voice_command_ambiguous_threshold()
+        return False
+
+    def _request_voice_command_clarification(self, command: str) -> None:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return
+        self._clear_voice_next_action_prompt()
+        self._start_voice_interaction_window(reason="command-clarification", hold_s=12.0)
+        self._voice_protocol_hold_paused = True
+        self._voice_protocol_pending_command_clarification = normalized
+        self._voice_protocol_pending_command_heard_text = normalized
+        confidence = self._voice_command_confidence()
+        self._voice_protocol_pending_command_confidence = -1.0 if confidence is None else confidence
+        phrase = (
+            f"I think I heard {normalized}. "
+            "Say yes if that is correct, say it again, or say cancel."
+        )
+        quiet_delay_s = self._voice_operator_silence_delay_s(minimum_quiet_s=1.1)
+        self._speak_after_operator_quiet(phrase, interrupt=False, minimum_quiet_s=1.1)
+        phrase_len_s = self._estimate_human_phrase_duration_s(phrase)
+        self._prime_voice_listener_followup_window(
+            reason="command-clarification",
+            delay_s=quiet_delay_s + phrase_len_s + 0.35,
+            hold_s=max(4.0, 12.0 - phrase_len_s - 0.35),
+        )
+        self._arm_voice_pending_response_timeout(
+            kind="command_clarification",
+            heard_text=normalized,
+            timeout_s=14.0,
+        )
+        self._log(
+            "Voice protocol: command clarification requested "
+            f"(heard='{normalized}' confidence={confidence if confidence is not None else 'n/a'})"
+        )
+
+    def _resolve_voice_command_clarification(self, command: str) -> Optional[str]:
+        pending_command = str(getattr(self, "_voice_protocol_pending_command_clarification", "") or "").strip().lower()
+        if not pending_command:
+            return command
+
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return None
+
+        affirmative = (
+            normalized in {"yes", "y", "yeah", "yep", "ok", "okay", "confirm", "confirmed"}
+            or "go ahead" in normalized
+            or "do it" in normalized
+            or "that is right" in normalized
+            or "that's right" in normalized
+        )
+        negative = (
+            normalized in {"no", "n"}
+            or "say it again" in normalized
+            or "say that again" in normalized
+            or "repeat that" in normalized
+            or "repeat it" in normalized
+            or "not that" in normalized
+            or "wrong" in normalized
+        )
+        cancel = (
+            normalized == "cancel"
+            or "cancel that" in normalized
+            or "cancel the command" in normalized
+            or "never mind" in normalized
+            or "nevermind" in normalized
+        )
+
+        if affirmative:
+            resolved = pending_command
+            self._clear_voice_command_clarification()
+            self._log(f"Voice protocol: command clarification confirmed -> {resolved}")
+            return resolved
+
+        if cancel:
+            heard_text = str(getattr(self, "_voice_protocol_pending_command_heard_text", pending_command) or pending_command)
+            self._clear_voice_command_clarification()
+            response = f"Cancelled. I will not run {heard_text}. What do you want me to do next?"
+            self._set_operator_task_status(heard_text, "rejected", "Cancelled after voice clarification.")
+            self._speak_after_operator_quiet(response, interrupt=False)
+            self._schedule_voice_next_action_prompt(
+                delay_s=max(3.6, self._estimate_human_phrase_duration_s(response) + 1.0)
+            )
+            return None
+
+        if negative:
+            heard_text = str(getattr(self, "_voice_protocol_pending_command_heard_text", pending_command) or pending_command)
+            self._clear_voice_command_clarification()
+            self._start_voice_interaction_window(reason="command-clarification-repeat", hold_s=12.0)
+            repeat_phrase = f"Understood. I will not run {heard_text}. Please say the command again."
+            quiet_delay_s = self._voice_operator_silence_delay_s()
+            self._speak_after_operator_quiet(repeat_phrase, interrupt=False)
+            repeat_len_s = self._estimate_human_phrase_duration_s(repeat_phrase)
+            self._prime_voice_listener_followup_window(
+                reason="command-clarification-repeat",
+                delay_s=quiet_delay_s + repeat_len_s + 0.35,
+                hold_s=max(4.0, 12.0 - repeat_len_s - 0.35),
+            )
+            return None
+
+        if self._voice_command_can_replace_pending_prompt(normalized):
+            heard_text = str(getattr(self, "_voice_protocol_pending_command_heard_text", pending_command) or pending_command)
+            self._clear_voice_command_clarification()
+            self._set_operator_task_status(heard_text, "rejected", f"Superseded by new voice command: {normalized}.")
+            self._log(f"Voice protocol: command clarification superseded by new command -> {normalized}")
+            return normalized
+
+        if self._voice_command_is_low_signal_followup(normalized):
+            self._log(f"Voice protocol: ignored low-signal clarification reply -> {normalized}")
+            return None
+
+        self._start_voice_interaction_window(reason="command-clarification-repeat", hold_s=10.0)
+        reminder = "Please say yes, say the command again, or say cancel."
+        quiet_delay_s = self._voice_operator_silence_delay_s(minimum_quiet_s=1.1)
+        self._speak_after_operator_quiet(reminder, interrupt=False, minimum_quiet_s=1.1)
+        reminder_len_s = self._estimate_human_phrase_duration_s(reminder)
+        self._prime_voice_listener_followup_window(
+            reason="command-clarification-repeat",
+            delay_s=quiet_delay_s + reminder_len_s + 0.35,
+            hold_s=max(4.0, 10.0 - reminder_len_s - 0.35),
+        )
+        self._arm_voice_pending_response_timeout(
+            kind="command_clarification",
+            heard_text=str(getattr(self, "_voice_protocol_pending_command_heard_text", pending_command) or pending_command),
+            timeout_s=14.0,
+        )
+        return None
+
+    def _cancel_operator_tasks(self, *, cancel_all: bool) -> str:
+        removed_labels: List[str] = []
+
+        if bool(getattr(self, "_voice_protocol_pending_command_clarification", "")):
+            removed_labels.append(
+                str(getattr(self, "_voice_protocol_pending_command_heard_text", "pending command clarification") or "pending command clarification")
+            )
+            self._clear_voice_command_clarification()
+
+        if bool(getattr(self, "_voice_protocol_pending_connect_confirmation", False)):
+            self._clear_voice_connect_confirmation()
+            removed_labels.append("pending board connection request")
+
+        self._clear_voice_next_action_prompt()
+
+        if cancel_all:
+            while self._assistant_task_queue:
+                task = dict(self._assistant_task_queue.pop())
+                label = str(task.get("label") or "queued assistant request")
+                removed_labels.append(label)
+                self._set_operator_task_status(label, "rejected", "Cancelled by operator before execution.")
+        elif self._assistant_task_queue:
+            task = dict(self._assistant_task_queue.pop())
+            label = str(task.get("label") or "queued assistant request")
+            removed_labels.append(label)
+            self._set_operator_task_status(label, "rejected", "Cancelled by operator before execution.")
+
+        if removed_labels:
+            if cancel_all:
+                cleared_text = ", ".join(removed_labels[:3])
+                if len(removed_labels) > 3:
+                    cleared_text += f", and {len(removed_labels) - 3} more"
+                response = f"Cleared {len(removed_labels)} pending task{'s' if len(removed_labels) != 1 else ''}: {cleared_text}."
+            else:
+                response = f"Cancelled the last queued task: {removed_labels[-1]}."
+        else:
+            response = "There were no queued tasks to cancel."
+
+        running_parts: List[str] = []
+        if self._connection_busy:
+            running_label = self._connection_task_label or "the current connection task"
+            running_parts.append(f"{running_label.capitalize()} is already running and was not interrupted")
+        if self._assistant_busy:
+            active_label = str((self._assistant_active_task or {}).get("label") or "the current assistant request")
+            running_parts.append(f"{active_label} is already running and was not interrupted")
+        if running_parts:
+            response += " " + ". ".join(running_parts) + "."
+        response += " What do you want me to do next?"
+        return response
+
     def _voice_task_status_report(self) -> str:
         parts: List[str] = []
 
@@ -19051,6 +20239,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 parts.append(f"I am working on {active_label}. No other assistant requests are queued.")
         elif self._assistant_task_queue:
             parts.append(self._assistant_queue_summary())
+
+        paused_task = dict(getattr(self, "_paused_voice_task", {}) or {})
+        if paused_task:
+            paused_label = str(paused_task.get("label") or "paused task")
+            parts.append(f"Paused task available: {paused_label}. Say resume last task to continue it.")
 
         if not parts:
             parts.append("No background task is running right now.")
@@ -19097,7 +20290,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         task_kind = str(task.get("task_kind") or "prompt")
         prompt = str(task.get("prompt") or "")
         label = str(task.get("label") or self._assistant_task_label(task_kind, prompt))
-        self._assistant_active_task = dict(task)
+        task_record = dict(task)
+        self._assistant_active_task = dict(task_record)
         self._set_operator_task_status(label, "running", "Running in the background.")
         self._on_ai_assistant_settings_changed()
         self._focus_ai_workspace(task_kind)
@@ -19125,6 +20319,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             else:
                 reply = service.answer_operator_prompt(prompt, snapshot, model=model, include_logs=include_logs)
             self.assistant_reply_ready.emit({
+                "task": task_record,
                 "task_kind": task_kind,
                 "prompt": prompt,
                 "reply": reply,
@@ -19220,6 +20415,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "toggle_shortcuts",
                 "toggle_human_voice",
                 "toggle_ai_auto_speak",
+                "toggle_sentry",
                 "set_human_voice_style",
                 "toggle_camera",
                 "connect_link",
@@ -19511,6 +20707,31 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._chk_ai_auto_speak.setChecked(enabled)
                 self._on_ai_assistant_settings_changed()
                 notes.append(f"Assistant auto-speak {'enabled' if enabled else 'disabled'}." )
+            elif action_type == "toggle_sentry" and hasattr(self, "_chk_enable"):
+                enabled = bool(payload.get("enabled", True))
+                already_enabled = bool(self._chk_enable.isChecked())
+                if enabled:
+                    if already_enabled:
+                        self._clear_enable_sentry_after_connect()
+                        notes.append("Smart Sentry was already enabled.")
+                    elif self._comm.is_connected():
+                        self._clear_enable_sentry_after_connect()
+                        self._chk_enable.setChecked(True)
+                        notes.append("Smart Sentry enabled.")
+                    else:
+                        self._arm_enable_sentry_after_connect("assistant action")
+                        if self._connection_busy:
+                            notes.append("Smart Sentry will enable after the current board connection completes.")
+                        else:
+                            self._toggle_connection()
+                            notes.append("Controller link connection requested before enabling Smart Sentry.")
+                else:
+                    self._clear_enable_sentry_after_connect()
+                    if already_enabled:
+                        self._chk_enable.setChecked(False)
+                        notes.append("Smart Sentry disabled.")
+                    else:
+                        notes.append("Smart Sentry was already disabled.")
             elif action_type == "set_human_voice_style":
                 style_key = str(payload.get("style_key", "neutral") or "neutral")
                 self._apply_human_voice_style(style_key)
@@ -19616,8 +20837,38 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         return "\n".join(lines).strip()
 
     def _on_ai_assistant_reply_ready(self, payload: object) -> None:
-        completed_task = dict(getattr(self, "_assistant_active_task", {}) or {})
+        current_task = dict(getattr(self, "_assistant_active_task", {}) or {})
+        payload_task = dict(payload.get("task") or {}) if isinstance(payload, dict) else {}
+        completed_task = dict(payload_task or current_task)
         completed_label = str(completed_task.get("label") or "assistant request")
+        if not isinstance(payload, dict):
+            self._assistant_active_task = None
+            self._assistant_set_busy(False)
+            self._ai_current_state = "idle"
+            for _attr in ("_ai_orb_hero", "_ai_orb_video"):
+                _orb = getattr(self, _attr, None)
+                if _orb is not None:
+                    _orb.set_state("idle")
+            self._set_operator_task_status(completed_label, "failed", "Assistant reply payload was invalid.")
+            self._append_ai_output("Assistant reply payload was invalid.")
+            self._start_next_queued_ai_task()
+            return
+        completed_task_id = int(completed_task.get("id", 0) or 0)
+        current_task_id = int(current_task.get("id", 0) or 0)
+        if completed_task_id > 0 and completed_task_id in self._assistant_cancelled_task_ids:
+            self._assistant_cancelled_task_ids.discard(completed_task_id)
+            self._log(f"AI assistant reply ignored for cancelled task: {completed_label}")
+            if current_task_id == completed_task_id:
+                self._assistant_active_task = None
+                self._assistant_set_busy(False)
+            if not self._assistant_busy and not self._assistant_active_task:
+                self._start_next_queued_ai_task()
+            return
+        if current_task_id > 0 and completed_task_id > 0 and current_task_id != completed_task_id:
+            self._log(
+                f"AI assistant reply ignored for stale task {completed_task_id}; active task is {current_task_id}"
+            )
+            return
         self._assistant_active_task = None
         self._assistant_set_busy(False)
         # Return orbs to idle (will be overridden by voice state if speaking)
@@ -19626,11 +20877,6 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             _orb = getattr(self, _attr, None)
             if _orb is not None:
                 _orb.set_state("idle")
-        if not isinstance(payload, dict):
-            self._set_operator_task_status(completed_label, "failed", "Assistant reply payload was invalid.")
-            self._append_ai_output("Assistant reply payload was invalid.")
-            self._start_next_queued_ai_task()
-            return
         task_kind = str(payload.get("task_kind") or "prompt")
         prompt_text = str(payload.get("prompt") or "").strip()
         snapshot = dict(payload.get("snapshot") or {})
@@ -19837,23 +21083,27 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _assistant_spoken_reply(self, reply: AssistantReply, *, task_kind: str, action_notes: List[str]) -> str:
         spoken_parts: List[str] = []
+        brief_mode = self._voice_brief_responses_enabled()
         if task_kind == "analysis":
             spoken_parts.append("Analysis complete.")
             if reply.findings:
-                spoken_parts.append("Top finding.")
                 spoken_parts.append(self._spoken_sentence(reply.findings[0].detail, assistant_output=True))
-                if len(reply.findings) > 1:
+                if not brief_mode and len(reply.findings) > 1:
                     spoken_parts.append("Also.")
                     spoken_parts.append(self._spoken_sentence(reply.findings[1].detail, assistant_output=True))
             if reply.recommendations:
-                spoken_parts.append("Next step.")
+                if not brief_mode:
+                    spoken_parts.append("Next step.")
                 spoken_parts.append(self._spoken_sentence(reply.recommendations[0], assistant_output=True))
-            spoken_parts.append("End of analysys report.")
-            spoken_parts.append("Do you want me to resume guarding mode, or inspect something else?")
+            if brief_mode:
+                spoken_parts.append("Say resume guarding mode or ask for more detail.")
+            else:
+                spoken_parts.append("End of analysys report.")
+                spoken_parts.append("Do you want me to resume guarding mode, or inspect something else?")
         elif task_kind == "recommendations":
             spoken_parts.append("Recommendations ready.")
             if reply.recommendations:
-                for recommendation in reply.recommendations[:2]:
+                for recommendation in reply.recommendations[: (1 if brief_mode else 2)]:
                     spoken_parts.append(self._spoken_sentence(recommendation, assistant_output=True))
             elif reply.text:
                 spoken_parts.append(self._spoken_sentence(reply.text, assistant_output=True))
@@ -19869,7 +21119,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         compact = " ".join(part for part in spoken_parts if part).strip()
         compact = self._prepare_human_speech_text(compact, assistant_output=True)
-        return compact[:520].strip()
+        return compact[:360 if brief_mode else 520].strip()
 
     def _assistant_speech_summary(self, text: str, *, task_kind: str = "prompt") -> str:
         raw = self._prepare_human_speech_text(text, assistant_output=True)
@@ -21837,7 +23087,15 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._burst_interval_ms = max(10, int(interval_ms))
         self._burst_phase_on = True
         self._queue_comm_task("send_command", self._burst_pan, self._burst_tilt, fire=1)
-        self._burst_timer.start(self._burst_interval_ms)
+        self._burst_timer.start(self._fire_burst_phase_duration_ms())
+
+    def _fire_burst_phase_duration_ms(self) -> int:
+        interval_ms = max(10, int(self._burst_interval_ms))
+        if self._burst_phase_on and bool(getattr(self.config.engagement, "trigger_mode_bb", False)):
+            # Projectile trigger-servo paths need a longer latched fire request
+            # than the generic burst gap or the bridge can release before motion starts.
+            return max(interval_ms, MANUAL_TRIGGER_SERVO_LATCH_MS)
+        return interval_ms
 
     def _advance_fire_burst(self) -> None:
         if self._burst_remaining <= 0:
@@ -21851,12 +23109,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._stop_fire_burst(send_release=False)
                 return
             self._burst_phase_on = False
-            self._burst_timer.start(self._burst_interval_ms)
+            self._burst_timer.start(self._fire_burst_phase_duration_ms())
             return
 
         self._burst_phase_on = True
         self._queue_comm_task("send_command", self._burst_pan, self._burst_tilt, fire=1)
-        self._burst_timer.start(self._burst_interval_ms)
+        self._burst_timer.start(self._fire_burst_phase_duration_ms())
 
     def _stop_fire_burst(self, *, send_release: bool) -> None:
         self._burst_timer.stop()
@@ -22388,6 +23646,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         runtime = getattr(self, "_voice_runtime", None)
         if runtime is not None:
             return bool(getattr(runtime, "neural_tts_ready", False))
+        if self._neural_voice_backend_available():
+            return True
         model_path = self._resolve_voice_runtime_path(
             getattr(self.config.sound, "kokoro_model_path", "models/kokoro/kokoro-v1.0.onnx"),
             "models/kokoro/kokoro-v1.0.onnx",
@@ -22439,9 +23699,72 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._kokoro_voice_names_cache = list(voice_names)
         return voice_names
 
+    @staticmethod
+    def _is_kokoro_voice_name(voice_name: str) -> bool:
+        voice_id = str(voice_name or "").strip()
+        voice_prefix, separator, raw_name = voice_id.partition("_")
+        return bool(separator and raw_name and voice_prefix.lower() in KOKORO_VOICE_PREFIX_LABELS)
+
+    @staticmethod
+    def _is_neural_voice_name(voice_name: str) -> bool:
+        voice_id = str(voice_name or "").strip()
+        return bool(voice_id.endswith("Neural") and re.match(r"^[a-z]{2,3}-[A-Z]{2}-", voice_id))
+
+    def _neural_voice_backend_available(self) -> bool:
+        runtime = getattr(self, "_voice_runtime", None)
+        if runtime is not None and (
+            bool(getattr(runtime, "_edge_tts", None))
+            or bool(getattr(runtime, "_neural_tts", None))
+        ):
+            return True
+        azure_key = str(os.environ.get("AZURE_SPEECH_KEY", "") or "").strip()
+        azure_region = str(os.environ.get("AZURE_SPEECH_REGION", "") or "").strip()
+        if azure_key and azure_region and _module_spec_available("azure.cognitiveservices.speech"):
+            return True
+        return _module_spec_available("edge_tts")
+
+    def _preferred_neural_tts_backend(self) -> str:
+        if _module_spec_available("edge_tts"):
+            return "edge"
+        azure_key = str(os.environ.get("AZURE_SPEECH_KEY", "") or "").strip()
+        azure_region = str(os.environ.get("AZURE_SPEECH_REGION", "") or "").strip()
+        if azure_key and azure_region and _module_spec_available("azure.cognitiveservices.speech"):
+            return "azure"
+        return "edge"
+
+    def _available_neural_voice_names(self) -> List[str]:
+        configured_names = [
+            str(getattr(self.config.sound, "human_voice_name", "") or "").strip(),
+            str(getattr(self.config.sound, "neural_tts_voice_name", "") or "").strip(),
+        ]
+        voice_names = [voice_name for voice_name in CURATED_NEURAL_VOICE_IDS if self._is_neural_voice_name(voice_name)]
+        for voice_name in configured_names:
+            if self._is_neural_voice_name(voice_name):
+                voice_names.append(voice_name)
+        if self._neural_voice_backend_available() or any(self._is_neural_voice_name(name) for name in configured_names):
+            return list(dict.fromkeys(voice_names))
+        return []
+
+    def _available_human_voice_names(self) -> List[str]:
+        voice_names = list(self._available_kokoro_voice_names())
+        voice_names.extend(self._available_neural_voice_names())
+        selected_voice = self._human_voice_name()
+        if selected_voice:
+            voice_names.append(selected_voice)
+        return [name for name in dict.fromkeys(voice_names) if str(name or "").strip()]
+
+    def _selected_human_voice_backend(self, voice_name: str = "") -> str:
+        selected_voice = str(voice_name or self._human_voice_name() or "").strip()
+        if self._is_neural_voice_name(selected_voice):
+            return self._preferred_neural_tts_backend()
+        return "kokoro"
+
     def _human_voice_name(self) -> str:
+        explicit_name = str(getattr(self.config.sound, "human_voice_name", "") or "").strip()
+        if self._is_kokoro_voice_name(explicit_name) or self._is_neural_voice_name(explicit_name):
+            return explicit_name
         explicit_name = str(getattr(self.config.sound, "kokoro_voice_name", "") or "").strip()
-        if explicit_name:
+        if self._is_kokoro_voice_name(explicit_name):
             return explicit_name
         profile = str(getattr(self.config.sound, "kokoro_voice_profile", "female_us") or "female_us").strip().lower()
         profile_map = {
@@ -22462,11 +23785,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         runtime = getattr(self, "_voice_runtime", None)
         if runtime is None:
             return "unavailable"
-        if bool(getattr(runtime, "_kokoro_engine", None)):
+        backend_name = str(getattr(runtime, "_active_speech_backend", "") or "").strip().lower()
+        if backend_name:
+            return backend_name
+        if bool(getattr(runtime, "_kokoro_tts", None)):
             return "kokoro"
-        if bool(getattr(runtime, "_azure_synth", None)):
+        if bool(getattr(runtime, "_neural_tts", None)):
             return "azure"
-        if bool(getattr(runtime, "_edge_voice", "")):
+        if bool(getattr(runtime, "_edge_tts", None)):
             return "edge"
         return "runtime-initialized"
 
@@ -22568,6 +23894,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 _orb.set_state(ai_state)
 
     def _refresh_human_voice_diagnostics(self) -> None:
+        backend_summary = self._human_voice_backend_summary().lower()
         if hasattr(self, "_lbl_human_voice_diag_backend"):
             self._lbl_human_voice_diag_backend.setText(f"Backend: {self._human_voice_backend_summary()}")
         engine = getattr(self, "_speech_engine", None)
@@ -22589,7 +23916,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 f"Speech state: {getattr(self, '_speech_state_label', 'waiting')} | Human voice {'ON' if getattr(self.config.sound, 'human_voice_enabled', False) else 'OFF'} | {route_mode}"
             )
         if hasattr(self, "_lbl_human_voice_diag_route"):
-            route_note = "Kokoro offline runtime uses generated WAV playback on the default output device"
+            if backend_summary == "edge":
+                route_note = "Edge neural runtime generates online speech and plays it through the default output device"
+            elif backend_summary == "azure":
+                route_note = "Azure neural runtime generates online speech and plays it through the default output device"
+            elif backend_summary == "kokoro":
+                route_note = "Kokoro offline runtime uses generated WAV playback on the default output device"
+            else:
+                route_note = "Voice route is waiting for a ready runtime speech backend"
             if self._buzzer_suppressed_for_human_voice():
                 route_note += " | Board buzzer is intentionally muted while human voice mode is enabled"
             self._lbl_human_voice_diag_route.setText(f"Route: {route_note}")
@@ -22704,6 +24038,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _stop_human_speech(self) -> None:
         self._kokoro_busy_until_s = 0.0
+        runtime = getattr(self, "_voice_runtime", None)
+        if runtime is not None:
+            try:
+                runtime.stop_speaking()
+            except Exception:
+                pass
         # Stop Kokoro TTS if available
         kokoro_tts = getattr(self, "_kokoro_tts", None)
         if kokoro_tts is not None:
@@ -23151,7 +24491,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         azure_key = str(os.environ.get("AZURE_SPEECH_KEY", "") or "").strip()
         azure_region = str(os.environ.get("AZURE_SPEECH_REGION", "") or "").strip()
-        neural_tts_enabled = True
+        neural_tts_enabled = self._neural_voice_backend_available()
 
         # Resolve Kokoro model paths from the same root strategy used by Vosk/audio assets.
         _kokoro_model = self._resolve_voice_runtime_path(
@@ -23171,21 +24511,33 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             "female_uk": str(getattr(self.config.sound, "kokoro_voice_female_uk", "bf_emma") or "bf_emma"),
             "male_uk": str(getattr(self.config.sound, "kokoro_voice_male_uk", "bm_george") or "bm_george"),
         }
-        _kokoro_voice_name = str(getattr(self.config.sound, "kokoro_voice_name", "") or "").strip()
-        if not _kokoro_voice_name:
+        _fallback_kokoro_voice_name = str(getattr(self.config.sound, "kokoro_voice_name", "") or "").strip()
+        if not _fallback_kokoro_voice_name:
             # Fall back to direct voice ID if the profile key is not in the legacy map
-            _kokoro_voice_name = _voice_map.get(_voice_profile, _voice_profile)
+            _fallback_kokoro_voice_name = _voice_map.get(_voice_profile, _voice_profile)
+        _selected_voice_name = str(self._human_voice_name() or "").strip()
+        _selected_voice_backend = self._selected_human_voice_backend(_selected_voice_name)
+        _kokoro_voice_name = _fallback_kokoro_voice_name
+        if self._is_kokoro_voice_name(_selected_voice_name):
+            _kokoro_voice_name = _selected_voice_name
+        _selected_neural_voice_name = str(getattr(self.config.sound, "neural_tts_voice_name", "en-US-JennyNeural") or "en-US-JennyNeural").strip()
+        if self._is_neural_voice_name(_selected_voice_name):
+            _selected_neural_voice_name = _selected_voice_name
+        elif not self._is_neural_voice_name(_selected_neural_voice_name):
+            _selected_neural_voice_name = "en-US-JennyNeural"
         _kokoro_speed = float(getattr(self.config.sound, "kokoro_speed", 1.0) or 1.0)
 
         if voice_input_device:
             self._log(f"[VOICE] using input device for wake-word recognition: {voice_input_device}")
         else:
             self._log("[VOICE] using default system microphone for wake-word recognition")
+        if _selected_voice_name:
+            self._log(f"[VOICE] Selected human voice route: {_selected_voice_backend} ({_selected_voice_name})")
 
         if Path(_kokoro_model).is_file() and Path(_kokoro_voices).is_file():
             self._log(f"[VOICE] Kokoro offline TTS ready — profile: {_voice_profile}, voice: {_kokoro_voice_name}")
-        elif azure_key and azure_region:
-            self._log("[VOICE] Kokoro model not found; Azure neural voice fallback is available")
+        elif neural_tts_enabled:
+            self._log("[VOICE] Kokoro model not found; online neural voice fallback is available")
         else:
             self._log("[VOICE] Kokoro model not found — fallback neural voice may require internet")
 
@@ -23201,6 +24553,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             on_transcript=self._on_voice_transcript_from_worker,
             on_log=self._handle_voice_runtime_log,
             neural_tts_enabled=neural_tts_enabled,
+            preferred_tts_backend=_selected_voice_backend,
+            preferred_voice_name=_selected_voice_name or (_kokoro_voice_name if _selected_voice_backend == "kokoro" else _selected_neural_voice_name),
             kokoro_model_path=str(_kokoro_model),
             kokoro_voices_path=str(_kokoro_voices),
             kokoro_voice_name=_kokoro_voice_name,
@@ -23208,7 +24562,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             device_name=voice_input_device,
             azure_speech_key=azure_key,
             azure_speech_region=azure_region,
-            azure_voice_name=str(getattr(self.config.sound, "neural_tts_voice_name", "en-US-JennyNeural") or "en-US-JennyNeural"),
+            azure_voice_name=_selected_neural_voice_name,
             commands_enabled=command_listener_enabled,
             enable_wake_word_coordination=True,
         )
@@ -23269,6 +24623,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if not cmd:
             return False
         control_tokens = (
+            "cancel",
             "connect",
             "disconnect",
             "resume",
@@ -23395,10 +24750,16 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._voice_heard_status_text = "listening"
             if text:
                 self._note_operator_voice_activity(now=timestamp)
-                if self._human_voice_busy():
-                    self._stop_human_speech()
+                self._clear_voice_next_action_prompt()
+                self._stop_human_speech()
                 self._on_ai_state_update("listening")
             if kind == "final":
+                confidence_value = payload.get("confidence", None)
+                try:
+                    self._voice_last_command_confidence = float(confidence_value)
+                except Exception:
+                    self._voice_last_command_confidence = -1.0
+                self._voice_last_partial_before_final_text = self._voice_heard_partial_text or text
                 self._record_runtime_conversation_event(
                     "operator",
                     text,
@@ -23454,6 +24815,37 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 return int(word_map[token])
         return None
 
+    def _voice_command_requests_connect_and_enable(self, command: str) -> bool:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return False
+        connect_requested = any(
+            token in normalized
+            for token in (
+                "connect smart sentry boards",
+                "connect the smart sentry boards",
+                "connect boards",
+                "connect the boards",
+                "connect to the com port",
+                "connect to com port",
+                "connect com port",
+                "connect serial",
+            )
+        )
+        enable_requested = any(
+            token in normalized
+            for token in (
+                "enable smart sentry",
+                "enable the smart sentry",
+                "enable sentry",
+                "enable tracking",
+                "start smart sentry",
+                "start tracking",
+                "resume smart sentry",
+            )
+        )
+        return connect_requested and enable_requested
+
     def _on_voice_command_recognized(self, text: str) -> None:
         command = str(text or "").strip().lower()
         if not command:
@@ -23474,6 +24866,38 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._engage_voice_wake_protocol(source="wake-word", hold_s=12.0)
             return
 
+        resolved_command = self._resolve_voice_command_clarification(command)
+        if resolved_command is None:
+            return
+        command = str(resolved_command or "").strip().lower()
+        if not command:
+            return
+
+        if self._voice_command_should_ignore_low_confidence_noise(command):
+            self._log(f"Voice protocol: ignored low-confidence non-command speech -> {command}")
+            self._set_operator_task_status(command, "rejected", "Ignored low-confidence non-command speech fragment.")
+            return
+
+        if re.search(r"\b(?:priority|override)\b", command):
+            interrupted = self._interrupt_current_operator_task(keep_for_resume=True)
+            command = re.sub(r"\b(?:priority|override)\b", " ", command)
+            command = re.sub(r"\s+", " ", command).strip()
+            if not command:
+                if interrupted:
+                    response = (
+                        "Priority acknowledged. I paused the current task. "
+                        "Tell me the command, or say resume last task later."
+                    )
+                else:
+                    response = "Priority acknowledged. Tell me the command."
+                self._speak_after_operator_quiet(response, interrupt=False)
+                return
+            self._log(f"Voice protocol: priority override executing -> {command}")
+
+        if self._voice_command_should_request_clarification(command):
+            self._request_voice_command_clarification(command)
+            return
+
         if not self._authorize_voice_control_request(command):
             return
 
@@ -23481,9 +24905,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._speak_after_operator_quiet(self._voice_task_status_report(), interrupt=False)
             return
 
+        if self._voice_command_requests_connect_and_enable(command):
+            self._arm_enable_sentry_after_connect("voice connect and enable request")
+
         protocol_event = self._handle_voice_protocol_command(command)
-        if protocol_event:
-            self._play_voice_event(protocol_event)
+        if protocol_event is not None:
+            if protocol_event:
+                self._play_voice_event(protocol_event)
             return
 
         if self._voice_interaction_window_active():
@@ -23497,7 +24925,21 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         spoken_confirmation = ""
         handled_summary = ""
 
-        if any(token in command for token in ("start tracking", "start", "track target", "enable sentry", "enable tracking", "enable smart sentry", "enable the smart sentry")):
+        if any(
+            token in command
+            for token in (
+                "start tracking",
+                "track target",
+                "enable sentry",
+                "enable tracking",
+                "enable smart sentry",
+                "enable the smart sentry",
+                "start smart sentry",
+                "resume smart sentry",
+                "resume tracking",
+                "resume guarding mode",
+            )
+        ):
             already_enabled = bool(hasattr(self, "_chk_enable") and bool(self._chk_enable.isChecked()))
             was_hold_paused = bool(getattr(self, "_voice_protocol_hold_paused", False))
             self._voice_protocol_hold_paused = False
@@ -23516,7 +24958,20 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 else:
                     self._speak_after_operator_quiet("Smart Sentry is already enabled.", interrupt=False)
                     handled_summary = "Smart Sentry was already enabled."
-        elif any(token in command for token in ("stop tracking", "stop", "disable sentry", "disable tracking", "pause", "disable smart sentry", "disable the smart sentry", "pause smart sentry")):
+        elif any(
+            token in command
+            for token in (
+                "stop tracking",
+                "disable sentry",
+                "disable tracking",
+                "disable smart sentry",
+                "disable the smart sentry",
+                "pause smart sentry",
+                "pause tracking",
+                "pause guarding mode",
+                "stop smart sentry",
+            )
+        ):
             already_disabled = not bool(hasattr(self, "_chk_enable") and bool(self._chk_enable.isChecked()))
             self._voice_protocol_hold_paused = True
             if hasattr(self, "_chk_enable") and not already_disabled:
@@ -23672,7 +25127,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._start_voice_interaction_window(reason="cue-command", hold_s=10.0)
                 # Strip the cue name itself before routing as a prompt
                 prompt_text = re.sub(re.escape(cue), "", cmd).strip().strip(",.:!?").strip()
-                if prompt_text:
+                if prompt_text and self._voice_prompt_can_queue_ai(prompt_text, explicit=True):
                     self._clear_voice_next_action_prompt()
                     ai_task_kind = "analysis" if self._voice_prompt_requests_analysis(prompt_text) else "prompt"
                     ai_label = self._assistant_task_label(ai_task_kind, prompt_text)
@@ -23684,22 +25139,27 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                         spoken_confirmation = f"I am still finishing {active_label}. I queued your {ai_label}. It is number {queue_pos} in line."
                     else:
                         spoken_confirmation = f"Received. I started your {ai_label} in the background."
+                elif prompt_text:
+                    self._log(f"Voice protocol: ignored low-signal cue follow-up -> {prompt_text}")
                 handled = True
                 acknowledge_event = ""
 
             # During an active voice-interaction window, route non-mapped speech to AI chat
             if not handled and self._voice_interaction_window_active() and cmd:
-                self._clear_voice_next_action_prompt()
-                ai_task_kind = "analysis" if self._voice_prompt_requests_analysis(cmd) else "prompt"
-                ai_label = self._assistant_task_label(ai_task_kind, cmd)
-                was_busy = bool(self._assistant_busy)
-                queue_pos = len(self._assistant_task_queue) + 1 if was_busy else 0
-                active_label = str((self._assistant_active_task or {}).get("label") or "the current request")
-                self._start_ai_background_task(ai_task_kind, cmd)
-                if was_busy:
-                    spoken_confirmation = f"I am still finishing {active_label}. I queued your {ai_label}. It is number {queue_pos} in line."
+                if self._voice_prompt_can_queue_ai(cmd, explicit=False):
+                    self._clear_voice_next_action_prompt()
+                    ai_task_kind = "analysis" if self._voice_prompt_requests_analysis(cmd) else "prompt"
+                    ai_label = self._assistant_task_label(ai_task_kind, cmd)
+                    was_busy = bool(self._assistant_busy)
+                    queue_pos = len(self._assistant_task_queue) + 1 if was_busy else 0
+                    active_label = str((self._assistant_active_task or {}).get("label") or "the current request")
+                    self._start_ai_background_task(ai_task_kind, cmd)
+                    if was_busy:
+                        spoken_confirmation = f"I am still finishing {active_label}. I queued your {ai_label}. It is number {queue_pos} in line."
+                    else:
+                        spoken_confirmation = f"Received. I started your {ai_label} in the background."
                 else:
-                    spoken_confirmation = f"Received. I started your {ai_label} in the background."
+                    self._log(f"Voice protocol: ignored non-meaningful follow-up speech -> {cmd}")
                 handled = True
                 acknowledge_event = ""
 
@@ -23708,12 +25168,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._speak_after_operator_quiet(spoken_confirmation, interrupt=False)
             if handled_summary:
                 self._set_operator_task_status(command, "completed", handled_summary)
+                self._remember_actionable_voice_command(command, handled_summary)
             if acknowledge_event:
                 self._play_voice_event(acknowledge_event)
         else:
-            self._set_operator_task_status(command, "rejected", "I could not match that request to an executable command yet.")
+            self._set_operator_task_status(command, "rejected", "That does not match a known command yet.")
             self._speak_after_operator_quiet(
-                "I heard the request, but I could not match it to an executable command yet.",
+                "That does not match a known command. Please repeat.",
                 interrupt=False,
             )
             self._play_voice_event("command_not_recognized")
@@ -24086,11 +25547,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         human_voice_volume = self._human_voice_volume_pct()
         kokoro_profile = str(getattr(self.config.sound, "kokoro_voice_profile", "female_us") or "female_us").strip().lower()
         kokoro_speed = self._kokoro_speed_value()
-        voice_names = [
-            name
-            for name in dict.fromkeys(self._available_kokoro_voice_names() + [self._human_voice_name()])
-            if str(name or "").strip()
-        ]
+        active_voice_backend = self._selected_human_voice_backend()
+        voice_names = self._available_human_voice_names()
         for attr_name in ("_chk_sound_enabled", "_btn_buzzer_qa"):
             if hasattr(self, attr_name):
                 widget = getattr(self, attr_name)
@@ -24150,13 +25608,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             profile_index = max(0, self._combo_kokoro_voice_profile.findData(kokoro_profile))
             self._combo_kokoro_voice_profile.blockSignals(True)
             self._combo_kokoro_voice_profile.setCurrentIndex(profile_index)
-            self._combo_kokoro_voice_profile.setEnabled(self._human_voice_supported())
+            self._combo_kokoro_voice_profile.setEnabled(self._human_voice_supported() and active_voice_backend == "kokoro")
             self._combo_kokoro_voice_profile.blockSignals(False)
         if hasattr(self, "_combo_human_voice"):
             self._combo_human_voice.blockSignals(True)
             self._combo_human_voice.clear()
             for voice_name in voice_names:
-                self._combo_human_voice.addItem(format_kokoro_voice_label(voice_name), voice_name)
+                self._combo_human_voice.addItem(format_human_voice_label(voice_name), voice_name)
             if voice_names:
                 voice_name = self._human_voice_name()
                 voice_index = max(0, self._combo_human_voice.findData(voice_name)) if voice_name else 0
@@ -24166,7 +25624,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if hasattr(self, "_spin_kokoro_speed"):
             self._spin_kokoro_speed.blockSignals(True)
             self._spin_kokoro_speed.setValue(float(kokoro_speed))
-            self._spin_kokoro_speed.setEnabled(self._human_voice_supported())
+            self._spin_kokoro_speed.setEnabled(self._human_voice_supported() and active_voice_backend == "kokoro")
             self._spin_kokoro_speed.blockSignals(False)
         if hasattr(self, "_slider_human_voice_rate"):
             self._slider_human_voice_rate.blockSignals(True)
@@ -24458,12 +25916,15 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         profile_key = str(self._combo_kokoro_voice_profile.itemData(index) or "female_us").strip().lower()
         if profile_key not in KOKORO_VOICE_PROFILE_LABELS:
             profile_key = "female_us"
+        selected_voice = self._human_voice_name()
         self.config.sound.kokoro_voice_profile = profile_key
         self.config.sound.kokoro_voice_name = ""
+        if not self._is_neural_voice_name(selected_voice):
+            self.config.sound.human_voice_name = ""
         self._sync_sound_widgets()
         self._save_config_quietly()
         self._init_voice_runtime()
-        self._queue_setting_change_announcement("Kokoro voice profile", KOKORO_VOICE_PROFILE_LABELS.get(profile_key, profile_key))
+        self._queue_setting_change_announcement("Offline voice profile", KOKORO_VOICE_PROFILE_LABELS.get(profile_key, profile_key))
 
     def _on_mute_buzzer_for_human_voice_changed(self, checked: bool) -> None:
         self.config.sound.mute_buzzer_when_human_voice_enabled = bool(checked)
@@ -24509,22 +25970,26 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if not hasattr(self, "_combo_human_voice"):
             return
         voice_name = str(self._combo_human_voice.itemData(index) or "").strip()
-        self.config.sound.kokoro_voice_name = voice_name
-        profile = str(getattr(self.config.sound, "kokoro_voice_profile", "female_us") or "female_us").strip().lower()
-        if profile == "female_us":
-            self.config.sound.kokoro_voice_female_us = voice_name
-        elif profile == "male_us":
-            self.config.sound.kokoro_voice_male_us = voice_name
-        elif profile == "female_uk":
-            self.config.sound.kokoro_voice_female_uk = voice_name
-        elif profile == "male_uk":
-            self.config.sound.kokoro_voice_male_uk = voice_name
         self.config.sound.human_voice_name = voice_name
+        if self._is_neural_voice_name(voice_name):
+            self.config.sound.neural_tts_voice_name = voice_name
+        if self._is_kokoro_voice_name(voice_name):
+            self.config.sound.kokoro_voice_name = voice_name
+            profile = str(getattr(self.config.sound, "kokoro_voice_profile", "female_us") or "female_us").strip().lower()
+            if profile == "female_us":
+                self.config.sound.kokoro_voice_female_us = voice_name
+            elif profile == "male_us":
+                self.config.sound.kokoro_voice_male_us = voice_name
+            elif profile == "female_uk":
+                self.config.sound.kokoro_voice_female_uk = voice_name
+            elif profile == "male_uk":
+                self.config.sound.kokoro_voice_male_uk = voice_name
         self._sync_sound_widgets()
         self._save_config_quietly()
         self._init_voice_runtime()
         if voice_name:
-            self._queue_setting_change_announcement("Kokoro voice", voice_name)
+            setting_label = "Online voice" if self._is_neural_voice_name(voice_name) else "Voice"
+            self._queue_setting_change_announcement(setting_label, format_human_voice_label(voice_name))
 
     def _on_kokoro_speed_changed(self, value: float) -> None:
         speed = float(max(0.5, min(2.0, float(value))))
@@ -24617,9 +26082,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         original_voice = self._human_voice_name()
         fallback_voice = str(getattr(self.config.sound, "kokoro_voice_female_us", "af_sarah") or "af_sarah")
         selected_voice = original_voice or fallback_voice
-        target_voices = list(dict.fromkeys(self._available_kokoro_voice_names() + [selected_voice])) if scan_all else ([selected_voice] if selected_voice else [])
+        target_voices = list(dict.fromkeys(self._available_human_voice_names() + [selected_voice])) if scan_all else ([selected_voice] if selected_voice else [])
         if not target_voices:
-            summary = "Validation: no Kokoro voices are available to test"
+            summary = "Validation: no runtime voices are available to test"
             if hasattr(self, "_lbl_human_voice_diag_validation"):
                 self._lbl_human_voice_diag_validation.setText(summary)
             self._log(summary)
@@ -24632,7 +26097,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._combo_human_voice.setCurrentIndex(index)
                 self._on_human_voice_name_changed(index)
             else:
-                self.config.sound.kokoro_voice_name = str(voice_name)
+                self.config.sound.human_voice_name = str(voice_name)
+                if self._is_neural_voice_name(voice_name):
+                    self.config.sound.neural_tts_voice_name = str(voice_name)
+                elif self._is_kokoro_voice_name(voice_name):
+                    self.config.sound.kokoro_voice_name = str(voice_name)
                 self._init_voice_runtime()
             started = self._speak_human_phrase(f"Voice validation. {voice_name}.")
             deadline = time.time() + (0.75 if scan_all else 0.55)
@@ -24659,7 +26128,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._combo_human_voice.setCurrentIndex(restore_index)
                 self._on_human_voice_name_changed(restore_index)
             else:
-                self.config.sound.kokoro_voice_name = original_voice
+                self.config.sound.human_voice_name = original_voice
+                if self._is_neural_voice_name(original_voice):
+                    self.config.sound.neural_tts_voice_name = original_voice
+                elif self._is_kokoro_voice_name(original_voice):
+                    self.config.sound.kokoro_voice_name = original_voice
                 self._init_voice_runtime()
         self._refresh_human_voice_diagnostics()
         mode_label = "all voices" if scan_all else "current voice"
@@ -24767,6 +26240,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
     def _show_frame(self, frame: np.ndarray) -> None:
         """Convert BGR frame to QPixmap and display."""
         try:
+            self._sync_home_screen_visibility(force_video=True)
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             rgb = np.ascontiguousarray(rgb)
             h, w, ch = rgb.shape
@@ -24776,6 +26250,24 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._video_label.set_frame(pixmap, w, h)
         except Exception as e:
             print(f"[SENTRY_V2] _show_frame error: {e}")
+
+    def _sync_home_screen_visibility(self, *, force_home: bool = False, force_video: bool = False) -> None:
+        stack = getattr(self, "_video_stack", None)
+        if stack is None:
+            return
+        has_visual_source = bool(str(getattr(self, "_local_source_kind", "") or "").strip()) or self._has_local_source()
+        if force_home:
+            show_home = True
+        elif force_video:
+            show_home = False
+        else:
+            show_home = (not has_visual_source) or (not self._show_video_feed)
+        target = getattr(self, "_home_screen", None) if show_home else getattr(self, "_video_container", None)
+        if target is None:
+            return
+        if stack.currentWidget() is not target:
+            stack.setCurrentWidget(target)
+        self._home_screen_active = bool(show_home)
 
     def _draw_no_fire_mask_draft(self, frame: np.ndarray) -> None:
         if not self._mask_draft_vertices:

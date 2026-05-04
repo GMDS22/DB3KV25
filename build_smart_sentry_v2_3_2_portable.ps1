@@ -61,6 +61,7 @@ function Remove-DirectoryRobust([string]$targetPath) {
 
 function Get-ActiveVersion {
     foreach ($versionName in @(
+        'SMART_SENTRY_V4_0_0_VERSION.txt',
         'SMART_SENTRY_V3_5_3_VERSION.txt',
         'SMART_SENTRY_V3_5_2_VERSION.txt',
         'SMART_SENTRY_V3_5_1_VERSION.txt',
@@ -83,6 +84,7 @@ function Get-ActiveVersion {
 
 function Get-ActiveVersionMetadata {
     foreach ($versionName in @(
+        'SMART_SENTRY_V4_0_0_VERSION.txt',
         'SMART_SENTRY_V3_5_3_VERSION.txt',
         'SMART_SENTRY_V3_5_2_VERSION.txt',
         'SMART_SENTRY_V3_5_1_VERSION.txt',
