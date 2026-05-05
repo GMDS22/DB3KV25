@@ -12,6 +12,11 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Callable, Optional
 
+from .voice_toggle_registry import (
+    iter_voice_toggle_command_patterns,
+    iter_voice_toggle_grammar_fragments,
+)
+
 
 class AsyncWavPlayer:
     """Background WAV playback so camera/tracking loops never block."""
@@ -89,22 +94,11 @@ class AsyncWavPlayer:
                                 self._on_log(f"[VOICE] Windows MP3 playback failed for {path} (play rc={play_rc})")
                             finally:
                                 mci_send_string(f"close {alias}", None, 0, None)
-                        else:
-                            self._on_log(f"[VOICE] Windows MP3 playback failed for {path} (open rc={open_rc})")
-                    except Exception as exc:
-                        self._on_log(f"[VOICE] Windows MP3 playback unavailable for {path}: {exc}")
-                # Fallback: convert mp3 bytes via ffmpeg if available
-                try:
-                    wav_tmp = path.replace(".mp3", "_tmp.wav")
-                    subprocess.run(
-                        ["ffmpeg", "-y", "-i", path, wav_tmp],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
-                    )
-                    path = wav_tmp
-                    ext = ".wav"
-                except Exception:
-                    self._on_log(f"[VOICE] No MP3 playback backend is available for {path}")
-                    return
+                        return False
+                    except Exception:
+                        pass
+                self._on_log(f"[VOICE] No MP3 playback backend is available for {path}")
+                return
             # WAV playback
             if ext == ".wav":
                 if sa is not None:
@@ -652,6 +646,7 @@ class VoskCommandListener:
         self._input_gain_max: float = 6.0
         self._recent_signature: dict[str, object] = {}
         self._recent_spoken_phrase_suppressions: list[dict[str, object]] = []
+        self._recent_output_input_block_until_s: float = 0.0
 
     def _latest_signature(self) -> dict[str, object]:
         return dict(self._recent_signature)
@@ -707,19 +702,37 @@ class VoskCommandListener:
         normalized = re.sub(r"[^a-z0-9 ]+", " ", str(text or "").strip().lower())
         return re.sub(r"\s+", " ", normalized).strip()
 
-    def suppress_recent_output_text(self, text: str, *, hold_s: float) -> None:
+    def suppress_recent_output_text(self, text: str, *, hold_s: float, block_s: Optional[float] = None) -> None:
         sanitized = self._sanitize_speech_text(text)
         if not sanitized:
             return
-        expires_at = time.time() + max(0.8, float(hold_s or 0.0))
+        now = time.time()
+        hold_duration_s = max(0.8, float(hold_s or 0.0))
+        expires_at = now + hold_duration_s
         self._recent_spoken_phrase_suppressions.append({
             "text": sanitized,
             "expires_at": expires_at,
         })
+        block_duration_s = float(block_s) if block_s is not None else max(0.8, min(4.5, hold_duration_s - 0.65))
+        if block_duration_s > 0.0:
+            suppress_until = now + block_duration_s
+            self._recent_output_input_block_until_s = max(
+                float(getattr(self, "_recent_output_input_block_until_s", 0.0) or 0.0),
+                suppress_until,
+            )
+            self._suppress_wake_only_until_s = max(
+                float(getattr(self, "_suppress_wake_only_until_s", 0.0) or 0.0),
+                suppress_until,
+            )
         self._prune_recent_output_suppressions(now=time.time())
 
     def clear_recent_output_suppression(self) -> None:
         self._recent_spoken_phrase_suppressions = []
+        self._recent_output_input_block_until_s = 0.0
+
+    def _recent_output_input_block_active(self, *, now: Optional[float] = None) -> bool:
+        current_time = float(now if now is not None else time.time())
+        return current_time <= float(getattr(self, "_recent_output_input_block_until_s", 0.0) or 0.0)
 
     def _prune_recent_output_suppressions(self, *, now: Optional[float] = None) -> None:
         current_time = float(now if now is not None else time.time())
@@ -786,6 +799,9 @@ class VoskCommandListener:
             "set personality hunter",
             "set personality stealth",
             "set personality playful",
+            "run the smart sentry",
+            "run smart sentry",
+            "run it",
             "connect boards and enable smart sentry",
             "connect the boards and enable smart sentry",
             "connect smart sentry boards and enable smart sentry",
@@ -840,6 +856,9 @@ class VoskCommandListener:
             "cancel all queued tasks",
             "clear the queue",
             "resume last task",
+            "status update",
+            "current request",
+            "last request",
             "do it again",
             "same but faster",
             "priority",
@@ -849,6 +868,7 @@ class VoskCommandListener:
             "queue status",
             "what are you doing",
             "what are you working on",
+            "what are you checking",
             "what is in queue",
             "whats in queue",
             "current task",
@@ -870,8 +890,19 @@ class VoskCommandListener:
             "wait there",
             "other task",
             "another task",
+            "another question",
+            "another command",
+            "ask another question",
+            "give another command",
             "continue conversation",
             "keep listening",
+            "i have a question",
+            "question for you",
+            "can i ask a question",
+            "let me ask a question",
+            "i want to ask a question",
+            "i need help",
+            "i need your help",
             "start tracking",
             "stop tracking",
             "enable smart sentry",
@@ -931,12 +962,26 @@ class VoskCommandListener:
             "analyze the current app behavior",
             "analyze current app behaviour",
             "analyze the current app behaviour",
+            "diagnose",
+            "what's wrong",
+            "whats wrong",
+            "what's wrong with face detection",
+            "whats wrong with face detection",
+            "why is face detection not loading",
+            "why is face detection not working",
+            "why is face recognition not loading",
+            "why is face recognition not working",
+            "analyze why face detection is not loading",
+            "analyze why face recognition is not loading",
+            "tell me why face detection is not loading",
+            "tell me why face recognition is not loading",
             "status report",
             "system report",
             "check status",
             "run diagnostics",
             "connect",
             "disconnect",
+            *iter_voice_toggle_grammar_fragments(),
                 ]
                 if str(fragment or "").strip()
             )
@@ -1004,6 +1049,81 @@ class VoskCommandListener:
             return best_match
         return ""
 
+    def _looks_meaningful_followup_text(self, sanitized: str) -> bool:
+        normalized = re.sub(r"\s+", " ", str(sanitized or "").strip().lower())
+        if not normalized:
+            return False
+        known_fragments = set(self._command_grammar_fragments())
+        if normalized in known_fragments:
+            return True
+        if self._fuzzy_command_fragment_match(normalized):
+            return True
+
+        tokens = [tok for tok in re.findall(r"[a-z0-9]+", normalized) if tok]
+        token_count = len(tokens)
+        if token_count < 2:
+            return False
+
+        generic_question_prefixes = (
+            "why ",
+            "how ",
+            "what ",
+            "when ",
+            "where ",
+            "which ",
+            "who ",
+        )
+        if normalized.startswith(generic_question_prefixes) and token_count >= 4:
+            return True
+
+        directed_prefixes = (
+            "tell me ",
+            "explain ",
+            "look at ",
+            "check ",
+            "analyze ",
+            "analyse ",
+            "diagnose ",
+            "can you analyze ",
+            "can you explain ",
+            "can you check ",
+            "can you tell me ",
+            "could you analyze ",
+            "could you explain ",
+            "could you check ",
+            "could you tell me ",
+            "would you analyze ",
+            "would you explain ",
+            "would you check ",
+            "would you tell me ",
+        )
+        if normalized.startswith(directed_prefixes) and token_count >= 3:
+            return True
+
+        runtime_tokens = (
+            "current app",
+            "current system",
+            "runtime",
+            "face detection",
+            "face recognition",
+            "not loading",
+            "not working",
+            "what happened",
+            "problem",
+            "issue",
+            "tracking",
+            "camera",
+        )
+        if token_count >= 3 and any(token in normalized for token in runtime_tokens):
+            return True
+
+        intent_patterns = (
+            r"\b(?:connect|disconnect|enable|disable|resume|pause|start|stop|open|close|run|check|set|change|switch|load|use|increase|decrease|go)\b.*\b(?:smart\s+sentry|boards?|com|port|serial|camera|tracking|guard(?:ing)?\s*mode|face|recognition|human\s+voice|assistant\s+auto\s+speak|shortcuts?|voice\s+style|profile|model|brightness|speed|confidence|theme|home|rest)\b",
+            r"\b(?:analy(?:ze|sis)|analyse|diagnos(?:e|is|tic)|explain|look at|check)\b.*\b(?:app|runtime|system|face|recognition|tracking|camera|behavior|behaviour|issue|problem|status)\b",
+            r"\b(?:tell me|show me)\b.*\b(?:status|runtime|current\s+app|current\s+system|face\s+detection|face\s+recognition)\b",
+        )
+        return any(re.search(pattern, normalized) for pattern in intent_patterns)
+
     def _boost_audio_chunk(self, chunk: bytes) -> tuple[bytes, int, int, float]:
         if not chunk:
             return chunk, 0, 0, 1.0
@@ -1066,6 +1186,10 @@ class VoskCommandListener:
         aliases: list[str] = [base] if base else []
         if base == "elion":
             aliases.extend([
+                "hey elion",
+                "hi elion",
+                "leon",
+                "hey leon",
                 "e lion",
                 "a lion",
                 "alien",
@@ -1166,6 +1290,10 @@ class VoskCommandListener:
             (r"\banalyse\b", "analyze"),
             (r"\bbehaviour\b", "behavior"),
             (r"\brun the offense\b", "run diagnostics"),
+            (r"\bi(?:'| a)?ve got a question\b", "i have a question"),
+            (r"\bi got a question\b", "i have a question"),
+            (r"\bquestion for ya\b", "question for you"),
+            (r"\bi need some help\b", "i need help"),
             (r"\bcancel that(?:\s+[a-z]+)?$", "cancel that"),
             (r"\byou do it\b", "do it"),
         )
@@ -1240,6 +1368,7 @@ class VoskCommandListener:
             (r"\bincrease\b.*\btracking\b.*\bpriority\b", "increase tracking priority"),
             (r"\bdecrease\b.*\btracking\b.*\bpriority\b", "decrease tracking priority"),
             (r"\btalk\b.*\bless\b", "talk less"),
+            (r"\brun\b.*\bsmart\s+sentry\b", "connect boards and enable smart sentry"),
             (r"\bconnect\b.*\b(app|boards?|smart\s+sentry)\b.*\b(com|port|ports|serial)\b.*\benable\b.*\bsmart\s+sentry\b", "connect boards and enable smart sentry"),
             (r"\bconnect\b.*\benable\b.*\bsmart\s+sentry\b", "connect boards and enable smart sentry"),
             (r"\bcancel\b.*\ball\b.*\b(queue|queued|tasks?)\b", "cancel all tasks in queue"),
@@ -1255,14 +1384,7 @@ class VoskCommandListener:
             (r"\bconnect\b.*\bboards?\b", "connect boards"),
             (r"\bopen\b.*\b(camera|video)\b", "open camera"),
             (r"\bclose\b.*\b(camera|video)\b", "close camera"),
-            (r"\benable\b.*\bface\b.*\brecognition\b", "enable face recognition"),
-            (r"\bdisable\b.*\bface\b.*\brecognition\b", "disable face recognition"),
-            (r"\benable\b.*\bhuman\b.*\bvoice\b", "enable human voice"),
-            (r"\bdisable\b.*\bhuman\b.*\bvoice\b", "disable human voice"),
-            (r"\benable\b.*\b(?:assistant\s+)?auto\s+speak\b", "enable assistant auto speak"),
-            (r"\bdisable\b.*\b(?:assistant\s+)?auto\s+speak\b", "disable assistant auto speak"),
-            (r"\benable\b.*\bshortcuts?\b", "enable shortcuts"),
-            (r"\bdisable\b.*\bshortcuts?\b", "disable shortcuts"),
+            *iter_voice_toggle_command_patterns(),
             (r"\bchange\b.*\btheme\b.*\b(anything|something|another|different)\b", "change the theme to anything else"),
             (r"\bchange\b.*\btheme\b", "change theme"),
             (r"\brun\b.*\bdiagnostic(?:s)?\b", "run diagnostics"),
@@ -1290,6 +1412,8 @@ class VoskCommandListener:
         if all(token in filler_words for token in tokens):
             return True
         if len(tokens) >= 2 and len(set(tokens)) == 1 and tokens[0] in filler_words:
+            return True
+        if not self._looks_meaningful_followup_text(str(sanitized or "")):
             return True
         if confidence is None:
             return False
@@ -1405,6 +1529,10 @@ class VoskCommandListener:
             return ""
         sanitized = re.sub(r"[^a-z0-9 ]+", " ", normalized)
         sanitized = re.sub(r"\s+", " ", sanitized).strip()
+        now = time.time()
+        if self._recent_output_input_block_active(now=now):
+            self._on_log(f"[VOICE-DIAG] self-echo-final-window-suppressed text='{sanitized}'")
+            return ""
         if self._matches_recent_output_echo(sanitized, partial=False):
             self._on_log(f"[VOICE-DIAG] self-echo-final-suppressed text='{sanitized}'")
             return ""
@@ -1423,7 +1551,6 @@ class VoskCommandListener:
             return final_text
         wake_aliases = self._wake_word_aliases(wake_word)
         pattern = r"\b(?:" + "|".join(re.escape(alias) for alias in wake_aliases) + r")\b"
-        now = time.time()
         wake_matched = bool(re.search(pattern, corrected))
         if not wake_matched and wake_aliases:
             wake_matched = self._fuzzy_contains_wake(corrected, wake_aliases)
@@ -1432,6 +1559,17 @@ class VoskCommandListener:
             stripped = re.sub(r"\s+", " ", stripped)
             stripped = self._canonicalize_command_text(stripped)
             self._open_wake_command_window(now=now)
+            if stripped and self._should_reject_low_signal_window_text(stripped, confidence=confidence):
+                self._on_log(
+                    f"[VOICE-DIAG] wake-followup-noise-rejected wake='{wake_word}' text='{stripped}'"
+                )
+                if now <= float(getattr(self, "_suppress_wake_only_until_s", 0.0) or 0.0):
+                    self._on_log(
+                        f"[VOICE-DIAG] wake-word-final-suppressed text='{corrected}' "
+                        f"suppress_until={self._suppress_wake_only_until_s:.2f}"
+                    )
+                    return ""
+                return wake_word
             final_text = f"{wake_word} {stripped}".strip() if stripped else wake_word
             self._on_log(
                 f"[VOICE-DIAG] wake-word-match wake='{wake_word}' text='{corrected}' window_until={self._command_window_until_s:.2f}"
@@ -1580,6 +1718,9 @@ class VoskCommandListener:
                             partial = json.loads(recognizer.PartialResult() or "{}")
                             partial_text = str(partial.get("partial", "") or "").strip().lower()
                             if partial_text:
+                                if self._recent_output_input_block_active(now=time.time()):
+                                    self._on_log(f"[VOICE-DIAG] self-echo-partial-window-suppressed text='{partial_text}'")
+                                    continue
                                 if self._matches_recent_output_echo(partial_text, partial=True):
                                     self._on_log(f"[VOICE-DIAG] self-echo-partial-suppressed text='{partial_text}'")
                                     continue
@@ -1784,6 +1925,9 @@ try {{
                 if message.startswith("partial|"):
                     partial_text = str(message.split("|", 1)[1] or "").strip().lower()
                     if partial_text:
+                        if self._recent_output_input_block_active(now=time.time()):
+                            self._on_log(f"[VOICE-DIAG] self-echo-partial-window-suppressed text='{partial_text}'")
+                            continue
                         if self._matches_recent_output_echo(partial_text, partial=True):
                             self._on_log(f"[VOICE-DIAG] self-echo-partial-suppressed text='{partial_text}'")
                             continue
@@ -1858,17 +2002,10 @@ def _can_use_windows_speech_backend(device_name: str) -> bool:
         return False
     if not requested:
         return True
-    requested_signature = _normalized_audio_device_signature(requested)
-    default_signature = _normalized_audio_device_signature(default_name)
-    if not requested_signature or not default_signature:
-        return False
-    requested_tokens = set(requested_signature.split(" "))
-    default_tokens = set(default_signature.split(" "))
-    overlap = requested_tokens & default_tokens
-    required_overlap = 1 if min(len(requested_tokens), len(default_tokens)) <= 1 else 2
-    return len(overlap) >= required_overlap and (
-        requested_tokens.issubset(default_tokens) or default_tokens.issubset(requested_tokens)
-    )
+    # Windows native speech can only bind to the current default input device.
+    # When the operator explicitly selects a microphone, keep STT on Vosk so the
+    # configured device is actually honored.
+    return False
 
 
 class SharedAudioInputManager:
@@ -2113,13 +2250,7 @@ class VoiceRuntimeController:
         cleaned = re.sub(r"\s+", " ", str(text or "").strip())
         if not cleaned:
             return False
-        try:
-            self._listener.suppress_recent_output_text(
-                cleaned,
-                hold_s=self._estimated_speech_duration_s(cleaned) + 1.0,
-            )
-        except Exception:
-            pass
+        self.register_output_echo_suppression(cleaned)
         if self._kokoro_tts is not None and self._kokoro_tts.enabled:
             return self._kokoro_tts.speak_async(cleaned)
         if self._neural_tts is not None and self._neural_tts.enabled:
@@ -2127,6 +2258,20 @@ class VoiceRuntimeController:
         if self._edge_tts is not None and self._edge_tts.enabled:
             return self._edge_tts.speak_async(cleaned)
         return False
+
+    def register_output_echo_suppression(self, text: str, *, extra_hold_s: float = 1.0) -> None:
+        cleaned = re.sub(r"\s+", " ", str(text or "").strip())
+        if not cleaned:
+            return
+        try:
+            speech_duration_s = self._estimated_speech_duration_s(cleaned)
+            self._listener.suppress_recent_output_text(
+                cleaned,
+                hold_s=speech_duration_s + max(0.0, float(extra_hold_s or 0.0)),
+                block_s=speech_duration_s + 0.35,
+            )
+        except Exception:
+            pass
 
     def signal_wake_word_detected(self, wake_word: str) -> None:
         """Forward external wake-word detection into the command listener window."""
