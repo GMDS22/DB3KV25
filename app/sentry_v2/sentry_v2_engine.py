@@ -117,11 +117,16 @@ class SentryV2Engine:
         self._trigger_hold_start: float = 0.0
         self._trigger_gate_active: bool = False
         self._trigger_refractory_until: float = 0.0
+        self._active_reacquire_confirm_pending_frames: int = 0
+        self._active_reacquire_confirm_pending_until: float = 0.0
         self._last_reacquire_note: str = ""
         self._last_reacquire_time: float = 0.0
         self._last_pir_note: str = ""
         self._last_pir_time: float = 0.0
         self._last_no_fire_mask_name: str = ""
+        self._track_identity_cache: Dict[int, Dict[str, object]] = {}
+        self._last_fire_veto_reason: str = ""
+        self._last_fire_veto_time: float = 0.0
         self._loss_recovery_phase: str = ""
         self._loss_recovery_protocol: str = ""
         self._loss_recovery_context: Dict[str, object] = {}
@@ -320,10 +325,16 @@ class SentryV2Engine:
         self._active_target_last_source = ""
         self._last_err_pan_deg = 0.0
         self._last_err_tilt_deg = 0.0
+        self._active_reacquire_confirm_pending_frames = 0
+        self._active_reacquire_confirm_pending_until = 0.0
         self._last_reacquire_note = ""
         self._last_reacquire_time = 0.0
         self._last_pir_note = ""
         self._last_pir_time = 0.0
+        self._last_no_fire_mask_name = ""
+        self._track_identity_cache.clear()
+        self._last_fire_veto_reason = ""
+        self._last_fire_veto_time = 0.0
         self._return_start = 0.0
         self._reset_loss_recovery_state()
         self._pir_cue_mode = False
@@ -418,6 +429,7 @@ class SentryV2Engine:
 
         self._last_no_fire_mask_name = ""
         self.last_detections = list(detections)
+        self._update_track_identity_cache(detections, now)
 
         # 1. Filter
         qualified, diagnostics = self._filter.filter_with_diagnostics(detections, now)
@@ -1313,7 +1325,7 @@ class SentryV2Engine:
                 and elapsed >= float(self.cfg.engagement.aim_lock_timeout)
                 and target is not None
                 and self._ready_to_fire()
-                and self._target_meets_fire_requirements(target)
+                and self._target_meets_fire_requirements(target, now=now)
                 and self._has_aim_lock(lock_pan, lock_tilt)
                 and self._current_no_fire_mask() is None
             ):
@@ -1429,8 +1441,10 @@ class SentryV2Engine:
                     self._start_return_to_guard(now)
 
     def _find_active_target(self, order: EngagementOrder) -> Optional[TrackedTarget]:
+        now = time.time()
         for target in self.last_targets:
             if target.det.track_id == order.target.det.track_id:
+                self._clear_active_reacquire_confirm_pending()
                 self._remember_active_target(target.det, target=target)
                 return target
         reacquired = self._find_reacquire_target(order)
@@ -1441,8 +1455,19 @@ class SentryV2Engine:
             new_track_id = int(reacquired.det.track_id)
             if new_track_id != old_track_id:
                 self._last_reacquire_note = f"reacquire {old_track_id}->{new_track_id}"
-                self._last_reacquire_time = time.time()
+                self._last_reacquire_time = now
+                self._arm_active_reacquire_confirm_pending(old_track_id=old_track_id, new_track_id=new_track_id, now=now)
+            else:
+                self._clear_active_reacquire_confirm_pending()
             return reacquired
+        pending_det = self._match_active_reacquire_confirm_pending_detection(order)
+        if pending_det is not None:
+            self._remember_active_target(pending_det, timestamp=now)
+            self._active_reacquire_confirm_pending_frames = max(0, self._active_reacquire_confirm_pending_frames - 1)
+            self._last_reacquire_note = f"reacquire confirm pending {int(pending_det.track_id)}"
+            self._last_reacquire_time = now
+            return order.target
+        self._clear_active_reacquire_confirm_pending()
         return None
 
     def _find_reacquire_target(self, order: EngagementOrder) -> Optional[TrackedTarget]:
@@ -1561,6 +1586,77 @@ class SentryV2Engine:
             return None
         return best_target
 
+    def _arm_active_reacquire_confirm_pending(
+        self,
+        *,
+        old_track_id: int,
+        new_track_id: int,
+        now: Optional[float] = None,
+    ) -> None:
+        current_time = float(now if now is not None else time.time())
+        self._active_reacquire_confirm_pending_frames = 2
+        self._active_reacquire_confirm_pending_until = current_time + 0.30
+        self._last_reacquire_note = f"reacquire {old_track_id}->{new_track_id}"
+        self._last_reacquire_time = current_time
+
+    def _clear_active_reacquire_confirm_pending(self) -> None:
+        self._active_reacquire_confirm_pending_frames = 0
+        self._active_reacquire_confirm_pending_until = 0.0
+
+    def _match_active_reacquire_confirm_pending_detection(
+        self,
+        order: EngagementOrder,
+    ) -> Optional[DetectedObject]:
+        if self._active_reacquire_confirm_pending_frames <= 0:
+            return None
+        current_time = time.time()
+        if current_time > float(self._active_reacquire_confirm_pending_until or 0.0):
+            return None
+        if not self.last_detections or not self.last_filter_diagnostics:
+            return None
+
+        anchor_center = self._active_target_last_center or (
+            float(order.target.det.center_x),
+            float(order.target.det.center_y),
+        )
+        anchor_bbox = self._active_target_last_bbox or order.target.det.bbox
+        anchor_class = str(getattr(self, "_active_target_last_class", "") or order.target.det.class_name or "").strip().lower()
+        anchor_source = str(getattr(self, "_active_target_last_source", "") or order.target.det.source or "").strip().lower()
+        frame_w = float(max(1, self.cfg.guard.frame_width))
+        frame_h = float(max(1, self.cfg.guard.frame_height))
+        anchor_diag = ((float(anchor_bbox[2]) ** 2) + (float(anchor_bbox[3]) ** 2)) ** 0.5
+        pending_radius_px = max(64.0, min(frame_w, frame_h) * 0.14, anchor_diag * 0.52)
+        diagnostics_by_track = {
+            int(decision.track_id): decision
+            for decision in self.last_filter_diagnostics
+            if not bool(decision.passed)
+        }
+
+        best_det: Optional[DetectedObject] = None
+        best_score = float("inf")
+        for det in self.last_detections:
+            decision = diagnostics_by_track.get(int(det.track_id))
+            if decision is None:
+                continue
+            if int(decision.confirm_required) <= 1 or int(decision.confirm_hits) >= int(decision.confirm_required):
+                continue
+            target_class = str(det.class_name or "").strip().lower()
+            target_source = str(det.source or "").strip().lower()
+            if anchor_source and target_source and target_source != anchor_source:
+                continue
+            if anchor_class and anchor_class not in NON_SEMANTIC_REACQUIRE_CLASSES:
+                if target_class and target_class != anchor_class:
+                    continue
+            dist_px = ((float(det.center_x) - anchor_center[0]) ** 2 + (float(det.center_y) - anchor_center[1]) ** 2) ** 0.5
+            iou = self._bbox_iou(anchor_bbox, det.bbox)
+            if dist_px > pending_radius_px and iou < 0.10:
+                continue
+            score = (dist_px / max(1.0, pending_radius_px)) - (iou * 0.60)
+            if score < best_score:
+                best_score = score
+                best_det = det
+        return best_det
+
     def _remember_active_target(
         self,
         det: DetectedObject,
@@ -1621,9 +1717,117 @@ class SentryV2Engine:
             return True
         return self._aim_lock_frames >= max(1, self.cfg.engagement.aim_lock_required_frames)
 
-    def _target_meets_fire_requirements(self, target: TrackedTarget) -> bool:
+    def _person_identity_fire_authorization_window_s(self) -> float:
+        loss_timeout = float(getattr(self.cfg.engagement, "target_loss_timeout", 1.4) or 1.4)
+        return max(1.75, min(3.0, loss_timeout + 0.40))
+
+    def _set_fire_veto_reason(self, reason: str, now: float) -> None:
+        self._last_fire_veto_reason = str(reason or "")
+        self._last_fire_veto_time = float(now)
+
+    def _prune_track_identity_cache(self, now: float) -> None:
+        max_age = max(5.0, self._person_identity_fire_authorization_window_s() * 3.0)
+        stale_track_ids = [
+            track_id
+            for track_id, entry in self._track_identity_cache.items()
+            if (now - float(entry.get("seen_at", 0.0) or 0.0)) > max_age
+        ]
+        for track_id in stale_track_ids:
+            self._track_identity_cache.pop(track_id, None)
+
+    def _cache_track_identity_observation(self, det: DetectedObject, now: float) -> Optional[Dict[str, object]]:
+        if str(getattr(det, "class_name", "") or "").strip().lower() != "person":
+            return None
+
+        identity_label = str(getattr(det, "identity_label", "") or "").strip()
+        identity_profile_id = str(getattr(det, "identity_profile_id", "") or "").strip()
+        if not (identity_label or identity_profile_id):
+            return None
+
+        entry = {
+            "label": identity_label,
+            "profile_id": identity_profile_id,
+            "friendly": bool(getattr(det, "friendly_identity", False)),
+            "confidence": float(getattr(det, "identity_confidence", 0.0) or 0.0),
+            "seen_at": float(now),
+        }
+        try:
+            track_id = int(getattr(det, "track_id", -1) or -1)
+        except Exception:
+            track_id = -1
+        if track_id >= 0:
+            self._track_identity_cache[track_id] = entry
+        return entry
+
+    def _update_track_identity_cache(self, detections: List[DetectedObject], now: float) -> None:
+        self._prune_track_identity_cache(now)
+        for det in detections:
+            self._cache_track_identity_observation(det, now)
+
+    def _resolve_person_fire_identity(self, target: TrackedTarget, now: float) -> Optional[Dict[str, object]]:
+        direct_entry = self._cache_track_identity_observation(target.det, now)
+        if direct_entry is not None:
+            return direct_entry
+
+        try:
+            track_id = int(getattr(target.det, "track_id", -1) or -1)
+        except Exception:
+            track_id = -1
+        if track_id < 0:
+            return None
+
+        cached = self._track_identity_cache.get(track_id)
+        if cached is None:
+            return None
+
+        age_s = max(0.0, now - float(cached.get("seen_at", 0.0) or 0.0))
+        if age_s > self._person_identity_fire_authorization_window_s():
+            return None
+        return cached
+
+    def _person_target_is_fire_authorized(self, target: TrackedTarget, now: float) -> bool:
+        class_name = str(getattr(target.det, "class_name", "") or "").strip().lower()
+        if class_name != "person":
+            return True
+        if not bool(getattr(self.cfg.face_recognition, "enabled", False)):
+            self._set_fire_veto_reason("person auto-fire blocked: face recognition disabled", now)
+            return False
+
+        direct_identity_entry = self._cache_track_identity_observation(target.det, now)
+        if direct_identity_entry is not None:
+            if bool(direct_identity_entry.get("friendly", False)):
+                label = str(
+                    direct_identity_entry.get("label", "")
+                    or direct_identity_entry.get("profile_id", "")
+                    or "known face"
+                ).strip()
+                self._set_fire_veto_reason(f"person auto-fire blocked: friendly identity {label}", now)
+                return False
+
+            self._last_fire_veto_reason = ""
+            return True
+
+        identity_entry = self._resolve_person_fire_identity(target, now)
+        if identity_entry is not None and bool(identity_entry.get("friendly", False)):
+            label = str(identity_entry.get("label", "") or identity_entry.get("profile_id", "") or "known face").strip()
+            self._set_fire_veto_reason(f"person auto-fire blocked: recent friendly identity {label}", now)
+            return False
+
+        if identity_entry is not None:
+            label = str(identity_entry.get("label", "") or identity_entry.get("profile_id", "") or "hostile match").strip()
+            self._set_fire_veto_reason(f"person auto-fire blocked: hostile identity {label} not current", now)
+            return False
+
+        self._set_fire_veto_reason("person auto-fire blocked: explicit hostile identity required", now)
+
+        return False
+
+    def _target_meets_fire_requirements(self, target: TrackedTarget, *, now: Optional[float] = None) -> bool:
         eng = self.cfg.engagement
+        check_time = time.time() if now is None else float(now)
         return (
+            self._person_target_is_fire_authorized(target, check_time)
+            and
             float(target.det.confidence) >= float(eng.fire_trigger_min_confidence)
             and float(target.persistence) >= float(eng.fire_trigger_min_persistence)
         )
@@ -1633,7 +1837,6 @@ class SentryV2Engine:
         # phase is stricter so micro-adjust and firing never run on delayed
         # debug-board feedback while the target is still moving.  The runtime
         # exports show the current debug-board cadence can land around 0.45 s
-        # under load, so tighter gates just force repeated fire->precision
         # resets instead of using the measured pose we already have.
         return 0.48 if for_fire else 0.55
 
@@ -1642,7 +1845,6 @@ class SentryV2Engine:
         ratio = float(speed_value - 10) / 90.0
         # Scale ranges [0.65, 1.0]: slow presets are dampened, fast presets are
         # at full authority.  Previously exceeded 1.0 at high speeds, which
-        # amplified corrections and caused commanded_pan to race ahead of the
         # actual servo position, producing visible overshoot on initial lock-on.
         scale = min(1.0, 0.65 + (ratio * 0.85))
         if use_fire_limits:
@@ -1812,6 +2014,11 @@ class SentryV2Engine:
 
     def _begin_fire(self, order: EngagementOrder, now: float) -> None:
         """Transition to fire phase — respects auto_trigger_enabled gate."""
+        if not self._person_target_is_fire_authorized(order.target, now):
+            self._trigger_gate_active = False
+            self._trigger_hold_start = 0.0
+            return
+
         blocked_mask = self._current_no_fire_mask()
         prompted_auto_fire_allowed = True
         if str(getattr(order.target.det, "source", "")) == "prompted":
@@ -1882,6 +2089,7 @@ class SentryV2Engine:
         self._target_lost_since = 0.0
         self._trigger_hold_start = 0.0
         self._trigger_gate_active = False
+        self._clear_active_reacquire_confirm_pending()
         self._reset_loss_recovery_state()
 
     def _compute_target_angle_error(self, det: DetectedObject) -> Tuple[float, float]:
@@ -1921,9 +2129,11 @@ class SentryV2Engine:
         predicted_norm_cy = max(0.0, min(1.0, float(target.det.norm_cy) + (heading_y * lead_time)))
         pred_err_pan, pred_err_tilt = self._planner.pixel_error_to_angle_error(predicted_norm_cx, predicted_norm_cy)
         max_lead_pan = max(0.0, float(getattr(eng, "predictive_max_lead_pan_deg", 0.0) or 0.0))
-        max_lead_tilt = max(0.0, float(getattr(eng, "predictive_max_lead_tilt_deg", 0.0) or 0.0))
         lead_pan = max(-max_lead_pan, min(max_lead_pan, pred_err_pan - raw_err_pan))
-        lead_tilt = max(-max_lead_tilt, min(max_lead_tilt, pred_err_tilt - raw_err_tilt))
+        # Screen-space vertical motion is easily polluted by the turret's own tilt
+        # movement, which can make live tracking climb away from the target.
+        # Keep raw visual centering on tilt and reserve prediction for pan only.
+        lead_tilt = 0.0
         return raw_err_pan + lead_pan, raw_err_tilt + lead_tilt
 
     def _record_active_target_solution(
@@ -2654,6 +2864,11 @@ class SentryV2Engine:
             self._trigger_gate_active = False
             return False
 
+        if not self._person_target_is_fire_authorized(target, now):
+            self._trigger_hold_start = 0.0
+            self._trigger_gate_active = False
+            return False
+
         # Centering check: use hysteresis (wider exit than enter)
         enter_pan = float(eng.fire_trigger_enter_pan_tolerance)
         enter_tilt = float(eng.fire_trigger_enter_tilt_tolerance)
@@ -2764,13 +2979,15 @@ class SentryV2Engine:
             fire_tilt_limit = float(eng.fire_micro_adjust_max_tilt_step)
             precision_pan_limit = float(eng.precision_max_pan_step) if float(eng.precision_max_pan_step) > 0.0 else float(eng.precision_max_step)
             precision_tilt_limit = float(eng.precision_max_tilt_step) if float(eng.precision_max_tilt_step) > 0.0 else float(eng.precision_max_step)
+            # Keep fire-phase micro-adjust conservative. The widened v4 limits
+            # let noisy vertical error walk the turret away from the target.
             pan_limit = max(
                 fire_pan_limit,
-                min(precision_pan_limit * 0.92, fire_pan_limit + ((abs(lock_pan) / fire_window_pan) * 0.60)),
+                min(precision_pan_limit * 0.55, fire_pan_limit + ((abs(lock_pan) / fire_window_pan) * 0.22)),
             )
             tilt_limit = max(
                 fire_tilt_limit,
-                min(precision_tilt_limit * 0.92, fire_tilt_limit + ((abs(lock_tilt) / fire_window_tilt) * 0.50)),
+                min(precision_tilt_limit * 0.55, fire_tilt_limit + ((abs(lock_tilt) / fire_window_tilt) * 0.18)),
             )
         else:
             pan_limit = float(eng.precision_max_pan_step) if float(eng.precision_max_pan_step) > 0.0 else float(eng.precision_max_step)
@@ -3093,6 +3310,8 @@ class SentryV2Engine:
             "sound_alert_recent": bool(self._sound_alert_note_time and (time.time() - self._sound_alert_note_time) <= 3.0),
             "loss_recovery_phase": self._loss_recovery_phase,
             "no_fire_mask": self._last_no_fire_mask_name,
+            "fire_veto_reason": self._last_fire_veto_reason,
+            "fire_veto_recent": bool(self._last_fire_veto_time and (time.time() - self._last_fire_veto_time) <= 3.0),
             "motion_enabled": bool(self._motion_enabled),
             "filter_rejections": [
                 {
