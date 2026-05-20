@@ -31,6 +31,7 @@ import tempfile
 import threading
 import time
 import traceback
+import weakref
 from pathlib import Path
 
 from typing import Callable, Dict, Iterable, List, Optional, Tuple
@@ -124,6 +125,7 @@ from .face_identity import (
     FaceIdentityRuntime,
     FaceMatchResult,
 )
+from .face_queue_panel import FaceQueuePanel
 from .sentry_v2_config import (
     SENTRY_HOME_PAN,
     SENTRY_HOME_TILT,
@@ -3817,6 +3819,8 @@ class SentryV2TabWidget(QWidget):
         self._last_announced_identity_at: Dict[str, float] = {}
         self._announced_identity_session_keys: set[str] = set()
         self._last_gesture_identity_at: Dict[str, float] = {}
+        self._face_queue_panel: Optional[FaceQueuePanel] = None
+        self._last_face_queue_update_s: float = 0.0
         self._last_autotrack_voice_state: str = ""
         self._last_autotrack_voice_track_id: int = -1
         self._last_autotrack_voice_report_s: float = 0.0
@@ -4166,8 +4170,13 @@ class SentryV2TabWidget(QWidget):
     def _schedule_startup_tasks(self) -> None:
         """CHANGE WARNING: Startup work here couples camera bring-up, transport auto-connect, and YOLO warmup; keep expensive work deferred when quick startup is enabled."""
         self._startup_voice_intro_pending = True
-        if self._has_local_source():
-            QTimer.singleShot(0, self._announce_startup_voice_intro)
+        # Schedule the startup greeting unconditionally. The 1500 ms delay gives
+        # the UI time to become visible and the voice runtime time to initialise.
+        # If a camera opens first (~1050 ms via the secondary trigger in
+        # _open_video_capture_source) the idempotency check in
+        # _announce_startup_voice_intro prevents a double-speak.  If no camera
+        # is configured or the open fails the greeting still fires at 1500 ms.
+        QTimer.singleShot(1500, self._announce_startup_voice_intro)
         if bool(getattr(self.config, "quick_startup_enabled", True)):
             self._log("Quick startup enabled: starting background camera open, deferring auto-connect, and scheduling lazy YOLO model load.")
             QTimer.singleShot(800, self._auto_open_camera_on_startup)
@@ -4176,7 +4185,12 @@ class SentryV2TabWidget(QWidget):
             return
         self._schedule_auto_yolo_load(1200)
         QTimer.singleShot(800, self._auto_open_camera_on_startup)
-        QTimer.singleShot(1000, lambda: self._auto_connect_on_startup(0))
+        _wr = weakref.ref(self)
+        def _safe_auto_connect_startup(_w=_wr):
+            _s = _w()
+            if _s is not None:
+                _s._auto_connect_on_startup(0)
+        QTimer.singleShot(1000, _safe_auto_connect_startup)
         QTimer.singleShot(0, self._schedule_startup_rest_move)
 
     def _auto_open_camera_on_startup(self, _retry: int = 0) -> None:
@@ -4191,7 +4205,13 @@ class SentryV2TabWidget(QWidget):
             self._log(f"[CAM-DEBUG] Auto-open exception (attempt {_retry+1}): {exc}")
             if not self._closing and not self._has_local_source() and _retry < 3:
                 delay = 1500 * (_retry + 1)
-                QTimer.singleShot(delay, lambda r=_retry+1: self._auto_open_camera_on_startup(r))
+                _wr = weakref.ref(self)
+                _r = _retry + 1
+                def _safe_retry_open(_w=_wr, r=_r):
+                    _s = _w()
+                    if _s is not None:
+                        _s._auto_open_camera_on_startup(r)
+                QTimer.singleShot(delay, _safe_retry_open)
 
     def _auto_connect_on_startup(self, _retry: int = 0) -> None:
         """Auto-connect on startup if in WiFi mode and not already connected."""
@@ -4222,7 +4242,13 @@ class SentryV2TabWidget(QWidget):
                 self._log(
                     f"Auto-connect wait: Debug Board COM port not resolved yet (retry {_retry + 1}/4 in {delay_ms}ms)"
                 )
-                QTimer.singleShot(delay_ms, lambda r=_retry + 1: self._auto_connect_on_startup(r))
+                _wr = weakref.ref(self)
+                _r = _retry + 1
+                def _safe_retry_connect(_w=_wr, r=_r):
+                    _s = _w()
+                    if _s is not None:
+                        _s._auto_connect_on_startup(r)
+                QTimer.singleShot(delay_ms, _safe_retry_connect)
                 return
 
         self._startup_autoconnect_active = True
@@ -4459,7 +4485,12 @@ class SentryV2TabWidget(QWidget):
         delay_ms = max(0, int(getattr(self.config.guard, "rest_startup_delay_ms", 900) or 0))
         self._startup_rest_schedule_token += 1
         token = int(self._startup_rest_schedule_token)
-        QTimer.singleShot(delay_ms, lambda current_token=token: self._execute_startup_rest_move(current_token))
+        _wr = weakref.ref(self)
+        def _safe_rest_move(_w=_wr, t=token):
+            _s = _w()
+            if _s is not None:
+                _s._execute_startup_rest_move(t)
+        QTimer.singleShot(delay_ms, _safe_rest_move)
 
     def _execute_startup_rest_move(self, token: Optional[int] = None) -> None:
         if self._closing or self._cleanup_started or self._shutdown_in_progress:
@@ -4802,10 +4833,26 @@ class SentryV2TabWidget(QWidget):
         # Wrap video label + quick-access chip bar in a container
         _video_container = QWidget()
         self._video_container = _video_container
-        _video_container_lay = QVBoxLayout(_video_container)
+
+        # Outer horizontal layout: video area on left, face queue panel on right
+        _video_outer_lay = QHBoxLayout(_video_container)
+        _video_outer_lay.setContentsMargins(0, 0, 0, 0)
+        _video_outer_lay.setSpacing(0)
+
+        # Inner video widget holds the VBox (video label + chip bars)
+        _video_inner = QWidget()
+        _video_inner.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        _video_container_lay = QVBoxLayout(_video_inner)
         _video_container_lay.setContentsMargins(0, 0, 0, 0)
         _video_container_lay.setSpacing(0)
         _video_container_lay.addWidget(self._video_label, 1)
+
+        _video_outer_lay.addWidget(_video_inner, 1)
+
+        # Face queue panel (fixed-width strip on the right side of the video)
+        self._face_queue_panel = FaceQueuePanel()
+        self._face_queue_panel.face_saved.connect(self._on_face_queue_saved)
+        _video_outer_lay.addWidget(self._face_queue_panel, 0)
 
         # Quick-access chip bar
         _qa_chip_bar = QWidget()
@@ -4866,19 +4913,13 @@ class SentryV2TabWidget(QWidget):
         self._btn_buzzer_qa.setChecked(bool(getattr(self.config.sound, "enabled", True)))
         _qa_chip_bar_lay.addWidget(self._btn_buzzer_qa)
 
-        self._btn_buzzer_volume_qa = _mk_qa_btn("🔉", "Buzzer volume quick mute/unmute")
-        self._btn_buzzer_volume_qa.setChecked(self._sound_volume_pct() > 0)
-        self._btn_buzzer_volume_qa.toggled.connect(self._on_qa_buzzer_volume_toggled)
-        _qa_chip_bar_lay.addWidget(self._btn_buzzer_volume_qa)
-
         self._btn_human_voice_qa = _mk_qa_btn("🗣️", "Human Voice (TTS) ON/OFF")
         self._btn_human_voice_qa.setChecked(bool(getattr(self.config.sound, "human_voice_enabled", False)))
         _qa_chip_bar_lay.addWidget(self._btn_human_voice_qa)
 
-        self._btn_ai_voice_volume_qa = _mk_qa_btn("🔈", "AI voice volume quick mute/unmute")
-        self._btn_ai_voice_volume_qa.setChecked(self._human_voice_volume_pct() > 0)
-        self._btn_ai_voice_volume_qa.toggled.connect(self._on_qa_ai_voice_volume_toggled)
-        _qa_chip_bar_lay.addWidget(self._btn_ai_voice_volume_qa)
+        self._btn_volume_flyout_qa = _mk_qa_btn("VOL", "Quick volume controls (click to expand)", checkable=True)
+        self._btn_volume_flyout_qa.setChecked(False)
+        _qa_chip_bar_lay.addWidget(self._btn_volume_flyout_qa)
 
         self._btn_acoustic_guard_qa = _mk_qa_btn("🎤", "Acoustic Guard (USB Mic) ON/OFF")
         self._btn_acoustic_guard_qa.setChecked(bool(getattr(self.config.acoustic_guard, "enabled", False)))
@@ -5012,6 +5053,45 @@ class SentryV2TabWidget(QWidget):
         _qa_chip_bar_lay.addStretch(1)
 
         _video_container_lay.addWidget(_qa_chip_bar, 0)
+
+        # ---- Volume flyout panel (hidden by default, toggled by _btn_volume_flyout_qa) ----
+        self._qa_volume_flyout = QWidget()
+        self._qa_volume_flyout.setObjectName("qaTuneFlyout")
+        _vf_lay = QHBoxLayout(self._qa_volume_flyout)
+        _vf_lay.setContentsMargins(6, 4, 6, 4)
+        _vf_lay.setSpacing(8)
+
+        _lbl_buzz_vol = QLabel("Buzzer %:")
+        _lbl_buzz_vol.setObjectName("qaTuneLabel")
+        _vf_lay.addWidget(_lbl_buzz_vol)
+        self._sld_buzzer_volume_qa = QSlider(Qt.Horizontal)
+        self._sld_buzzer_volume_qa.setRange(0, 100)
+        self._sld_buzzer_volume_qa.setValue(self._sound_volume_pct())
+        self._sld_buzzer_volume_qa.setFixedWidth(110)
+        self._sld_buzzer_volume_qa.setToolTip(SENTRY_V2_TOOLTIPS.get("sound_volume", ""))
+        _vf_lay.addWidget(self._sld_buzzer_volume_qa)
+        self._lbl_buzzer_volume_qa = QLabel(f"{self._sound_volume_pct()}%")
+        self._lbl_buzzer_volume_qa.setObjectName("qaTuneLabel")
+        self._lbl_buzzer_volume_qa.setFixedWidth(40)
+        _vf_lay.addWidget(self._lbl_buzzer_volume_qa)
+
+        _lbl_ai_vol = QLabel("AI Voice %:")
+        _lbl_ai_vol.setObjectName("qaTuneLabel")
+        _vf_lay.addWidget(_lbl_ai_vol)
+        self._sld_ai_voice_volume_qa = QSlider(Qt.Horizontal)
+        self._sld_ai_voice_volume_qa.setRange(0, 100)
+        self._sld_ai_voice_volume_qa.setValue(self._human_voice_volume_pct())
+        self._sld_ai_voice_volume_qa.setFixedWidth(110)
+        self._sld_ai_voice_volume_qa.setToolTip("Human voice volume percent")
+        _vf_lay.addWidget(self._sld_ai_voice_volume_qa)
+        self._lbl_ai_voice_volume_qa = QLabel(f"{self._human_voice_volume_pct()}%")
+        self._lbl_ai_voice_volume_qa.setObjectName("qaTuneLabel")
+        self._lbl_ai_voice_volume_qa.setFixedWidth(40)
+        _vf_lay.addWidget(self._lbl_ai_voice_volume_qa)
+
+        _vf_lay.addStretch(1)
+        self._qa_volume_flyout.setVisible(False)
+        _video_container_lay.addWidget(self._qa_volume_flyout, 0)
 
         # ---- Tune flyout panel (hidden by default, toggled by _btn_tune_qa) ----
         self._qa_tune_flyout = QWidget()
@@ -11637,6 +11717,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._maybe_face_speaker_during_voice_window(engine_objects, now)
         self._last_face_matches = list(face_matches)
         self._update_face_runtime_status()
+        self._maybe_push_unknown_faces_to_queue(frame, base_objects, now)
         prompted_objects: List[DetectedObject] = []
         if bool(self.config.prompted_targets_enabled):
             prompted_objects = self._prompted_matcher.detect(frame, engine_objects, now)
@@ -12028,7 +12109,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if not self.isVisible():
             QTimer.singleShot(600, self._announce_startup_voice_intro)
             return
-        if bool(getattr(self, "_camera_open_in_progress", False)) or not self._has_local_source():
+        # Only hold while a camera open is actively in progress (prevents
+        # speaking over camera-open feedback).  Do NOT gate on whether a camera
+        # is actually open — the greeting is purely conversational and has no
+        # dependency on a live source.
+        if bool(getattr(self, "_camera_open_in_progress", False)):
             QTimer.singleShot(400, self._announce_startup_voice_intro)
             return
 
@@ -12432,6 +12517,30 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             )
             return "acknowledged"
 
+        if any(token in cmd for token in ("restart smart sentry", "restart the smart sentry", "restart app", "restart the app", "relaunch smart sentry", "relaunch the smart sentry")):
+            if bool(getattr(self, "_shutdown_in_progress", False)) or bool(getattr(self, "_cleanup_started", False)):
+                self._speak_after_operator_quiet("The app is already restarting.", interrupt=False)
+                return "acknowledged"
+            # Generate a non-repeating response using the voice phrase picker
+            response = self._voice_pick_phrase(
+                "restart_app",
+                (
+                    "Restarting Smart Sentry now.",
+                    "Relaunching the application.",
+                    "Initiating application restart.",
+                    "Restarting the system now.",
+                    "Reloading Smart Sentry.",
+                )
+            )
+            self._run_voice_action_after_confirmation(
+                response,
+                lambda: self._restart_application(),
+                interrupt=False,
+                action_label="restart-app",
+                wait_for_speech_completion=True,
+            )
+            return "acknowledged"
+
         cancel_all_tokens = (
             "cancel all tasks in queue",
             "cancel all queued tasks",
@@ -12511,6 +12620,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return self._execute_voice_disconnect_request()
 
         if self._voice_command_starts_with_phrase(cmd, connect_tokens):
+            # If the canonicalized command carries the "enable smart sentry"
+            # intent (e.g. from "run the smart sentry"), arm the deferred-enable
+            # flag so _execute_voice_connect_request activates detection after
+            # the boards connect.  Without this the enable half is silently
+            # dropped because the flag defaults to False.
+            if "enable smart sentry" in cmd or "enable sentry" in cmd:
+                self._arm_enable_sentry_after_connect(reason="voice command: run the smart sentry")
             return self._execute_voice_connect_request()
 
         resume_tokens = (
@@ -14150,7 +14266,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._log(
                     f"Auto-connect retry scheduled ({next_retry}/4) after transient COM open failure"
                 )
-                QTimer.singleShot(delay_ms, lambda r=next_retry: self._auto_connect_on_startup(r))
+                _wr_connect = weakref.ref(self)
+                _r_connect = next_retry
+                def _safe_auto_connect_retry(_w=_wr_connect, r=_r_connect):
+                    _s = _w()
+                    if _s is not None:
+                        _s._auto_connect_on_startup(r)
+                QTimer.singleShot(delay_ms, _safe_auto_connect_retry)
             else:
                 self._startup_autoconnect_active = False
 
@@ -14942,7 +15064,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             # Retry with increasing back-off (1.5s, 3s, 4.5s)
             delay = 1500 * (retry + 1)
             self._set_camera_status(f"Retrying camera ({retry+1}/3)…", "warn")
-            QTimer.singleShot(delay, lambda r=retry+1: self._auto_open_camera_on_startup(r))
+            _wr_cam = weakref.ref(self)
+            _r_cam = retry + 1
+            def _safe_cam_open_retry(_w=_wr_cam, r=_r_cam):
+                _s = _w()
+                if _s is not None:
+                    _s._auto_open_camera_on_startup(r)
+            QTimer.singleShot(delay, _safe_cam_open_retry)
         else:
             self._startup_retry_count = -1
             self._set_camera_status(f"Failed to open: {source_text}", "error")
@@ -19729,6 +19857,67 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._maybe_announce_face_match(best_match, now)
             self._maybe_run_friendly_identity_gesture(best_match, now)
         return filtered, matches
+
+    def _maybe_push_unknown_faces_to_queue(
+        self,
+        frame: np.ndarray,
+        objects: list,
+        now: float,
+    ) -> None:
+        """Detect unrecognised faces and push them to the face queue panel."""
+        panel = getattr(self, "_face_queue_panel", None)
+        if panel is None or not bool(getattr(self.config, "face_recognition", None) and self.config.face_recognition.enabled):
+            return
+        last_s = float(getattr(self, "_last_face_queue_update_s", 0.0) or 0.0)
+        if now - last_s < 2.5:
+            return
+        self._last_face_queue_update_s = now
+        person_boxes = list(self._face_person_boxes(objects) or []) or None
+        try:
+            unknowns = self._face_runtime.detect_unknown_faces(
+                frame,
+                min_face_size_px=int(self.config.face_recognition.min_face_size_px),
+                person_boxes=person_boxes,
+                threshold=float(self.config.face_recognition.recognition_threshold),
+                min_profile_embeddings=self._face_identity_required_samples(),
+            )
+        except Exception:
+            return
+        for unk in unknowns:
+            panel.push_detection(unk.temp_id, unk.crop_bgr, unk.embedding)
+
+    def _on_face_queue_saved(
+        self,
+        temp_id: str,
+        name: str,
+        is_target: bool,
+        embedding: object,
+    ) -> None:
+        """Called when the operator saves a card from the face queue panel."""
+        import numpy as _np
+        if not name:
+            return
+        embedding_vec = embedding if isinstance(embedding, _np.ndarray) else None
+        if embedding_vec is None:
+            self._log(f"Face queue save: no embedding for '{name}', skipped.")
+            return
+        backend = str(getattr(self._face_runtime, "active_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY)
+        friendly = not is_target
+        profile = self._face_library.upsert_profile(
+            name,
+            [embedding_vec],
+            embedding_backend=backend,
+            friendly=friendly,
+            announce_name=True,
+            cute_gesture=not is_target,
+        )
+        if profile is None:
+            self._log(f"Face queue save: upsert_profile returned None for '{name}'.")
+            return
+        self._face_runtime.refresh_library(self._face_library)
+        self._save_face_identity_library()
+        self._rebuild_face_profile_list()
+        self._log(f"Face queue: enrolled '{name}' (target={is_target}, profile_id={profile.profile_id[:8]}…)")
 
     def _maybe_announce_face_match(self, match: FaceMatchResult, now: float) -> None:
         if not bool(self.config.face_recognition.announce_known_faces) or not bool(match.announce_name):
@@ -25955,10 +26144,15 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                     self._set_human_voice_runtime_state("error")
                     return False
             if used_local_qt:
+                # Bug 1 fix: echo suppression window for Qt/SAPI path (duration unknown; use char-rate estimate)
+                _qt_est_s = max(0.7, min(8.0, len(cleaned) / 18.0))
+                self._voice_echo_suppress_until = time.time() + _qt_est_s + 1.5
                 return True
             speed = self._kokoro_speed_value()
             est_duration_s = max(0.7, min(7.0, (len(cleaned) / 18.0) / max(0.5, speed)))
             self._kokoro_busy_until_s = time.time() + est_duration_s
+            # Bug 1 fix: echo suppression window for neural/Kokoro path
+            self._voice_echo_suppress_until = time.time() + est_duration_s + 1.5
             self._set_human_voice_runtime_state("speaking")
             QTimer.singleShot(int(est_duration_s * 1000), lambda: self._set_human_voice_runtime_state("ready"))
             return True
@@ -26758,7 +26952,28 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             if isinstance(value, (str, int, float, bool)) or value is None:
                 transcript_meta[str(key)] = value
 
-        self._last_voice_signature = dict(payload)
+        # Bug 1 fix: protect voice frequency signature from TTS self-echo contamination.
+        # When Elion is actively speaking (or just finished), the mic picks up the TTS
+        # output and Vosk emits echo partials that carry the TTS voice's frequency_hz.
+        # If we let those overwrite _last_voice_signature unconditionally, the next
+        # operator command fails the frequency-match auth check, firing another rejection
+        # TTS → more echo → infinite rejection loop.
+        #
+        # Strategy: during the echo-suppression window we still update the payload
+        # so that updated_at stays fresh (prevents staleness expiry on the next real
+        # operator transcript), but we preserve the frequency_hz and confidence values
+        # from the last genuine operator speech so the enrolment baseline is unchanged.
+        _echo_suppress_until = float(getattr(self, "_voice_echo_suppress_until", 0.0))
+        if time.time() < _echo_suppress_until:
+            _prior = dict(getattr(self, "_last_voice_signature", {}) or {})
+            _merged = dict(payload)
+            if _prior.get("frequency_hz", 0.0):
+                _merged["frequency_hz"] = _prior["frequency_hz"]
+            if _prior.get("confidence") is not None:
+                _merged["confidence"] = _prior["confidence"]
+            self._last_voice_signature = _merged
+        else:
+            self._last_voice_signature = dict(payload)
 
         if kind == "status":
             prior_status = self._voice_heard_status_text
@@ -26796,6 +27011,19 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 )
                 self._voice_heard_final_text = text
                 self._voice_heard_partial_text = ""
+                # Bug 2 fix: wake-split recovery.
+                # Vosk partial-decodes fire a bare "elion" command that opens the intake
+                # window, and the rest of the utterance ("run smart sentry") arrives here
+                # as a voice_transcript_final event instead of a voice_command signal.
+                # If a wake-pending window is still open, route the final text as a
+                # command body so it goes through the normal dispatch pipeline.
+                _wake_pending = float(getattr(self, "_voice_wake_pending_until", 0.0))
+                if _wake_pending > 0.0 and time.time() < _wake_pending and text:
+                    if not self._voice_command_is_cue_only(text):
+                        self._voice_wake_pending_until = 0.0
+                        self._log(f"[VOICE] wake-split recovery: routing '{text}' as command body")
+                        # Defer one event loop tick to avoid re-entrancy in this handler
+                        QTimer.singleShot(0, lambda _t=text: self._on_voice_command_recognized(_t))
             else:
                 if text != self._voice_heard_partial_text:
                     self._record_runtime_conversation_event(
@@ -26980,6 +27208,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         cue = self._assistant_cue_name()
         if cue and self._voice_command_is_cue_only(command):
             self._log("[VOICE CMD] wake word received with no additional text")
+            # Bug 2 fix: when the wake word fires as a bare partial, hold a short
+            # window so that the command body ("Elion, run the sentry" → "run the
+            # sentry" arriving as a final transcript) can be captured and routed
+            # through the normal command handler instead of being swallowed silently.
+            self._voice_wake_pending_until = time.time() + 2.5
             self._open_voice_conversation_intake(
                 source="wake-word",
                 hold_s=16.0,
@@ -28083,6 +28316,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         # Tune flyout toggle
         self._btn_tune_qa.clicked.connect(lambda checked: self._qa_tune_flyout.setVisible(checked))
 
+        # Volume flyout toggle
+        self._btn_volume_flyout_qa.clicked.connect(lambda checked: self._qa_volume_flyout.setVisible(checked))
+
         # Auto-lighting flyout toggle
         self._btn_auto_light_flyout_qa.clicked.connect(
             lambda checked: self._qa_autolight_flyout.setVisible(checked)
@@ -28198,6 +28434,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         # QA volume slider (back-sync is handled inside _sync_sound_widgets which includes _sld_volume_qa)
         self._sld_volume_qa.valueChanged.connect(self._on_sound_volume_changed)
+        self._sld_buzzer_volume_qa.valueChanged.connect(self._on_sound_volume_changed)
+        self._sld_ai_voice_volume_qa.valueChanged.connect(self._on_human_voice_volume_changed)
 
     def _sync_behaviour_buttons(self) -> None:
         """Sync the three sentry-behaviour QA buttons to the current config value (radio-style)."""
@@ -28251,6 +28489,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._sld_volume_qa.blockSignals(True)
             self._sld_volume_qa.setValue(volume_pct)
             self._sld_volume_qa.blockSignals(False)
+        if hasattr(self, "_sld_buzzer_volume_qa"):
+            self._sld_buzzer_volume_qa.blockSignals(True)
+            self._sld_buzzer_volume_qa.setValue(volume_pct)
+            self._sld_buzzer_volume_qa.setEnabled(enabled)
+            self._sld_buzzer_volume_qa.blockSignals(False)
+        if hasattr(self, "_lbl_buzzer_volume_qa"):
+            self._lbl_buzzer_volume_qa.setText(f"{volume_pct}%")
         if hasattr(self, "_combo_sound_personality"):
             combo_index = max(0, self._combo_sound_personality.findData(personality))
             self._combo_sound_personality.blockSignals(True)
@@ -28328,22 +28573,19 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._slider_human_voice_volume.setValue(human_voice_volume)
             self._slider_human_voice_volume.setEnabled(self._human_voice_supported())
             self._slider_human_voice_volume.blockSignals(False)
+        if hasattr(self, "_sld_ai_voice_volume_qa"):
+            self._sld_ai_voice_volume_qa.blockSignals(True)
+            self._sld_ai_voice_volume_qa.setValue(human_voice_volume)
+            self._sld_ai_voice_volume_qa.setEnabled(self._human_voice_supported())
+            self._sld_ai_voice_volume_qa.blockSignals(False)
+        if hasattr(self, "_lbl_ai_voice_volume_qa"):
+            self._lbl_ai_voice_volume_qa.setText(f"{human_voice_volume}%")
         if hasattr(self, "_lbl_human_voice_rate"):
             self._lbl_human_voice_rate.setText(f"{human_voice_rate}%")
         if hasattr(self, "_lbl_human_voice_pitch"):
             self._lbl_human_voice_pitch.setText(f"{human_voice_pitch}%")
         if hasattr(self, "_lbl_human_voice_volume"):
             self._lbl_human_voice_volume.setText("Muted" if human_voice_volume <= 0 else f"{human_voice_volume}%")
-        if hasattr(self, "_btn_buzzer_volume_qa"):
-            self._btn_buzzer_volume_qa.blockSignals(True)
-            self._btn_buzzer_volume_qa.setChecked(volume_pct > 0)
-            self._btn_buzzer_volume_qa.setEnabled(enabled)
-            self._btn_buzzer_volume_qa.blockSignals(False)
-        if hasattr(self, "_btn_ai_voice_volume_qa"):
-            self._btn_ai_voice_volume_qa.blockSignals(True)
-            self._btn_ai_voice_volume_qa.setChecked(human_voice_volume > 0)
-            self._btn_ai_voice_volume_qa.setEnabled(self._human_voice_supported())
-            self._btn_ai_voice_volume_qa.blockSignals(False)
         if hasattr(self, "_lbl_human_voice_status"):
             self._update_human_voice_status_label()
         if hasattr(self, "_btn_test_human_voice"):
@@ -28524,16 +28766,6 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._queue_setting_change_announcement("Sound volume", f"{self._sound_volume_pct()} percent")
         if bool(getattr(self.config.sound, "enabled", True)) and self._sound_volume_pct() > 0:
             self._sound_engine.note_settings_changed()
-
-    def _on_qa_buzzer_volume_toggled(self, checked: bool) -> None:
-        if checked:
-            restore = int(getattr(self, "_qa_prev_buzzer_volume", 65) or 65)
-            self._on_sound_volume_changed(max(1, min(100, restore)))
-            return
-        current = self._sound_volume_pct()
-        if current > 0:
-            self._qa_prev_buzzer_volume = current
-        self._on_sound_volume_changed(0)
 
     def _on_auto_lighting_toggled(self, checked: bool) -> None:
         self.config.lighting.auto_lighting_enabled = bool(checked)
@@ -28812,16 +29044,6 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._sync_sound_widgets()
         self._save_config_quietly()
         self._queue_setting_change_announcement("Voice volume", f"{self.config.sound.human_voice_volume_pct} percent")
-
-    def _on_qa_ai_voice_volume_toggled(self, checked: bool) -> None:
-        if checked:
-            restore = int(getattr(self, "_qa_prev_ai_voice_volume", 85) or 85)
-            self._on_human_voice_volume_changed(max(1, min(100, restore)))
-            return
-        current = self._human_voice_volume_pct()
-        if current > 0:
-            self._qa_prev_ai_voice_volume = current
-        self._on_human_voice_volume_changed(0)
 
     def _on_test_human_voice_clicked(self) -> None:
         if not self._human_voice_supported():
