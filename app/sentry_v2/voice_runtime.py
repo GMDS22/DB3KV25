@@ -805,6 +805,11 @@ class VoskCommandListener:
         # callback thread; read by the recognition loop to detect a stalled device.
         # Python float writes are GIL-atomic, so no extra lock is needed here.
         self._last_audio_ts: float = time.monotonic()
+        # Monotonic timestamp of the last chunk whose raw RMS was > 0, tracked in the
+        # recognition loop.  Used to detect persistent zero-signal (e.g. hardware mute
+        # or device reconnect) and force a stream restart before the stall watchdog would
+        # normally fire.  Initialized to monotonic time so the grace window starts at boot.
+        self._last_nonzero_audio_ts: float = time.monotonic()
         # Recognition-loop-side activity stamp: monotonic time of the last audio chunk
         # that was pulled from the queue AND passed the RMS gate in the recognition loop.
         # Initialized to 0.0 so the 10-second silence warning never fires at startup
@@ -2621,6 +2626,7 @@ class VoskCommandListener:
         # Tunable I/O watchdog constants (not configurable at runtime; change here if needed).
         _QUEUE_TIMEOUT_S: float = 2.0   # how long to wait for each audio frame from the queue
         _STALL_TIMEOUT_S: float = 5.0   # seconds of silence from callback before declaring a stall
+        _ZERO_SIGNAL_RESTART_S: float = 20.0  # persistent rms=0 seconds before forcing a stream restart
         _MAX_RESTART: int = 3           # max consecutive stream restart attempts before giving up
 
         self._stream_restart_attempts = 0
@@ -2633,8 +2639,9 @@ class VoskCommandListener:
                     self._audio_queue.get_nowait()
                 except queue.Empty:
                     break
-            # Reset the watchdog clock for the new stream attempt.
+            # Reset the watchdog clocks for the new stream attempt.
             self._last_audio_ts = time.monotonic()
+            self._last_nonzero_audio_ts = time.monotonic()
 
             try:
                 device_index = self._resolve_input_device(sd)
@@ -2714,6 +2721,32 @@ class VoskCommandListener:
                             rms = int(audioop.rms(chunk, 2))
                         except Exception:
                             rms = 0
+                        # ── Zero-signal watchdog ────────────────────────────────────────
+                        # The stall watchdog (queue.Empty path above) only fires when the
+                        # callback stops delivering frames entirely.  A device that streams
+                        # all-zero PCM (hardware mute, device reconnect, driver reset) keeps
+                        # the queue full and bypasses that check.  Detect persistent zero-
+                        # signal here and force a stream restart so the device is re-opened
+                        # on the new default (e.g. a freshly connected microphone).
+                        _now_mono = time.monotonic()
+                        if rms > 0:
+                            self._last_nonzero_audio_ts = _now_mono
+                        elif _now_mono - self._last_nonzero_audio_ts > _ZERO_SIGNAL_RESTART_S:
+                            self._stream_restart_attempts += 1
+                            if self._stream_restart_attempts > _MAX_RESTART:
+                                self._on_log(
+                                    "[VOICE] Persistent zero-signal — max restart attempts reached, "
+                                    "disabling voice input"
+                                )
+                                self._emit_transcript("status", "mic_error", source="watchdog")
+                                return
+                            self._on_log(
+                                f"[VOICE] Persistent zero-signal detected — restarting audio stream "
+                                f"({self._stream_restart_attempts}/{_MAX_RESTART}); "
+                                "device may have been muted or disconnected"
+                            )
+                            self._last_nonzero_audio_ts = _now_mono  # reset so we don't loop-restart
+                            break  # exit inner loop; outer loop will reopen the stream
                         if not self._should_process_recognizer_audio(rms):
                             continue
                         # Device is delivering healthy audio — reset the stall counter
@@ -2916,17 +2949,29 @@ try {{
         if os.name != "nt":
             super()._listen_loop()
             return
+        _ps_script_path: Optional[str] = None
         try:
+            import tempfile
             script = self._powershell_listener_script()
-            encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+            # Write the script to a temp file and pass via -File to avoid the
+            # Windows CreateProcess command-line 32 767-character limit that
+            # causes [WinError 206] when the grammar phrase list is large.
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=".ps1",
+                delete=False,
+                encoding="utf-8",
+            ) as _tf:
+                _tf.write(script)
+                _ps_script_path = _tf.name
             self._recognizer_process = subprocess.Popen(
                 [
                     "powershell.exe",
                     "-NoProfile",
                     "-ExecutionPolicy",
                     "Bypass",
-                    "-EncodedCommand",
-                    encoded,
+                    "-File",
+                    _ps_script_path,
                 ],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
@@ -2938,6 +2983,11 @@ try {{
             )
         except Exception as exc:
             self._on_log(f"[VOICE] Windows speech listener unavailable; falling back to Vosk: {exc}")
+            if _ps_script_path:
+                try:
+                    os.unlink(_ps_script_path)
+                except Exception:
+                    pass
             super()._listen_loop()
             return
 
@@ -2991,6 +3041,11 @@ try {{
         finally:
             self._terminate_recognizer_process()
             self._signature_probe.stop()
+            if _ps_script_path:
+                try:
+                    os.unlink(_ps_script_path)
+                except Exception:
+                    pass
 
         if not self._stop.is_set():
             self._on_log("[VOICE] Windows speech listener exited; falling back to Vosk")

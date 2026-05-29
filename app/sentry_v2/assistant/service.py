@@ -1398,7 +1398,7 @@ class LocalAssistantService:
                 options=self._llm_options(max_output_tokens=220, temperature=0.15),
             )
             return AssistantReply(
-                text=reply_text.strip(),
+                text=reply_text.strip() + "  End of analysys report.",
                 source="ollama",
                 findings=findings,
                 recommendations=recommendations,
@@ -1411,7 +1411,7 @@ class LocalAssistantService:
         except Exception as exc:
             fallback = self._fallback_analysis_text(snapshot, findings, recommendations)
             return AssistantReply(
-                text=fallback,
+                text=fallback + "  End of analysys report.",
                 source="deterministic",
                 findings=findings,
                 recommendations=recommendations,
@@ -1442,7 +1442,7 @@ class LocalAssistantService:
                 options=self._llm_options(max_output_tokens=260, temperature=0.15),
             )
             return AssistantReply(
-                text=reply_text.strip(),
+                text=reply_text.strip() + "  End of analysys report.",
                 source="ollama",
                 findings=findings,
                 recommendations=recommendations,
@@ -1455,7 +1455,7 @@ class LocalAssistantService:
         except Exception as exc:
             fallback = self._fallback_recommendation_text(recommendations)
             return AssistantReply(
-                text=fallback,
+                text=fallback + "  End of analysys report.",
                 source="deterministic",
                 findings=findings,
                 recommendations=recommendations,

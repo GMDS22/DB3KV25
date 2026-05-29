@@ -30,6 +30,7 @@ from .ml_training_logger import MLTrainingLogger
 from .sentry_v2_pir_manager import SentryV2PIRManager
 from .precision_tuning_logger import PrecisionTuningLogger
 from .autotracking_logger import AutotrackingLogger
+from .scene_memory import SceneMemory
 
 
 NON_SEMANTIC_REACQUIRE_CLASSES = {"moving_object", "motion", "foreground", "color", "unknown"}
@@ -74,6 +75,7 @@ class SentryV2Engine:
         self._scorer = ThreatScorer(config.threat_scoring, config.target_filter, self._ml_logger)
         self._planner = EngagementPlanner(config.engagement, config.guard, config.no_fire_masks)
         self._pir_manager = SentryV2PIRManager(config.pir_guard)
+        self._scene_memory = SceneMemory()
 
         # Turret state (tracked by main app, seeded from guard config)
         self.current_pan: float = config.guard.guard_pan
@@ -439,6 +441,10 @@ class SentryV2Engine:
         # 2. Score
         scored = self._scorer.score(qualified, now)
         self.last_targets = scored
+
+        # 2b. Record detections in scene memory for class-prior tracking.
+        for _t in scored:
+            self._scene_memory.record(_t.det, now)
 
         # Log YOLO detections if autotracking logging enabled
         if self._log_autotracking and scored:
@@ -840,6 +846,13 @@ class SentryV2Engine:
         # Check for threats first — engagement always takes priority
         if targets_for_engagement:
             if now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown:
+                # Apply scene-memory class-prior as a soft tiebreaker so classes
+                # observed more often in this session are preferred when threat
+                # scores are similar.  The bias is capped at 20 % to avoid
+                # overriding a genuine threat-score difference.
+                targets_for_engagement = self._scene_memory.order_candidates_by_prior(
+                    targets_for_engagement, now
+                )
                 queue = self._planner.plan(targets_for_engagement, self.current_pan, self.current_tilt)
                 if queue:
                     # Log engagement promotion for primary target
@@ -1179,6 +1192,13 @@ class SentryV2Engine:
             speed_ratio = float(max(10, min(100, int(getattr(self.cfg.engagement, "engagement_speed", 80) or 80))) - 10) / 90.0
             aim_settle_time = max(0.02, 0.20 * (1.0 - speed_ratio * 0.92))
             if self._acquire_phase_ready(now, aim_settle_time):
+                target = self._find_active_target(order)
+                if target is not None:
+                    raw_err_pan, raw_err_tilt = self._compute_target_angle_error(target.det)
+                    if self._needs_additional_coarse_acquire(raw_err_pan, raw_err_tilt):
+                        self._phase_start = now
+                        self._issue_coarse_acquire_move(order, target=target, now=now)
+                        return
                 if self.cfg.engagement.precision_aim_enabled:
                     self._enter_precision_phase(now, order)
                 else:
@@ -1939,22 +1959,54 @@ class SentryV2Engine:
         self._engage_phase = "aim"
         self._phase_start = now
         target = self._find_active_target(order)
+        self._issue_coarse_acquire_move(order, target=target, now=now)
+
+    def _coarse_acquire_handoff_tolerances(self) -> Tuple[float, float]:
+        eng = self.cfg.engagement
+        pan_tol = max(
+            2.0,
+            float(getattr(eng, "aim_lock_pan_tolerance", 0.65) or 0.65) * 3.0,
+            float(getattr(eng, "precision_max_pan_step", getattr(eng, "precision_max_step", 0.85)) or 0.85) * 2.0,
+        )
+        tilt_tol = max(
+            1.6,
+            float(getattr(eng, "aim_lock_tilt_tolerance", 0.55) or 0.55) * 3.0,
+            float(getattr(eng, "precision_max_tilt_step", getattr(eng, "precision_max_step", 0.85)) or 0.85) * 2.0,
+        )
+        return float(pan_tol), float(tilt_tol)
+
+    def _needs_additional_coarse_acquire(self, err_pan: float, err_tilt: float) -> bool:
+        pan_tol, tilt_tol = self._coarse_acquire_handoff_tolerances()
+        return abs(float(err_pan)) > pan_tol or abs(float(err_tilt)) > tilt_tol
+
+    def _coarse_acquire_step(self, err_pan: float, err_tilt: float) -> Tuple[float, float]:
+        max_step_pan = max(1.9, float(getattr(self.cfg.engagement, "precision_max_pan_step", 0.0) or 0.0) * 2.35)
+        max_step_tilt = max(1.5, float(getattr(self.cfg.engagement, "precision_max_tilt_step", 0.0) or 0.0) * 2.35)
+        # Large first errors get a slightly softer cap to reduce initial overshoot,
+        # while still keeping acquisition noticeably quick.
+        if abs(float(err_pan)) >= 8.0:
+            max_step_pan *= 0.82
+        if abs(float(err_tilt)) >= 6.0:
+            max_step_tilt *= 0.82
+        step_pan = max(-max_step_pan, min(max_step_pan, float(err_pan)))
+        step_tilt = max(-max_step_tilt, min(max_step_tilt, float(err_tilt)))
+        return float(step_pan), float(step_tilt)
+
+    def _issue_coarse_acquire_move(
+        self,
+        order: EngagementOrder,
+        *,
+        target: Optional[TrackedTarget],
+        now: float,
+    ) -> None:
         if target is not None:
             # Initial acquire must be derived from live target position, but keep
             # the first jump bounded to avoid abrupt moves from stale queue plans.
             # Use raw (non-predictive) target error for the first acquire move;
             # predictive lead can overshoot during guard->engage handoff.
             err_pan, err_tilt = self._compute_target_angle_error(target.det)
-            max_step_pan = max(1.9, float(getattr(self.cfg.engagement, "precision_max_pan_step", 0.0) or 0.0) * 2.35)
-            max_step_tilt = max(1.5, float(getattr(self.cfg.engagement, "precision_max_tilt_step", 0.0) or 0.0) * 2.35)
-            # Large first errors get a slightly softer cap to reduce initial overshoot,
-            # while still keeping acquisition noticeably quick.
-            if abs(float(err_pan)) >= 8.0:
-                max_step_pan *= 0.82
-            if abs(float(err_tilt)) >= 6.0:
-                max_step_tilt *= 0.82
-            step_pan = max(-max_step_pan, min(max_step_pan, float(err_pan)))
-            step_tilt = max(-max_step_tilt, min(max_step_tilt, float(err_tilt)))
+            self._record_active_target_solution(target, now, err_pan, err_tilt)
+            step_pan, step_tilt = self._coarse_acquire_step(err_pan, err_tilt)
             self._move_turret(self.current_pan + step_pan, self.current_tilt + step_tilt)
         else:
             self._move_turret(order.pan, order.tilt)
