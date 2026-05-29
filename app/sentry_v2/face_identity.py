@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 import uuid
@@ -28,6 +29,7 @@ _SFACE_MAX_DETECT_DIM = 640
 _SFACE_EMBEDDING_SIZE = 128
 _SFACE_RECOMMENDED_COSINE_THRESHOLD = 0.363
 _SFACE_AMBIGUITY_MARGIN = 0.015
+_MIN_EMBEDDING_NORM = 1e-7  # embeddings with norm at or below this are treated as zero
 
 
 @dataclass
@@ -53,6 +55,15 @@ class FaceMatchResult:
     friendly: bool = False
     announce_name: bool = False
     cute_gesture: bool = False
+
+
+@dataclass
+class UnknownFaceDetection:
+    """A detected face that did not match any enrolled profile."""
+    bbox: Tuple[int, int, int, int]
+    crop_bgr: Optional[np.ndarray]
+    embedding: Optional[np.ndarray]
+    temp_id: str
 
 
 @dataclass
@@ -477,6 +488,91 @@ class FaceIdentityRuntime:
             )
         return results
 
+    def detect_unknown_faces(
+        self,
+        frame: np.ndarray,
+        *,
+        min_face_size_px: int = 56,
+        person_boxes: Optional[List[Tuple[int, int, int, int]]] = None,
+        threshold: float = 0.82,
+        min_profile_embeddings: int = 1,
+    ) -> List[UnknownFaceDetection]:
+        """
+        Detect faces that do NOT match any enrolled profile.
+
+        Returns crop images and embeddings suitable for auto-enrollment.
+        This is intentionally separate from ``match_known_faces`` so it can
+        be called even when no profiles are enrolled yet.
+        """
+        if frame is None or frame.size == 0:
+            return []
+        faces = self._detect_face_entries(
+            frame,
+            min_face_size_px=min_face_size_px,
+            roi_boxes=person_boxes,
+        )
+        required_samples = max(1, int(min_profile_embeddings))
+        results: List[UnknownFaceDetection] = []
+        for face in faces:
+            embedding = self._embedding_from_face_entry(frame, face)
+            profile: Optional[FaceIdentityProfile] = None
+            confidence = 0.0
+
+            if embedding is not None:
+                profile, confidence = self._match_embedding(
+                    embedding,
+                    backend=self._active_backend,
+                    min_profile_embeddings=required_samples,
+                )
+
+            # Legacy fallback check (same logic as match_known_faces)
+            if (
+                (profile is None or confidence < float(threshold))
+                and self._allow_legacy_fallback
+                and self._active_backend == FACE_EMBEDDING_BACKEND_SFACE
+            ):
+                legacy_embedding = self._legacy_embedding_from_bbox(frame, face.bbox)
+                if legacy_embedding is not None:
+                    leg_profile, leg_confidence = self._match_embedding(
+                        legacy_embedding,
+                        backend=FACE_EMBEDDING_BACKEND_LEGACY,
+                        min_profile_embeddings=required_samples,
+                    )
+                    if leg_profile is not None and leg_confidence >= float(threshold):
+                        profile = leg_profile
+                        confidence = leg_confidence
+
+            # Only include if genuinely unmatched
+            if profile is not None and confidence >= float(threshold):
+                continue
+
+            # Crop face region
+            x, y, w, h = face.bbox
+            crop_bgr: Optional[np.ndarray] = None
+            try:
+                if w > 0 and h > 0:
+                    crop_bgr = frame[y: y + h, x: x + w].copy()
+                    if crop_bgr.size == 0:
+                        crop_bgr = None
+            except Exception:
+                crop_bgr = None
+
+            # Stable temp_id from embedding bytes; fall back to bbox string
+            if embedding is not None:
+                raw_id = hashlib.sha256(embedding.tobytes()).hexdigest()[:16]
+            else:
+                raw_id = hashlib.sha256(str(face.bbox).encode()).hexdigest()[:16]
+
+            results.append(
+                UnknownFaceDetection(
+                    bbox=face.bbox,
+                    crop_bgr=crop_bgr,
+                    embedding=embedding,
+                    temp_id=raw_id,
+                )
+            )
+        return results
+
     def _match_embedding(
         self,
         embedding: np.ndarray,
@@ -484,6 +580,8 @@ class FaceIdentityRuntime:
         backend: Optional[str] = None,
         min_profile_embeddings: int = 1,
     ) -> Tuple[Optional[FaceIdentityProfile], float]:
+        if embedding is None:
+            return None, 0.0
         best_profile: Optional[FaceIdentityProfile] = None
         best_score = -1.0
         runner_up_score = -1.0
@@ -499,7 +597,7 @@ class FaceIdentityRuntime:
                 if candidate.size != embedding.size:
                     continue
                 denom = float(np.linalg.norm(embedding) * np.linalg.norm(candidate))
-                if denom <= 1e-6:
+                if denom <= _MIN_EMBEDDING_NORM:
                     continue
                 score = float(np.dot(embedding, candidate) / denom)
                 scores.append(score)
@@ -559,7 +657,7 @@ class FaceIdentityRuntime:
             if vector.size != _SFACE_EMBEDDING_SIZE:
                 return None
             norm = float(np.linalg.norm(vector))
-            if norm > 1e-6:
+            if norm > _MIN_EMBEDDING_NORM:
                 return vector / norm
             return None
         return self._legacy_embedding_from_bbox(frame, face.bbox)
@@ -580,7 +678,7 @@ class FaceIdentityRuntime:
         histogram = cv2.calcHist([resized], [0], None, [16], [0, 256]).flatten().astype(np.float32)
         vector = np.concatenate([low_freq.astype(np.float32), histogram], axis=0)
         norm = float(np.linalg.norm(vector))
-        if norm <= 1e-6:
+        if norm <= _MIN_EMBEDDING_NORM:
             return None
         return vector / norm
 
@@ -594,13 +692,15 @@ class FaceIdentityRuntime:
         if frame is None or frame.size == 0:
             return []
         if self._active_backend == FACE_EMBEDDING_BACKEND_SFACE and self._face_detector is not None:
-            entries = self._detect_face_entries_sface(
+            # When the model-backed detector is active, an empty YuNet result should
+            # stay empty instead of falling through to the legacy Haar cascade.
+            # Falling back on every miss makes non-face textures and body regions show
+            # up as face detections, especially in the right-side unknown-face queue.
+            return self._detect_face_entries_sface(
                 frame,
                 min_face_size_px=min_face_size_px,
                 roi_boxes=roi_boxes,
             )
-            if entries:
-                return entries
         return self._detect_face_entries_legacy(
             frame,
             min_face_size_px=min_face_size_px,

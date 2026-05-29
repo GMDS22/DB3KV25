@@ -1,0 +1,318 @@
+{
+  "generated_at_local": "2026-05-13 00:29:37",
+  "generated_at_epoch_s": 1778603377.0906494,
+  "entry_count": 10,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 1,
+    "operator": 7
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 6,
+    "voice_transcript_final": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 8
+  },
+  "voice_transcript_summary": {
+    "partial_count": 6,
+    "final_count": 1,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "smart sentry anomaly automatic",
+  "latest_operator_request": "smart sentry anomaly automatic",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup.",
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778603016.632579,
+      "timestamp_local": "2026-05-13 00:23:36",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778603016.6335783,
+      "timestamp_local": "2026-05-13 00:23:36",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778603017.9451694,
+      "timestamp_local": "2026-05-13 00:23:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778603017.9451694,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778603060.775525,
+      "timestamp_local": "2026-05-13 00:24:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603060.775525,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778603061.0337934,
+      "timestamp_local": "2026-05-13 00:24:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603061.0337934,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778603061.2922134,
+      "timestamp_local": "2026-05-13 00:24:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry anomaly",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603061.2922134,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778603062.0292783,
+      "timestamp_local": "2026-05-13 00:24:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry announcements",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603062.0292783,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778603062.2742584,
+      "timestamp_local": "2026-05-13 00:24:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry anomaly acoustic",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603062.2742584,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778603098.0249224,
+      "timestamp_local": "2026-05-13 00:24:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry anomaly automatic",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603098.0249224,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778603135.6544402,
+      "timestamp_local": "2026-05-13 00:25:35",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "smart sentry anomaly automatic",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778603135.6544402,
+        "source": "final"
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778603016.632579,
+      "timestamp_local": "2026-05-13 00:23:36",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778603016.6335783,
+      "timestamp_local": "2026-05-13 00:23:36",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778603017.9451694,
+      "timestamp_local": "2026-05-13 00:23:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778603017.9451694,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778603060.775525,
+      "timestamp_local": "2026-05-13 00:24:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603060.775525,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778603061.0337934,
+      "timestamp_local": "2026-05-13 00:24:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603061.0337934,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778603061.2922134,
+      "timestamp_local": "2026-05-13 00:24:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry anomaly",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603061.2922134,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778603062.0292783,
+      "timestamp_local": "2026-05-13 00:24:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry announcements",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603062.0292783,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778603062.2742584,
+      "timestamp_local": "2026-05-13 00:24:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry anomaly acoustic",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603062.2742584,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778603098.0249224,
+      "timestamp_local": "2026-05-13 00:24:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry anomaly automatic",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778603098.0249224,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778603135.6544402,
+      "timestamp_local": "2026-05-13 00:25:35",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "smart sentry anomaly automatic",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778603135.6544402,
+        "source": "final"
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260513_002937.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260513_002937.md"
+  }
+}

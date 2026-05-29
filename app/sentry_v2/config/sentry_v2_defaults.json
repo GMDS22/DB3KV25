@@ -36,6 +36,7 @@
     "trigger_mosfet_pulse_ms": 120,
     "trigger_mosfet_cycle_count": 1,
     "trigger_mosfet_cycle_off_ms": 50,
+    "trigger_output_active_low": false,
     "trigger_servo_rest_deg": 0,
     "trigger_servo_fire_deg": 45,
     "trigger_servo_speed_dps": 360

@@ -1,0 +1,1647 @@
+{
+  "generated_at_local": "2026-05-06 14:12:18",
+  "generated_at_epoch_s": 1778047938.8617787,
+  "entry_count": 90,
+  "counts_by_role": {
+    "assistant": 11,
+    "system": 1,
+    "operator": 78
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 2,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "spoken_confirmation": 8,
+    "voice_transcript_partial": 51,
+    "voice_transcript_final": 13,
+    "voice_command": 14
+  },
+  "counts_by_channel": {
+    "text": 3,
+    "voice": 87
+  },
+  "voice_transcript_summary": {
+    "partial_count": 51,
+    "final_count": 13,
+    "voice_command_count": 14,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "elion tracking voice use turn guard hold position",
+  "latest_operator_request": "elion tracking voice use turn guard hold position",
+  "latest_assistant_message": "Understood. Holding position. Tell me when to resume guarding mode.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup.",
+    "More normalized voice commands were dispatched than final transcript events were captured. Compare transcript text against command text to catch aggressive normalization or routing drift."
+  ],
+  "recent_turns": [
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1778047924.3004622,
+      "timestamp_local": "2026-05-06 14:12:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active target matching",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047924.3004622,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 80,
+      "timestamp_epoch_s": 1778047925.0407436,
+      "timestamp_local": "2026-05-06 14:12:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active target alion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047925.0407436,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 81,
+      "timestamp_epoch_s": 1778047925.2504256,
+      "timestamp_local": "2026-05-06 14:12:05",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 82,
+      "timestamp_epoch_s": 1778047925.5401604,
+      "timestamp_local": "2026-05-06 14:12:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active target alion show",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047925.5401604,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 83,
+      "timestamp_epoch_s": 1778047925.7971268,
+      "timestamp_local": "2026-05-06 14:12:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active target alion show the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047925.7971268,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1778047926.1404169,
+      "timestamp_local": "2026-05-06 14:12:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active target alion tuning",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047926.1404169,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1778047930.8476412,
+      "timestamp_local": "2026-05-06 14:12:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn guard hey",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047930.8476412,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1778047931.3556824,
+      "timestamp_local": "2026-05-06 14:12:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn guard hold position",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047931.3556824,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1778047932.7247996,
+      "timestamp_local": "2026-05-06 14:12:12",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion tracking voice use turn guard hold position",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047932.7247996,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1778047933.0609205,
+      "timestamp_local": "2026-05-06 14:12:13",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion tracking voice use turn guard hold position",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1778047934.2096896,
+      "timestamp_local": "2026-05-06 14:12:14",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Understood. Holding position. Tell me when to resume guarding mode.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1778047938.3383968,
+      "timestamp_local": "2026-05-06 14:12:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "voice cleanup turn guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047938.3383968,
+        "source": "vosk",
+        "frequency_hz": 149.6,
+        "rms": 495,
+        "updated_at": 1778047936.4325988
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778047798.70338,
+      "timestamp_local": "2026-05-06 14:09:58",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778047798.7044172,
+      "timestamp_local": "2026-05-06 14:09:58",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778047799.8448658,
+      "timestamp_local": "2026-05-06 14:09:59",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778047799.8448658,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778047839.7341404,
+      "timestamp_local": "2026-05-06 14:10:39",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Good to go. Ask your question naturally, or say Elion first if you want a dedicated conversation window.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778047847.2492151,
+      "timestamp_local": "2026-05-06 14:10:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "go ask a question natural the voice alien face e",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047847.2492151,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778047847.258746,
+      "timestamp_local": "2026-05-06 14:10:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "go ask a question natural the voice alien face e want to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047847.258746,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778047847.4974732,
+      "timestamp_local": "2026-05-06 14:10:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "go ask a question natural the voice alien face e want the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047847.4974732,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778047848.6987612,
+      "timestamp_local": "2026-05-06 14:10:48",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion to go ask a question natural the voice face e want that",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047848.6987612,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778047848.750044,
+      "timestamp_local": "2026-05-06 14:10:48",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion to go ask a question natural the voice face e want that",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778047848.7510467,
+      "timestamp_local": "2026-05-06 14:10:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "active",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047848.7510467,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778047849.6064167,
+      "timestamp_local": "2026-05-06 14:10:49",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "active",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047849.6064167,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778047854.003676,
+      "timestamp_local": "2026-05-06 14:10:54",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active targets recognition",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047854.003676,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778047854.2429125,
+      "timestamp_local": "2026-05-06 14:10:54",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active targets running no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047854.2429125,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778047855.1267152,
+      "timestamp_local": "2026-05-06 14:10:55",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "standby guard no active targets fire no",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047855.1267152,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778047858.760284,
+      "timestamp_local": "2026-05-06 14:10:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047858.760284,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778047858.8180604,
+      "timestamp_local": "2026-05-06 14:10:58",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778047859.8438246,
+      "timestamp_local": "2026-05-06 14:10:59",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047859.8438246,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778047868.00463,
+      "timestamp_local": "2026-05-06 14:11:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn guard hold position standby guard no active targets",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047868.00463,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778047868.2548382,
+      "timestamp_local": "2026-05-06 14:11:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn guard hold position standby guard no active targets running",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047868.2548382,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778047868.5126588,
+      "timestamp_local": "2026-05-06 14:11:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn guard hold position standby guard no active targets for human",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047868.5126588,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778047868.7585368,
+      "timestamp_local": "2026-05-06 14:11:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn guard hold position standby guard no active targets running",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047868.7585368,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778047869.2038808,
+      "timestamp_local": "2026-05-06 14:11:09",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "tracking voice use wait activate turn guard hold position standby guard no active targets running",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047869.2038808,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778047869.4440844,
+      "timestamp_local": "2026-05-06 14:11:09",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "tracking voice use wait activate turn guard hold position standby guard no active targets running",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778047869.3826475,
+      "timestamp_local": "2026-05-06 14:11:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047869.3826475,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778047869.4974282,
+      "timestamp_local": "2026-05-06 14:11:09",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778047870.554446,
+      "timestamp_local": "2026-05-06 14:11:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047870.554446,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778047871.415259,
+      "timestamp_local": "2026-05-06 14:11:11",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion who are you",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047871.415259,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1778047871.4939775,
+      "timestamp_local": "2026-05-06 14:11:11",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion who are you",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1778047871.6885028,
+      "timestamp_local": "2026-05-06 14:11:11",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "I am Elion Mosk, or Elion for short, Smart Sentry's runtime AI assistant by GM Labs, a personal project by Gino. I provide live analysis, diagnostics, supported command handling, and supported runtime setting updates.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": true
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1778047872.2946987,
+      "timestamp_local": "2026-05-06 14:11:12",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Understood. Holding position. Tell me when to resume guarding mode.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1778047875.5539417,
+      "timestamp_local": "2026-05-06 14:11:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking paused use leon turn guard hold position",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047875.5539417,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1778047875.8036458,
+      "timestamp_local": "2026-05-06 14:11:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking paused use leon turn guard hold position status",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047875.8036458,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1778047876.0534415,
+      "timestamp_local": "2026-05-06 14:11:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking paused use leon turn guard hold position standby",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047876.0534415,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1778047876.5549436,
+      "timestamp_local": "2026-05-06 14:11:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking paused use leon turn guard hold position standby guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047876.5549436,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1778047876.8082428,
+      "timestamp_local": "2026-05-06 14:11:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking paused use leon turn guard hold position standby guard no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047876.8082428,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1778047877.0553184,
+      "timestamp_local": "2026-05-06 14:11:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking paused use leon turn guard hold position standby guard no active",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047877.0553184,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1778047877.5546093,
+      "timestamp_local": "2026-05-06 14:11:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking paused use leon turn guard hold position standby guard no active targets",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047877.5546093,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1778047877.8036206,
+      "timestamp_local": "2026-05-06 14:11:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking paused use leon turn guard hold position standby guard no active targets running",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047877.8036206,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1778047878.0551872,
+      "timestamp_local": "2026-05-06 14:11:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking paused use leon turn guard hold position standby guard no active targets on no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047878.0551872,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1778047879.197147,
+      "timestamp_local": "2026-05-06 14:11:19",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "tracking paused use wait activate turn guard hold position standby guard no active targets no",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047879.197147,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1778047879.2972338,
+      "timestamp_local": "2026-05-06 14:11:19",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "tracking paused use wait activate turn guard hold position standby guard no active targets no",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1778047880.089507,
+      "timestamp_local": "2026-05-06 14:11:20",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Understood. Holding position. Tell me when to resume guarding mode.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1778047885.1705503,
+      "timestamp_local": "2026-05-06 14:11:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on gesture hold tell me why resume guarding",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047885.1705503,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1778047885.2405863,
+      "timestamp_local": "2026-05-06 14:11:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on gesture hold tell me why resume guarding mode",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047885.2405863,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1778047886.4898334,
+      "timestamp_local": "2026-05-06 14:11:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on gesture hold tell me why resume guarding mode running",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047886.4898334,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1778047886.7410448,
+      "timestamp_local": "2026-05-06 14:11:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on gesture hold tell me why resume guarding mode run the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047886.7410448,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1778047886.995737,
+      "timestamp_local": "2026-05-06 14:11:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on gesture hold tell me why resume guarding mode run the smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047886.995737,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1778047887.2425716,
+      "timestamp_local": "2026-05-06 14:11:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on gesture hold tell me why resume guarding mode run the smart sentry",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047887.2425716,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1778047888.2454767,
+      "timestamp_local": "2026-05-06 14:11:28",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047888.2454767,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1778047888.3908513,
+      "timestamp_local": "2026-05-06 14:11:28",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1778047889.199893,
+      "timestamp_local": "2026-05-06 14:11:29",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Connecting Smart Sentry boards now.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1778047892.5140707,
+      "timestamp_local": "2026-05-06 14:11:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "setting guard no active",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047892.5140707,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1778047892.7539754,
+      "timestamp_local": "2026-05-06 14:11:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "setting guard no active shortcuts",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047892.7539754,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1778047893.25115,
+      "timestamp_local": "2026-05-06 14:11:33",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "setting guard no active shortcuts for human",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047893.25115,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1778047893.5047214,
+      "timestamp_local": "2026-05-06 14:11:33",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "setting guard no active shortcuts for human voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047893.5047214,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1778047894.3778942,
+      "timestamp_local": "2026-05-06 14:11:34",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "setting guard no active shortcuts for human",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047894.3778942,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1778047894.5061147,
+      "timestamp_local": "2026-05-06 14:11:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047894.5061147,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1778047894.7744539,
+      "timestamp_local": "2026-05-06 14:11:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the alion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047894.7744539,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 59,
+      "timestamp_epoch_s": 1778047895.0285382,
+      "timestamp_local": "2026-05-06 14:11:35",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 60,
+      "timestamp_epoch_s": 1778047895.2581406,
+      "timestamp_local": "2026-05-06 14:11:35",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the alion change your voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047895.2581406,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 61,
+      "timestamp_epoch_s": 1778047904.2261872,
+      "timestamp_local": "2026-05-06 14:11:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking paused use leon turn guard hold position is alion guard no active targets for human",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047904.2261872,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 62,
+      "timestamp_epoch_s": 1778047904.6154044,
+      "timestamp_local": "2026-05-06 14:11:44",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 63,
+      "timestamp_epoch_s": 1778047904.4818242,
+      "timestamp_local": "2026-05-06 14:11:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking paused use leon turn guard hold position is alion guard no active targets for human voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047904.4818242,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 64,
+      "timestamp_epoch_s": 1778047906.151457,
+      "timestamp_local": "2026-05-06 14:11:46",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion tracking paused use turn change guard hold position is guard no active targets for human",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047906.151457,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 65,
+      "timestamp_epoch_s": 1778047906.4967241,
+      "timestamp_local": "2026-05-06 14:11:46",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion tracking paused use turn change guard hold position is guard no active targets for human",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 66,
+      "timestamp_epoch_s": 1778047907.5273705,
+      "timestamp_local": "2026-05-06 14:11:47",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Understood. Holding position. Tell me when to resume guarding mode.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 67,
+      "timestamp_epoch_s": 1778047910.6494138,
+      "timestamp_local": "2026-05-06 14:11:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn turn guard hey",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047910.6494138,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1778047910.9020886,
+      "timestamp_local": "2026-05-06 14:11:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn turn guard home",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047910.9020886,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1778047911.149342,
+      "timestamp_local": "2026-05-06 14:11:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn turn guard hold position",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047911.149342,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1778047912.148732,
+      "timestamp_local": "2026-05-06 14:11:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn turn guard hold position who are you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047912.148732,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1778047913.0387053,
+      "timestamp_local": "2026-05-06 14:11:53",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "tracking pause use make optimise turn guard hold position who are you",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047913.0387053,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1778047913.0979087,
+      "timestamp_local": "2026-05-06 14:11:53",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "tracking pause use make optimise turn guard hold position who are you",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1778047914.0184631,
+      "timestamp_local": "2026-05-06 14:11:54",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Understood. Holding position. Tell me when to resume guarding mode.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1778047919.1512914,
+      "timestamp_local": "2026-05-06 14:11:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on the search hold position tell me why to resume guarding mode",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047919.1512914,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1778047920.159302,
+      "timestamp_local": "2026-05-06 14:12:00",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "resume guarding mode",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047920.159302,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1778047920.261451,
+      "timestamp_local": "2026-05-06 14:12:00",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "resume guarding mode",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1778047921.5582356,
+      "timestamp_local": "2026-05-06 14:12:01",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Resuming guarding mode now.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1778047924.039339,
+      "timestamp_local": "2026-05-06 14:12:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047924.039339,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1778047924.3004622,
+      "timestamp_local": "2026-05-06 14:12:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active target matching",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047924.3004622,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 80,
+      "timestamp_epoch_s": 1778047925.0407436,
+      "timestamp_local": "2026-05-06 14:12:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active target alion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047925.0407436,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 81,
+      "timestamp_epoch_s": 1778047925.2504256,
+      "timestamp_local": "2026-05-06 14:12:05",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 82,
+      "timestamp_epoch_s": 1778047925.5401604,
+      "timestamp_local": "2026-05-06 14:12:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active target alion show",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047925.5401604,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 83,
+      "timestamp_epoch_s": 1778047925.7971268,
+      "timestamp_local": "2026-05-06 14:12:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active target alion show the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047925.7971268,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1778047926.1404169,
+      "timestamp_local": "2026-05-06 14:12:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active target alion tuning",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047926.1404169,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1778047930.8476412,
+      "timestamp_local": "2026-05-06 14:12:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn guard hey",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047930.8476412,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1778047931.3556824,
+      "timestamp_local": "2026-05-06 14:12:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking voice use leon turn guard hold position",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047931.3556824,
+        "source": "vosk",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1778047932.7247996,
+      "timestamp_local": "2026-05-06 14:12:12",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion tracking voice use turn guard hold position",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778047932.7247996,
+        "source": "final",
+        "frequency_hz": 302.0,
+        "rms": 492,
+        "updated_at": 1778047847.7378879
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1778047933.0609205,
+      "timestamp_local": "2026-05-06 14:12:13",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion tracking voice use turn guard hold position",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1778047934.2096896,
+      "timestamp_local": "2026-05-06 14:12:14",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Understood. Holding position. Tell me when to resume guarding mode.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1778047938.3383968,
+      "timestamp_local": "2026-05-06 14:12:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "voice cleanup turn guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778047938.3383968,
+        "source": "vosk",
+        "frequency_hz": 149.6,
+        "rms": 495,
+        "updated_at": 1778047936.4325988
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/conversation_exports/sentry_v2_runtime_conversation_20260506_141218.json",
+    "markdown": "snapshots/conversation_exports/sentry_v2_runtime_conversation_20260506_141218.md"
+  }
+}

@@ -8,9 +8,17 @@ Designed as a dataclass for easy serialization / UI binding.
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+# Increment _CURRENT_SCHEMA_VERSION whenever a field is added, removed, or
+# renamed in SentryV2Config (or any sub-config that would break existing saves).
+# Bump this constant AND add a migration branch in SentryV2Config.from_dict().
+_CURRENT_SCHEMA_VERSION: int = 1
+
+_log = logging.getLogger(__name__)
 
 SENTRY_PAN_MIN = 0.0
 SENTRY_PAN_MAX = 270.0
@@ -190,6 +198,8 @@ class EngagementConfig:
     trigger_mosfet_pulse_ms: int = 120
     trigger_mosfet_cycle_count: int = 1
     trigger_mosfet_cycle_off_ms: int = 50
+    # False = active-HIGH trigger output (MOSFET driver), True = active-LOW relay module.
+    trigger_output_active_low: bool = False
     # Projectile trigger-servo tuning pushed to the active IO firmware at runtime.
     trigger_servo_rest_deg: int = 0
     trigger_servo_fire_deg: int = 45
@@ -292,8 +302,23 @@ class EngagementConfig:
     stationary_release_suppress_s: float = 10.0
     stationary_release_motion_px: float = 36.0
 
+    # Internal sentinel — set by __post_init__ so that re-constructing an
+    # EngagementConfig from an already-normalised dict (e.g. from_dict) does
+    # not re-run the clamping logic and drift values a second time.
+    # init=False keeps the field out of __init__'s signature, so
+    # EngagementConfig(**saved_dict) continues to work without modification.
+    _normalized: bool = field(default=False, init=False, repr=False)
+
     def __post_init__(self) -> None:
-        normalize_auto_trigger_engagement(self)
+        if not self._normalized:
+            normalize_auto_trigger_engagement(self)
+            self._normalized = True
+
+    def to_dict(self) -> dict:
+        """Serialise this config, excluding the internal ``_normalized`` sentinel."""
+        d = asdict(self)
+        d.pop("_normalized", None)
+        return d
 
 
 def normalize_auto_trigger_engagement(engagement: "EngagementConfig") -> List[str]:
@@ -535,11 +560,14 @@ class SoundConfig:
     volume_pct: int = 100
     personality: str = "sentinel"
     attitude_pct: int = 60
+    cue_output_route: str = "both"
+    event_sound_style: str = "classic"
+    event_sound_policy: str = "all_runtime"
     rest_cue_enabled: bool = True
     robot_voice_enabled: bool = True
-    human_voice_enabled: bool = False
+    human_voice_enabled: bool = True
     mute_buzzer_when_human_voice_enabled: bool = True
-    human_voice_name: str = "Microsoft Zira Desktop"
+    human_voice_name: str = ""
     human_voice_style: str = "neutral"
     human_voice_rate_pct: int = 100
     human_voice_pitch_pct: int = 100
@@ -554,8 +582,8 @@ class SoundConfig:
     voice_commands_enabled: bool = True
     voice_wake_word: str = "elion"
     voice_command_cooldown_s: float = 0.35
-    voice_operator_silence_hold_s: float = 0.45
-    voice_response_delay_s: float = 0.25
+    voice_operator_silence_hold_s: float = 0.18
+    voice_response_delay_s: float = 0.0
     voice_command_confidence_threshold: float = 0.78
     voice_command_ambiguous_threshold: float = 0.92
     voice_brief_responses: bool = False
@@ -587,11 +615,11 @@ class AcousticGuardConfig:
     device_name: str = ""
     sample_rate_hz: int = 16000
     block_size: int = 1024
-    warmup_seconds: float = 3.0
+    warmup_seconds: float = 4.0
     baseline_adapt_rate: float = 0.035
-    anomaly_threshold_db: float = 3.5
-    anomaly_zscore_threshold: float = 1.6
-    event_cooldown_s: float = 8.0
+    anomaly_threshold_db: float = 8.0
+    anomaly_zscore_threshold: float = 2.8
+    event_cooldown_s: float = 10.0
     queue_ttl_s: float = 14.0
     home_hold_s: float = 0.35
     pir_check_hold_s: float = 0.30
@@ -605,6 +633,8 @@ class FaceRecognitionConfig:
     """Known-face identification and friendly-recognition behavior."""
     enabled: bool = True
     library_path: str = CANONICAL_FACE_LIBRARY_PATH
+    operator_profile_id: str = ""
+    operator_profile_name: str = ""
     backend: str = "opencv_sface"
     detector_model_path: str = "app/models/face/face_detection_yunet_2023mar.onnx"
     recognizer_model_path: str = "app/models/face/face_recognition_sface_2021dec.onnx"
@@ -616,6 +646,11 @@ class FaceRecognitionConfig:
     cute_gesture_enabled: bool = True
     gesture_cooldown_s: float = 30.0
     registration_samples_required: int = 1
+    # When True (default), allow auto-fire on persons whose identity cannot be
+    # resolved — either because face recognition is disabled or because no
+    # matching face was found in the library.  Set to False to require an
+    # explicit hostile/unknown-accept decision before firing on any person.
+    fire_on_unknown_persons: bool = True
 
 
 @dataclass
@@ -636,7 +671,7 @@ class AIAssistantConfig:
     allow_runtime_analysis: bool = True
     allow_action_execution: bool = True
     auto_speak_responses: bool = False
-    auto_speak_requires_cue_name: bool = True
+    auto_speak_requires_cue_name: bool = False
 
 
 @dataclass
@@ -645,6 +680,7 @@ class ShortcutConfig:
     enabled: bool = True
     manual_controls_enabled: bool = False
     quick_view_doc_path: str = "SMART_SENTRY_SHORTCUT_KEYS.md"
+    bindings: Dict[str, List[str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -655,6 +691,8 @@ class ThemeConfig:
     surface_opacity_pct: int = 94
     video_panel_opacity_pct: int = 100
     window_opacity_pct: int = 100
+    hero_glow_pct: int = 100
+    divider_strength_pct: int = 100
     corner_radius_px: int = 14
     font_scale_pct: int = 100
     contrast_pct: int = 100
@@ -717,6 +755,10 @@ def normalize_connection_config(connection: "ConnectionConfig") -> List[str]:
 @dataclass
 class SentryV2Config:
     """Top-level configuration for SMART SENTRY V3."""
+    # schema_version is written to every saved file and checked on load so that
+    # upgrades between releases can be detected and handled gracefully.
+    # See _CURRENT_SCHEMA_VERSION and from_dict() for the migration path.
+    schema_version: int = _CURRENT_SCHEMA_VERSION
     connection: ConnectionConfig = field(default_factory=ConnectionConfig)
     detection_mode: DetectionModeConfig = field(default_factory=DetectionModeConfig)
     target_filter: TargetFilterConfig = field(default_factory=TargetFilterConfig)
@@ -740,6 +782,7 @@ class SentryV2Config:
     show_engagement_zone: bool = False
     show_guard_crosshair: bool = True
     show_no_fire_masks: bool = True
+    show_fire_veto_overlay: bool = True
     scope_view_enabled: bool = False
     scope_radius_pct: int = 35
     scope_vignette_opacity: int = 60
@@ -747,6 +790,7 @@ class SentryV2Config:
     main_splitter_sizes: List[int] = field(default_factory=list)
     layout_splitter_sizes: List[int] = field(default_factory=list)
     bottom_info_splitter_sizes: List[int] = field(default_factory=list)
+    telemetry_voice_splitter_sizes: List[int] = field(default_factory=list)
     quick_access_expanded: bool = False
     quick_access_pinned: bool = False
     quick_access_panel_height: int = 156
@@ -768,7 +812,12 @@ class SentryV2Config:
     # Serialization helpers
     # ------------------------------------------------------------------ #
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        # EngagementConfig carries an internal _normalized sentinel that must
+        # not be persisted — strip it here so old saves remain compatible.
+        if "engagement" in d and isinstance(d["engagement"], dict):
+            d["engagement"].pop("_normalized", None)
+        return d
 
     @staticmethod
     def _sanitize_guard_config(guard: GuardConfig) -> GuardConfig:
@@ -810,8 +859,83 @@ class SentryV2Config:
             guard.random_tilt_min, guard.random_tilt_max = guard.random_tilt_max, guard.random_tilt_min
         return guard
 
+    @staticmethod
+    def _sanitize_acoustic_guard_config(acoustic: AcousticGuardConfig) -> AcousticGuardConfig:
+        acoustic.sample_rate_hz = int(max(8000, acoustic.sample_rate_hz))
+        acoustic.block_size = int(max(128, acoustic.block_size))
+        acoustic.warmup_seconds = float(max(0.5, acoustic.warmup_seconds))
+        acoustic.baseline_adapt_rate = float(min(0.25, max(0.001, acoustic.baseline_adapt_rate)))
+        acoustic.anomaly_threshold_db = float(max(1.0, acoustic.anomaly_threshold_db))
+        acoustic.anomaly_zscore_threshold = float(max(0.5, acoustic.anomaly_zscore_threshold))
+        acoustic.event_cooldown_s = float(max(0.5, acoustic.event_cooldown_s))
+        acoustic.queue_ttl_s = float(max(1.0, acoustic.queue_ttl_s))
+        acoustic.home_hold_s = float(max(0.0, acoustic.home_hold_s))
+        acoustic.pir_check_hold_s = float(max(0.0, acoustic.pir_check_hold_s))
+        acoustic.quick_lr_hold_s = float(max(0.0, acoustic.quick_lr_hold_s))
+        acoustic.quick_lr_offset_deg = float(max(1.0, acoustic.quick_lr_offset_deg))
+        acoustic.sweep_speed_dps = float(max(1.0, acoustic.sweep_speed_dps))
+
+        if (
+            abs(acoustic.anomaly_threshold_db - 3.5) < 0.05
+            and abs(acoustic.anomaly_zscore_threshold - 1.6) < 0.05
+        ):
+            acoustic.anomaly_threshold_db = 8.0
+            acoustic.anomaly_zscore_threshold = 2.8
+            acoustic.warmup_seconds = max(acoustic.warmup_seconds, 4.0)
+            acoustic.event_cooldown_s = max(acoustic.event_cooldown_s, 10.0)
+        return acoustic
+
+    @staticmethod
+    def _sanitize_shortcut_config(shortcuts: ShortcutConfig) -> ShortcutConfig:
+        normalized: Dict[str, List[str]] = {}
+        raw_bindings = getattr(shortcuts, "bindings", {}) or {}
+        if isinstance(raw_bindings, dict):
+            for raw_action_id, raw_sequences in raw_bindings.items():
+                action_id = str(raw_action_id or "").strip()
+                if not action_id:
+                    continue
+                explicit_empty_binding = False
+                if isinstance(raw_sequences, str):
+                    sequence_candidates = [raw_sequences]
+                elif isinstance(raw_sequences, (list, tuple)):
+                    sequence_candidates = list(raw_sequences)
+                    explicit_empty_binding = len(sequence_candidates) == 0
+                else:
+                    continue
+                sequences: List[str] = []
+                for raw_sequence in sequence_candidates:
+                    sequence = str(raw_sequence or "").strip()
+                    if sequence and sequence not in sequences:
+                        sequences.append(sequence)
+                if sequences or explicit_empty_binding:
+                    normalized[action_id] = sequences
+        shortcuts.bindings = normalized
+        if not str(getattr(shortcuts, "quick_view_doc_path", "")).strip():
+            shortcuts.quick_view_doc_path = "SMART_SENTRY_SHORTCUT_KEYS.md"
+        return shortcuts
+
     @classmethod
     def from_dict(cls, d: dict) -> "SentryV2Config":
+        # ── Schema version check ──────────────────────────────────────────────
+        # Default to 0 so that old config files (which predate versioning) are
+        # detected and logged.  The loader is fully backward-compatible: any
+        # field that is absent in the file simply uses the dataclass default.
+        raw_version: int = int(d.get("schema_version", 0) or 0)
+        if raw_version == 0:
+            _log.warning(
+                "Loading legacy config (no schema_version field). "
+                "Defaults applied for any new fields introduced since the file was saved."
+            )
+        elif raw_version < _CURRENT_SCHEMA_VERSION:
+            _log.info(
+                "Config schema_version %d is older than current %d. "
+                "Defaults applied for any new fields.",
+                raw_version,
+                _CURRENT_SCHEMA_VERSION,
+            )
+        # Always write back the current schema version so the file is migrated
+        # on the next save(), regardless of what version was on disk.
+
         cn = ConnectionConfig(**d.get("connection", {}))
         normalize_connection_config(cn)
         if not str(cn.camera_source).strip():
@@ -859,12 +983,14 @@ class SentryV2Config:
         lighting_cfg = LightingConfig(**dict(d.get("lighting", {})))
         sound_cfg = SoundConfig(**dict(d.get("sound", {})))
         acoustic_cfg = AcousticGuardConfig(**dict(d.get("acoustic_guard", {})))
+        acoustic_cfg = cls._sanitize_acoustic_guard_config(acoustic_cfg)
         face_cfg = FaceRecognitionConfig(**dict(d.get("face_recognition", {})))
         ai_cfg = AIAssistantConfig(**dict(d.get("ai_assistant", {})))
-        shortcut_cfg = ShortcutConfig(**dict(d.get("shortcuts", {})))
+        shortcut_cfg = cls._sanitize_shortcut_config(ShortcutConfig(**dict(d.get("shortcuts", {}))))
         theme_cfg = ThemeConfig(**dict(d.get("theme", {})))
         
         return cls(
+            schema_version=_CURRENT_SCHEMA_VERSION,
             connection=cn,
             detection_mode=dm,
             target_filter=tf,
@@ -886,6 +1012,7 @@ class SentryV2Config:
             show_engagement_zone=d.get("show_engagement_zone", False),
             show_guard_crosshair=d.get("show_guard_crosshair", True),
             show_no_fire_masks=d.get("show_no_fire_masks", True),
+            show_fire_veto_overlay=d.get("show_fire_veto_overlay", True),
             scope_view_enabled=d.get("scope_view_enabled", False),
             scope_radius_pct=d.get("scope_radius_pct", 35),
             scope_vignette_opacity=d.get("scope_vignette_opacity", 60),
@@ -893,6 +1020,7 @@ class SentryV2Config:
             main_splitter_sizes=[int(v) for v in d.get("main_splitter_sizes", []) if isinstance(v, (int, float))],
             layout_splitter_sizes=[int(v) for v in d.get("layout_splitter_sizes", []) if isinstance(v, (int, float))],
             bottom_info_splitter_sizes=[int(v) for v in d.get("bottom_info_splitter_sizes", []) if isinstance(v, (int, float))],
+            telemetry_voice_splitter_sizes=[int(v) for v in d.get("telemetry_voice_splitter_sizes", []) if isinstance(v, (int, float))],
             quick_access_expanded=bool(d.get("quick_access_expanded", False)),
             quick_access_pinned=bool(d.get("quick_access_pinned", False)),
             quick_access_panel_height=int(d.get("quick_access_panel_height", 156)),

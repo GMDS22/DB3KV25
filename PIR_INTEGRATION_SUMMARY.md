@@ -1,27 +1,33 @@
-# PIR Sensor Integration - Complete Implementation Summary
+# PIR Sensor Integration - Implementation Summary
 
-**Date**: December 2024, updated for Smart Sentry v2.3.2 on 2026-04-08  
-**Status**: ✅ COMPLETE (UI + Firmware + Documentation) with current runtime deltas documented below  
-**Scope**: 3 PIR motion sensors with toggleable integration across Smart Sentry v2 PC app and ESP32 firmware
+Date: 2026-05-13
+Status: Historical implementation summary with current runtime delta for the live Smart Sentry app
+Audience: Developers and integrators
+Scope: 3 PIR motion sensors with toggleable integration across the Smart Sentry runtime and supporting firmware
 
 ---
 
-## Current Runtime Delta For v2.3.2
+## Current Runtime Delta For The Current App
 
 The original PIR integration remains valid, but the live runtime contract now includes these documented updates:
 
-- Smart Sentry v2 is operated as a standalone app workflow.
-- The current live app firmware path is `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` for the WiFi + Debug Board path.
-- `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino` remains the current DB3000 serial IO + PIR reference, not the primary live WiFi runtime.
-- The canonical current settings file is `app/config/smart_sentry_v2_3_2_settings.json`.
+- Smart Sentry is operated as a standalone app workflow.
+- The current active app firmware path is `arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino` for the Nano USB IO + Debug Board USB contract.
+- `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino` remains the WiFi reference sketch for WiFi-specific validation, not the primary current app path.
+- `arduino/DB3000_ESP32_IO_Telemetry_PIR/DB3000_ESP32_IO_Telemetry_PIR.ino` remains the DB3000 serial IO + PIR reference.
+- The canonical current settings file is `app/config/smart_sentry_settings.json`.
 - The current default three-zone layout is 45°, 135°, and 225° pan with 35° tilt.
-- The current saved operator profile maps those sensor ids to 270.0°, 152.0°, and 29.0° cue pans with 55.0°, 52.0°, and 54.0° tilt.
+- The current canonical settings file currently maps those sensor ids to 45.0°, 135.0°, and 225.0° cue pans with 35.0° tilt.
 - Current per-sensor debounce default is 500 ms.
 - Current `confirmation_timeout` default is 1.2 s.
+- Current `cue_hold_time_s` is 0.18 s.
+- Current `search_style` and `loss_search_style` are both `hunting` with 1 round.
 - The cue point is now the confirmation center, and multi-point no-detect scans intentionally begin from the first offset point instead of re-visiting the center again.
 - `target_loss_timeout` is the outer after-loss recovery window, while adaptive after-loss selects the protocol inside that window; PIR cue/scan suppresses normal target-loss recovery while active.
 
 When documenting or validating PIR behavior, describe the live cue-confirm-offset-search sequence rather than the older center-revisit interpretation.
+
+Historical note: the deeper architecture and delivery sections below remain useful for implementation history, but the bullets above are the current live-app delta that should win when older wording disagrees.
 
 ---
 
@@ -36,8 +42,9 @@ When documenting or validating PIR behavior, describe the live cue-confirm-offse
 ✅ **sentry_v2_tooltips.py**: Context help for all PIR controls  
 
 ### 2. ESP32 Firmware (This Session)
-✅ **SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino**: Current live WiFi + Debug Board app firmware  
-✅ **DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino**: Current DB3000 direct-serial IO + PIR reference  
+✅ **SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino**: Current active dual-USB app firmware  
+✅ **SMART_SENTRY_ESP32_UDP_PIR.ino**: WiFi reference firmware for WiFi-specific validation  
+✅ **DB3000_ESP32_IO_Telemetry_PIR.ino**: Current DB3000 direct-serial IO + PIR reference  
 ✅ **Pin Assignments**: GPIO 35, 34, 39 (3 PIR sensors)  
 ✅ **Toggle**: Runtime `pir_enabled` on WiFi path, `P` token on DB3000 serial path  
 ✅ **Backward Compatible**: All original DB3000 serial commands work unchanged  
@@ -213,12 +220,14 @@ app/sentry_v2/
 ### ESP32 Firmware
 ```
 arduino/
-├── SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/
-│   └── SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino        (CURRENT live WiFi app path)
+├── SMART_SENTRY_V3_0_NANO_USB_IO_PIR/
+│   └── SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino (CURRENT active dual-USB app path)
+├── SMART_SENTRY_ESP32_UDP_PIR/
+│   └── SMART_SENTRY_ESP32_UDP_PIR.ino        (WiFi reference path)
 ├── DB3000_ESP32_IO_Telemetry_2026/
 │   └── DB3000_ESP32_IO_Telemetry_2026.ino           (ORIGINAL, untouched)
-└── DB3000_ESP32_IO_Telemetry_2026_w_PIR/
-        └── DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino    (Current serial IO + PIR path)
+└── DB3000_ESP32_IO_Telemetry_PIR/
+        └── DB3000_ESP32_IO_Telemetry_PIR.ino    (Current serial IO + PIR path)
 ```
 
 ### Documentation
@@ -257,7 +266,7 @@ test_pir_ui_config.py                 ✓ 5/5 tests pass
 
 ### Arduino Sketch ✅
 ```
-DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
+DB3000_ESP32_IO_Telemetry_PIR.ino
 ├─ Syntax: Valid (preprocessor directives correct)
 ├─ Compile: Ready for Arduino IDE 2.x + ESP32 support
 ├─ Size: ~10 KB (PIR enabled) or ~8.5 KB (disabled)
@@ -351,13 +360,13 @@ pir_guard:
         confirmation_timeout: 1.2s
 ```
 
-Current saved operator profile in `app/config/smart_sentry_v2_3_2_settings.json`:
+Current saved operator profile in `app/config/smart_sentry_settings.json`:
 
 ```yaml
 pir_guard:
         pir_enabled: true
         sensors:
-                0: {cue_pan: 270.0°, cue_tilt: 55.0°, debounce_ms: 500, enabled: true}
+                0: {cue_pan: 45.0°, cue_tilt: 35.0°, debounce_ms: 500, enabled: false}
                 1: {cue_pan: 152.0°, cue_tilt: 52.0°, debounce_ms: 500, enabled: true}
                 2: {cue_pan: 29.0°, cue_tilt: 54.0°, debounce_ms: 500, enabled: true}
         cue_hold_time_s: 0.18

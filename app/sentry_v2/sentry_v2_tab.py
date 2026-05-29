@@ -18723,6 +18723,16 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "confidence": float(self.config.detection_mode.yolo_confidence),
                 "min_area": int(self.config.detection_mode.yolo_min_area),
             },
+            "scene_objects": [
+                {
+                    "class_name": str(getattr(det, "class_name", "") or ""),
+                    "score": float(getattr(det, "score", 0.0) or 0.0),
+                    "identity_label": str(getattr(det, "identity_label", "") or ""),
+                }
+                for det in list(getattr(self, "_last_detected_objects", []) or [])[:16]
+                if str(getattr(det, "class_name", "") or "").strip()
+                   and str(getattr(det, "class_name", "") or "").strip().lower() not in {"motion", "foreground", "color", "moving_object"}
+            ],
             "face_runtime": self._face_runtime_snapshot_data(),
             "assistant_runtime": {
                 "provider_available": bool(getattr(self, "_assistant_available", False)),
@@ -19466,6 +19476,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._set_checkbox_checked_silently(getattr(self, "_chk_face_quick_toggle", None), True)
             self._log("Face recognition auto-enabled after saving profiles")
 
+        self._invalidate_face_identity_runtime_cache()
+        self._update_face_runtime_status()
+
         # Clear the enrollment overlay and return to the live camera
         self._face_close_enrollment_preview()
 
@@ -19886,6 +19899,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         for unk in unknowns:
             panel.push_detection(unk.temp_id, unk.crop_bgr, unk.embedding)
 
+    def _invalidate_face_identity_runtime_cache(self) -> None:
+        self._last_face_matches = []
+        self._last_face_match_eval_s = 0.0
+        self._last_face_person_boxes = []
+        self._last_face_queue_update_s = 0.0
+        self._force_next_display_refresh = True
+
     def _on_face_queue_saved(
         self,
         temp_id: str,
@@ -19917,6 +19937,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._face_runtime.refresh_library(self._face_library)
         self._save_face_identity_library()
         self._rebuild_face_profile_list()
+        if not bool(self.config.face_recognition.enabled):
+            self.config.face_recognition.enabled = True
+            self._set_checkbox_checked_silently(getattr(self, "_chk_face_enabled", None), True)
+            self._set_checkbox_checked_silently(getattr(self, "_chk_face_quick_toggle", None), True)
+        self._invalidate_face_identity_runtime_cache()
+        self._update_face_runtime_status()
         self._log(f"Face queue: enrolled '{name}' (target={is_target}, profile_id={profile.profile_id[:8]}…)")
 
     def _maybe_announce_face_match(self, match: FaceMatchResult, now: float) -> None:
@@ -21259,6 +21285,27 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._on_ai_state_update("listening")
         self._log(f"Voice protocol: conversational AI intake opened ({source})")
 
+    def _is_camera_scene_query_prompt(self, text: str) -> bool:
+        normalized = re.sub(r"\s+", " ", str(text or "").strip().lower())
+        if not normalized:
+            return False
+        patterns = (
+            r"\bwhat can you see\b",
+            r"\bwhat do you see\b",
+            r"\bwhat are you seeing\b",
+            r"\bwhat objects\b.*\b(?:see|seeing|detect)\b",
+            r"\bwhat classes\b.*\b(?:see|seeing|detect)\b",
+            r"\bdescribe\b.*\b(?:what you see|camera view|current scene|scene on camera|camera feed)\b",
+            r"\btell me what(?:'s| is) (?:on|in) (?:the )?camera\b",
+            r"\btell me what is on camera\b",
+            r"\breport what you (?:can )?see\b",
+            r"\bwhat(?:'s| is) in (?:the )?(?:camera|frame|view)\b",
+            r"\blook at (?:the )?camera\b",
+            r"\bscan (?:the )?(?:area|scene|frame)\b",
+            r"\b(?:describe|report)\b.*\b(?:scene|view|frame|area)\b",
+        )
+        return any(re.search(pattern, normalized) for pattern in patterns)
+
     def _voice_prompt_has_supported_ai_intent(self, prompt_text: str) -> bool:
         normalized = re.sub(r"\s+", " ", str(prompt_text or "").strip().lower())
         if not normalized or self._voice_command_is_low_signal_followup(normalized):
@@ -21385,6 +21432,27 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if not normalized or self._voice_command_is_low_signal_followup(normalized):
             return False
         return self._voice_prompt_has_supported_ai_intent(normalized)
+
+    def _is_camera_scene_query_prompt(self, text: str) -> bool:
+        normalized = re.sub(r"\s+", " ", str(text or "").strip().lower())
+        if not normalized:
+            return False
+        patterns = (
+            r"\bwhat can you see\b",
+            r"\bwhat do you see\b",
+            r"\bwhat are you seeing\b",
+            r"\bwhat objects\b.*\b(?:see|seeing|detect)\b",
+            r"\bwhat classes\b.*\b(?:see|seeing|detect)\b",
+            r"\bdescribe\b.*\b(?:what you see|camera view|current scene|scene on camera|camera feed)\b",
+            r"\btell me what(?:'s| is) (?:on|in) (?:the )?camera\b",
+            r"\btell me what is on camera\b",
+            r"\breport what you (?:can )?see\b",
+            r"\bwhat(?:'s| is) in (?:the )?(?:camera|frame|view)\b",
+            r"\blook at (?:the )?camera\b",
+            r"\bscan (?:the )?(?:area|scene|frame)\b",
+            r"\b(?:describe|report)\b.*\b(?:scene|view|frame|area)\b",
+        )
+        return any(re.search(pattern, normalized) for pattern in patterns)
 
     def _voice_prompt_can_queue_ai(self, prompt_text: str, *, explicit: bool) -> bool:
         normalized = re.sub(r"\s+", " ", str(prompt_text or "").strip().lower())
@@ -21859,6 +21927,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
     def _launch_ai_background_task(self, task: Dict[str, object]) -> None:
         task_kind = str(task.get("task_kind") or "prompt")
         prompt = str(task.get("prompt") or "")
+        # Use enriched prompt if available (for scene queries), otherwise use original
+        effective_prompt = str(task.get("_enriched_prompt", prompt))
         label = str(task.get("label") or self._assistant_task_label(task_kind, prompt))
         task_record = dict(task)
         self._assistant_active_task = dict(task_record)
@@ -21887,11 +21957,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             elif task_kind == "recommendations":
                 reply = service.recommend_settings(snapshot, model=model, include_logs=include_logs)
             else:
-                reply = service.answer_operator_prompt(prompt, snapshot, model=model, include_logs=include_logs)
+                reply = service.answer_operator_prompt(effective_prompt, snapshot, model=model, include_logs=include_logs)
             self.assistant_reply_ready.emit({
                 "task": task_record,
                 "task_kind": task_kind,
-                "prompt": prompt,
+                "prompt": prompt,  # Keep original prompt for logging
                 "reply": reply,
                 "snapshot": snapshot,
             })
@@ -21914,15 +21984,23 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._append_ai_output("Assistant is disabled.", task_kind=task_kind)
             return
         conversational_prompt = self._assistant_prompt_is_conversational(task_kind, prompt)
+        # If this is a scene query, enrich the prompt with current detection context
+        # so the AI can describe what the camera actually sees.
+        enriched_prompt = str(prompt or "")
+        if str(task_kind or "prompt").strip().lower() == "prompt" and self._is_camera_scene_query_prompt(enriched_prompt):
+            scene_ctx = self._build_scene_description_context()
+            if scene_ctx:
+                enriched_prompt = enriched_prompt + "\n\n[Current camera scene context:\n" + scene_ctx + "]"
         task = {
             "id": self._next_operator_task_id(),
             "task_kind": str(task_kind or "prompt"),
-            "prompt": str(prompt or ""),
+            "prompt": str(prompt or ""),  # Keep original prompt for logging/labels
             "label": self._assistant_task_label(task_kind, prompt),
             "announce_on_start": False,
             # CRITICAL FIX: Track if this task should be spoken when dequeued.
             # Conversational prompts in voice windows MUST be marked for speaking.
             "should_speak": bool(conversational_prompt and self._voice_interaction_window_active()),
+            "_enriched_prompt": enriched_prompt,  # Internal field for actual processing
         }
         if self._assistant_busy:
             self._assistant_task_queue.append(task)
@@ -22777,6 +22855,54 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return
         if not self._speak_after_operator_quiet(self._last_spoken_ai_response, interrupt=False, assistant_output=True):
             self._append_ai_output("Human voice speech is unavailable or disabled. Enable it and validate the route in AI Voice Validation first.")
+
+    def _build_scene_description_context(self) -> str:
+        detected_objects = list(getattr(self, "_last_detected_objects", []) or [])
+        face_reporting_active = bool(self.config.face_recognition.enabled and self._face_library.profiles)
+        
+        semantic_counts: Dict[str, int] = {}
+        recognized_people: List[str] = []
+        unknown_person_count = 0
+        for det in detected_objects[:16]:
+            class_name = str(getattr(det, "class_name", "") or "").strip().lower()
+            if not class_name or class_name in {"motion", "foreground", "color", "moving_object"}:
+                continue
+            semantic_counts[class_name] = semantic_counts.get(class_name, 0) + 1
+            if class_name == "person" and face_reporting_active:
+                identity_label = str(getattr(det, "identity_label", "") or "").strip()
+                if identity_label:
+                    if identity_label not in recognized_people:
+                        recognized_people.append(identity_label)
+                else:
+                    unknown_person_count += 1
+        
+        stats = self.engine.get_engagement_stats() if self.engine is not None else {}
+        state_name = str(stats.get("state") or "PAUSED").strip().upper()
+        camera_open = self._has_local_source()
+        detection_mode = self._assistant_detection_mode_name()
+        
+        lines = []
+        lines.append(f"Camera: {'open' if camera_open else 'closed'}")
+        lines.append(f"Detection mode: {detection_mode}")
+        lines.append(f"Sentry state: {state_name}")
+        
+        if not camera_open:
+            lines.append("No camera feed active.")
+        elif not semantic_counts:
+            lines.append("No objects currently detected in the camera view.")
+        else:
+            top = sorted(semantic_counts.items(), key=lambda x: (-x[1], x[0]))[:6]
+            counts_str = ", ".join(
+                f"{count} {cls}" + ("" if count == 1 else "s")
+                for cls, count in top
+            )
+            lines.append(f"Objects visible: {counts_str}.")
+            if recognized_people:
+                lines.append(f"Recognized faces: {', '.join(recognized_people[:3])}.")
+            if unknown_person_count > 0:
+                lines.append(f"Unrecognized people in view: {unknown_person_count}.")
+        
+        return "\n".join(lines)
 
     def _build_ai_activity_report(self) -> str:
         def _spoken_count(label: str, count: int) -> str:
@@ -26815,6 +26941,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         enabled_word, disabled_word = self._voice_toggle_state_words(spec)
         return enabled_word if state else disabled_word
 
+    def _voice_toggle_label_verbs(self, label: str) -> Tuple[str, str]:
+        normalized = re.sub(r"\s+", " ", str(label or "").strip().lower())
+        if normalized.endswith("s") and not normalized.endswith("ss"):
+            return "are", "were"
+        return "is", "was"
+
     def _voice_toggle_control_checked_state(self, spec: Dict[str, object]) -> Optional[bool]:
         control_attr = str(spec.get("control_attr", "") or "").strip()
         if not control_attr:
@@ -26857,20 +26989,21 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return None
         toggle_action = str(spec.get("toggle_action", "set") or "set").strip().lower()
         label = str(spec.get("label", normalized) or normalized).strip() or normalized
+        present_verb, past_verb = self._voice_toggle_label_verbs(label)
         current_state = self._voice_toggle_control_checked_state(spec)
         if toggle_action == "status":
             if current_state is None:
                 return "", f"I could not determine the current status of {label.lower()} right now.", f"{label} status unavailable."
             state_word = self._voice_toggle_state_word(spec, current_state)
-            return "", f"{label} is currently {state_word}.", f"{label} status reported as {state_word}."
+            return "", f"{label} {present_verb} currently {state_word}.", f"{label} status reported as {state_word}."
 
         desired_state = bool(spec.get("desired_state", False))
         state_word = self._voice_toggle_state_word(spec, desired_state)
         if current_state is not None and current_state == desired_state:
-            return "", f"{label} is already {state_word}.", f"{label} was already {state_word}."
+            return "", f"{label} {present_verb} already {state_word}.", f"{label} {past_verb} already {state_word}."
         if not self._apply_voice_toggle_control_state(spec, desired_state):
             return "", f"I could not change {label.lower()} from voice right now.", f"{label} voice toggle unavailable."
-        return "acknowledged", f"{label} is now {state_word}.", f"{label} {state_word}."
+        return "acknowledged", f"{label} {present_verb} now {state_word}.", f"{label} {state_word}."
 
     def _authorize_voice_control_request(self, command: str) -> bool:
         if not self._voice_control_request_requires_operator(command):

@@ -183,6 +183,10 @@ struct TriggerConfig {
   int   mode       = 0;    // 0=water, 1=projectile
   float cooldown_s = 1.5f;
   float max_fire_s = 3.0f;
+  int   mosfet_pulse_ms = (int)TRIGGER_PULSE_MS;
+  int   mosfet_cycle_count = 1;
+  int   mosfet_cycle_off_ms = 50;
+  bool  output_active_low = false;
   int   servo_rest_deg = TRIGGER_SERVO_REST_DEG_DEFAULT;
   int   servo_fire_deg = TRIGGER_SERVO_FIRE_DEG_DEFAULT;
   int   servo_speed_dps = TRIGGER_SERVO_SPEED_DPS_DEFAULT;
@@ -235,8 +239,13 @@ static bool fire_hold    = false;
 static uint32_t last_cmd_ms      = 0;
 static uint32_t last_state_ms    = 0;
 static uint32_t last_mosfet_fire_start_ms = 0;
+static uint32_t last_fire_start_ms = 0;
 static bool     fire_active        = false;
 static bool     rapid_fire_active  = false;
+static bool     mosfet_cycle_active = false;
+static bool     mosfet_cycle_on_phase = false;
+static int      mosfet_cycle_pulses_remaining = 0;
+static int      last_fire_request_cmd = 0;
 static bool     trigger_servo_pwm_ready = false;
 static float    trigger_servo_current_deg = (float)TRIGGER_SERVO_REST_DEG_DEFAULT;
 static float    trigger_servo_target_deg  = (float)TRIGGER_SERVO_REST_DEG_DEFAULT;
@@ -287,6 +296,8 @@ static bool     first_client_seen = false;
 static uint32_t last_wifi_check_ms = 0;
 static uint32_t wifi_recover_count = 0;
 static bool     link_safe_mode_active = true;
+static String   control_source_mode = "app";
+static String   control_source_active = "app";
 
 static const uint32_t LINK_IDLE_SAFE_TIMEOUT_MS = 1500;
 static const uint8_t  SOUND_OWNER_NONE = 0;
@@ -996,7 +1007,21 @@ static void update_accessories() {
   digitalWrite(PIN_ACC_RELAY,   acc_state   ? HIGH : LOW);
   digitalWrite(PIN_SPARE_RELAY, spare_state ? HIGH : LOW);
 }
-static void set_mosfet(bool on) { digitalWrite(PIN_TRIGGER_MOSFET, on ? HIGH : LOW); }
+static void set_mosfet(bool on) {
+  bool pin_high = trigger_cfg.output_active_low ? !on : on;
+  digitalWrite(PIN_TRIGGER_MOSFET, pin_high ? HIGH : LOW);
+}
+
+static uint32_t trigger_pulse_runtime_ms() {
+  int delta_deg = abs(trigger_cfg.servo_fire_deg - trigger_cfg.servo_rest_deg);
+  int speed_dps = max(10, trigger_cfg.servo_speed_dps);
+  uint32_t travel_ms = (uint32_t)((1000UL * (uint32_t)delta_deg) / (uint32_t)speed_dps);
+  uint32_t total_ms = travel_ms + 40UL;
+  if (total_ms < 20UL) total_ms = 20UL;
+  if (total_ms > 2000UL) total_ms = 2000UL;
+  return total_ms;
+}
+
 static void set_trigger_servo_target(bool fire_state) {
   trigger_servo_target_deg = (float)(fire_state ? clamp_servo_angle(trigger_cfg.servo_fire_deg)
                                                 : clamp_servo_angle(trigger_cfg.servo_rest_deg));
@@ -1026,11 +1051,19 @@ static void update_trigger_servo_motion(uint32_t now_val) {
 static void update_fire_outputs(uint32_t now_val, bool blocked) {
   if (blocked) {
     fire_active = rapid_fire_active = false;
+    mosfet_cycle_active = false;
+    mosfet_cycle_on_phase = false;
+    mosfet_cycle_pulses_remaining = 0;
+    last_fire_request_cmd = 0;
     set_mosfet(false); set_trigger_servo_target(false);
     return;
   }
   if (!fire_request) {
     fire_active = rapid_fire_active = false;
+    mosfet_cycle_active = false;
+    mosfet_cycle_on_phase = false;
+    mosfet_cycle_pulses_remaining = 0;
+    last_fire_request_cmd = 0;
     set_mosfet(false); set_trigger_servo_target(false);
     return;
   }
@@ -1046,27 +1079,58 @@ static void update_fire_outputs(uint32_t now_val, bool blocked) {
       set_mosfet(on); fire_active = on; rapid_fire_active = true;
       return;
     }
-    // Single pulse
-    if (!fire_active) {
-      fire_active = true;
+    rapid_fire_active = false;
+    if (fire_request && !last_fire_request_cmd && !mosfet_cycle_active) {
+      mosfet_cycle_active = true;
+      mosfet_cycle_on_phase = true;
+      mosfet_cycle_pulses_remaining = max(1, trigger_cfg.mosfet_cycle_count);
       last_mosfet_fire_start_ms = now_val;
+      fire_active = true;
       set_mosfet(true);
       Serial.println("[FIRE] MOSFET -> ON");
-    } else if ((now_val - last_mosfet_fire_start_ms) > (uint32_t)trigger_cfg.mosfet_pulse_ms) {
-      set_mosfet(false);
-      fire_active = false;
-      fire_request = 0;
-      Serial.println("[FIRE] MOSFET -> OFF");
+    } else if (mosfet_cycle_active) {
+      if (mosfet_cycle_on_phase) {
+        if ((now_val - last_mosfet_fire_start_ms) >= (uint32_t)trigger_cfg.mosfet_pulse_ms) {
+          set_mosfet(false);
+          mosfet_cycle_on_phase = false;
+          last_mosfet_fire_start_ms = now_val;
+          mosfet_cycle_pulses_remaining--;
+          Serial.println("[FIRE] MOSFET -> OFF");
+          if (mosfet_cycle_pulses_remaining <= 0) {
+            mosfet_cycle_active = false;
+            fire_active = false;
+            fire_request = 0;
+          }
+        }
+      } else if ((now_val - last_mosfet_fire_start_ms) >= (uint32_t)trigger_cfg.mosfet_cycle_off_ms) {
+        if (mosfet_cycle_pulses_remaining > 0) {
+          mosfet_cycle_on_phase = true;
+          last_mosfet_fire_start_ms = now_val;
+          set_mosfet(true);
+          fire_active = true;
+          Serial.println("[FIRE] MOSFET -> ON");
+        } else {
+          mosfet_cycle_active = false;
+          fire_active = false;
+          fire_request = 0;
+          set_mosfet(false);
+        }
+      }
     }
+    last_fire_request_cmd = fire_request ? 1 : 0;
     return;
   }
   // Projectile (trigger servo pulse)
+  mosfet_cycle_active = false;
+  mosfet_cycle_on_phase = false;
+  mosfet_cycle_pulses_remaining = 0;
+  last_fire_request_cmd = fire_request ? 1 : 0;
   if (!fire_active) {
     fire_active = true;
     last_fire_start_ms = now_val;
     set_trigger_servo_target(true);
     Serial.println("[FIRE] Trigger servo -> FIRE");
-  } else if ((now_val - last_fire_start_ms) > TRIGGER_PULSE_MS) {
+  } else if ((now_val - last_fire_start_ms) > trigger_pulse_runtime_ms()) {
     set_trigger_servo_target(false);
     fire_active = false;
     fire_request = 0;
@@ -1158,8 +1222,15 @@ static void send_ack(int seq, bool ok, IPAddress ip, uint16_t port) {
   s["fire"]          = fire_active ? 1 : 0;
   s["safety"]        = safety_state; s["mode"]         = trigger_cfg.mode;
   s["current_fault"] = current_fault;
-  s["control_source_mode"] = "app";
-  s["control_source_active"] = "app";
+  s["trigger_output_active_low"] = trigger_cfg.output_active_low ? 1 : 0;
+  s["trigger_mosfet_pulse_ms"] = trigger_cfg.mosfet_pulse_ms;
+  s["trigger_mosfet_cycle_count"] = trigger_cfg.mosfet_cycle_count;
+  s["trigger_mosfet_cycle_off_ms"] = trigger_cfg.mosfet_cycle_off_ms;
+  s["trigger_servo_rest_deg"] = trigger_cfg.servo_rest_deg;
+  s["trigger_servo_fire_deg"] = trigger_cfg.servo_fire_deg;
+  s["trigger_servo_speed_dps"] = trigger_cfg.servo_speed_dps;
+  s["control_source_mode"] = control_source_mode;
+  s["control_source_active"] = control_source_active;
   s["pan_mA_valid"]  = true;
   s["tilt_mA_valid"] = (PIN_CURR_TILT >= 0);
   s["total_mA_valid"] = (PIN_CURR_TOTAL >= 0);
@@ -1197,7 +1268,7 @@ static void send_caps(IPAddress ip, uint16_t port) {
   caps["speaker_volume_assigned"] = false;
   caps["header_reference_locked"] = false;
   caps["rc_input_supported"] = false;
-  caps["rc_mode_supported"] = false;
+  caps["rc_mode_supported"] = true;
   caps["rc_mode_default"] = "app";
 #if ENABLE_PIR_SUPPORT
   caps["pir_support"] = true;
@@ -1229,14 +1300,21 @@ static void send_state(IPAddress ip, uint16_t port) {
   s["fire"]          = fire_active ? 1 : 0;
   s["safety"]        = safety_state; s["mode"]         = trigger_cfg.mode;
   s["current_fault"] = current_fault;
+  s["trigger_output_active_low"] = trigger_cfg.output_active_low ? 1 : 0;
+  s["trigger_mosfet_pulse_ms"] = trigger_cfg.mosfet_pulse_ms;
+  s["trigger_mosfet_cycle_count"] = trigger_cfg.mosfet_cycle_count;
+  s["trigger_mosfet_cycle_off_ms"] = trigger_cfg.mosfet_cycle_off_ms;
+  s["trigger_servo_rest_deg"] = trigger_cfg.servo_rest_deg;
+  s["trigger_servo_fire_deg"] = trigger_cfg.servo_fire_deg;
+  s["trigger_servo_speed_dps"] = trigger_cfg.servo_speed_dps;
   s["pan_mA"]        = latest_pan_mA;
   s["tilt_mA"]       = latest_tilt_mA;
   s["total_mA"]      = latest_total_mA;
   s["pan_mA_valid"]  = true;
   s["tilt_mA_valid"] = (PIN_CURR_TILT >= 0);
   s["total_mA_valid"] = (PIN_CURR_TOTAL >= 0);
-  s["control_source_mode"] = "app";
-  s["control_source_active"] = "app";
+  s["control_source_mode"] = control_source_mode;
+  s["control_source_active"] = control_source_active;
 #if ENABLE_PIR_SUPPORT
   s["pir_enabled"] = pir_enabled ? 1 : 0;
 #endif
@@ -1296,6 +1374,10 @@ static void apply_config(JsonObject cfg) {
     trigger_cfg.mode       = t["mode"]       | trigger_cfg.mode;
     trigger_cfg.cooldown_s = t["cooldown_s"] | trigger_cfg.cooldown_s;
     trigger_cfg.max_fire_s = t["max_fire_s"] | trigger_cfg.max_fire_s;
+    trigger_cfg.mosfet_pulse_ms = clamp_int(t["mosfet_pulse_ms"] | trigger_cfg.mosfet_pulse_ms, 10, 2000);
+    trigger_cfg.mosfet_cycle_count = clamp_int(t["mosfet_cycle_count"] | trigger_cfg.mosfet_cycle_count, 1, 20);
+    trigger_cfg.mosfet_cycle_off_ms = clamp_int(t["mosfet_cycle_off_ms"] | trigger_cfg.mosfet_cycle_off_ms, 10, 2000);
+    trigger_cfg.output_active_low = ((int)(t["output_active_low"] | (trigger_cfg.output_active_low ? 1 : 0))) != 0;
     trigger_cfg.servo_rest_deg = clamp_servo_angle(t["servo_rest_deg"] | trigger_cfg.servo_rest_deg);
     trigger_cfg.servo_fire_deg = clamp_servo_angle(t["servo_fire_deg"] | trigger_cfg.servo_fire_deg);
     if (trigger_cfg.servo_fire_deg < trigger_cfg.servo_rest_deg) {
@@ -1547,6 +1629,20 @@ static void process_packet(char *buffer, size_t len, IPAddress ip, uint16_t port
       } else if (strcmp(action, "sweep") == 0) {
         start_sweep_sequence(now_ms());
         send_ack(seq, true, ip, port);
+      } else if (strcmp(action, "rc_mode") == 0) {
+        const char *requested_mode = payload["mode"] | payload["control_source_mode"] | "app";
+        String requested = String(requested_mode);
+        requested.trim();
+        requested.toLowerCase();
+        if (requested != "app" && requested != "auto" && requested != "rc") {
+          send_ack(seq, false, ip, port);
+        } else {
+          control_source_mode = requested;
+          control_source_active = "app";
+          Serial.printf("[CMD] control_source_mode -> %s (active=%s)\n",
+                        control_source_mode.c_str(), control_source_active.c_str());
+          send_ack(seq, true, ip, port);
+        }
       } else if (strcmp(action, "encoder_request") == 0) {
         send_ack(seq, true, ip, port); send_state(ip, port);
       } else if (strcmp(action, "bus_ping") == 0) {

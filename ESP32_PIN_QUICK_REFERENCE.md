@@ -177,8 +177,8 @@ GND, 3V3, 36, 39, 34, 35, 32, 33, 25, 26, 19, 18, 17, 16, 4, 0, 2, 15, 13, 12, 1
 
 ## Firmware Configuration Checklist
 
-- Current WiFi baseline sketch: `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
-- Current USB serial IO sketch: `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
+- Current WiFi baseline sketch: `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino`
+- Current USB serial IO sketch: `arduino/DB3000_ESP32_IO_Telemetry_PIR/DB3000_ESP32_IO_Telemetry_PIR.ino`
 - GPIO4 passive buzzer is required if Smart Sentry sound cues should play on-board.
 
 Contract note:
@@ -196,8 +196,8 @@ Contract note:
 
 ### Firmware File
 - [ ] Using the correct sketch for the topology being tested
-- [ ] WiFi app path: `SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
-- [ ] Direct serial IO path: `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
+- [ ] WiFi app path: `SMART_SENTRY_ESP32_UDP_PIR.ino`
+- [ ] Direct serial IO path: `DB3000_ESP32_IO_Telemetry_PIR.ino`
 - [ ] Original file `DB3000_ESP32_IO_Telemetry_2026.ino` backed up
 - [ ] `#define ENABLE_PIR_SUPPORT 1` (or 0 if PIR not needed)
 
@@ -210,7 +210,7 @@ Contract note:
 
 ### Post-Flash Verification
 - [ ] Serial monitor shows boot message
-- [ ] `[BOOT] DB3000_ESP32_IO_Telemetry_2026_w_PIR ready`
+- [ ] `[BOOT] DB3000_ESP32_IO_Telemetry_PIR ready`
 - [ ] Responds to test command: `S0` → ACK message
 - [ ] LED/Laser/Acc relays engage on command
 - [ ] Trigger (water/projectile) responds to F token
@@ -269,4 +269,4 @@ Response: ACK S=1 M=0 F=0 L=0 R=0 G=0 P=0
 **Pin Map Version**: 2.1 (Current Smart Sentry PIR contract)  
 **Last Updated**: April 2026  
 **Hardware**: ESP32 Dev Module (30-pin variant)  
-**Firmware**: WiFi baseline `SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`; direct serial IO `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
+**Firmware**: WiFi baseline `SMART_SENTRY_ESP32_UDP_PIR.ino`; direct serial IO `DB3000_ESP32_IO_Telemetry_PIR.ino`

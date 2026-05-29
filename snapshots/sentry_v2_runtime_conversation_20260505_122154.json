@@ -1,0 +1,145 @@
+{
+  "generated_at_local": "2026-05-05 12:21:54",
+  "generated_at_epoch_s": 1777954914.4665744,
+  "entry_count": 4,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 1
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "spoken_confirmation": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 2
+  },
+  "voice_transcript_summary": {
+    "partial_count": 0,
+    "final_count": 0,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "",
+  "latest_operator_request": "",
+  "latest_assistant_message": "System online and listening. Do you want me to connect boards, enable sentry, or run another task?",
+  "analysis_hints": [],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1777954907.966434,
+      "timestamp_local": "2026-05-05 12:21:47",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1777954907.9679387,
+      "timestamp_local": "2026-05-05 12:21:47",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1777954910.1533558,
+      "timestamp_local": "2026-05-05 12:21:50",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1777954910.1533558,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1777954911.1975148,
+      "timestamp_local": "2026-05-05 12:21:51",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "System online and listening. Do you want me to connect boards, enable sentry, or run another task?",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1777954907.966434,
+      "timestamp_local": "2026-05-05 12:21:47",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1777954907.9679387,
+      "timestamp_local": "2026-05-05 12:21:47",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1777954910.1533558,
+      "timestamp_local": "2026-05-05 12:21:50",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1777954910.1533558,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1777954911.1975148,
+      "timestamp_local": "2026-05-05 12:21:51",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "System online and listening. Do you want me to connect boards, enable sentry, or run another task?",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/conversation_exports/sentry_v2_runtime_conversation_20260505_122154.json",
+    "markdown": "snapshots/conversation_exports/sentry_v2_runtime_conversation_20260505_122154.md"
+  }
+}

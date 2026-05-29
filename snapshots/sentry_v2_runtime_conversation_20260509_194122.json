@@ -1,0 +1,422 @@
+{
+  "generated_at_local": "2026-05-09 19:41:22",
+  "generated_at_epoch_s": 1778326882.0367668,
+  "entry_count": 12,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 1,
+    "operator": 8
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "spoken_confirmation": 1,
+    "voice_transcript_partial": 7,
+    "voice_transcript_final": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 10
+  },
+  "voice_transcript_summary": {
+    "partial_count": 7,
+    "final_count": 1,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "is the mode",
+  "latest_operator_request": "is the mode",
+  "latest_assistant_message": "The smart Sentry is now online, say the command.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778326104.4017773,
+      "timestamp_local": "2026-05-09 19:28:24",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778326104.403286,
+      "timestamp_local": "2026-05-09 19:28:24",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778326105.6029952,
+      "timestamp_local": "2026-05-09 19:28:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778326105.6029952,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778326141.8896024,
+      "timestamp_local": "2026-05-09 19:29:01",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "The smart Sentry is now online, say the command.",
+      "metadata": {
+        "interrupt": true,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778326693.6185684,
+      "timestamp_local": "2026-05-09 19:38:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger enabled",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326693.6185684,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778326693.886616,
+      "timestamp_local": "2026-05-09 19:38:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326693.886616,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778326694.1267202,
+      "timestamp_local": "2026-05-09 19:38:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger enabled",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326694.1267202,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778326695.369431,
+      "timestamp_local": "2026-05-09 19:38:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is the mode",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326695.369431,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778326697.5515864,
+      "timestamp_local": "2026-05-09 19:38:17",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "is the mode",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778326697.5515864,
+        "source": "final",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778326699.9862888,
+      "timestamp_local": "2026-05-09 19:38:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "mode",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326699.9862888,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778326702.236488,
+      "timestamp_local": "2026-05-09 19:38:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "mode the camera",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326702.236488,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778326702.4954114,
+      "timestamp_local": "2026-05-09 19:38:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "mode the camera what is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326702.4954114,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778326104.4017773,
+      "timestamp_local": "2026-05-09 19:28:24",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778326104.403286,
+      "timestamp_local": "2026-05-09 19:28:24",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778326105.6029952,
+      "timestamp_local": "2026-05-09 19:28:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778326105.6029952,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778326141.8896024,
+      "timestamp_local": "2026-05-09 19:29:01",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "The smart Sentry is now online, say the command.",
+      "metadata": {
+        "interrupt": true,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778326693.6185684,
+      "timestamp_local": "2026-05-09 19:38:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger enabled",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326693.6185684,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778326693.886616,
+      "timestamp_local": "2026-05-09 19:38:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326693.886616,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778326694.1267202,
+      "timestamp_local": "2026-05-09 19:38:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger enabled",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326694.1267202,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778326695.369431,
+      "timestamp_local": "2026-05-09 19:38:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is the mode",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326695.369431,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778326697.5515864,
+      "timestamp_local": "2026-05-09 19:38:17",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "is the mode",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778326697.5515864,
+        "source": "final",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778326699.9862888,
+      "timestamp_local": "2026-05-09 19:38:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "mode",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326699.9862888,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778326702.236488,
+      "timestamp_local": "2026-05-09 19:38:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "mode the camera",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326702.236488,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778326702.4954114,
+      "timestamp_local": "2026-05-09 19:38:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "mode the camera what is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778326702.4954114,
+        "source": "vosk",
+        "frequency_hz": 408.0,
+        "rms": 921,
+        "updated_at": 1778326445.6408222
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260509_194122.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260509_194122.md"
+  }
+}

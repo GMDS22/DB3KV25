@@ -7,7 +7,11 @@ import time
 from pathlib import Path
 from typing import Callable, List, Optional
 
+import logging
+
 import numpy as np
+
+_log = logging.getLogger(__name__)
 
 
 class USBMicrophoneAnomalyDetector:
@@ -45,6 +49,7 @@ class USBMicrophoneAnomalyDetector:
         self.device_name = str(device_name or "").strip()
         self.wake_word = str(wake_word or "").strip().lower()
         self.vosk_model_path = str(vosk_model_path or "").strip()
+        self._minimum_anomaly_duration_s = 0.18
         self._wake_word_buffer: bytes = b""
         self._last_wake_word_check = 0.0
         # Vosk recognizer is created once and reused (not per-call) to avoid heap thrash.
@@ -111,6 +116,10 @@ class USBMicrophoneAnomalyDetector:
             thread.join(timeout=1.0)
         self._running = False
 
+    def _required_anomaly_blocks(self) -> int:
+        block_duration_s = float(self.block_size) / float(max(1, self.sample_rate_hz))
+        return max(2, int(math.ceil(self._minimum_anomaly_duration_s / max(1e-3, block_duration_s))))
+
     def _resolve_input_device(self, sd_module) -> Optional[int]:
         target = self.device_name.lower().strip()
         if not target:
@@ -164,6 +173,9 @@ class USBMicrophoneAnomalyDetector:
         baseline_var: float = 0.0
         warmup_started = time.time()
         last_event_time = 0.0
+        consecutive_anomaly_blocks = 0
+        anomaly_peak_level_db = float("-inf")
+        anomaly_peak_baseline_db = 0.0
         self._running = True
 
         stream = None
@@ -191,6 +203,9 @@ class USBMicrophoneAnomalyDetector:
                 if baseline_mean is None:
                     baseline_mean = level_db
                     baseline_var = 1.0
+                    consecutive_anomaly_blocks = 0
+                    anomaly_peak_level_db = float("-inf")
+                    anomaly_peak_baseline_db = 0.0
                     continue
 
                 alpha = self.baseline_adapt_rate
@@ -200,18 +215,37 @@ class USBMicrophoneAnomalyDetector:
                 if (now - warmup_started) < self.warmup_seconds:
                     baseline_mean = (1.0 - alpha) * baseline_mean + (alpha * level_db)
                     baseline_var = (1.0 - alpha) * baseline_var + (alpha * (delta * delta))
+                    consecutive_anomaly_blocks = 0
+                    anomaly_peak_level_db = float("-inf")
+                    anomaly_peak_baseline_db = 0.0
                     continue
 
                 sigma = max(0.25, math.sqrt(max(1e-6, baseline_var)))
                 z_score = delta / sigma
 
-                if delta >= self.anomaly_threshold_db and z_score >= self.anomaly_zscore_threshold:
-                    if (now - last_event_time) >= self.cooldown_s:
-                        last_event_time = now
-                        try:
-                            self._on_anomaly(level_db, baseline_mean)
-                        except Exception:
-                            pass
+                is_anomaly = delta >= self.anomaly_threshold_db and z_score >= self.anomaly_zscore_threshold
+                if is_anomaly:
+                    consecutive_anomaly_blocks += 1
+                    if level_db >= anomaly_peak_level_db:
+                        anomaly_peak_level_db = level_db
+                        anomaly_peak_baseline_db = baseline_mean
+                    if consecutive_anomaly_blocks >= self._required_anomaly_blocks():
+                        if (now - last_event_time) >= self.cooldown_s:
+                            last_event_time = now
+                            try:
+                                self._on_anomaly(
+                                    anomaly_peak_level_db if math.isfinite(anomaly_peak_level_db) else level_db,
+                                    anomaly_peak_baseline_db,
+                                )
+                            except Exception:
+                                pass
+                        consecutive_anomaly_blocks = 0
+                        anomaly_peak_level_db = float("-inf")
+                        anomaly_peak_baseline_db = 0.0
+                else:
+                    consecutive_anomaly_blocks = 0
+                    anomaly_peak_level_db = float("-inf")
+                    anomaly_peak_baseline_db = 0.0
 
                 # Keep adapting baseline to environment so normal changes are absorbed.
                 baseline_mean = (1.0 - alpha) * baseline_mean + (alpha * level_db)

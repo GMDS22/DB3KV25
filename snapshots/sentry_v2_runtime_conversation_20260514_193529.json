@@ -1,0 +1,2340 @@
+{
+  "generated_at_local": "2026-05-14 19:35:29",
+  "generated_at_epoch_s": 1778758529.8370385,
+  "entry_count": 124,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 88,
+    "operator": 34
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 88,
+    "voice_transcript_partial": 30,
+    "voice_transcript_final": 4
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 122
+  },
+  "voice_transcript_summary": {
+    "partial_count": 30,
+    "final_count": 4,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "thanks but no things",
+  "latest_operator_request": "thanks but no things",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup.",
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 113,
+      "timestamp_epoch_s": 1778758518.746921,
+      "timestamp_local": "2026-05-14 19:35:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758518.746921,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 114,
+      "timestamp_epoch_s": 1778758519.2472537,
+      "timestamp_local": "2026-05-14 19:35:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758519.2472537,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 115,
+      "timestamp_epoch_s": 1778758519.9978256,
+      "timestamp_local": "2026-05-14 19:35:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758519.9978256,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 116,
+      "timestamp_epoch_s": 1778758520.4990945,
+      "timestamp_local": "2026-05-14 19:35:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758520.4990945,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 117,
+      "timestamp_epoch_s": 1778758521.2478778,
+      "timestamp_local": "2026-05-14 19:35:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758521.2478778,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 118,
+      "timestamp_epoch_s": 1778758522.449435,
+      "timestamp_local": "2026-05-14 19:35:22",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "thanks but no things",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778758522.449435,
+        "source": "final",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 119,
+      "timestamp_epoch_s": 1778758522.6235623,
+      "timestamp_local": "2026-05-14 19:35:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758522.6235623,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 120,
+      "timestamp_epoch_s": 1778758523.80337,
+      "timestamp_local": "2026-05-14 19:35:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758523.80337,
+        "source": "vosk",
+        "frequency_hz": 234.0,
+        "rms": 1602,
+        "updated_at": 1778758523.1242392
+      }
+    },
+    {
+      "id": 121,
+      "timestamp_epoch_s": 1778758523.80337,
+      "timestamp_local": "2026-05-14 19:35:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758523.80337,
+        "source": "vosk",
+        "frequency_hz": 234.0,
+        "rms": 1602,
+        "updated_at": 1778758523.1242392
+      }
+    },
+    {
+      "id": 122,
+      "timestamp_epoch_s": 1778758524.3733659,
+      "timestamp_local": "2026-05-14 19:35:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758524.3733659,
+        "source": "vosk",
+        "frequency_hz": 234.0,
+        "rms": 1602,
+        "updated_at": 1778758523.1242392
+      }
+    },
+    {
+      "id": 123,
+      "timestamp_epoch_s": 1778758524.6237123,
+      "timestamp_local": "2026-05-14 19:35:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758524.6237123,
+        "source": "vosk",
+        "frequency_hz": 234.0,
+        "rms": 1602,
+        "updated_at": 1778758523.1242392
+      }
+    },
+    {
+      "id": 124,
+      "timestamp_epoch_s": 1778758528.123679,
+      "timestamp_local": "2026-05-14 19:35:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758528.123679,
+        "source": "vosk",
+        "frequency_hz": 234.0,
+        "rms": 1602,
+        "updated_at": 1778758523.1242392
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778758328.4199197,
+      "timestamp_local": "2026-05-14 19:32:08",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778758328.4199197,
+      "timestamp_local": "2026-05-14 19:32:08",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778758330.300094,
+      "timestamp_local": "2026-05-14 19:32:10",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758330.300094,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778758330.9204063,
+      "timestamp_local": "2026-05-14 19:32:10",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758330.9204063,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778758334.6360862,
+      "timestamp_local": "2026-05-14 19:32:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smarter eventually",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758334.6360862,
+        "source": "vosk",
+        "frequency_hz": 98.0,
+        "rms": 137,
+        "updated_at": 1778758332.2699285
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778758335.0707815,
+      "timestamp_local": "2026-05-14 19:32:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smarter than before",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758335.0707815,
+        "source": "vosk",
+        "frequency_hz": 98.0,
+        "rms": 137,
+        "updated_at": 1778758332.2699285
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778758335.7582939,
+      "timestamp_local": "2026-05-14 19:32:15",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "hello smarter than before",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778758335.7582939,
+        "source": "final",
+        "frequency_hz": 98.0,
+        "rms": 137,
+        "updated_at": 1778758332.2699285
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778758336.6288364,
+      "timestamp_local": "2026-05-14 19:32:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758336.6288364,
+        "source": "vosk",
+        "frequency_hz": 98.0,
+        "rms": 137,
+        "updated_at": 1778758332.2699285
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778758337.8424554,
+      "timestamp_local": "2026-05-14 19:32:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758337.8424554,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778758337.8434558,
+      "timestamp_local": "2026-05-14 19:32:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758337.8434558,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778758337.9695277,
+      "timestamp_local": "2026-05-14 19:32:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so much",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758337.9695277,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778758338.0969,
+      "timestamp_local": "2026-05-14 19:32:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "most central",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758338.0969,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778758338.1815958,
+      "timestamp_local": "2026-05-14 19:32:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "question three",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758338.1815958,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778758339.1588936,
+      "timestamp_local": "2026-05-14 19:32:19",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "question three",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778758339.1588936,
+        "source": "final",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778758339.193683,
+      "timestamp_local": "2026-05-14 19:32:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758339.193683,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778758344.87922,
+      "timestamp_local": "2026-05-14 19:32:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758344.87922,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778758347.3791804,
+      "timestamp_local": "2026-05-14 19:32:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758347.3791804,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778758347.879747,
+      "timestamp_local": "2026-05-14 19:32:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758347.879747,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778758352.8800995,
+      "timestamp_local": "2026-05-14 19:32:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758352.8800995,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778758353.3792112,
+      "timestamp_local": "2026-05-14 19:32:33",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758353.3792112,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778758377.1312575,
+      "timestamp_local": "2026-05-14 19:32:57",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758377.1312575,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778758377.6303997,
+      "timestamp_local": "2026-05-14 19:32:57",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758377.6303997,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778758377.8796363,
+      "timestamp_local": "2026-05-14 19:32:57",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758377.8796363,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778758378.3799295,
+      "timestamp_local": "2026-05-14 19:32:58",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758378.3799295,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778758379.3805544,
+      "timestamp_local": "2026-05-14 19:32:59",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758379.3805544,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778758379.8805285,
+      "timestamp_local": "2026-05-14 19:32:59",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758379.8805285,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778758380.1315076,
+      "timestamp_local": "2026-05-14 19:33:00",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758380.1315076,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1778758380.6303751,
+      "timestamp_local": "2026-05-14 19:33:00",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758380.6303751,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1778758385.1303484,
+      "timestamp_local": "2026-05-14 19:33:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758385.1303484,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1778758385.6298213,
+      "timestamp_local": "2026-05-14 19:33:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758385.6298213,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1778758386.630518,
+      "timestamp_local": "2026-05-14 19:33:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758386.630518,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1778758387.1305146,
+      "timestamp_local": "2026-05-14 19:33:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758387.1305146,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1778758392.3801186,
+      "timestamp_local": "2026-05-14 19:33:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758392.3801186,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1778758392.8802996,
+      "timestamp_local": "2026-05-14 19:33:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758392.8802996,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1778758395.8843153,
+      "timestamp_local": "2026-05-14 19:33:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758395.8843153,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1778758396.711375,
+      "timestamp_local": "2026-05-14 19:33:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758396.711375,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1778758397.2186213,
+      "timestamp_local": "2026-05-14 19:33:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758397.2186213,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1778758398.2124996,
+      "timestamp_local": "2026-05-14 19:33:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758398.2124996,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1778758402.2129002,
+      "timestamp_local": "2026-05-14 19:33:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758402.2129002,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1778758403.2127697,
+      "timestamp_local": "2026-05-14 19:33:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758403.2127697,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1778758409.9625692,
+      "timestamp_local": "2026-05-14 19:33:29",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758409.9625692,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1778758410.463044,
+      "timestamp_local": "2026-05-14 19:33:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758410.463044,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1778758414.2133462,
+      "timestamp_local": "2026-05-14 19:33:34",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758414.2133462,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1778758414.963226,
+      "timestamp_local": "2026-05-14 19:33:34",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758414.963226,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1778758416.7170613,
+      "timestamp_local": "2026-05-14 19:33:36",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758416.7170613,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1778758417.212939,
+      "timestamp_local": "2026-05-14 19:33:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758417.212939,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1778758420.7124972,
+      "timestamp_local": "2026-05-14 19:33:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758420.7124972,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1778758421.2133014,
+      "timestamp_local": "2026-05-14 19:33:41",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758421.2133014,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1778758424.2132828,
+      "timestamp_local": "2026-05-14 19:33:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758424.2132828,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1778758424.7133782,
+      "timestamp_local": "2026-05-14 19:33:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758424.7133782,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1778758428.4633312,
+      "timestamp_local": "2026-05-14 19:33:48",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758428.4633312,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1778758429.962882,
+      "timestamp_local": "2026-05-14 19:33:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758429.962882,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1778758431.213504,
+      "timestamp_local": "2026-05-14 19:33:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758431.213504,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1778758431.7126052,
+      "timestamp_local": "2026-05-14 19:33:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758431.7126052,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1778758432.9645019,
+      "timestamp_local": "2026-05-14 19:33:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758432.9645019,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1778758433.463133,
+      "timestamp_local": "2026-05-14 19:33:53",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758433.463133,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1778758440.2190516,
+      "timestamp_local": "2026-05-14 19:34:00",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758440.2190516,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1778758440.713713,
+      "timestamp_local": "2026-05-14 19:34:00",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758440.713713,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 59,
+      "timestamp_epoch_s": 1778758445.7130108,
+      "timestamp_local": "2026-05-14 19:34:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758445.7130108,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 60,
+      "timestamp_epoch_s": 1778758446.212987,
+      "timestamp_local": "2026-05-14 19:34:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758446.212987,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 61,
+      "timestamp_epoch_s": 1778758453.4631116,
+      "timestamp_local": "2026-05-14 19:34:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758453.4631116,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 62,
+      "timestamp_epoch_s": 1778758453.9637363,
+      "timestamp_local": "2026-05-14 19:34:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758453.9637363,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 63,
+      "timestamp_epoch_s": 1778758458.9634018,
+      "timestamp_local": "2026-05-14 19:34:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758458.9634018,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 64,
+      "timestamp_epoch_s": 1778758459.7134457,
+      "timestamp_local": "2026-05-14 19:34:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758459.7134457,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 65,
+      "timestamp_epoch_s": 1778758469.4637208,
+      "timestamp_local": "2026-05-14 19:34:29",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758469.4637208,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 66,
+      "timestamp_epoch_s": 1778758469.96369,
+      "timestamp_local": "2026-05-14 19:34:29",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758469.96369,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 67,
+      "timestamp_epoch_s": 1778758471.9661837,
+      "timestamp_local": "2026-05-14 19:34:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758471.9661837,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1778758472.4640722,
+      "timestamp_local": "2026-05-14 19:34:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758472.4640722,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1778758478.4642687,
+      "timestamp_local": "2026-05-14 19:34:38",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758478.4642687,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1778758479.2636044,
+      "timestamp_local": "2026-05-14 19:34:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smartest",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758479.2636044,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1778758479.7154086,
+      "timestamp_local": "2026-05-14 19:34:39",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758479.7154086,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1778758489.9645672,
+      "timestamp_local": "2026-05-14 19:34:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758489.9645672,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1778758489.9904695,
+      "timestamp_local": "2026-05-14 19:34:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart city",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758489.9904695,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1778758490.2560441,
+      "timestamp_local": "2026-05-14 19:34:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758490.2560441,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1778758490.5581257,
+      "timestamp_local": "2026-05-14 19:34:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758490.5581257,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1778758491.2166853,
+      "timestamp_local": "2026-05-14 19:34:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758491.2166853,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1778758493.714214,
+      "timestamp_local": "2026-05-14 19:34:53",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758493.714214,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1778758495.2298808,
+      "timestamp_local": "2026-05-14 19:34:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be not",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758495.2298808,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1778758495.7435334,
+      "timestamp_local": "2026-05-14 19:34:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758495.7435334,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 80,
+      "timestamp_epoch_s": 1778758496.1813855,
+      "timestamp_local": "2026-05-14 19:34:56",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758496.1813855,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 81,
+      "timestamp_epoch_s": 1778758497.6804225,
+      "timestamp_local": "2026-05-14 19:34:57",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758497.6804225,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 82,
+      "timestamp_epoch_s": 1778758497.732821,
+      "timestamp_local": "2026-05-14 19:34:57",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758497.732821,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 83,
+      "timestamp_epoch_s": 1778758498.0369992,
+      "timestamp_local": "2026-05-14 19:34:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you needed me not to me learn anything",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758498.0369992,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1778758498.2543879,
+      "timestamp_local": "2026-05-14 19:34:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet not immediately",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758498.2543879,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1778758498.500314,
+      "timestamp_local": "2026-05-14 19:34:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758498.500314,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1778758499.209888,
+      "timestamp_local": "2026-05-14 19:34:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison me",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758499.209888,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1778758499.6800392,
+      "timestamp_local": "2026-05-14 19:34:59",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758499.6800392,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1778758500.4306026,
+      "timestamp_local": "2026-05-14 19:35:00",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758500.4306026,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1778758500.4708042,
+      "timestamp_local": "2026-05-14 19:35:00",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison me right now",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758500.4708042,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1778758500.9309597,
+      "timestamp_local": "2026-05-14 19:35:00",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758500.9309597,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 91,
+      "timestamp_epoch_s": 1778758505.180849,
+      "timestamp_local": "2026-05-14 19:35:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758505.180849,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 92,
+      "timestamp_epoch_s": 1778758505.2078636,
+      "timestamp_local": "2026-05-14 19:35:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison me right now it",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758505.2078636,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 93,
+      "timestamp_epoch_s": 1778758505.5736766,
+      "timestamp_local": "2026-05-14 19:35:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison me right now it it",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758505.5736766,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 94,
+      "timestamp_epoch_s": 1778758505.7631323,
+      "timestamp_local": "2026-05-14 19:35:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison me right now i'm",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758505.7631323,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 95,
+      "timestamp_epoch_s": 1778758505.9458516,
+      "timestamp_local": "2026-05-14 19:35:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison me right now i'm noticing",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758505.9458516,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 96,
+      "timestamp_epoch_s": 1778758506.2261057,
+      "timestamp_local": "2026-05-14 19:35:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison me right now i'm not a few",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758506.2261057,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 97,
+      "timestamp_epoch_s": 1778758506.6809196,
+      "timestamp_local": "2026-05-14 19:35:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758506.6809196,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 98,
+      "timestamp_epoch_s": 1778758509.4306858,
+      "timestamp_local": "2026-05-14 19:35:09",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758509.4306858,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 99,
+      "timestamp_epoch_s": 1778758509.7086818,
+      "timestamp_local": "2026-05-14 19:35:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison me right now i'm not the police and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758509.7086818,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 100,
+      "timestamp_epoch_s": 1778758509.9629762,
+      "timestamp_local": "2026-05-14 19:35:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison me right now i'm not the police and really",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758509.9629762,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 101,
+      "timestamp_epoch_s": 1778758510.4969923,
+      "timestamp_local": "2026-05-14 19:35:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison me right now i'm not the police and really know",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758510.4969923,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 102,
+      "timestamp_epoch_s": 1778758510.7137382,
+      "timestamp_local": "2026-05-14 19:35:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart said you need to be nice to meet up in unison me right now i'm not the police and really know much",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758510.7137382,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 103,
+      "timestamp_epoch_s": 1778758511.9046185,
+      "timestamp_local": "2026-05-14 19:35:11",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "run the smart said you need me not to me learn in unison me right now it if i m not the police and really know",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778758511.9046185,
+        "source": "final",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 104,
+      "timestamp_epoch_s": 1778758512.996522,
+      "timestamp_local": "2026-05-14 19:35:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758512.996522,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 105,
+      "timestamp_epoch_s": 1778758512.996522,
+      "timestamp_local": "2026-05-14 19:35:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758512.996522,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 106,
+      "timestamp_epoch_s": 1778758515.5237446,
+      "timestamp_local": "2026-05-14 19:35:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "thanks but no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758515.5237446,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 107,
+      "timestamp_epoch_s": 1778758515.7942038,
+      "timestamp_local": "2026-05-14 19:35:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "thanks but not",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758515.7942038,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 108,
+      "timestamp_epoch_s": 1778758516.0367105,
+      "timestamp_local": "2026-05-14 19:35:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "thanks but not the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758516.0367105,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 109,
+      "timestamp_epoch_s": 1778758516.501018,
+      "timestamp_local": "2026-05-14 19:35:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758516.501018,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 110,
+      "timestamp_epoch_s": 1778758516.7477865,
+      "timestamp_local": "2026-05-14 19:35:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758516.7477865,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 111,
+      "timestamp_epoch_s": 1778758516.762601,
+      "timestamp_local": "2026-05-14 19:35:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "thanks but no things",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778758516.762601,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 112,
+      "timestamp_epoch_s": 1778758517.2477,
+      "timestamp_local": "2026-05-14 19:35:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758517.2477,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 113,
+      "timestamp_epoch_s": 1778758518.746921,
+      "timestamp_local": "2026-05-14 19:35:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758518.746921,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 114,
+      "timestamp_epoch_s": 1778758519.2472537,
+      "timestamp_local": "2026-05-14 19:35:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758519.2472537,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 115,
+      "timestamp_epoch_s": 1778758519.9978256,
+      "timestamp_local": "2026-05-14 19:35:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758519.9978256,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 116,
+      "timestamp_epoch_s": 1778758520.4990945,
+      "timestamp_local": "2026-05-14 19:35:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758520.4990945,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 117,
+      "timestamp_epoch_s": 1778758521.2478778,
+      "timestamp_local": "2026-05-14 19:35:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758521.2478778,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 118,
+      "timestamp_epoch_s": 1778758522.449435,
+      "timestamp_local": "2026-05-14 19:35:22",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "thanks but no things",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778758522.449435,
+        "source": "final",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 119,
+      "timestamp_epoch_s": 1778758522.6235623,
+      "timestamp_local": "2026-05-14 19:35:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758522.6235623,
+        "source": "vosk",
+        "frequency_hz": 100.0,
+        "rms": 127,
+        "updated_at": 1778758336.8794243
+      }
+    },
+    {
+      "id": 120,
+      "timestamp_epoch_s": 1778758523.80337,
+      "timestamp_local": "2026-05-14 19:35:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758523.80337,
+        "source": "vosk",
+        "frequency_hz": 234.0,
+        "rms": 1602,
+        "updated_at": 1778758523.1242392
+      }
+    },
+    {
+      "id": 121,
+      "timestamp_epoch_s": 1778758523.80337,
+      "timestamp_local": "2026-05-14 19:35:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758523.80337,
+        "source": "vosk",
+        "frequency_hz": 234.0,
+        "rms": 1602,
+        "updated_at": 1778758523.1242392
+      }
+    },
+    {
+      "id": 122,
+      "timestamp_epoch_s": 1778758524.3733659,
+      "timestamp_local": "2026-05-14 19:35:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758524.3733659,
+        "source": "vosk",
+        "frequency_hz": 234.0,
+        "rms": 1602,
+        "updated_at": 1778758523.1242392
+      }
+    },
+    {
+      "id": 123,
+      "timestamp_epoch_s": 1778758524.6237123,
+      "timestamp_local": "2026-05-14 19:35:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758524.6237123,
+        "source": "vosk",
+        "frequency_hz": 234.0,
+        "rms": 1602,
+        "updated_at": 1778758523.1242392
+      }
+    },
+    {
+      "id": 124,
+      "timestamp_epoch_s": 1778758528.123679,
+      "timestamp_local": "2026-05-14 19:35:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778758528.123679,
+        "source": "vosk",
+        "frequency_hz": 234.0,
+        "rms": 1602,
+        "updated_at": 1778758523.1242392
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260514_193529.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260514_193529.md"
+  }
+}

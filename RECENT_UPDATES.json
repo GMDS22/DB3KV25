@@ -2,6 +2,15 @@
     "updates":  [
                     {
                         "version":  "4.0.0",
+                        "fix":  "Fixed portable-build voice packaging so release bundles now include the `models/` runtime tree and the optional AI TTS backends (`edge_tts`, `kokoro_onnx`, and Azure speech). This restores Kokoro offline voices and neural voice routes in packaged builds instead of leaving them available only in the source workspace.",
+                        "category":  "Build/Voice",
+                        "date":  "2026-05-05",
+                        "issue":  "ISS-107",
+                        "title":  "Portable voice packaging fix: bundle AI voice models and backends",
+                        "status":  "Worked"
+                    },
+                    {
+                        "version":  "4.0.0",
                         "fix":  "Prepared the Smart Sentry v4.0.0 release line by promoting a dedicated 4.0.0 version marker through runtime and portable-build resolution, keeping canonical settings/custom presets/prompted targets/face-library packaging intact, and simplifying the DADBOT home screen to logo plus title only.",
                         "category":  "Release/UI",
                         "date":  "2026-05-05",

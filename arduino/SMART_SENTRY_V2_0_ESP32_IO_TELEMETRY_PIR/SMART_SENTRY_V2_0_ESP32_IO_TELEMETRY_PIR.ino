@@ -417,7 +417,7 @@ void setup() {
   Serial.println("[BOOT] PIR support disabled (ENABLE_PIR_SUPPORT=0)");
 #endif
 
-  Serial.println("[BOOT] DB3000_ESP32_IO_Telemetry_2026_w_PIR ready");
+  Serial.println("[BOOT] DB3000_ESP32_IO_Telemetry_PIR ready");
   Serial.println("[BOOT] Expected host tokens: S/M/F/L/R/G over USB serial");
 #if ENABLE_PIR_SUPPORT
   Serial.println("[BOOT] Additional token: P (PIR enable/disable)");

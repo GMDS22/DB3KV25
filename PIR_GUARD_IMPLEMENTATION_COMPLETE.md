@@ -1,7 +1,11 @@
-# Smart Sentry v2 PIR Guard Integration - Complete
+# Smart Sentry PIR Guard Integration - Complete
+
+Date: 2026-05-13
+Status: Historical technical deep-dive. Use `PIR_AT_A_GLANCE.md` and `PIR_GUARD_QUICK_START.md` for the current live contract.
+Audience: Developers and maintainers
 
 ## Overview
-Full implementation of 3-sensor blind-spot motion detection system with adaptive scan protocol for Smart Sentry v2 turret controller. Feature includes GUI controls, proper defaults, and safe integration without affecting baseline systems.
+Original full implementation notes for the 3-sensor blind-spot motion detection system with adaptive scan protocol. This file remains useful for architecture history and deep-dive implementation context, but it is not the single source of truth for the current live runtime contract.
 
 ## What Was Built
 
@@ -245,7 +249,11 @@ python test_pir_ui_config.py
 
 ## Configuration Persistence
 
-Settings saved in `app/config/smart_sentry_v2_3_2_settings.json`:
+Settings are now persisted in the canonical runtime settings file `app/config/smart_sentry_settings.json`.
+
+Historical note: older versioned settings files may still exist as migration fallbacks, but they are not the authoritative current file.
+
+Example structure:
 ```json
 {
   "pir_guard": {

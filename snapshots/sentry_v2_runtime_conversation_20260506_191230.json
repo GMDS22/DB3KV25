@@ -1,0 +1,873 @@
+{
+  "generated_at_local": "2026-05-06 19:12:30",
+  "generated_at_epoch_s": 1778065950.5358706,
+  "entry_count": 46,
+  "counts_by_role": {
+    "assistant": 8,
+    "system": 1,
+    "operator": 37
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_final": 11,
+    "voice_transcript_partial": 21,
+    "voice_command": 5,
+    "spoken_confirmation": 6
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 44
+  },
+  "voice_transcript_summary": {
+    "partial_count": 21,
+    "final_count": 11,
+    "voice_command_count": 5,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "resume guarding mode",
+  "latest_operator_request": "resume guarding mode",
+  "latest_assistant_message": "Resuming guarding mode now.",
+  "analysis_hints": [],
+  "recent_turns": [
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1778065935.7544987,
+      "timestamp_local": "2026-05-06 19:12:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hold position",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065935.7544987,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1778065937.0141575,
+      "timestamp_local": "2026-05-06 19:12:17",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "hold position",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065937.0141575,
+        "source": "final"
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1778065937.4608507,
+      "timestamp_local": "2026-05-06 19:12:17",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "hold position",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1778065938.5003445,
+      "timestamp_local": "2026-05-06 19:12:18",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Understood. Holding position. Tell me when to resume guarding mode.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1778065943.5670252,
+      "timestamp_local": "2026-05-06 19:12:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on the slew hold position tell me why to rest",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065943.5670252,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1778065943.8138533,
+      "timestamp_local": "2026-05-06 19:12:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on the slew hold position tell me why to resume guarding",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065943.8138533,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1778065944.321183,
+      "timestamp_local": "2026-05-06 19:12:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on the slew hold position tell me why to resume guarding mode",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065944.321183,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1778065945.3203194,
+      "timestamp_local": "2026-05-06 19:12:25",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "resume guarding mode",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065945.3203194,
+        "source": "final",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1778065945.4730566,
+      "timestamp_local": "2026-05-06 19:12:25",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "resume guarding mode",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1778065946.5607867,
+      "timestamp_local": "2026-05-06 19:12:26",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Resuming guarding mode now.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1778065949.3657916,
+      "timestamp_local": "2026-05-06 19:12:29",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "friendly guard no active",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065949.3657916,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1778065949.5953362,
+      "timestamp_local": "2026-05-06 19:12:29",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "friendly guard no active targets",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065949.5953362,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778065761.1417696,
+      "timestamp_local": "2026-05-06 19:09:21",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778065761.1427703,
+      "timestamp_local": "2026-05-06 19:09:21",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778065762.2046707,
+      "timestamp_local": "2026-05-06 19:09:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778065762.2046707,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778065788.575243,
+      "timestamp_local": "2026-05-06 19:09:48",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "hey",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065788.575243,
+        "source": "final"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778065808.821511,
+      "timestamp_local": "2026-05-06 19:10:08",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "hey",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065808.821511,
+        "source": "final"
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778065844.3210166,
+      "timestamp_local": "2026-05-06 19:10:44",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "hey",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065844.3210166,
+        "source": "final"
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778065874.5755746,
+      "timestamp_local": "2026-05-06 19:11:14",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "hey",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065874.5755746,
+        "source": "final"
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778065898.7282648,
+      "timestamp_local": "2026-05-06 19:11:38",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hey",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065898.7282648,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778065898.9932384,
+      "timestamp_local": "2026-05-06 19:11:38",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hey leon",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065898.9932384,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778065899.952704,
+      "timestamp_local": "2026-05-06 19:11:39",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065899.952704,
+        "source": "final"
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778065900.051669,
+      "timestamp_local": "2026-05-06 19:11:40",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778065900.8585014,
+      "timestamp_local": "2026-05-06 19:11:40",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Yes. What do you want to know?",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778065903.899319,
+      "timestamp_local": "2026-05-06 19:11:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "yes what do you working",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065903.899319,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778065904.1486104,
+      "timestamp_local": "2026-05-06 19:11:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "yes what do you want to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065904.1486104,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778065904.4056559,
+      "timestamp_local": "2026-05-06 19:11:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "yes what do you want to no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065904.4056559,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778065905.2749114,
+      "timestamp_local": "2026-05-06 19:11:45",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "yes what do you want to no",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065905.2749114,
+        "source": "final"
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778065906.8994849,
+      "timestamp_local": "2026-05-06 19:11:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065906.8994849,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778065907.1487565,
+      "timestamp_local": "2026-05-06 19:11:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run smart sentry",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065907.1487565,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778065908.4530714,
+      "timestamp_local": "2026-05-06 19:11:48",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065908.4530714,
+        "source": "final"
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778065908.5583363,
+      "timestamp_local": "2026-05-06 19:11:48",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778065909.509403,
+      "timestamp_local": "2026-05-06 19:11:49",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Connecting Smart Sentry boards now.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778065915.898506,
+      "timestamp_local": "2026-05-06 19:11:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "connect smart sentry voice known face id guard no active targets running",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065915.898506,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778065916.5492826,
+      "timestamp_local": "2026-05-06 19:11:56",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "connect smart sentry voice no video the guard no active targets",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065916.5492826,
+        "source": "final"
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778065916.7254784,
+      "timestamp_local": "2026-05-06 19:11:56",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "connect smart sentry voice no video the guard no active targets",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778065917.9211078,
+      "timestamp_local": "2026-05-06 19:11:57",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Smart Sentry is already connected and enabled. Ask another question or give another command when ready.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778065924.6262674,
+      "timestamp_local": "2026-05-06 19:12:04",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I am still guarding right now. Ask another question, give another command, or say pause guarding if you want me to hold position.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778065933.2586608,
+      "timestamp_local": "2026-05-06 19:12:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "close to ask another question give another command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065933.2586608,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1778065933.5104618,
+      "timestamp_local": "2026-05-06 19:12:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "close to ask another question give another command voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065933.5104618,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1778065933.7780085,
+      "timestamp_local": "2026-05-06 19:12:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "close to ask another question give another command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065933.7780085,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1778065934.0092318,
+      "timestamp_local": "2026-05-06 19:12:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "close to ask another question give another command disabled",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065934.0092318,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1778065934.2818682,
+      "timestamp_local": "2026-05-06 19:12:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "close to ask another question give another command disable is guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065934.2818682,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1778065934.7719991,
+      "timestamp_local": "2026-05-06 19:12:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "close to ask another question give another command disable is guard e",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065934.7719991,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1778065935.668629,
+      "timestamp_local": "2026-05-06 19:12:15",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "close to ask another question give another command disable is guard",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065935.668629,
+        "source": "final"
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1778065935.7404459,
+      "timestamp_local": "2026-05-06 19:12:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tilt",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065935.7404459,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1778065935.7544987,
+      "timestamp_local": "2026-05-06 19:12:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hold position",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065935.7544987,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1778065937.0141575,
+      "timestamp_local": "2026-05-06 19:12:17",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "hold position",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065937.0141575,
+        "source": "final"
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1778065937.4608507,
+      "timestamp_local": "2026-05-06 19:12:17",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "hold position",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1778065938.5003445,
+      "timestamp_local": "2026-05-06 19:12:18",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Understood. Holding position. Tell me when to resume guarding mode.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1778065943.5670252,
+      "timestamp_local": "2026-05-06 19:12:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on the slew hold position tell me why to rest",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065943.5670252,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1778065943.8138533,
+      "timestamp_local": "2026-05-06 19:12:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on the slew hold position tell me why to resume guarding",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065943.8138533,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1778065944.321183,
+      "timestamp_local": "2026-05-06 19:12:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "on the slew hold position tell me why to resume guarding mode",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065944.321183,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1778065945.3203194,
+      "timestamp_local": "2026-05-06 19:12:25",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "resume guarding mode",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778065945.3203194,
+        "source": "final",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1778065945.4730566,
+      "timestamp_local": "2026-05-06 19:12:25",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "resume guarding mode",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1778065946.5607867,
+      "timestamp_local": "2026-05-06 19:12:26",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Resuming guarding mode now.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1778065949.3657916,
+      "timestamp_local": "2026-05-06 19:12:29",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "friendly guard no active",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065949.3657916,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1778065949.5953362,
+      "timestamp_local": "2026-05-06 19:12:29",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "friendly guard no active targets",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778065949.5953362,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 799,
+        "updated_at": 1778065937.5572767
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260506_191230.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260506_191230.md"
+  }
+}

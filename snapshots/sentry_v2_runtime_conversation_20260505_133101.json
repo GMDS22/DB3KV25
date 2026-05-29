@@ -1,0 +1,4401 @@
+{
+  "generated_at_local": "2026-05-05 13:31:01",
+  "generated_at_epoch_s": 1777959061.1743164,
+  "entry_count": 265,
+  "counts_by_role": {
+    "assistant": 11,
+    "system": 1,
+    "operator": 253
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "spoken_confirmation": 9,
+    "voice_transcript_partial": 204,
+    "voice_transcript_final": 43,
+    "voice_command": 6
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 263
+  },
+  "voice_transcript_summary": {
+    "partial_count": 204,
+    "final_count": 43,
+    "voice_command_count": 6,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "line the",
+  "latest_operator_request": "line the",
+  "latest_assistant_message": "No confirmation received. I did not run can you tell a joke.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 254,
+      "timestamp_epoch_s": 1777958504.3609536,
+      "timestamp_local": "2026-05-05 13:21:44",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "No confirmation received. I did not run can you tell a joke.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 255,
+      "timestamp_epoch_s": 1777958653.6200416,
+      "timestamp_local": "2026-05-05 13:24:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "as",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958653.6200416,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 256,
+      "timestamp_epoch_s": 1777958730.013524,
+      "timestamp_local": "2026-05-05 13:25:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "if",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958730.013524,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 257,
+      "timestamp_epoch_s": 1777958730.2392778,
+      "timestamp_local": "2026-05-05 13:25:30",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "if",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958730.2392778,
+        "source": "final",
+        "confidence": 0.73,
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 258,
+      "timestamp_epoch_s": 1777958734.5116963,
+      "timestamp_local": "2026-05-05 13:25:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958734.5116963,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 259,
+      "timestamp_epoch_s": 1777958755.5484738,
+      "timestamp_local": "2026-05-05 13:25:55",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958755.5484738,
+        "source": "final",
+        "confidence": 0.02,
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 260,
+      "timestamp_epoch_s": 1777958841.152654,
+      "timestamp_local": "2026-05-05 13:27:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "house",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958841.152654,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    },
+    {
+      "id": 261,
+      "timestamp_epoch_s": 1777958841.5798032,
+      "timestamp_local": "2026-05-05 13:27:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958841.5798032,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    },
+    {
+      "id": 262,
+      "timestamp_epoch_s": 1777958842.0680556,
+      "timestamp_local": "2026-05-05 13:27:22",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958842.0680556,
+        "source": "final",
+        "confidence": 0.22,
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    },
+    {
+      "id": 263,
+      "timestamp_epoch_s": 1777958848.448307,
+      "timestamp_local": "2026-05-05 13:27:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "line",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958848.448307,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    },
+    {
+      "id": 264,
+      "timestamp_epoch_s": 1777958848.652704,
+      "timestamp_local": "2026-05-05 13:27:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "line the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958848.652704,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    },
+    {
+      "id": 265,
+      "timestamp_epoch_s": 1777958849.48373,
+      "timestamp_local": "2026-05-05 13:27:29",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "line the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958849.48373,
+        "source": "final",
+        "confidence": 0.63,
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1777958213.5326185,
+      "timestamp_local": "2026-05-05 13:16:53",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1777958213.5341206,
+      "timestamp_local": "2026-05-05 13:16:53",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1777958215.3285644,
+      "timestamp_local": "2026-05-05 13:16:55",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1777958215.3285644,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1777958219.4836426,
+      "timestamp_local": "2026-05-05 13:16:59",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Smart Sentry AI is online. What do you want me to do first?",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1777958226.734094,
+      "timestamp_local": "2026-05-05 13:17:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "as",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958226.734094,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1777958227.160487,
+      "timestamp_local": "2026-05-05 13:17:07",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "as",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958227.160487,
+        "source": "final",
+        "confidence": 0.81
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1777958227.3554268,
+      "timestamp_local": "2026-05-05 13:17:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958227.3554268,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1777958227.3554268,
+      "timestamp_local": "2026-05-05 13:17:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "some",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958227.3554268,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1777958227.5591757,
+      "timestamp_local": "2026-05-05 13:17:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958227.5591757,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1777958227.7613668,
+      "timestamp_local": "2026-05-05 13:17:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart as",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958227.7613668,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1777958228.1690001,
+      "timestamp_local": "2026-05-05 13:17:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he was",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958228.1690001,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1777958228.5768821,
+      "timestamp_local": "2026-05-05 13:17:08",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "he was",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958228.5768821,
+        "source": "final",
+        "confidence": 0.06
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1777958229.9089906,
+      "timestamp_local": "2026-05-05 13:17:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958229.9089906,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1777958231.3427393,
+      "timestamp_local": "2026-05-05 13:17:11",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "he",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958231.3427393,
+        "source": "final",
+        "confidence": 0.48
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1777958235.4144313,
+      "timestamp_local": "2026-05-05 13:17:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958235.4144313,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1777958235.4144313,
+      "timestamp_local": "2026-05-05 13:17:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "able",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958235.4144313,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1777958235.6212215,
+      "timestamp_local": "2026-05-05 13:17:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the late",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958235.6212215,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1777958235.825366,
+      "timestamp_local": "2026-05-05 13:17:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the united",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958235.825366,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1777958236.033245,
+      "timestamp_local": "2026-05-05 13:17:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a boy who are",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958236.033245,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1777958236.4387867,
+      "timestamp_local": "2026-05-05 13:17:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a blatantly",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958236.4387867,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1777958237.052947,
+      "timestamp_local": "2026-05-05 13:17:17",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "a blatantly",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958237.052947,
+        "source": "final",
+        "confidence": 0.03
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1777958243.1445813,
+      "timestamp_local": "2026-05-05 13:17:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958243.1445813,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1777958244.161535,
+      "timestamp_local": "2026-05-05 13:17:24",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958244.161535,
+        "source": "final",
+        "confidence": 0.18
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1777958246.0074697,
+      "timestamp_local": "2026-05-05 13:17:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "do",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958246.0074697,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1777958246.8512824,
+      "timestamp_local": "2026-05-05 13:17:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "eighty",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958246.8512824,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1777958247.0556252,
+      "timestamp_local": "2026-05-05 13:17:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "eighty one",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958247.0556252,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1777958247.2585065,
+      "timestamp_local": "2026-05-05 13:17:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "eighty one on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958247.2585065,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1777958247.4631534,
+      "timestamp_local": "2026-05-05 13:17:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "eighty one on one",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958247.4631534,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1777958247.667708,
+      "timestamp_local": "2026-05-05 13:17:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "eighty one one one one",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958247.667708,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1777958249.9102554,
+      "timestamp_local": "2026-05-05 13:17:29",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "81111",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958249.9102554,
+        "source": "final",
+        "confidence": 0.3
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1777958249.910759,
+      "timestamp_local": "2026-05-05 13:17:29",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "one",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958249.910759,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1777958250.5165515,
+      "timestamp_local": "2026-05-05 13:17:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "one or",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958250.5165515,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1777958250.7188125,
+      "timestamp_local": "2026-05-05 13:17:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "one lonely",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958250.7188125,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1777958250.9223824,
+      "timestamp_local": "2026-05-05 13:17:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "one lonely nowhere",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958250.9223824,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1777958251.3284445,
+      "timestamp_local": "2026-05-05 13:17:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "one lonely when a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958251.3284445,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1777958251.7377887,
+      "timestamp_local": "2026-05-05 13:17:31",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "one lonely when a",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958251.7377887,
+        "source": "final",
+        "confidence": 0.56
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1777958257.010703,
+      "timestamp_local": "2026-05-05 13:17:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "witch",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958257.010703,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1777958257.010703,
+      "timestamp_local": "2026-05-05 13:17:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which each",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958257.010703,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1777958257.5718634,
+      "timestamp_local": "2026-05-05 13:17:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "pitch to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958257.5718634,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1777958257.9846907,
+      "timestamp_local": "2026-05-05 13:17:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "niche as soon as",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958257.9846907,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1777958258.1883044,
+      "timestamp_local": "2026-05-05 13:17:38",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "niche as soon as he has",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958258.1883044,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1777958259.4040012,
+      "timestamp_local": "2026-05-05 13:17:39",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "niche as soon as he has",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958259.4040012,
+        "source": "final",
+        "confidence": 0.1
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1777958262.0294116,
+      "timestamp_local": "2026-05-05 13:17:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958262.0294116,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1777958262.228803,
+      "timestamp_local": "2026-05-05 13:17:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "in",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958262.228803,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1777958262.4308045,
+      "timestamp_local": "2026-05-05 13:17:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "in the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958262.4308045,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1777958262.648868,
+      "timestamp_local": "2026-05-05 13:17:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a u.s.",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958262.648868,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1777958263.2595682,
+      "timestamp_local": "2026-05-05 13:17:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "in the rest of the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958263.2595682,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1777958263.464207,
+      "timestamp_local": "2026-05-05 13:17:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a u.s.",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958263.464207,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1777958263.4873698,
+      "timestamp_local": "2026-05-05 13:17:43",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "a u s",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958263.4873698,
+        "source": "final",
+        "confidence": 0.13
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1777958264.1414516,
+      "timestamp_local": "2026-05-05 13:17:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "team",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958264.1414516,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1777958265.1516485,
+      "timestamp_local": "2026-05-05 13:17:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "in",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958265.1516485,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1777958265.1516485,
+      "timestamp_local": "2026-05-05 13:17:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "be",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958265.1516485,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1777958265.557585,
+      "timestamp_local": "2026-05-05 13:17:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "guy and the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958265.557585,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1777958265.761587,
+      "timestamp_local": "2026-05-05 13:17:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is not",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958265.761587,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1777958265.9685032,
+      "timestamp_local": "2026-05-05 13:17:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "guy and the rest",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958265.9685032,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1777958266.810856,
+      "timestamp_local": "2026-05-05 13:17:46",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "guy and the rest",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958266.810856,
+        "source": "final",
+        "confidence": 0.41
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1777958267.8192883,
+      "timestamp_local": "2026-05-05 13:17:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "of the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958267.8192883,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1777958268.0208204,
+      "timestamp_local": "2026-05-05 13:17:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958268.0208204,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 59,
+      "timestamp_epoch_s": 1777958268.2270167,
+      "timestamp_local": "2026-05-05 13:17:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we are",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958268.2270167,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 60,
+      "timestamp_epoch_s": 1777958268.424603,
+      "timestamp_local": "2026-05-05 13:17:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "leon",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958268.424603,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 61,
+      "timestamp_epoch_s": 1777958268.8630567,
+      "timestamp_local": "2026-05-05 13:17:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "leon i",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958268.8630567,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 62,
+      "timestamp_epoch_s": 1777958269.0665672,
+      "timestamp_local": "2026-05-05 13:17:49",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "leon",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958269.0665672,
+        "source": "final",
+        "confidence": 0.65
+      }
+    },
+    {
+      "id": 63,
+      "timestamp_epoch_s": 1777958270.0874267,
+      "timestamp_local": "2026-05-05 13:17:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "go",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958270.0874267,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 64,
+      "timestamp_epoch_s": 1777958270.2898118,
+      "timestamp_local": "2026-05-05 13:17:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "were",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958270.2898118,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 65,
+      "timestamp_epoch_s": 1777958270.4930854,
+      "timestamp_local": "2026-05-05 13:17:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "was in",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958270.4930854,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 66,
+      "timestamp_epoch_s": 1777958270.6977746,
+      "timestamp_local": "2026-05-05 13:17:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "was in a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958270.6977746,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 67,
+      "timestamp_epoch_s": 1777958270.9145741,
+      "timestamp_local": "2026-05-05 13:17:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "was india",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958270.9145741,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1777958271.3353674,
+      "timestamp_local": "2026-05-05 13:17:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "was india's",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958271.3353674,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1777958272.5516536,
+      "timestamp_local": "2026-05-05 13:17:52",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "was india s",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958272.5516536,
+        "source": "final",
+        "confidence": 0.4
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1777958275.0178888,
+      "timestamp_local": "2026-05-05 13:17:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958275.0178888,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1777958275.419839,
+      "timestamp_local": "2026-05-05 13:17:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he has",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958275.419839,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1777958276.0313377,
+      "timestamp_local": "2026-05-05 13:17:56",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "eighty when",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958276.0313377,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1777958276.234503,
+      "timestamp_local": "2026-05-05 13:17:56",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he has",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958276.234503,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1777958276.8457625,
+      "timestamp_local": "2026-05-05 13:17:56",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he has earned",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958276.8457625,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1777958277.2962198,
+      "timestamp_local": "2026-05-05 13:17:57",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "he has earned",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958277.2962198,
+        "source": "final",
+        "confidence": 0.25
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1777958284.5038962,
+      "timestamp_local": "2026-05-05 13:18:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "in",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958284.5038962,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1777958284.7054758,
+      "timestamp_local": "2026-05-05 13:18:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a while",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958284.7054758,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1777958284.914964,
+      "timestamp_local": "2026-05-05 13:18:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the white",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958284.914964,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1777958285.3368688,
+      "timestamp_local": "2026-05-05 13:18:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "in",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958285.3368688,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 80,
+      "timestamp_epoch_s": 1777958285.7389023,
+      "timestamp_local": "2026-05-05 13:18:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the white",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958285.7389023,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 81,
+      "timestamp_epoch_s": 1777958285.943264,
+      "timestamp_local": "2026-05-05 13:18:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it has",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958285.943264,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 82,
+      "timestamp_epoch_s": 1777958286.76837,
+      "timestamp_local": "2026-05-05 13:18:06",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "it has",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958286.76837,
+        "source": "final",
+        "confidence": 0.02
+      }
+    },
+    {
+      "id": 83,
+      "timestamp_epoch_s": 1777958287.1775887,
+      "timestamp_local": "2026-05-05 13:18:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958287.1775887,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1777958287.5821574,
+      "timestamp_local": "2026-05-05 13:18:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "long",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958287.5821574,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1777958287.7824316,
+      "timestamp_local": "2026-05-05 13:18:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "only one",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958287.7824316,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1777958288.6519318,
+      "timestamp_local": "2026-05-05 13:18:08",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "only one",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958288.6519318,
+        "source": "final",
+        "confidence": 0.11
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1777958295.4592183,
+      "timestamp_local": "2026-05-05 13:18:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "see",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958295.4592183,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1777958295.68111,
+      "timestamp_local": "2026-05-05 13:18:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "say",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958295.68111,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1777958307.0226462,
+      "timestamp_local": "2026-05-05 13:18:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "day",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958307.0226462,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1777958307.0226462,
+      "timestamp_local": "2026-05-05 13:18:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958307.0226462,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 91,
+      "timestamp_epoch_s": 1777958307.2235372,
+      "timestamp_local": "2026-05-05 13:18:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "here",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958307.2235372,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 92,
+      "timestamp_epoch_s": 1777958307.6280384,
+      "timestamp_local": "2026-05-05 13:18:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "to believe",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958307.6280384,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 93,
+      "timestamp_epoch_s": 1777958307.829387,
+      "timestamp_local": "2026-05-05 13:18:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "to believe in",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958307.829387,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 94,
+      "timestamp_epoch_s": 1777958308.239946,
+      "timestamp_local": "2026-05-05 13:18:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "to believe he",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958308.239946,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 95,
+      "timestamp_epoch_s": 1777958309.2795808,
+      "timestamp_local": "2026-05-05 13:18:29",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "to believe he",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958309.2795808,
+        "source": "final",
+        "confidence": 0.26
+      }
+    },
+    {
+      "id": 96,
+      "timestamp_epoch_s": 1777958310.7628138,
+      "timestamp_local": "2026-05-05 13:18:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958310.7628138,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 97,
+      "timestamp_epoch_s": 1777958310.7689774,
+      "timestamp_local": "2026-05-05 13:18:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "has",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958310.7689774,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 98,
+      "timestamp_epoch_s": 1777958311.5825806,
+      "timestamp_local": "2026-05-05 13:18:31",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "has",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958311.5825806,
+        "source": "final",
+        "confidence": 0.21
+      }
+    },
+    {
+      "id": 99,
+      "timestamp_epoch_s": 1777958316.496484,
+      "timestamp_local": "2026-05-05 13:18:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958316.496484,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 100,
+      "timestamp_epoch_s": 1777958316.496484,
+      "timestamp_local": "2026-05-05 13:18:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958316.496484,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 101,
+      "timestamp_epoch_s": 1777958316.6999547,
+      "timestamp_local": "2026-05-05 13:18:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958316.6999547,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 102,
+      "timestamp_epoch_s": 1777958317.1076043,
+      "timestamp_local": "2026-05-05 13:18:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a clear",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958317.1076043,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 103,
+      "timestamp_epoch_s": 1777958317.310312,
+      "timestamp_local": "2026-05-05 13:18:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a hero",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958317.310312,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 104,
+      "timestamp_epoch_s": 1777958317.518034,
+      "timestamp_local": "2026-05-05 13:18:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a clear",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958317.518034,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 105,
+      "timestamp_epoch_s": 1777958317.7173352,
+      "timestamp_local": "2026-05-05 13:18:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "made clear he",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958317.7173352,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 106,
+      "timestamp_epoch_s": 1777958318.751154,
+      "timestamp_local": "2026-05-05 13:18:38",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "made clear he",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958318.751154,
+        "source": "final",
+        "confidence": 0.3
+      }
+    },
+    {
+      "id": 107,
+      "timestamp_epoch_s": 1777958321.1922367,
+      "timestamp_local": "2026-05-05 13:18:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "may",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958321.1922367,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 108,
+      "timestamp_epoch_s": 1777958333.680453,
+      "timestamp_local": "2026-05-05 13:18:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "was fifty",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958333.680453,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 109,
+      "timestamp_epoch_s": 1777958340.035408,
+      "timestamp_local": "2026-05-05 13:19:00",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "fifth",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958340.035408,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 110,
+      "timestamp_epoch_s": 1777958343.5553448,
+      "timestamp_local": "2026-05-05 13:19:03",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "keep",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958343.5553448,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 111,
+      "timestamp_epoch_s": 1777958345.4332378,
+      "timestamp_local": "2026-05-05 13:19:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "have a fifth",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958345.4332378,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 112,
+      "timestamp_epoch_s": 1777958346.046318,
+      "timestamp_local": "2026-05-05 13:19:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "have a fifth of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958346.046318,
+        "source": "windows"
+      }
+    },
+    {
+      "id": 113,
+      "timestamp_epoch_s": 1777958346.9091032,
+      "timestamp_local": "2026-05-05 13:19:06",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "have a fifth of",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958346.9091032,
+        "source": "final",
+        "confidence": 0.3
+      }
+    },
+    {
+      "id": 114,
+      "timestamp_epoch_s": 1777958351.3712666,
+      "timestamp_local": "2026-05-05 13:19:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958351.3712666,
+        "source": "windows",
+        "frequency_hz": 308.6,
+        "rms": 175,
+        "updated_at": 1777958350.0638568
+      }
+    },
+    {
+      "id": 115,
+      "timestamp_epoch_s": 1777958359.3985116,
+      "timestamp_local": "2026-05-05 13:19:19",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958359.3985116,
+        "source": "final",
+        "confidence": 0.08,
+        "frequency_hz": 308.6,
+        "rms": 175,
+        "updated_at": 1777958350.0638568
+      }
+    },
+    {
+      "id": 116,
+      "timestamp_epoch_s": 1777958367.7326474,
+      "timestamp_local": "2026-05-05 13:19:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "scene",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958367.7326474,
+        "source": "windows",
+        "frequency_hz": 308.6,
+        "rms": 175,
+        "updated_at": 1777958350.0638568
+      }
+    },
+    {
+      "id": 117,
+      "timestamp_epoch_s": 1777958367.9347577,
+      "timestamp_local": "2026-05-05 13:19:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "game",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958367.9347577,
+        "source": "windows",
+        "frequency_hz": 308.6,
+        "rms": 175,
+        "updated_at": 1777958350.0638568
+      }
+    },
+    {
+      "id": 118,
+      "timestamp_epoch_s": 1777958368.341445,
+      "timestamp_local": "2026-05-05 13:19:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "game and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958368.341445,
+        "source": "windows",
+        "frequency_hz": 308.6,
+        "rms": 175,
+        "updated_at": 1777958350.0638568
+      }
+    },
+    {
+      "id": 119,
+      "timestamp_epoch_s": 1777958368.7512228,
+      "timestamp_local": "2026-05-05 13:19:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "be more",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958368.7512228,
+        "source": "windows",
+        "frequency_hz": 308.6,
+        "rms": 175,
+        "updated_at": 1777958350.0638568
+      }
+    },
+    {
+      "id": 120,
+      "timestamp_epoch_s": 1777958368.9546626,
+      "timestamp_local": "2026-05-05 13:19:28",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "game and",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958368.9546626,
+        "source": "final",
+        "confidence": 0.57,
+        "frequency_hz": 308.6,
+        "rms": 175,
+        "updated_at": 1777958350.0638568
+      }
+    },
+    {
+      "id": 121,
+      "timestamp_epoch_s": 1777958370.3724566,
+      "timestamp_local": "2026-05-05 13:19:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958370.3724566,
+        "source": "windows",
+        "frequency_hz": 308.6,
+        "rms": 175,
+        "updated_at": 1777958350.0638568
+      }
+    },
+    {
+      "id": 122,
+      "timestamp_epoch_s": 1777958370.9828382,
+      "timestamp_local": "2026-05-05 13:19:30",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958370.9828382,
+        "source": "final",
+        "confidence": 0.82,
+        "frequency_hz": 308.6,
+        "rms": 175,
+        "updated_at": 1777958350.0638568
+      }
+    },
+    {
+      "id": 123,
+      "timestamp_epoch_s": 1777958377.0208085,
+      "timestamp_local": "2026-05-05 13:19:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "main",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958377.0208085,
+        "source": "windows",
+        "frequency_hz": 308.6,
+        "rms": 175,
+        "updated_at": 1777958350.0638568
+      }
+    },
+    {
+      "id": 124,
+      "timestamp_epoch_s": 1777958377.6323547,
+      "timestamp_local": "2026-05-05 13:19:37",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "main",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958377.6323547,
+        "source": "final",
+        "confidence": 0.03,
+        "frequency_hz": 308.6,
+        "rms": 175,
+        "updated_at": 1777958350.0638568
+      }
+    },
+    {
+      "id": 125,
+      "timestamp_epoch_s": 1777958382.3498197,
+      "timestamp_local": "2026-05-05 13:19:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958382.3498197,
+        "source": "windows",
+        "frequency_hz": 367.2,
+        "rms": 195,
+        "updated_at": 1777958381.2197862
+      }
+    },
+    {
+      "id": 126,
+      "timestamp_epoch_s": 1777958383.5707812,
+      "timestamp_local": "2026-05-05 13:19:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thing",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958383.5707812,
+        "source": "windows",
+        "frequency_hz": 367.2,
+        "rms": 195,
+        "updated_at": 1777958381.2197862
+      }
+    },
+    {
+      "id": 127,
+      "timestamp_epoch_s": 1777958383.9743748,
+      "timestamp_local": "2026-05-05 13:19:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thought",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958383.9743748,
+        "source": "windows",
+        "frequency_hz": 367.2,
+        "rms": 195,
+        "updated_at": 1777958381.2197862
+      }
+    },
+    {
+      "id": 128,
+      "timestamp_epoch_s": 1777958384.1768413,
+      "timestamp_local": "2026-05-05 13:19:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the things",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958384.1768413,
+        "source": "windows",
+        "frequency_hz": 367.2,
+        "rms": 195,
+        "updated_at": 1777958381.2197862
+      }
+    },
+    {
+      "id": 129,
+      "timestamp_epoch_s": 1777958384.3786905,
+      "timestamp_local": "2026-05-05 13:19:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thing",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958384.3786905,
+        "source": "windows",
+        "frequency_hz": 367.2,
+        "rms": 195,
+        "updated_at": 1777958381.2197862
+      }
+    },
+    {
+      "id": 130,
+      "timestamp_epoch_s": 1777958384.989685,
+      "timestamp_local": "2026-05-05 13:19:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thought",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958384.989685,
+        "source": "windows",
+        "frequency_hz": 367.2,
+        "rms": 195,
+        "updated_at": 1777958381.2197862
+      }
+    },
+    {
+      "id": 131,
+      "timestamp_epoch_s": 1777958385.190968,
+      "timestamp_local": "2026-05-05 13:19:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thing",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958385.190968,
+        "source": "windows",
+        "frequency_hz": 367.2,
+        "rms": 195,
+        "updated_at": 1777958381.2197862
+      }
+    },
+    {
+      "id": 132,
+      "timestamp_epoch_s": 1777958385.3962102,
+      "timestamp_local": "2026-05-05 13:19:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the th",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958385.3962102,
+        "source": "windows",
+        "frequency_hz": 367.2,
+        "rms": 195,
+        "updated_at": 1777958381.2197862
+      }
+    },
+    {
+      "id": 133,
+      "timestamp_epoch_s": 1777958385.6006527,
+      "timestamp_local": "2026-05-05 13:19:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thought",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958385.6006527,
+        "source": "windows",
+        "frequency_hz": 367.2,
+        "rms": 195,
+        "updated_at": 1777958381.2197862
+      }
+    },
+    {
+      "id": 134,
+      "timestamp_epoch_s": 1777958386.016423,
+      "timestamp_local": "2026-05-05 13:19:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thing",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958386.016423,
+        "source": "windows",
+        "frequency_hz": 261.7,
+        "rms": 4960,
+        "updated_at": 1777958385.6550593
+      }
+    },
+    {
+      "id": 135,
+      "timestamp_epoch_s": 1777958386.4260066,
+      "timestamp_local": "2026-05-05 13:19:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the th",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958386.4260066,
+        "source": "windows",
+        "frequency_hz": 261.7,
+        "rms": 4960,
+        "updated_at": 1777958385.6550593
+      }
+    },
+    {
+      "id": 136,
+      "timestamp_epoch_s": 1777958386.6267014,
+      "timestamp_local": "2026-05-05 13:19:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thick",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958386.6267014,
+        "source": "windows",
+        "frequency_hz": 261.7,
+        "rms": 4960,
+        "updated_at": 1777958385.6550593
+      }
+    },
+    {
+      "id": 137,
+      "timestamp_epoch_s": 1777958386.8308718,
+      "timestamp_local": "2026-05-05 13:19:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thing he",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958386.8308718,
+        "source": "windows",
+        "frequency_hz": 261.7,
+        "rms": 4960,
+        "updated_at": 1777958385.6550593
+      }
+    },
+    {
+      "id": 138,
+      "timestamp_epoch_s": 1777958387.2400038,
+      "timestamp_local": "2026-05-05 13:19:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the things that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958387.2400038,
+        "source": "windows",
+        "frequency_hz": 261.7,
+        "rms": 4960,
+        "updated_at": 1777958385.6550593
+      }
+    },
+    {
+      "id": 139,
+      "timestamp_epoch_s": 1777958387.6602454,
+      "timestamp_local": "2026-05-05 13:19:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the things that if",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958387.6602454,
+        "source": "windows",
+        "frequency_hz": 414.1,
+        "rms": 592,
+        "updated_at": 1777958387.3174899
+      }
+    },
+    {
+      "id": 140,
+      "timestamp_epoch_s": 1777958387.8562393,
+      "timestamp_local": "2026-05-05 13:19:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thirty th",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958387.8562393,
+        "source": "windows",
+        "frequency_hz": 401.8,
+        "rms": 376,
+        "updated_at": 1777958387.8255
+      }
+    },
+    {
+      "id": 141,
+      "timestamp_epoch_s": 1777958389.7166064,
+      "timestamp_local": "2026-05-05 13:19:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thirty th of a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958389.7166064,
+        "source": "windows",
+        "frequency_hz": 401.8,
+        "rms": 376,
+        "updated_at": 1777958387.8255
+      }
+    },
+    {
+      "id": 142,
+      "timestamp_epoch_s": 1777958390.1204975,
+      "timestamp_local": "2026-05-05 13:19:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thirty th of a deal",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958390.1204975,
+        "source": "windows",
+        "frequency_hz": 401.8,
+        "rms": 376,
+        "updated_at": 1777958387.8255
+      }
+    },
+    {
+      "id": 143,
+      "timestamp_epoch_s": 1777958390.3234196,
+      "timestamp_local": "2026-05-05 13:19:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thirty th of a deal yet",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958390.3234196,
+        "source": "windows",
+        "frequency_hz": 156.2,
+        "rms": 2352,
+        "updated_at": 1777958390.2556028
+      }
+    },
+    {
+      "id": 144,
+      "timestamp_epoch_s": 1777958390.9886491,
+      "timestamp_local": "2026-05-05 13:19:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thirty th of a deal yet more",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958390.9886491,
+        "source": "windows",
+        "frequency_hz": 167.5,
+        "rms": 720,
+        "updated_at": 1777958390.6450284
+      }
+    },
+    {
+      "id": 145,
+      "timestamp_epoch_s": 1777958391.135616,
+      "timestamp_local": "2026-05-05 13:19:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the thirty th of a ely and will",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958391.135616,
+        "source": "windows",
+        "frequency_hz": 167.5,
+        "rms": 720,
+        "updated_at": 1777958390.6450284
+      }
+    },
+    {
+      "id": 146,
+      "timestamp_epoch_s": 1777958391.7641096,
+      "timestamp_local": "2026-05-05 13:19:51",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the 30 th of a ely and will",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958391.7641096,
+        "source": "final",
+        "confidence": 0.22,
+        "frequency_hz": 167.5,
+        "rms": 720,
+        "updated_at": 1777958390.6450284
+      }
+    },
+    {
+      "id": 147,
+      "timestamp_epoch_s": 1777958392.5676706,
+      "timestamp_local": "2026-05-05 13:19:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "be",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958392.5676706,
+        "source": "windows",
+        "frequency_hz": 167.5,
+        "rms": 720,
+        "updated_at": 1777958390.6450284
+      }
+    },
+    {
+      "id": 148,
+      "timestamp_epoch_s": 1777958393.1752608,
+      "timestamp_local": "2026-05-05 13:19:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "be an",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958393.1752608,
+        "source": "windows",
+        "frequency_hz": 320.3,
+        "rms": 2448,
+        "updated_at": 1777958392.5676706
+      }
+    },
+    {
+      "id": 149,
+      "timestamp_epoch_s": 1777958393.3793504,
+      "timestamp_local": "2026-05-05 13:19:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "be a mass",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958393.3793504,
+        "source": "windows",
+        "frequency_hz": 250.4,
+        "rms": 242,
+        "updated_at": 1777958393.33684
+      }
+    },
+    {
+      "id": 150,
+      "timestamp_epoch_s": 1777958393.5839732,
+      "timestamp_local": "2026-05-05 13:19:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "be a mask or",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958393.5839732,
+        "source": "windows",
+        "frequency_hz": 250.4,
+        "rms": 242,
+        "updated_at": 1777958393.33684
+      }
+    },
+    {
+      "id": 151,
+      "timestamp_epoch_s": 1777958393.785724,
+      "timestamp_local": "2026-05-05 13:19:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "be a nice home",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958393.785724,
+        "source": "windows",
+        "frequency_hz": 250.4,
+        "rms": 242,
+        "updated_at": 1777958393.33684
+      }
+    },
+    {
+      "id": 152,
+      "timestamp_epoch_s": 1777958394.2366283,
+      "timestamp_local": "2026-05-05 13:19:54",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "be amassed who",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958394.2366283,
+        "source": "final",
+        "confidence": 0.56,
+        "frequency_hz": 250.4,
+        "rms": 242,
+        "updated_at": 1777958393.33684
+      }
+    },
+    {
+      "id": 153,
+      "timestamp_epoch_s": 1777958397.0324545,
+      "timestamp_local": "2026-05-05 13:19:57",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958397.0324545,
+        "source": "windows",
+        "frequency_hz": 250.4,
+        "rms": 242,
+        "updated_at": 1777958393.33684
+      }
+    },
+    {
+      "id": 154,
+      "timestamp_epoch_s": 1777958397.4388416,
+      "timestamp_local": "2026-05-05 13:19:57",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "played the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958397.4388416,
+        "source": "windows",
+        "frequency_hz": 250.4,
+        "rms": 242,
+        "updated_at": 1777958393.33684
+      }
+    },
+    {
+      "id": 155,
+      "timestamp_epoch_s": 1777958397.641528,
+      "timestamp_local": "2026-05-05 13:19:57",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "reduced by",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958397.641528,
+        "source": "windows",
+        "frequency_hz": 250.4,
+        "rms": 242,
+        "updated_at": 1777958393.33684
+      }
+    },
+    {
+      "id": 156,
+      "timestamp_epoch_s": 1777958397.8440218,
+      "timestamp_local": "2026-05-05 13:19:57",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "played the spicy",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958397.8440218,
+        "source": "windows",
+        "frequency_hz": 250.4,
+        "rms": 242,
+        "updated_at": 1777958393.33684
+      }
+    },
+    {
+      "id": 157,
+      "timestamp_epoch_s": 1777958398.2519758,
+      "timestamp_local": "2026-05-05 13:19:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "radius besieged",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958398.2519758,
+        "source": "windows",
+        "frequency_hz": 250.4,
+        "rms": 242,
+        "updated_at": 1777958393.33684
+      }
+    },
+    {
+      "id": 158,
+      "timestamp_epoch_s": 1777958398.4573033,
+      "timestamp_local": "2026-05-05 13:19:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "radius proceeds go",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958398.4573033,
+        "source": "windows",
+        "frequency_hz": 164.1,
+        "rms": 161,
+        "updated_at": 1777958398.4558015
+      }
+    },
+    {
+      "id": 159,
+      "timestamp_epoch_s": 1777958398.6618729,
+      "timestamp_local": "2026-05-05 13:19:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "played the spicy coat",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958398.6618729,
+        "source": "windows",
+        "frequency_hz": 168.2,
+        "rms": 156,
+        "updated_at": 1777958398.5755134
+      }
+    },
+    {
+      "id": 160,
+      "timestamp_epoch_s": 1777958399.0706036,
+      "timestamp_local": "2026-05-05 13:19:59",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "played the spicy coat",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958399.0706036,
+        "source": "final",
+        "confidence": 0.49,
+        "frequency_hz": 168.2,
+        "rms": 156,
+        "updated_at": 1777958398.5755134
+      }
+    },
+    {
+      "id": 161,
+      "timestamp_epoch_s": 1777958403.6371515,
+      "timestamp_local": "2026-05-05 13:20:03",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958403.6371515,
+        "source": "windows",
+        "frequency_hz": 326.6,
+        "rms": 202,
+        "updated_at": 1777958402.2973287
+      }
+    },
+    {
+      "id": 162,
+      "timestamp_epoch_s": 1777958404.4869423,
+      "timestamp_local": "2026-05-05 13:20:04",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "of",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958404.4869423,
+        "source": "final",
+        "confidence": 0.44,
+        "frequency_hz": 371.1,
+        "rms": 136,
+        "updated_at": 1777958404.3356898
+      }
+    },
+    {
+      "id": 163,
+      "timestamp_epoch_s": 1777958405.0992336,
+      "timestamp_local": "2026-05-05 13:20:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sea",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958405.0992336,
+        "source": "windows",
+        "frequency_hz": 371.1,
+        "rms": 136,
+        "updated_at": 1777958404.3356898
+      }
+    },
+    {
+      "id": 164,
+      "timestamp_epoch_s": 1777958406.3472872,
+      "timestamp_local": "2026-05-05 13:20:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sea and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958406.3472872,
+        "source": "windows",
+        "frequency_hz": 414.1,
+        "rms": 137,
+        "updated_at": 1777958405.7465165
+      }
+    },
+    {
+      "id": 165,
+      "timestamp_epoch_s": 1777958407.1976385,
+      "timestamp_local": "2026-05-05 13:20:07",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "sea and",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958407.1976385,
+        "source": "final",
+        "confidence": 0.47,
+        "frequency_hz": 401.8,
+        "rms": 344,
+        "updated_at": 1777958406.3859382
+      }
+    },
+    {
+      "id": 166,
+      "timestamp_epoch_s": 1777958410.8386905,
+      "timestamp_local": "2026-05-05 13:20:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it's",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958410.8386905,
+        "source": "windows",
+        "frequency_hz": 401.8,
+        "rms": 344,
+        "updated_at": 1777958406.3859382
+      }
+    },
+    {
+      "id": 167,
+      "timestamp_epoch_s": 1777958411.6550741,
+      "timestamp_local": "2026-05-05 13:20:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it's it's",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958411.6550741,
+        "source": "windows",
+        "frequency_hz": 401.8,
+        "rms": 344,
+        "updated_at": 1777958406.3859382
+      }
+    },
+    {
+      "id": 168,
+      "timestamp_epoch_s": 1777958412.435919,
+      "timestamp_local": "2026-05-05 13:20:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it's it's the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958412.435919,
+        "source": "windows",
+        "frequency_hz": 401.8,
+        "rms": 344,
+        "updated_at": 1777958406.3859382
+      }
+    },
+    {
+      "id": 169,
+      "timestamp_epoch_s": 1777958412.8979843,
+      "timestamp_local": "2026-05-05 13:20:12",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "it s it s the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958412.8979843,
+        "source": "final",
+        "confidence": 0.52,
+        "frequency_hz": 401.8,
+        "rms": 344,
+        "updated_at": 1777958406.3859382
+      }
+    },
+    {
+      "id": 170,
+      "timestamp_epoch_s": 1777958415.319381,
+      "timestamp_local": "2026-05-05 13:20:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "true",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958415.319381,
+        "source": "windows",
+        "frequency_hz": 358.0,
+        "rms": 219,
+        "updated_at": 1777958415.097078
+      }
+    },
+    {
+      "id": 171,
+      "timestamp_epoch_s": 1777958415.5299444,
+      "timestamp_local": "2026-05-05 13:20:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "route",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958415.5299444,
+        "source": "windows",
+        "frequency_hz": 358.0,
+        "rms": 219,
+        "updated_at": 1777958415.097078
+      }
+    },
+    {
+      "id": 172,
+      "timestamp_epoch_s": 1777958415.72802,
+      "timestamp_local": "2026-05-05 13:20:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "way through the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958415.72802,
+        "source": "windows",
+        "frequency_hz": 358.0,
+        "rms": 219,
+        "updated_at": 1777958415.097078
+      }
+    },
+    {
+      "id": 173,
+      "timestamp_epoch_s": 1777958416.138724,
+      "timestamp_local": "2026-05-05 13:20:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "true believer",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958416.138724,
+        "source": "windows",
+        "frequency_hz": 376.3,
+        "rms": 347,
+        "updated_at": 1777958415.8563097
+      }
+    },
+    {
+      "id": 174,
+      "timestamp_epoch_s": 1777958416.5467277,
+      "timestamp_local": "2026-05-05 13:20:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "way through the lyons",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958416.5467277,
+        "source": "windows",
+        "frequency_hz": 376.3,
+        "rms": 347,
+        "updated_at": 1777958415.8563097
+      }
+    },
+    {
+      "id": 175,
+      "timestamp_epoch_s": 1777958416.956775,
+      "timestamp_local": "2026-05-05 13:20:16",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion way through the lyons",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958416.956775,
+        "source": "final",
+        "confidence": 0.41,
+        "frequency_hz": 376.3,
+        "rms": 347,
+        "updated_at": 1777958415.8563097
+      }
+    },
+    {
+      "id": 176,
+      "timestamp_epoch_s": 1777958417.326983,
+      "timestamp_local": "2026-05-05 13:20:17",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion way through the lyons",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 177,
+      "timestamp_epoch_s": 1777958418.7913277,
+      "timestamp_local": "2026-05-05 13:20:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958418.7913277,
+        "source": "windows",
+        "frequency_hz": 376.3,
+        "rms": 347,
+        "updated_at": 1777958415.8563097
+      }
+    },
+    {
+      "id": 178,
+      "timestamp_epoch_s": 1777958419.6790824,
+      "timestamp_local": "2026-05-05 13:20:19",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "he",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958419.6790824,
+        "source": "final",
+        "confidence": 0.78,
+        "frequency_hz": 297.3,
+        "rms": 148,
+        "updated_at": 1777958419.1945512
+      }
+    },
+    {
+      "id": 179,
+      "timestamp_epoch_s": 1777958422.2673776,
+      "timestamp_local": "2026-05-05 13:20:22",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I think I heard elion way through the lyons. Say yes if that is correct, say it again, or say cancel.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 180,
+      "timestamp_epoch_s": 1777958431.9144564,
+      "timestamp_local": "2026-05-05 13:20:31",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "No confirmation received. I did not run elion way through the lyons.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 181,
+      "timestamp_epoch_s": 1777958432.7588937,
+      "timestamp_local": "2026-05-05 13:20:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "was",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958432.7588937,
+        "source": "windows",
+        "frequency_hz": 187.5,
+        "rms": 151,
+        "updated_at": 1777958431.7376337
+      }
+    },
+    {
+      "id": 182,
+      "timestamp_epoch_s": 1777958440.5274265,
+      "timestamp_local": "2026-05-05 13:20:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958440.5274265,
+        "source": "windows",
+        "frequency_hz": 187.5,
+        "rms": 151,
+        "updated_at": 1777958431.7376337
+      }
+    },
+    {
+      "id": 183,
+      "timestamp_epoch_s": 1777958440.7298331,
+      "timestamp_local": "2026-05-05 13:20:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hey",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958440.7298331,
+        "source": "windows",
+        "frequency_hz": 187.5,
+        "rms": 151,
+        "updated_at": 1777958431.7376337
+      }
+    },
+    {
+      "id": 184,
+      "timestamp_epoch_s": 1777958440.9343762,
+      "timestamp_local": "2026-05-05 13:20:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ate the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958440.9343762,
+        "source": "windows",
+        "frequency_hz": 187.5,
+        "rms": 151,
+        "updated_at": 1777958431.7376337
+      }
+    },
+    {
+      "id": 185,
+      "timestamp_epoch_s": 1777958441.1388497,
+      "timestamp_local": "2026-05-05 13:20:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ate the lee",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958441.1388497,
+        "source": "windows",
+        "frequency_hz": 187.5,
+        "rms": 151,
+        "updated_at": 1777958431.7376337
+      }
+    },
+    {
+      "id": 186,
+      "timestamp_epoch_s": 1777958441.345102,
+      "timestamp_local": "2026-05-05 13:20:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ate the lyons",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958441.345102,
+        "source": "windows",
+        "frequency_hz": 156.2,
+        "rms": 146,
+        "updated_at": 1777958441.3380847
+      }
+    },
+    {
+      "id": 187,
+      "timestamp_epoch_s": 1777958441.7502363,
+      "timestamp_local": "2026-05-05 13:20:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ate the liane",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958441.7502363,
+        "source": "windows",
+        "frequency_hz": 156.2,
+        "rms": 146,
+        "updated_at": 1777958441.3380847
+      }
+    },
+    {
+      "id": 188,
+      "timestamp_epoch_s": 1777958442.013845,
+      "timestamp_local": "2026-05-05 13:20:42",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion ate the liane",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958442.013845,
+        "source": "final",
+        "confidence": 0.44,
+        "frequency_hz": 156.2,
+        "rms": 146,
+        "updated_at": 1777958441.3380847
+      }
+    },
+    {
+      "id": 189,
+      "timestamp_epoch_s": 1777958442.5879145,
+      "timestamp_local": "2026-05-05 13:20:42",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion ate the liane",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 190,
+      "timestamp_epoch_s": 1777958444.696181,
+      "timestamp_local": "2026-05-05 13:20:44",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I think I heard elion ate the liane. Say yes if that is correct, say it again, or say cancel.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 191,
+      "timestamp_epoch_s": 1777958447.7812226,
+      "timestamp_local": "2026-05-05 13:20:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "as",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958447.7812226,
+        "source": "windows",
+        "frequency_hz": 199.2,
+        "rms": 129,
+        "updated_at": 1777958444.787848
+      }
+    },
+    {
+      "id": 192,
+      "timestamp_epoch_s": 1777958451.4929254,
+      "timestamp_local": "2026-05-05 13:20:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "its",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958451.4929254,
+        "source": "windows",
+        "frequency_hz": 199.2,
+        "rms": 129,
+        "updated_at": 1777958444.787848
+      }
+    },
+    {
+      "id": 193,
+      "timestamp_epoch_s": 1777958452.5279813,
+      "timestamp_local": "2026-05-05 13:20:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it's it's",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958452.5279813,
+        "source": "windows",
+        "frequency_hz": 199.2,
+        "rms": 129,
+        "updated_at": 1777958444.787848
+      }
+    },
+    {
+      "id": 194,
+      "timestamp_epoch_s": 1777958453.346821,
+      "timestamp_local": "2026-05-05 13:20:53",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "it s it s",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958453.346821,
+        "source": "final",
+        "confidence": 0.75,
+        "frequency_hz": 199.2,
+        "rms": 129,
+        "updated_at": 1777958444.787848
+      }
+    },
+    {
+      "id": 195,
+      "timestamp_epoch_s": 1777958453.733257,
+      "timestamp_local": "2026-05-05 13:20:53",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "it s it s",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 196,
+      "timestamp_epoch_s": 1777958454.9715886,
+      "timestamp_local": "2026-05-05 13:20:54",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958454.9715886,
+        "source": "windows",
+        "frequency_hz": 199.2,
+        "rms": 129,
+        "updated_at": 1777958444.787848
+      }
+    },
+    {
+      "id": 197,
+      "timestamp_epoch_s": 1777958455.1758847,
+      "timestamp_local": "2026-05-05 13:20:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958455.1758847,
+        "source": "windows",
+        "frequency_hz": 199.2,
+        "rms": 129,
+        "updated_at": 1777958444.787848
+      }
+    },
+    {
+      "id": 198,
+      "timestamp_epoch_s": 1777958455.3804314,
+      "timestamp_local": "2026-05-05 13:20:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i have",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958455.3804314,
+        "source": "windows",
+        "frequency_hz": 402.3,
+        "rms": 557,
+        "updated_at": 1777958455.2877462
+      }
+    },
+    {
+      "id": 199,
+      "timestamp_epoch_s": 1777958455.582275,
+      "timestamp_local": "2026-05-05 13:20:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i have a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958455.582275,
+        "source": "windows",
+        "frequency_hz": 402.3,
+        "rms": 557,
+        "updated_at": 1777958455.2877462
+      }
+    },
+    {
+      "id": 200,
+      "timestamp_epoch_s": 1777958456.0008943,
+      "timestamp_local": "2026-05-05 13:20:56",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a head request",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958456.0008943,
+        "source": "windows",
+        "frequency_hz": 396.8,
+        "rms": 144,
+        "updated_at": 1777958455.929571
+      }
+    },
+    {
+      "id": 201,
+      "timestamp_epoch_s": 1777958456.1958497,
+      "timestamp_local": "2026-05-05 13:20:56",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i have a question",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958456.1958497,
+        "source": "windows",
+        "frequency_hz": 344.1,
+        "rms": 137,
+        "updated_at": 1777958456.1784618
+      }
+    },
+    {
+      "id": 202,
+      "timestamp_epoch_s": 1777958456.6584768,
+      "timestamp_local": "2026-05-05 13:20:56",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "i have a question",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958456.6584768,
+        "source": "final",
+        "confidence": 0.85,
+        "frequency_hz": 300.2,
+        "rms": 186,
+        "updated_at": 1777958456.3088543
+      }
+    },
+    {
+      "id": 203,
+      "timestamp_epoch_s": 1777958457.2179213,
+      "timestamp_local": "2026-05-05 13:20:57",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958457.2179213,
+        "source": "windows",
+        "frequency_hz": 300.2,
+        "rms": 186,
+        "updated_at": 1777958456.3088543
+      }
+    },
+    {
+      "id": 204,
+      "timestamp_epoch_s": 1777958459.0332484,
+      "timestamp_local": "2026-05-05 13:20:59",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Please say yes, say the command again, or say cancel.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 205,
+      "timestamp_epoch_s": 1777958461.5569956,
+      "timestamp_local": "2026-05-05 13:21:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it's",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958461.5569956,
+        "source": "windows",
+        "frequency_hz": 300.2,
+        "rms": 186,
+        "updated_at": 1777958456.3088543
+      }
+    },
+    {
+      "id": 206,
+      "timestamp_epoch_s": 1777958462.1599436,
+      "timestamp_local": "2026-05-05 13:21:02",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "it s",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958462.1599436,
+        "source": "final",
+        "confidence": 0.86,
+        "frequency_hz": 300.2,
+        "rms": 186,
+        "updated_at": 1777958456.3088543
+      }
+    },
+    {
+      "id": 207,
+      "timestamp_epoch_s": 1777958462.8823812,
+      "timestamp_local": "2026-05-05 13:21:02",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "it s",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 208,
+      "timestamp_epoch_s": 1777958465.1862388,
+      "timestamp_local": "2026-05-05 13:21:05",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Please say yes, say the command again, or say cancel.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 209,
+      "timestamp_epoch_s": 1777958466.7240157,
+      "timestamp_local": "2026-05-05 13:21:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958466.7240157,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 210,
+      "timestamp_epoch_s": 1777958467.1272807,
+      "timestamp_local": "2026-05-05 13:21:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a huge",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958467.1272807,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 211,
+      "timestamp_epoch_s": 1777958467.3332336,
+      "timestamp_local": "2026-05-05 13:21:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a new dell",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958467.3332336,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 212,
+      "timestamp_epoch_s": 1777958467.537928,
+      "timestamp_local": "2026-05-05 13:21:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "a villager",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958467.537928,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 213,
+      "timestamp_epoch_s": 1777958467.745127,
+      "timestamp_local": "2026-05-05 13:21:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "can you tell a joke",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958467.745127,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 214,
+      "timestamp_epoch_s": 1777958469.012412,
+      "timestamp_local": "2026-05-05 13:21:09",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "can you tell a joke",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958469.012412,
+        "source": "final",
+        "confidence": 0.28,
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 215,
+      "timestamp_epoch_s": 1777958469.4221463,
+      "timestamp_local": "2026-05-05 13:21:09",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "can you tell a joke",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 216,
+      "timestamp_epoch_s": 1777958470.6139746,
+      "timestamp_local": "2026-05-05 13:21:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "do",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958470.6139746,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 217,
+      "timestamp_epoch_s": 1777958470.825489,
+      "timestamp_local": "2026-05-05 13:21:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958470.825489,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 218,
+      "timestamp_epoch_s": 1777958471.0202508,
+      "timestamp_local": "2026-05-05 13:21:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "down the age",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958471.0202508,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 219,
+      "timestamp_epoch_s": 1777958471.2234223,
+      "timestamp_local": "2026-05-05 13:21:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "down the ager",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958471.2234223,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 220,
+      "timestamp_epoch_s": 1777958471.6282482,
+      "timestamp_local": "2026-05-05 13:21:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tell me a joke",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958471.6282482,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 221,
+      "timestamp_epoch_s": 1777958473.7696044,
+      "timestamp_local": "2026-05-05 13:21:13",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I think I heard can you tell a joke. Say yes if that is correct, say it again, or say cancel.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 222,
+      "timestamp_epoch_s": 1777958478.452754,
+      "timestamp_local": "2026-05-05 13:21:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958478.452754,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 223,
+      "timestamp_epoch_s": 1777958479.6866033,
+      "timestamp_local": "2026-05-05 13:21:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "that you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958479.6866033,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 224,
+      "timestamp_epoch_s": 1777958479.88055,
+      "timestamp_local": "2026-05-05 13:21:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958479.88055,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 225,
+      "timestamp_epoch_s": 1777958480.0927224,
+      "timestamp_local": "2026-05-05 13:21:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the u.s.",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958480.0927224,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 226,
+      "timestamp_epoch_s": 1777958480.9243844,
+      "timestamp_local": "2026-05-05 13:21:20",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "and the u s",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958480.9243844,
+        "source": "final",
+        "confidence": 0.18,
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 227,
+      "timestamp_epoch_s": 1777958481.7806396,
+      "timestamp_local": "2026-05-05 13:21:21",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "and the u s",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 228,
+      "timestamp_epoch_s": 1777958482.538973,
+      "timestamp_local": "2026-05-05 13:21:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "be",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958482.538973,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 229,
+      "timestamp_epoch_s": 1777958482.7444544,
+      "timestamp_local": "2026-05-05 13:21:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "year",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958482.7444544,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 230,
+      "timestamp_epoch_s": 1777958482.947423,
+      "timestamp_local": "2026-05-05 13:21:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "u.s.",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958482.947423,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 231,
+      "timestamp_epoch_s": 1777958483.1521788,
+      "timestamp_local": "2026-05-05 13:21:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "yes",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958483.1521788,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 232,
+      "timestamp_epoch_s": 1777958483.5603678,
+      "timestamp_local": "2026-05-05 13:21:23",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "yes",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958483.5603678,
+        "source": "final",
+        "confidence": 0.89,
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 233,
+      "timestamp_epoch_s": 1777958485.6844344,
+      "timestamp_local": "2026-05-05 13:21:25",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Please say yes, say the command again, or say cancel.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 234,
+      "timestamp_epoch_s": 1777958493.6751537,
+      "timestamp_local": "2026-05-05 13:21:33",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958493.6751537,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 162,
+        "updated_at": 1777958466.168555
+      }
+    },
+    {
+      "id": 235,
+      "timestamp_epoch_s": 1777958494.8331153,
+      "timestamp_local": "2026-05-05 13:21:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958494.8331153,
+        "source": "windows",
+        "frequency_hz": 324.4,
+        "rms": 431,
+        "updated_at": 1777958494.0741625
+      }
+    },
+    {
+      "id": 236,
+      "timestamp_epoch_s": 1777958495.7891195,
+      "timestamp_local": "2026-05-05 13:21:35",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958495.7891195,
+        "source": "windows",
+        "frequency_hz": 293.0,
+        "rms": 245,
+        "updated_at": 1777958495.4829192
+      }
+    },
+    {
+      "id": 237,
+      "timestamp_epoch_s": 1777958495.9927845,
+      "timestamp_local": "2026-05-05 13:21:35",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958495.9927845,
+        "source": "windows",
+        "frequency_hz": 292.9,
+        "rms": 342,
+        "updated_at": 1777958495.9907794
+      }
+    },
+    {
+      "id": 238,
+      "timestamp_epoch_s": 1777958496.4138076,
+      "timestamp_local": "2026-05-05 13:21:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the three",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958496.4138076,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 239,
+      "timestamp_epoch_s": 1777958496.625038,
+      "timestamp_local": "2026-05-05 13:21:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958496.625038,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 240,
+      "timestamp_epoch_s": 1777958496.8438067,
+      "timestamp_local": "2026-05-05 13:21:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the things we're",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958496.8438067,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 241,
+      "timestamp_epoch_s": 1777958497.2678568,
+      "timestamp_local": "2026-05-05 13:21:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the threat of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958497.2678568,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 242,
+      "timestamp_epoch_s": 1777958497.4659555,
+      "timestamp_local": "2026-05-05 13:21:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the threat of an",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958497.4659555,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 243,
+      "timestamp_epoch_s": 1777958497.6660147,
+      "timestamp_local": "2026-05-05 13:21:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing that has",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958497.6660147,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 244,
+      "timestamp_epoch_s": 1777958498.0752082,
+      "timestamp_local": "2026-05-05 13:21:38",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing that has the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958498.0752082,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 245,
+      "timestamp_epoch_s": 1777958498.6828184,
+      "timestamp_local": "2026-05-05 13:21:38",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing and that the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958498.6828184,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 246,
+      "timestamp_epoch_s": 1777958499.497507,
+      "timestamp_local": "2026-05-05 13:21:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing and that the high",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958499.497507,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 247,
+      "timestamp_epoch_s": 1777958499.7030153,
+      "timestamp_local": "2026-05-05 13:21:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing that has a ten-one",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958499.7030153,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 248,
+      "timestamp_epoch_s": 1777958499.9107952,
+      "timestamp_local": "2026-05-05 13:21:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing and that the one thousand",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958499.9107952,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 249,
+      "timestamp_epoch_s": 1777958500.3126738,
+      "timestamp_local": "2026-05-05 13:21:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing that has that that wasn't aware",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958500.3126738,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 250,
+      "timestamp_epoch_s": 1777958500.5259008,
+      "timestamp_local": "2026-05-05 13:21:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing that has that that wasn't aware of the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958500.5259008,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 251,
+      "timestamp_epoch_s": 1777958500.9252586,
+      "timestamp_local": "2026-05-05 13:21:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing and that the house where he owns",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958500.9252586,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 252,
+      "timestamp_epoch_s": 1777958501.3395739,
+      "timestamp_local": "2026-05-05 13:21:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "and the thing that has that that wasn't aware of the only",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958501.3395739,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 253,
+      "timestamp_epoch_s": 1777958502.1812556,
+      "timestamp_local": "2026-05-05 13:21:42",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "and the thing that has that that wasn t aware of the only",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958502.1812556,
+        "source": "final",
+        "confidence": 0.08,
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 254,
+      "timestamp_epoch_s": 1777958504.3609536,
+      "timestamp_local": "2026-05-05 13:21:44",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "No confirmation received. I did not run can you tell a joke.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 255,
+      "timestamp_epoch_s": 1777958653.6200416,
+      "timestamp_local": "2026-05-05 13:24:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "as",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958653.6200416,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 256,
+      "timestamp_epoch_s": 1777958730.013524,
+      "timestamp_local": "2026-05-05 13:25:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "if",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958730.013524,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 257,
+      "timestamp_epoch_s": 1777958730.2392778,
+      "timestamp_local": "2026-05-05 13:25:30",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "if",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958730.2392778,
+        "source": "final",
+        "confidence": 0.73,
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 258,
+      "timestamp_epoch_s": 1777958734.5116963,
+      "timestamp_local": "2026-05-05 13:25:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958734.5116963,
+        "source": "windows",
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 259,
+      "timestamp_epoch_s": 1777958755.5484738,
+      "timestamp_local": "2026-05-05 13:25:55",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958755.5484738,
+        "source": "final",
+        "confidence": 0.02,
+        "frequency_hz": 331.2,
+        "rms": 459,
+        "updated_at": 1777958496.1291118
+      }
+    },
+    {
+      "id": 260,
+      "timestamp_epoch_s": 1777958841.152654,
+      "timestamp_local": "2026-05-05 13:27:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "house",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958841.152654,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    },
+    {
+      "id": 261,
+      "timestamp_epoch_s": 1777958841.5798032,
+      "timestamp_local": "2026-05-05 13:27:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958841.5798032,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    },
+    {
+      "id": 262,
+      "timestamp_epoch_s": 1777958842.0680556,
+      "timestamp_local": "2026-05-05 13:27:22",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958842.0680556,
+        "source": "final",
+        "confidence": 0.22,
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    },
+    {
+      "id": 263,
+      "timestamp_epoch_s": 1777958848.448307,
+      "timestamp_local": "2026-05-05 13:27:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "line",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958848.448307,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    },
+    {
+      "id": 264,
+      "timestamp_epoch_s": 1777958848.652704,
+      "timestamp_local": "2026-05-05 13:27:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "line the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1777958848.652704,
+        "source": "windows",
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    },
+    {
+      "id": 265,
+      "timestamp_epoch_s": 1777958849.48373,
+      "timestamp_local": "2026-05-05 13:27:29",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "line the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1777958849.48373,
+        "source": "final",
+        "confidence": 0.63,
+        "frequency_hz": 339.8,
+        "rms": 3351,
+        "updated_at": 1777958841.055816
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/conversation_exports/sentry_v2_runtime_conversation_20260505_133101.json",
+    "markdown": "snapshots/conversation_exports/sentry_v2_runtime_conversation_20260505_133101.md"
+  }
+}

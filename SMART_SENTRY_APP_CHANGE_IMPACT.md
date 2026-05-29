@@ -50,6 +50,7 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 - Known-face recognition now depends on `app/sentry_v2/face_identity.py`, `app/sentry_v2/target_filter.py`, `app/sentry_v2/sentry_v2_tab.py`, and `app/sentry_v2/sentry_v2_overlay.py` staying aligned: identity labels, friendly suppression, and preview annotations are intentionally split across those layers.
 - The Smart Sentry buzzer is now used for short robotic identity-name cues in `app/sentry_v2/sound_engine.py`; do not fork that into a separate PC audio path without updating transport assumptions and docs together.
 - Human-like local speech now depends on the PyQt5 QtTextToSpeech runtime and its Windows SAPI plugin path; if packaging changes, review voice-engine availability at the same time as assistant and sound UI changes.
+- Packaged AI voice availability now also depends on `models/kokoro/` plus the bundled `edge_tts`, `kokoro_onnx`, and `azure.cognitiveservices.speech` packages; if portable build logic changes, review these together or packaged human voice routes will silently fall back to local Microsoft voices.
 - Human voice presets and assistant spoken tone are now coupled through `human_voice_style` plus the rate/pitch/volume sliders in `app/sentry_v2/sentry_v2_config.py` and `app/sentry_v2/sentry_v2_tab.py`; if one changes, review both the Controls tab preset behavior and the assistant reply path together.
 - The Controls-tab human voice contract now also includes `mute_buzzer_when_human_voice_enabled` plus the Voice Diagnostics surface in `app/sentry_v2/sentry_v2_tab.py`; if buzzer or human voice behavior changes, review both the ESP32 sound path and the Windows speech path together so they do not overlap or misreport state.
 - Operator shortcuts are now a documented runtime surface, not a hidden convenience: `app/sentry_v2/sentry_v2_tab.py`, `SMART_SENTRY_SHORTCUT_KEYS.md`, `SMART_SENTRY_MANUAL.md`, and `RECENT_UPDATES.json` must move together when the key map changes.
@@ -71,7 +72,7 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 
 ### DB3000 USB serial IO path
 
-- Sketch: `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
+- Sketch: `arduino/DB3000_ESP32_IO_Telemetry_PIR/DB3000_ESP32_IO_Telemetry_PIR.ino`
 - Used when ESP32 IO remains on direct serial tokens.
 
 ### Arduino Nano USB serial IO replacement path
@@ -84,7 +85,7 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 
 ### DB3000 WiFi UDP baseline
 
-- Sketch: `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+- Sketch: `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino`
 - Used for the documented Smart Sentry WiFi runtime baseline on the DB3000 path.
 - Rule: this firmware path remains valid across desktop app releases until the firmware contract itself changes.
 - Current contract highlights:

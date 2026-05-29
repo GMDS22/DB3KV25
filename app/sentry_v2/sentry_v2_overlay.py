@@ -594,10 +594,20 @@ class SentryV2Overlay:
             f"ERR  pan {stats['last_err_pan_deg']:+.2f}   tilt {stats['last_err_tilt_deg']:+.2f}",
             f"LOCK {stats['aim_lock_frames']}   QUEUE {stats['queue_position'] + 1}/{max(1, stats['queue_length'])}",
         ]
+        veto_line = ""
         if engage_phase:
             lines.append(f"PHASE {engage_phase.upper()}")
         if stats.get("reacquire_recent") and stats.get("reacquire_note"):
             lines.append(f"REACQ {stats['reacquire_note']}")
+        if bool(getattr(self.cfg, "show_fire_veto_overlay", True)):
+            veto_reason = str(stats.get("fire_veto_reason", "") or "").strip()
+            if bool(stats.get("fire_veto_recent", False)) and veto_reason:
+                prefix = "person auto-fire blocked:"
+                if veto_reason.lower().startswith(prefix):
+                    veto_reason = veto_reason[len(prefix):].strip()
+                if len(veto_reason) > 64:
+                    veto_reason = veto_reason[:61].rstrip() + "..."
+                veto_line = f"VETO {veto_reason}"
 
         margin = 10
         # Place below the state badge.
@@ -609,3 +619,5 @@ class SentryV2Overlay:
         for line in lines:
             self._put_text(frame, line, (margin, y), _FS_SMALL, _COL_PANEL_TEXT)
             y += lh + 3
+        if veto_line:
+            self._put_text(frame, veto_line, (margin, y), _FS_SMALL, _COL_RETICLE_RED)

@@ -1,0 +1,257 @@
+{
+  "generated_at_local": "2026-05-11 12:24:15",
+  "generated_at_epoch_s": 1778473455.9092503,
+  "entry_count": 7,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 1,
+    "operator": 4
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 3,
+    "voice_transcript_final": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 5
+  },
+  "voice_transcript_summary": {
+    "partial_count": 3,
+    "final_count": 1,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "smart is on auto the command",
+  "latest_operator_request": "smart is on auto the command",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778473317.3246477,
+      "timestamp_local": "2026-05-11 12:21:57",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778473317.325696,
+      "timestamp_local": "2026-05-11 12:21:57",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778473318.9814038,
+      "timestamp_local": "2026-05-11 12:21:58",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778473318.9814038,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778473359.8772616,
+      "timestamp_local": "2026-05-11 12:22:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is on the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778473359.8772616,
+        "source": "vosk",
+        "frequency_hz": 414.0,
+        "rms": 1200,
+        "updated_at": 1778473324.8608768
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778473403.1204772,
+      "timestamp_local": "2026-05-11 12:23:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is on the commands",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778473403.1204772,
+        "source": "vosk",
+        "frequency_hz": 414.0,
+        "rms": 1200,
+        "updated_at": 1778473324.8608768
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778473428.3798487,
+      "timestamp_local": "2026-05-11 12:23:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is on the command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778473428.3798487,
+        "source": "vosk",
+        "frequency_hz": 414.0,
+        "rms": 1200,
+        "updated_at": 1778473324.8608768
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778473453.782583,
+      "timestamp_local": "2026-05-11 12:24:13",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "smart is on auto the command",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778473453.782583,
+        "source": "final",
+        "frequency_hz": 414.0,
+        "rms": 1200,
+        "updated_at": 1778473324.8608768
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778473317.3246477,
+      "timestamp_local": "2026-05-11 12:21:57",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778473317.325696,
+      "timestamp_local": "2026-05-11 12:21:57",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778473318.9814038,
+      "timestamp_local": "2026-05-11 12:21:58",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778473318.9814038,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778473359.8772616,
+      "timestamp_local": "2026-05-11 12:22:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is on the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778473359.8772616,
+        "source": "vosk",
+        "frequency_hz": 414.0,
+        "rms": 1200,
+        "updated_at": 1778473324.8608768
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778473403.1204772,
+      "timestamp_local": "2026-05-11 12:23:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is on the commands",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778473403.1204772,
+        "source": "vosk",
+        "frequency_hz": 414.0,
+        "rms": 1200,
+        "updated_at": 1778473324.8608768
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778473428.3798487,
+      "timestamp_local": "2026-05-11 12:23:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is on the command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778473428.3798487,
+        "source": "vosk",
+        "frequency_hz": 414.0,
+        "rms": 1200,
+        "updated_at": 1778473324.8608768
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778473453.782583,
+      "timestamp_local": "2026-05-11 12:24:13",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "smart is on auto the command",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778473453.782583,
+        "source": "final",
+        "frequency_hz": 414.0,
+        "rms": 1200,
+        "updated_at": 1778473324.8608768
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260511_122415.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260511_122415.md"
+  }
+}

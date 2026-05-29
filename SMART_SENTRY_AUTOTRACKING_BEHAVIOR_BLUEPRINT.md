@@ -1,5 +1,9 @@
 # Smart Sentry Autotracking Behavior Blueprint
 
+Date: 2026-05-13
+Status: Live behavior-contract document for current Smart Sentry tracking, PIR cueing, target-loss recovery, center aim, and fire gating
+Audience: Developers, validators, advanced tuners
+
 Purpose: this is the primary behavior-contract file for Smart Sentry target tracking, PIR cueing, target-loss recovery, center-aim logic, and fire gating.
 
 Use this file first whenever:

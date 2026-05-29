@@ -455,6 +455,11 @@ $recentUpdatesPath = Join-Path $repoRoot 'RECENT_UPDATES.json'
 $releaseVersionPath = $activeVersionMetadata.MarkerPath
 $db3kVersionPath = Join-Path $repoRoot 'DB3K_VERSION.txt'
 $rootModelsPath = Join-Path $repoRoot 'YOLO_MODELS'
+$voiceModelsPath = Join-Path $repoRoot 'models'
+$requiredVoiceModelRelativePaths = @(
+    'models\kokoro\kokoro-v1.0.onnx',
+    'models\kokoro\voices-v1.0.bin'
+)
 
 Assert-CanonicalConfigFilesExist -sourceConfigDir $appConfigPath -fileNames $canonicalConfigFileNames
 
@@ -462,7 +467,24 @@ if (-not (Test-Path $activeLauncherPath)) {
     throw "App launcher was not found: $activeLauncherPath"
 }
 
-$requiredModules = @('PyInstaller', 'PyQt5', 'cv2', 'numpy', 'serial', 'torch', 'ultralytics', 'lap')
+$requiredModules = @(
+    'PyInstaller',
+    'PyQt5',
+    'cv2',
+    'numpy',
+    'serial',
+    'sounddevice',
+    'soundfile',
+    'language_tags',
+    'vosk',
+    'espeakng_loader',
+    'torch',
+    'ultralytics',
+    'lap',
+    'edge_tts',
+    'kokoro_onnx',
+    'azure.cognitiveservices.speech'
+)
 if ($bundleSklearn) {
     $requiredModules += 'sklearn'
 }
@@ -471,6 +493,13 @@ if ($bundleYtDlp) {
 }
 
 Assert-PythonModulesAvailable -pythonCommand $pythonExe -moduleNames $requiredModules
+
+foreach ($requiredVoiceModelRelativePath in $requiredVoiceModelRelativePaths) {
+    $requiredVoiceModelPath = Join-Path $repoRoot $requiredVoiceModelRelativePath
+    if (-not (Test-Path $requiredVoiceModelPath)) {
+        throw "Missing required voice model asset for portable build: $requiredVoiceModelPath"
+    }
+}
 
 if ($bundleModels) {
     if (-not (Test-Path $rootModelsPath)) {
@@ -506,6 +535,14 @@ $pyInstallerArgs = @(
     '--specpath', $specRoot,
     '--collect-all', 'torchvision',
     '--collect-all', 'ultralytics',
+    '--collect-all', 'sounddevice',
+    '--collect-all', 'soundfile',
+    '--collect-all', 'vosk',
+    '--collect-all', 'edge_tts',
+    '--collect-all', 'kokoro_onnx',
+    '--collect-all', 'espeakng_loader',
+    '--collect-all', 'language_tags',
+    '--collect-all', 'azure.cognitiveservices.speech',
     '--exclude-module', 'onnxscript',
     '--exclude-module', 'onnxscript.onnx_opset',
     '--exclude-module', 'onnx_ir',
@@ -523,6 +560,12 @@ $pyInstallerArgs = @(
     '--hidden-import', 'theme_manager',
     '--hidden-import', 'torch',
     '--hidden-import', 'torchvision',
+    '--hidden-import', 'vosk',
+    '--hidden-import', 'edge_tts',
+    '--hidden-import', 'kokoro_onnx',
+    '--hidden-import', 'espeakng_loader',
+    '--hidden-import', 'language_tags',
+    '--hidden-import', 'azure.cognitiveservices.speech',
     '--hidden-import', 'sentry_v2.sentry_v2_tab',
     '--collect-submodules', 'numpy',
     '--collect-submodules', 'asyncio',
@@ -531,6 +574,7 @@ $pyInstallerArgs = @(
     '--add-data', "$appConfigPath;app/config",
     '--add-data', "$appSentryConfigPath;app/sentry_v2/config",
     '--add-data', "$appLogoPath;app",
+    '--add-data', "$voiceModelsPath;models",
     '--add-data', "$recentUpdatesPath;.",
     '--add-data', "$releaseVersionPath;.",
     '--add-data', "$db3kVersionPath;.",
@@ -599,7 +643,7 @@ if (-not (Test-Path $releaseContentsDir)) {
     throw "Expected versioned support folder was not created: $releaseContentsDir"
 }
 
-Assert-RequiredReleaseArtifacts -buildRoot $outputDir -exeName $releaseExeName -contentsDirName $releaseContentsDirName -pythonRuntimeDllName $pythonRuntimeDllName
+Assert-RequiredReleaseArtifacts -buildRoot $outputDir -exeName $releaseExeName -contentsDirName $releaseContentsDirName -pythonRuntimeDllName $pythonRuntimeDllName -requiredContentRelativePaths $requiredVoiceModelRelativePaths
 
 $yoloDir = Join-Path $releaseContentsDir 'YOLO_MODELS'
 $publicYoloDir = Join-Path $outputDir 'YOLO_MODELS'
@@ -655,7 +699,7 @@ Copy-Item -Path (Join-Path $outputDir '*') -Destination $releaseDir -Recurse -Fo
 Sync-QtVcRuntimeDlls -releaseRoot $releaseDir -contentsDirName $releaseContentsDirName
 
 $releaseExePath = Join-Path $releaseDir $releaseExeName
-Assert-RequiredReleaseArtifacts -buildRoot $releaseDir -exeName $releaseExeName -contentsDirName $releaseContentsDirName -pythonRuntimeDllName $pythonRuntimeDllName
+Assert-RequiredReleaseArtifacts -buildRoot $releaseDir -exeName $releaseExeName -contentsDirName $releaseContentsDirName -pythonRuntimeDllName $pythonRuntimeDllName -requiredContentRelativePaths $requiredVoiceModelRelativePaths
 Patch-BundledUltralyticsGit -contentsDirPath (Join-Path $releaseDir $releaseContentsDirName)
 
 if ($bundleModels) {

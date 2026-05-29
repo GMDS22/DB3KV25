@@ -1,14 +1,20 @@
 # PIR Guard Quick Start Guide
 
+Date: 2026-05-13
+Status: Live operator guide for the current Smart Sentry PIR workflow
+Audience: Operators and validators
+
 ## Feature Summary
-3-sensor blind-spot motion detection with cue-first confirmation, a short cue hold, and a localized hunt around the triggered zone when no target is confirmed at the cue point. Uses the live Smart Sentry v2.3.2 Guard workflow.
+3-sensor blind-spot motion detection with cue-first confirmation, a short cue hold, and a localized hunt around the triggered zone when no target is confirmed at the cue point. This guide reflects the current standalone Smart Sentry Guard workflow running on the active dual-USB app contract.
+
+Current hardware note: the live app uses the Arduino Nano USB IO + Debug Board USB path. The older ESP32 WiFi PIR sketch remains reference material for WiFi-specific work, not the primary current app path.
 
 For the full editor-facing behavior contract that also covers visual target tracking, target-loss reacquire, preset intent, and fire gating, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md`.
 
 ## Enabling PIR Guard
 
-### Step 1: Open Smart Sentry v2
-- Launch Smart Sentry v2 from its standalone launcher
+### Step 1: Open Smart Sentry
+- Launch Smart Sentry from its standalone launcher
 - Click the **Guard** settings tab
 
 ### Step 2: Enable PIR Master Switch
@@ -130,12 +136,12 @@ Important: if you are trying to remove a pause after the PIR hunt finishes, do n
 
 Settings saved automatically to:
 ```
-app/config/smart_sentry_v2_3_2_settings.json
+app/config/smart_sentry_settings.json
 ```
 
 To reset PIR settings to defaults:
 1. Close the app
-2. Open `smart_sentry_v2_3_2_settings.json`
+2. Open `smart_sentry_settings.json`
 3. Delete or clear the `"pir_guard"` section
 4. Save and restart app
 

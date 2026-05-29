@@ -1,0 +1,346 @@
+{
+  "generated_at_local": "2026-05-09 19:20:31",
+  "generated_at_epoch_s": 1778325631.2415354,
+  "entry_count": 11,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 1,
+    "operator": 8
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_final": 2,
+    "voice_transcript_partial": 6
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 9
+  },
+  "voice_transcript_summary": {
+    "partial_count": 6,
+    "final_count": 2,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "what do loop",
+  "latest_operator_request": "what do loop",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup.",
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778325343.5422218,
+      "timestamp_local": "2026-05-09 19:15:43",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778325343.543222,
+      "timestamp_local": "2026-05-09 19:15:43",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778325344.75051,
+      "timestamp_local": "2026-05-09 19:15:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778325344.75051,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778325355.7680364,
+      "timestamp_local": "2026-05-09 19:15:55",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "guard",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778325355.7680364,
+        "source": "final"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778325365.1471136,
+      "timestamp_local": "2026-05-09 19:16:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "human",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325365.1471136,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778325365.3977685,
+      "timestamp_local": "2026-05-09 19:16:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what do",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325365.3977685,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778325365.8968506,
+      "timestamp_local": "2026-05-09 19:16:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what do loop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325365.8968506,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778325368.8970852,
+      "timestamp_local": "2026-05-09 19:16:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what do loop disabled",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325368.8970852,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778325372.898155,
+      "timestamp_local": "2026-05-09 19:16:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what do loop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325372.898155,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778325374.680925,
+      "timestamp_local": "2026-05-09 19:16:14",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "what do loop",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778325374.680925,
+        "source": "final"
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778325385.6441104,
+      "timestamp_local": "2026-05-09 19:16:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "cues",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325385.6441104,
+        "source": "vosk"
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778325343.5422218,
+      "timestamp_local": "2026-05-09 19:15:43",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778325343.543222,
+      "timestamp_local": "2026-05-09 19:15:43",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778325344.75051,
+      "timestamp_local": "2026-05-09 19:15:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778325344.75051,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778325355.7680364,
+      "timestamp_local": "2026-05-09 19:15:55",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "guard",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778325355.7680364,
+        "source": "final"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778325365.1471136,
+      "timestamp_local": "2026-05-09 19:16:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "human",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325365.1471136,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778325365.3977685,
+      "timestamp_local": "2026-05-09 19:16:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what do",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325365.3977685,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778325365.8968506,
+      "timestamp_local": "2026-05-09 19:16:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what do loop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325365.8968506,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778325368.8970852,
+      "timestamp_local": "2026-05-09 19:16:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what do loop disabled",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325368.8970852,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778325372.898155,
+      "timestamp_local": "2026-05-09 19:16:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what do loop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325372.898155,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778325374.680925,
+      "timestamp_local": "2026-05-09 19:16:14",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "what do loop",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778325374.680925,
+        "source": "final"
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778325385.6441104,
+      "timestamp_local": "2026-05-09 19:16:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "cues",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778325385.6441104,
+        "source": "vosk"
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260509_192031.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260509_192031.md"
+  }
+}

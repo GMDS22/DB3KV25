@@ -46,9 +46,16 @@ This document defines the intended **portable-only** surface for Smart Sentry v2
 
 - YOLO_MODELS/
 
+## Required voice/runtime model folders
+
+- models/kokoro/
+- models/vosk/
+
 This is the only supported source-side and operator-facing portable-release model folder. Do not mirror models into app/models/ or app/YOLO_MODELS/.
 
 For the packaged release, keep the public drop location at the release root as `F:\SMART SENTRY V<version>\YOLO_MODELS`. Bundled fallback weights may also exist under `SMART_SENTRY_V<version_token>_FILES\YOLO_MODELS`, but that support-folder copy is not the operator-facing drop target.
+
+Voice/runtime models are different: keep the bundled `models/` tree inside `SMART_SENTRY_V<version_token>_FILES\models` so Kokoro offline TTS and Vosk speech recognition continue to work in the packaged app.
 
 Use the interpreter selected by the build helper in this order: `SMART_SENTRY_PYTHON_EXE`, then parent or repo `.venv311`, then parent or repo `.venv`.
 

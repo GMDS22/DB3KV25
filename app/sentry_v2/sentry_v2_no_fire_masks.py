@@ -58,6 +58,23 @@ def project_mask_to_frame(
     return points
 
 
+def _polygon_area(polygon: Sequence[Tuple[float, float]]) -> float:
+    """Return the absolute area of a polygon via the shoelace formula.
+
+    Returns 0.0 for degenerate inputs (fewer than 3 vertices, all collinear,
+    or duplicate points).  Callers should treat area < 1e-6 as degenerate.
+    """
+    n = len(polygon)
+    if n < 3:
+        return 0.0
+    area = 0.0
+    for i in range(n):
+        j = (i + 1) % n
+        area += polygon[i][0] * polygon[j][1]
+        area -= polygon[j][0] * polygon[i][1]
+    return abs(area) * 0.5
+
+
 def polygon_contains_point(
     polygon: Sequence[Tuple[float, float]],
     point: Tuple[float, float],
@@ -95,6 +112,11 @@ def find_blocking_mask(
             continue
         if len(mask.vertices) < 3:
             continue
-        if mask_contains_aim(mask, pan, tilt):
+        polygon = [(float(vertex.pan), float(vertex.tilt)) for vertex in mask.vertices]
+        # Skip degenerate masks (collinear/duplicate vertices) — fail closed means
+        # a broken mask definition must NOT silently allow fire through.
+        if _polygon_area(polygon) < 1e-6:
+            continue
+        if polygon_contains_point(polygon, (float(pan), float(tilt))):
             return mask
     return None

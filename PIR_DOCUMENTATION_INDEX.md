@@ -1,8 +1,9 @@
-# PIR Sensor Integration - Complete Documentation Index
+# PIR Sensor Integration - Documentation Index
 
-**Project**: Smart Sentry v2 with 3x PIR Blind-Spot Detection  
-**Status**: ✅ Complete, contract-audited for current v2.3.2 runtime  
-**Date**: April 2026  
+Date: 2026-05-13
+Status: Current PIR document map for the live Smart Sentry app
+Audience: Operators, developers, integrators
+Current App Contract: Arduino Nano USB IO + Debug Board USB is the active PIR app path; the ESP32 WiFi sketch remains reference material for WiFi-specific work
 
 ---
 
@@ -17,6 +18,7 @@
 
 2. **PIR_AT_A_GLANCE.md** (Current PIR contract audit)
    - Current live firmware path
+   - Current WiFi reference path
    - Current desktop runtime path
    - After-target-loss vs PIR interaction rules
    - Source-of-truth files
@@ -31,7 +33,7 @@
 
 ### For System Integrators / Developers
 1. **PIR_INTEGRATION_SUMMARY.md** (Executive Overview)
-   - What was delivered
+   - Historical implementation summary plus current runtime delta
    - System architecture
    - Filing locations
    - Integration checklist
@@ -74,12 +76,14 @@
 ### ESP32 Firmware
 ```
 arduino/
-├── SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/            [CURRENT LIVE APP WIFI PATH]
-│   └── SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino
+├── SMART_SENTRY_V3_0_NANO_USB_IO_PIR/     [CURRENT ACTIVE DUAL-USB APP PATH]
+│   └── SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino
+├── SMART_SENTRY_ESP32_UDP_PIR/            [WIFI REFERENCE PATH]
+│   └── SMART_SENTRY_ESP32_UDP_PIR.ino
 ├── DB3000_ESP32_IO_Telemetry_2026/               [ORIGINAL SERIAL IO BACKUP]
 │   └── DB3000_ESP32_IO_Telemetry_2026.ino
-└── DB3000_ESP32_IO_Telemetry_2026_w_PIR/         [CURRENT SERIAL IO + PIR PATH]
-   └── DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
+└── DB3000_ESP32_IO_Telemetry_PIR/         [CURRENT SERIAL IO + PIR PATH]
+   └── DB3000_ESP32_IO_Telemetry_PIR.ino
 ```
 
 ### Python Source Code (Smart Sentry v2)
@@ -160,7 +164,7 @@ project_root/
 - Backward compatibility info
 - Performance impact
 
-**Reference**: DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino for direct serial IO, SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino for the live WiFi path
+**Reference**: SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino for the active dual-USB app path, DB3000_ESP32_IO_Telemetry_PIR.ino for direct serial IO, SMART_SENTRY_ESP32_UDP_PIR.ino for the WiFi reference path
 - Well-commented code
 - Preprocessor-gated PIR section
 - Compile-time config: ENABLE_PIR_SUPPORT
@@ -379,8 +383,9 @@ Checklist note:
 **Software (Firmware)**
 - ESP32_PIR_FIRMWARE_GUIDE.md - Architecture
 - FIRMWARE_COMPARISON.md - Code changes
-- SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino - Live WiFi app path
-- DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino - Direct serial IO path
+- SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino - Active dual-USB app path
+- SMART_SENTRY_ESP32_UDP_PIR.ino - WiFi reference path
+- DB3000_ESP32_IO_Telemetry_PIR.ino - Direct serial IO path
 
 **Operations & Tuning**
 - PIR_GUARD_QUICK_START.md - Complete user guide

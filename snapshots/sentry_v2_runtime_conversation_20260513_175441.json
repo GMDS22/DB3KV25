@@ -1,0 +1,301 @@
+{
+  "generated_at_local": "2026-05-13 17:54:41",
+  "generated_at_epoch_s": 1778666081.9745317,
+  "entry_count": 9,
+  "counts_by_role": {
+    "assistant": 4,
+    "system": 1,
+    "operator": 4
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 2,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 2,
+    "voice_transcript_final": 1,
+    "voice_command": 1,
+    "spoken_reply": 1
+  },
+  "counts_by_channel": {
+    "text": 3,
+    "voice": 6
+  },
+  "voice_transcript_summary": {
+    "partial_count": 2,
+    "final_count": 1,
+    "voice_command_count": 1,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "what do you do",
+  "latest_operator_request": "what do you do",
+  "latest_assistant_message": "I can chat normally, answer questions about Smart Sentry, help with diagnostics when you ask, and handle supported commands. More advanced automation is still being built.",
+  "analysis_hints": [],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778665238.936035,
+      "timestamp_local": "2026-05-13 17:40:38",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778665238.9370296,
+      "timestamp_local": "2026-05-13 17:40:38",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778665240.928323,
+      "timestamp_local": "2026-05-13 17:40:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778665240.928323,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778665482.7269027,
+      "timestamp_local": "2026-05-13 17:44:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what can",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778665482.7269027,
+        "source": "vosk",
+        "frequency_hz": 344.0,
+        "rms": 6067,
+        "updated_at": 1778665482.6667812
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778665482.9587255,
+      "timestamp_local": "2026-05-13 17:44:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what can you do",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778665482.9587255,
+        "source": "vosk",
+        "frequency_hz": 363.6,
+        "rms": 2665,
+        "updated_at": 1778665482.9172657
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778665515.2678351,
+      "timestamp_local": "2026-05-13 17:45:15",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "what do you do",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778665515.2678351,
+        "source": "final",
+        "frequency_hz": 266.0,
+        "rms": 2060,
+        "updated_at": 1778665514.177301
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778665515.5309017,
+      "timestamp_local": "2026-05-13 17:45:15",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "what do you do",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778665515.5697634,
+      "timestamp_local": "2026-05-13 17:45:15",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "I can chat normally, answer questions about Smart Sentry, help with diagnostics when you ask, and handle supported commands. More advanced automation is still being built.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": true
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778665516.1524918,
+      "timestamp_local": "2026-05-13 17:45:16",
+      "role": "assistant",
+      "event_type": "spoken_reply",
+      "channel": "voice",
+      "text": "I can chat normally, answer questions about Smart Sentry, help with diagnostics when you ask, and handle supported commands. More advanced automation is still being built.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": true,
+        "spoken": true
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778665238.936035,
+      "timestamp_local": "2026-05-13 17:40:38",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778665238.9370296,
+      "timestamp_local": "2026-05-13 17:40:38",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778665240.928323,
+      "timestamp_local": "2026-05-13 17:40:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778665240.928323,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778665482.7269027,
+      "timestamp_local": "2026-05-13 17:44:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what can",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778665482.7269027,
+        "source": "vosk",
+        "frequency_hz": 344.0,
+        "rms": 6067,
+        "updated_at": 1778665482.6667812
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778665482.9587255,
+      "timestamp_local": "2026-05-13 17:44:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what can you do",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778665482.9587255,
+        "source": "vosk",
+        "frequency_hz": 363.6,
+        "rms": 2665,
+        "updated_at": 1778665482.9172657
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778665515.2678351,
+      "timestamp_local": "2026-05-13 17:45:15",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "what do you do",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778665515.2678351,
+        "source": "final",
+        "frequency_hz": 266.0,
+        "rms": 2060,
+        "updated_at": 1778665514.177301
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778665515.5309017,
+      "timestamp_local": "2026-05-13 17:45:15",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "what do you do",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778665515.5697634,
+      "timestamp_local": "2026-05-13 17:45:15",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "I can chat normally, answer questions about Smart Sentry, help with diagnostics when you ask, and handle supported commands. More advanced automation is still being built.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": true
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778665516.1524918,
+      "timestamp_local": "2026-05-13 17:45:16",
+      "role": "assistant",
+      "event_type": "spoken_reply",
+      "channel": "voice",
+      "text": "I can chat normally, answer questions about Smart Sentry, help with diagnostics when you ask, and handle supported commands. More advanced automation is still being built.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": true,
+        "spoken": true
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260513_175441.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260513_175441.md"
+  }
+}

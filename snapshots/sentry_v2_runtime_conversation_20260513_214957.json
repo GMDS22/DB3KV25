@@ -1,0 +1,557 @@
+{
+  "generated_at_local": "2026-05-13 21:49:57",
+  "generated_at_epoch_s": 1778680197.712708,
+  "entry_count": 19,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 1,
+    "operator": 16
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_final": 5,
+    "voice_transcript_partial": 11
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 17
+  },
+  "voice_transcript_summary": {
+    "partial_count": 11,
+    "final_count": 5,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "the",
+  "latest_operator_request": "the",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778679916.543093,
+      "timestamp_local": "2026-05-13 21:45:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "joined system",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778679916.543093,
+        "source": "vosk",
+        "frequency_hz": 348.0,
+        "rms": 723,
+        "updated_at": 1778679894.517276
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778679920.5087285,
+      "timestamp_local": "2026-05-13 21:45:20",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "joined system",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778679920.5087285,
+        "source": "final",
+        "frequency_hz": 348.0,
+        "rms": 723,
+        "updated_at": 1778679894.517276
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778680078.827754,
+      "timestamp_local": "2026-05-13 21:47:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we're",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680078.827754,
+        "source": "vosk",
+        "frequency_hz": 360.0,
+        "rms": 1698,
+        "updated_at": 1778680069.0950732
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778680079.043501,
+      "timestamp_local": "2026-05-13 21:47:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we are",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680079.043501,
+        "source": "vosk",
+        "frequency_hz": 360.0,
+        "rms": 1698,
+        "updated_at": 1778680069.0950732
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778680079.2997015,
+      "timestamp_local": "2026-05-13 21:47:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we're you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680079.2997015,
+        "source": "vosk",
+        "frequency_hz": 360.0,
+        "rms": 1698,
+        "updated_at": 1778680069.0950732
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778680099.0481434,
+      "timestamp_local": "2026-05-13 21:48:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we are you an alien",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680099.0481434,
+        "source": "vosk",
+        "frequency_hz": 112.0,
+        "rms": 2574,
+        "updated_at": 1778680099.02095
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778680103.3251157,
+      "timestamp_local": "2026-05-13 21:48:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we are you an alien alien",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680103.3251157,
+        "source": "vosk",
+        "frequency_hz": 102.0,
+        "rms": 1374,
+        "updated_at": 1778680103.270271
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778680117.045152,
+      "timestamp_local": "2026-05-13 21:48:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "during",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680117.045152,
+        "source": "vosk",
+        "frequency_hz": 238.0,
+        "rms": 1370,
+        "updated_at": 1778680116.9859252
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778680119.700084,
+      "timestamp_local": "2026-05-13 21:48:39",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "during",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778680119.700084,
+        "source": "final",
+        "frequency_hz": 252.0,
+        "rms": 1612,
+        "updated_at": 1778680118.2340539
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778680144.9624693,
+      "timestamp_local": "2026-05-13 21:49:04",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778680144.9624693,
+        "source": "final",
+        "frequency_hz": 212.0,
+        "rms": 6392,
+        "updated_at": 1778680144.7343097
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778680148.3102753,
+      "timestamp_local": "2026-05-13 21:49:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "in the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680148.3102753,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 2467,
+        "updated_at": 1778680148.2363749
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778680148.7764797,
+      "timestamp_local": "2026-05-13 21:49:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "earlier",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680148.7764797,
+        "source": "vosk",
+        "frequency_hz": 245.4,
+        "rms": 2181,
+        "updated_at": 1778680148.7377124
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778679799.5089676,
+      "timestamp_local": "2026-05-13 21:43:19",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778679799.5099678,
+      "timestamp_local": "2026-05-13 21:43:19",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778679802.4262369,
+      "timestamp_local": "2026-05-13 21:43:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778679802.4262369,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778679815.8953147,
+      "timestamp_local": "2026-05-13 21:43:35",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "his",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778679815.8953147,
+        "source": "final",
+        "frequency_hz": 317.7,
+        "rms": 363,
+        "updated_at": 1778679815.6263776
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778679900.5570955,
+      "timestamp_local": "2026-05-13 21:45:00",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "twenty",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778679900.5570955,
+        "source": "vosk",
+        "frequency_hz": 348.0,
+        "rms": 723,
+        "updated_at": 1778679894.517276
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778679901.7314491,
+      "timestamp_local": "2026-05-13 21:45:01",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "twenty",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778679901.7314491,
+        "source": "final",
+        "frequency_hz": 348.0,
+        "rms": 723,
+        "updated_at": 1778679894.517276
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778679916.3282773,
+      "timestamp_local": "2026-05-13 21:45:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "joined",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778679916.3282773,
+        "source": "vosk",
+        "frequency_hz": 348.0,
+        "rms": 723,
+        "updated_at": 1778679894.517276
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778679916.543093,
+      "timestamp_local": "2026-05-13 21:45:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "joined system",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778679916.543093,
+        "source": "vosk",
+        "frequency_hz": 348.0,
+        "rms": 723,
+        "updated_at": 1778679894.517276
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778679920.5087285,
+      "timestamp_local": "2026-05-13 21:45:20",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "joined system",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778679920.5087285,
+        "source": "final",
+        "frequency_hz": 348.0,
+        "rms": 723,
+        "updated_at": 1778679894.517276
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778680078.827754,
+      "timestamp_local": "2026-05-13 21:47:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we're",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680078.827754,
+        "source": "vosk",
+        "frequency_hz": 360.0,
+        "rms": 1698,
+        "updated_at": 1778680069.0950732
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778680079.043501,
+      "timestamp_local": "2026-05-13 21:47:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we are",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680079.043501,
+        "source": "vosk",
+        "frequency_hz": 360.0,
+        "rms": 1698,
+        "updated_at": 1778680069.0950732
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778680079.2997015,
+      "timestamp_local": "2026-05-13 21:47:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we're you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680079.2997015,
+        "source": "vosk",
+        "frequency_hz": 360.0,
+        "rms": 1698,
+        "updated_at": 1778680069.0950732
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778680099.0481434,
+      "timestamp_local": "2026-05-13 21:48:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we are you an alien",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680099.0481434,
+        "source": "vosk",
+        "frequency_hz": 112.0,
+        "rms": 2574,
+        "updated_at": 1778680099.02095
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778680103.3251157,
+      "timestamp_local": "2026-05-13 21:48:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we are you an alien alien",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680103.3251157,
+        "source": "vosk",
+        "frequency_hz": 102.0,
+        "rms": 1374,
+        "updated_at": 1778680103.270271
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778680117.045152,
+      "timestamp_local": "2026-05-13 21:48:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "during",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680117.045152,
+        "source": "vosk",
+        "frequency_hz": 238.0,
+        "rms": 1370,
+        "updated_at": 1778680116.9859252
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778680119.700084,
+      "timestamp_local": "2026-05-13 21:48:39",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "during",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778680119.700084,
+        "source": "final",
+        "frequency_hz": 252.0,
+        "rms": 1612,
+        "updated_at": 1778680118.2340539
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778680144.9624693,
+      "timestamp_local": "2026-05-13 21:49:04",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778680144.9624693,
+        "source": "final",
+        "frequency_hz": 212.0,
+        "rms": 6392,
+        "updated_at": 1778680144.7343097
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778680148.3102753,
+      "timestamp_local": "2026-05-13 21:49:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "in the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680148.3102753,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 2467,
+        "updated_at": 1778680148.2363749
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778680148.7764797,
+      "timestamp_local": "2026-05-13 21:49:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "earlier",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778680148.7764797,
+        "source": "vosk",
+        "frequency_hz": 245.4,
+        "rms": 2181,
+        "updated_at": 1778680148.7377124
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260513_214957.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260513_214957.md"
+  }
+}

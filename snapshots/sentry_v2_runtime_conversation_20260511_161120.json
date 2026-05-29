@@ -1,0 +1,558 @@
+{
+  "generated_at_local": "2026-05-11 16:11:20",
+  "generated_at_epoch_s": 1778487080.7645295,
+  "entry_count": 25,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 1,
+    "operator": 22
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 18,
+    "voice_transcript_final": 4
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 23
+  },
+  "voice_transcript_summary": {
+    "partial_count": 18,
+    "final_count": 4,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "elion what is ai logging logs the loss output mind",
+  "latest_operator_request": "elion what is ai logging logs the loss output mind",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup.",
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778484978.7781641,
+      "timestamp_local": "2026-05-11 15:36:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484978.7781641,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778484981.2794254,
+      "timestamp_local": "2026-05-11 15:36:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484981.2794254,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778484981.528976,
+      "timestamp_local": "2026-05-11 15:36:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484981.528976,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778484981.776439,
+      "timestamp_local": "2026-05-11 15:36:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484981.776439,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778484982.5283802,
+      "timestamp_local": "2026-05-11 15:36:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484982.5283802,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778484983.0304863,
+      "timestamp_local": "2026-05-11 15:36:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the current",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484983.0304863,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778484983.2791822,
+      "timestamp_local": "2026-05-11 15:36:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484983.2791822,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778484984.0352778,
+      "timestamp_local": "2026-05-11 15:36:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the loss",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484984.0352778,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778485204.53284,
+      "timestamp_local": "2026-05-11 15:40:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the loss output",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778485204.53284,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778485208.0665045,
+      "timestamp_local": "2026-05-11 15:40:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the loss output microphone",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778485208.0665045,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778485209.7834885,
+      "timestamp_local": "2026-05-11 15:40:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs e lion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778485209.7834885,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778485210.4865797,
+      "timestamp_local": "2026-05-11 15:40:10",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion what is ai logging logs the loss output mind",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778485210.4865797,
+        "source": "final"
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778484813.2846456,
+      "timestamp_local": "2026-05-11 15:33:33",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778484813.285646,
+      "timestamp_local": "2026-05-11 15:33:33",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778484814.9007983,
+      "timestamp_local": "2026-05-11 15:33:34",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778484814.9007983,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778484856.7696183,
+      "timestamp_local": "2026-05-11 15:34:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry anomaly",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484856.7696183,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778484857.0144875,
+      "timestamp_local": "2026-05-11 15:34:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry on is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484857.0144875,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778484857.9120343,
+      "timestamp_local": "2026-05-11 15:34:17",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "smart sentry is on is",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778484857.9120343,
+        "source": "final"
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778484861.5141046,
+      "timestamp_local": "2026-05-11 15:34:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484861.5141046,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778484862.6141195,
+      "timestamp_local": "2026-05-11 15:34:22",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "is",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778484862.6141195,
+        "source": "final"
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778484865.7705152,
+      "timestamp_local": "2026-05-11 15:34:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "machine",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484865.7705152,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778484866.0141742,
+      "timestamp_local": "2026-05-11 15:34:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "visual",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484866.0141742,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778484878.7644932,
+      "timestamp_local": "2026-05-11 15:34:38",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "machine learning",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484878.7644932,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778484879.345074,
+      "timestamp_local": "2026-05-11 15:34:39",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "machine",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778484879.345074,
+        "source": "final"
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778484972.5281844,
+      "timestamp_local": "2026-05-11 15:36:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484972.5281844,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778484978.7781641,
+      "timestamp_local": "2026-05-11 15:36:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484978.7781641,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778484981.2794254,
+      "timestamp_local": "2026-05-11 15:36:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484981.2794254,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778484981.528976,
+      "timestamp_local": "2026-05-11 15:36:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484981.528976,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778484981.776439,
+      "timestamp_local": "2026-05-11 15:36:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484981.776439,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778484982.5283802,
+      "timestamp_local": "2026-05-11 15:36:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484982.5283802,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778484983.0304863,
+      "timestamp_local": "2026-05-11 15:36:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the current",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484983.0304863,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778484983.2791822,
+      "timestamp_local": "2026-05-11 15:36:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484983.2791822,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778484984.0352778,
+      "timestamp_local": "2026-05-11 15:36:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the loss",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778484984.0352778,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778485204.53284,
+      "timestamp_local": "2026-05-11 15:40:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the loss output",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778485204.53284,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778485208.0665045,
+      "timestamp_local": "2026-05-11 15:40:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs the loss output microphone",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778485208.0665045,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778485209.7834885,
+      "timestamp_local": "2026-05-11 15:40:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what is ai logging leon logs e lion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778485209.7834885,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778485210.4865797,
+      "timestamp_local": "2026-05-11 15:40:10",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion what is ai logging logs the loss output mind",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778485210.4865797,
+        "source": "final"
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260511_161120.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260511_161120.md"
+  }
+}

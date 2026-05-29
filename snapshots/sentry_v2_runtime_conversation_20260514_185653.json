@@ -1,0 +1,2731 @@
+{
+  "generated_at_local": "2026-05-14 18:56:53",
+  "generated_at_epoch_s": 1778756213.1703098,
+  "entry_count": 149,
+  "counts_by_role": {
+    "assistant": 7,
+    "system": 73,
+    "operator": 69
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 2,
+    "assistant_analysis": 1,
+    "voice_status": 73,
+    "voice_transcript_partial": 51,
+    "voice_transcript_final": 14,
+    "voice_command": 4,
+    "spoken_reply": 1,
+    "spoken_confirmation": 3
+  },
+  "counts_by_channel": {
+    "text": 3,
+    "voice": 146
+  },
+  "voice_transcript_summary": {
+    "partial_count": 51,
+    "final_count": 14,
+    "voice_command_count": 4,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "because of waiting certain dodgy and the money",
+  "latest_operator_request": "because of waiting certain dodgy and the money",
+  "latest_assistant_message": "Hello. What would you like to talk about?",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 138,
+      "timestamp_epoch_s": 1778756053.7194698,
+      "timestamp_local": "2026-05-14 18:54:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756053.7194698,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 139,
+      "timestamp_epoch_s": 1778756057.469086,
+      "timestamp_local": "2026-05-14 18:54:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756057.469086,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 140,
+      "timestamp_epoch_s": 1778756057.5346751,
+      "timestamp_local": "2026-05-14 18:54:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than this marxism",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756057.5346751,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 141,
+      "timestamp_epoch_s": 1778756057.9726331,
+      "timestamp_local": "2026-05-14 18:54:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756057.9726331,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 142,
+      "timestamp_epoch_s": 1778756062.2249274,
+      "timestamp_local": "2026-05-14 18:54:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756062.2249274,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 143,
+      "timestamp_epoch_s": 1778756062.5510683,
+      "timestamp_local": "2026-05-14 18:54:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than the smart system like",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756062.5510683,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 144,
+      "timestamp_epoch_s": 1778756063.0580041,
+      "timestamp_local": "2026-05-14 18:54:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than the smart system for basketball",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756063.0580041,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 145,
+      "timestamp_epoch_s": 1778756063.7219489,
+      "timestamp_local": "2026-05-14 18:54:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756063.7219489,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 146,
+      "timestamp_epoch_s": 1778756063.972255,
+      "timestamp_local": "2026-05-14 18:54:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756063.972255,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 147,
+      "timestamp_epoch_s": 1778756064.3142004,
+      "timestamp_local": "2026-05-14 18:54:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than the smart system for basketball hundred",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756064.3142004,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 148,
+      "timestamp_epoch_s": 1778756064.6204212,
+      "timestamp_local": "2026-05-14 18:54:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than the smart system that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756064.6204212,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 149,
+      "timestamp_epoch_s": 1778756065.2228122,
+      "timestamp_local": "2026-05-14 18:54:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756065.2228122,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778755837.7813203,
+      "timestamp_local": "2026-05-14 18:50:37",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778755837.7823212,
+      "timestamp_local": "2026-05-14 18:50:37",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778755839.8746302,
+      "timestamp_local": "2026-05-14 18:50:39",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755839.8746302,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778755840.8475602,
+      "timestamp_local": "2026-05-14 18:50:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755840.8475602,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778755844.8074741,
+      "timestamp_local": "2026-05-14 18:50:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755844.8074741,
+        "source": "vosk",
+        "frequency_hz": 256.6,
+        "rms": 1471,
+        "updated_at": 1778755841.6009328
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778755844.8074741,
+      "timestamp_local": "2026-05-14 18:50:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755844.8074741,
+        "source": "vosk",
+        "frequency_hz": 256.6,
+        "rms": 1471,
+        "updated_at": 1778755841.6009328
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778755845.081805,
+      "timestamp_local": "2026-05-14 18:50:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sniped century is now online",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755845.081805,
+        "source": "vosk",
+        "frequency_hz": 92.0,
+        "rms": 158,
+        "updated_at": 1778755845.0581498
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778755845.835027,
+      "timestamp_local": "2026-05-14 18:50:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sniped century is now online and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755845.835027,
+        "source": "vosk",
+        "frequency_hz": 98.3,
+        "rms": 1604,
+        "updated_at": 1778755845.30839
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778755847.0911844,
+      "timestamp_local": "2026-05-14 18:50:47",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "sniped century is now online and",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755847.0911844,
+        "source": "final",
+        "frequency_hz": 98.3,
+        "rms": 1604,
+        "updated_at": 1778755845.30839
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778755847.2099164,
+      "timestamp_local": "2026-05-14 18:50:47",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755847.2099164,
+        "source": "vosk",
+        "frequency_hz": 98.3,
+        "rms": 1604,
+        "updated_at": 1778755845.30839
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778755847.5958905,
+      "timestamp_local": "2026-05-14 18:50:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "how are",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755847.5958905,
+        "source": "vosk",
+        "frequency_hz": 98.3,
+        "rms": 1604,
+        "updated_at": 1778755845.30839
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778755847.8167746,
+      "timestamp_local": "2026-05-14 18:50:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "how are you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755847.8167746,
+        "source": "vosk",
+        "frequency_hz": 98.3,
+        "rms": 1604,
+        "updated_at": 1778755845.30839
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778755848.757199,
+      "timestamp_local": "2026-05-14 18:50:48",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "who are you",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755848.757199,
+        "source": "final",
+        "frequency_hz": 98.3,
+        "rms": 1604,
+        "updated_at": 1778755845.30839
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778755848.791594,
+      "timestamp_local": "2026-05-14 18:50:48",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "processing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755848.791594,
+        "source": "state",
+        "frequency_hz": 98.3,
+        "rms": 1604,
+        "updated_at": 1778755845.30839
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778755848.791594,
+      "timestamp_local": "2026-05-14 18:50:48",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "heard",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755848.791594,
+        "source": "state",
+        "frequency_hz": 98.3,
+        "rms": 1604,
+        "updated_at": 1778755845.30839
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778755848.8086548,
+      "timestamp_local": "2026-05-14 18:50:48",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "who are you",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778755848.821446,
+      "timestamp_local": "2026-05-14 18:50:48",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "I am Elion Mesk, Elion for short. I am the AI assistant voice inside Smart Sentry.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": true
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778755848.8086548,
+      "timestamp_local": "2026-05-14 18:50:48",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755848.8086548,
+        "source": "vosk",
+        "frequency_hz": 98.3,
+        "rms": 1604,
+        "updated_at": 1778755845.30839
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778755848.9910152,
+      "timestamp_local": "2026-05-14 18:50:48",
+      "role": "assistant",
+      "event_type": "spoken_reply",
+      "channel": "voice",
+      "text": "I am Elion Mesk, Elion for short. I am the AI assistant voice inside Smart Sentry.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": true,
+        "spoken": true
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778755852.8974657,
+      "timestamp_local": "2026-05-14 18:50:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755852.8974657,
+        "source": "vosk",
+        "frequency_hz": 98.3,
+        "rms": 1604,
+        "updated_at": 1778755845.30839
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778755852.8974657,
+      "timestamp_local": "2026-05-14 18:50:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755852.8974657,
+        "source": "vosk",
+        "frequency_hz": 98.3,
+        "rms": 1604,
+        "updated_at": 1778755845.30839
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778755854.089275,
+      "timestamp_local": "2026-05-14 18:50:54",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755854.089275,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778755854.089275,
+      "timestamp_local": "2026-05-14 18:50:54",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755854.089275,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778755854.6475964,
+      "timestamp_local": "2026-05-14 18:50:54",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755854.6475964,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778755854.897788,
+      "timestamp_local": "2026-05-14 18:50:54",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755854.897788,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778755854.9291005,
+      "timestamp_local": "2026-05-14 18:50:54",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i am million mask idiot for short ai",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755854.9291005,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778755855.1639228,
+      "timestamp_local": "2026-05-14 18:50:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted psychotherapy",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755855.1639228,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1778755855.4233027,
+      "timestamp_local": "2026-05-14 18:50:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755855.4233027,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1778755855.6651483,
+      "timestamp_local": "2026-05-14 18:50:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755855.6651483,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1778755855.9132211,
+      "timestamp_local": "2026-05-14 18:50:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755855.9132211,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1778755856.3976555,
+      "timestamp_local": "2026-05-14 18:50:56",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755856.3976555,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1778755856.9398942,
+      "timestamp_local": "2026-05-14 18:50:56",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755856.9398942,
+        "source": "final",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1778755858.1477666,
+      "timestamp_local": "2026-05-14 18:50:58",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755858.1477666,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1778755858.157784,
+      "timestamp_local": "2026-05-14 18:50:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755858.157784,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1778755858.474439,
+      "timestamp_local": "2026-05-14 18:50:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart century and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755858.474439,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1778755858.7108088,
+      "timestamp_local": "2026-05-14 18:50:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart century and you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755858.7108088,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1778755858.9690108,
+      "timestamp_local": "2026-05-14 18:50:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart century and you change your",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755858.9690108,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1778755859.1931436,
+      "timestamp_local": "2026-05-14 18:50:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart century and you change your voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755859.1931436,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1778755859.6481705,
+      "timestamp_local": "2026-05-14 18:50:59",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755859.6481705,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1778755860.2766306,
+      "timestamp_local": "2026-05-14 18:51:00",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart sentry and you change your voice",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755860.2766306,
+        "source": "final",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1778755861.2919993,
+      "timestamp_local": "2026-05-14 18:51:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "processing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755861.2919993,
+        "source": "state",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1778755861.2919993,
+      "timestamp_local": "2026-05-14 18:51:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755861.2919993,
+        "source": "state",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1778755874.9554155,
+      "timestamp_local": "2026-05-14 18:51:14",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart sentry and you change your voice",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1778755874.982421,
+      "timestamp_local": "2026-05-14 18:51:14",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "All right. I can switch between multiple voices. You can ask for accents like British, and specify male or female.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1778755861.793099,
+      "timestamp_local": "2026-05-14 18:51:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755861.793099,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1778755875.0474448,
+      "timestamp_local": "2026-05-14 18:51:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755875.0474448,
+        "source": "state",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1778755862.494161,
+      "timestamp_local": "2026-05-14 18:51:02",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart century and you change your voice to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755862.494161,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1606,
+        "updated_at": 1778755853.3981268
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1778755863.697554,
+      "timestamp_local": "2026-05-14 18:51:03",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart sentry and you change your voice to",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755863.697554,
+        "source": "final",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1778755863.9212792,
+      "timestamp_local": "2026-05-14 18:51:03",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "processing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755863.9212792,
+        "source": "state",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1778755863.9222834,
+      "timestamp_local": "2026-05-14 18:51:03",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "heard",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755863.9222834,
+        "source": "state",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1778755875.1084762,
+      "timestamp_local": "2026-05-14 18:51:15",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "i am million mask idiot for short a i assisted side smart sentry and you change your voice to",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1778755875.138491,
+      "timestamp_local": "2026-05-14 18:51:15",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Understood. Absolutely. Tell me a voice style like British male or British female.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1778755864.4227352,
+      "timestamp_local": "2026-05-14 18:51:04",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755864.4227352,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1778755865.1725163,
+      "timestamp_local": "2026-05-14 18:51:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755865.1725163,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1778755873.9233892,
+      "timestamp_local": "2026-05-14 18:51:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755873.9233892,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1778755874.9243977,
+      "timestamp_local": "2026-05-14 18:51:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755874.9243977,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1778755877.4437442,
+      "timestamp_local": "2026-05-14 18:51:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755877.4437442,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1778755879.6922233,
+      "timestamp_local": "2026-05-14 18:51:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755879.6922233,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 59,
+      "timestamp_epoch_s": 1778755880.4433355,
+      "timestamp_local": "2026-05-14 18:51:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755880.4433355,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 60,
+      "timestamp_epoch_s": 1778755880.988822,
+      "timestamp_local": "2026-05-14 18:51:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755880.988822,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 61,
+      "timestamp_epoch_s": 1778755881.211734,
+      "timestamp_local": "2026-05-14 18:51:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755881.211734,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 62,
+      "timestamp_epoch_s": 1778755882.2176208,
+      "timestamp_local": "2026-05-14 18:51:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755882.2176208,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 63,
+      "timestamp_epoch_s": 1778755882.4832761,
+      "timestamp_local": "2026-05-14 18:51:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755882.4832761,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 64,
+      "timestamp_epoch_s": 1778755882.9760695,
+      "timestamp_local": "2026-05-14 18:51:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755882.9760695,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 65,
+      "timestamp_epoch_s": 1778755883.2267063,
+      "timestamp_local": "2026-05-14 18:51:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish and specially made",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755883.2267063,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 66,
+      "timestamp_epoch_s": 1778755884.2259514,
+      "timestamp_local": "2026-05-14 18:51:24",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish and specially made",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755884.2259514,
+        "source": "final",
+        "frequency_hz": 300.8,
+        "rms": 1230,
+        "updated_at": 1778755863.246254
+      }
+    },
+    {
+      "id": 67,
+      "timestamp_epoch_s": 1778755885.1847305,
+      "timestamp_local": "2026-05-14 18:51:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755885.1847305,
+        "source": "vosk",
+        "frequency_hz": 110.0,
+        "rms": 1606,
+        "updated_at": 1778755885.1847305
+      }
+    },
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1778755885.433379,
+      "timestamp_local": "2026-05-14 18:51:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish inspect i may or",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755885.433379,
+        "source": "vosk",
+        "frequency_hz": 110.0,
+        "rms": 1606,
+        "updated_at": 1778755885.1847305
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1778755885.5014794,
+      "timestamp_local": "2026-05-14 18:51:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish and special male",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755885.5014794,
+        "source": "vosk",
+        "frequency_hz": 110.0,
+        "rms": 1606,
+        "updated_at": 1778755885.1847305
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1778755885.7168732,
+      "timestamp_local": "2026-05-14 18:51:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish inspect i may have pushed",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755885.7168732,
+        "source": "vosk",
+        "frequency_hz": 110.0,
+        "rms": 1606,
+        "updated_at": 1778755885.1847305
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1778755886.0179496,
+      "timestamp_local": "2026-05-14 18:51:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish inspect i may have pushed toward",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755886.0179496,
+        "source": "vosk",
+        "frequency_hz": 110.0,
+        "rms": 1606,
+        "updated_at": 1778755885.1847305
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1778755886.9595635,
+      "timestamp_local": "2026-05-14 18:51:26",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish inspect i may have pushed toward",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755886.9595635,
+        "source": "final",
+        "frequency_hz": 110.0,
+        "rms": 1606,
+        "updated_at": 1778755885.1847305
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1778755887.88943,
+      "timestamp_local": "2026-05-14 18:51:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755887.88943,
+        "source": "vosk",
+        "frequency_hz": 110.0,
+        "rms": 1606,
+        "updated_at": 1778755885.1847305
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1778755887.9488738,
+      "timestamp_local": "2026-05-14 18:51:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish inspect i may have pushed toward",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755887.9488738,
+        "source": "vosk",
+        "frequency_hz": 110.0,
+        "rms": 1606,
+        "updated_at": 1778755885.1847305
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1778755888.1526215,
+      "timestamp_local": "2026-05-14 18:51:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish inspect i may have pushed toward in new",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755888.1526215,
+        "source": "vosk",
+        "frequency_hz": 326.0,
+        "rms": 1216,
+        "updated_at": 1778755888.1396158
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1778755889.1754594,
+      "timestamp_local": "2026-05-14 18:51:29",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish inspect i may have pushed toward in new",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755889.1754594,
+        "source": "final",
+        "frequency_hz": 326.0,
+        "rms": 1216,
+        "updated_at": 1778755888.1396158
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1778755890.0896995,
+      "timestamp_local": "2026-05-14 18:51:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755890.0896995,
+        "source": "vosk",
+        "frequency_hz": 326.0,
+        "rms": 1216,
+        "updated_at": 1778755888.1396158
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1778755890.0954893,
+      "timestamp_local": "2026-05-14 18:51:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish inspect i may have pushed toward in new",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755890.0954893,
+        "source": "vosk",
+        "frequency_hz": 326.0,
+        "rms": 1216,
+        "updated_at": 1778755888.1396158
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1778755891.4491096,
+      "timestamp_local": "2026-05-14 18:51:31",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish inspect i may have pushed toward in new",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755891.4491096,
+        "source": "final",
+        "frequency_hz": 326.0,
+        "rms": 1216,
+        "updated_at": 1778755888.1396158
+      }
+    },
+    {
+      "id": 80,
+      "timestamp_epoch_s": 1778755891.7714958,
+      "timestamp_local": "2026-05-14 18:51:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "processing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755891.7714958,
+        "source": "state",
+        "frequency_hz": 326.0,
+        "rms": 1216,
+        "updated_at": 1778755888.1396158
+      }
+    },
+    {
+      "id": 81,
+      "timestamp_epoch_s": 1778755891.7714958,
+      "timestamp_local": "2026-05-14 18:51:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "heard",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755891.7714958,
+        "source": "state",
+        "frequency_hz": 326.0,
+        "rms": 1216,
+        "updated_at": 1778755888.1396158
+      }
+    },
+    {
+      "id": 82,
+      "timestamp_epoch_s": 1778755892.282543,
+      "timestamp_local": "2026-05-14 18:51:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755892.282543,
+        "source": "vosk",
+        "frequency_hz": 326.0,
+        "rms": 1216,
+        "updated_at": 1778755888.1396158
+      }
+    },
+    {
+      "id": 83,
+      "timestamp_epoch_s": 1778755893.1634896,
+      "timestamp_local": "2026-05-14 18:51:33",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "right i can switch between multiple you can ask for acts reddish and i may or pushed towards india",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755893.1634896,
+        "source": "final",
+        "frequency_hz": 326.0,
+        "rms": 1216,
+        "updated_at": 1778755888.1396158
+      }
+    },
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1778755893.979184,
+      "timestamp_local": "2026-05-14 18:51:33",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755893.979184,
+        "source": "vosk",
+        "frequency_hz": 326.0,
+        "rms": 1216,
+        "updated_at": 1778755888.1396158
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1778755895.2295065,
+      "timestamp_local": "2026-05-14 18:51:35",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755895.2295065,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1778755929.7301888,
+      "timestamp_local": "2026-05-14 18:52:09",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755929.7301888,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1778755930.2302563,
+      "timestamp_local": "2026-05-14 18:52:10",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755930.2302563,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1778755933.9804108,
+      "timestamp_local": "2026-05-14 18:52:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755933.9804108,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1778755934.4803386,
+      "timestamp_local": "2026-05-14 18:52:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755934.4803386,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1778755936.7299159,
+      "timestamp_local": "2026-05-14 18:52:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755936.7299159,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 91,
+      "timestamp_epoch_s": 1778755936.7768273,
+      "timestamp_local": "2026-05-14 18:52:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "elaine",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755936.7768273,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 92,
+      "timestamp_epoch_s": 1778755937.0287445,
+      "timestamp_local": "2026-05-14 18:52:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alien",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755937.0287445,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 93,
+      "timestamp_epoch_s": 1778755937.838048,
+      "timestamp_local": "2026-05-14 18:52:17",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755937.838048,
+        "source": "final",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 94,
+      "timestamp_epoch_s": 1778755937.9234598,
+      "timestamp_local": "2026-05-14 18:52:17",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 95,
+      "timestamp_epoch_s": 1778755938.241307,
+      "timestamp_local": "2026-05-14 18:52:18",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Hello. What would you like to talk about?",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 96,
+      "timestamp_epoch_s": 1778755938.338953,
+      "timestamp_local": "2026-05-14 18:52:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755938.338953,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 97,
+      "timestamp_epoch_s": 1778755938.8468125,
+      "timestamp_local": "2026-05-14 18:52:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755938.8468125,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 98,
+      "timestamp_epoch_s": 1778755939.339853,
+      "timestamp_local": "2026-05-14 18:52:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755939.339853,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 99,
+      "timestamp_epoch_s": 1778755941.3393493,
+      "timestamp_local": "2026-05-14 18:52:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755941.3393493,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 100,
+      "timestamp_epoch_s": 1778755941.5894728,
+      "timestamp_local": "2026-05-14 18:52:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755941.5894728,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 101,
+      "timestamp_epoch_s": 1778755941.8605301,
+      "timestamp_local": "2026-05-14 18:52:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alien most elaborate would you like to trial",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755941.8605301,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 102,
+      "timestamp_epoch_s": 1778755942.1123803,
+      "timestamp_local": "2026-05-14 18:52:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alien most elaborate would you like to trial choose your",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755942.1123803,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 103,
+      "timestamp_epoch_s": 1778755943.1036701,
+      "timestamp_local": "2026-05-14 18:52:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alien most elaborate would you like to trial choose your voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755943.1036701,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 104,
+      "timestamp_epoch_s": 1778755945.0647018,
+      "timestamp_local": "2026-05-14 18:52:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alien most elaborate would you like to trial choose your voice to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755945.0647018,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 105,
+      "timestamp_epoch_s": 1778755948.6666236,
+      "timestamp_local": "2026-05-14 18:52:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alien most elaborate would you like to trial choose your voice to remain",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755948.6666236,
+        "source": "vosk",
+        "frequency_hz": 310.0,
+        "rms": 1436,
+        "updated_at": 1778755894.7307823
+      }
+    },
+    {
+      "id": 106,
+      "timestamp_epoch_s": 1778755958.1987035,
+      "timestamp_local": "2026-05-14 18:52:38",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "processing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755958.1987035,
+        "source": "state",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 107,
+      "timestamp_epoch_s": 1778755958.1987035,
+      "timestamp_local": "2026-05-14 18:52:38",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755958.1987035,
+        "source": "state",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 108,
+      "timestamp_epoch_s": 1778755961.699892,
+      "timestamp_local": "2026-05-14 18:52:41",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755961.699892,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 109,
+      "timestamp_epoch_s": 1778755962.1989806,
+      "timestamp_local": "2026-05-14 18:52:42",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755962.1989806,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 110,
+      "timestamp_epoch_s": 1778755962.44987,
+      "timestamp_local": "2026-05-14 18:52:42",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755962.44987,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 111,
+      "timestamp_epoch_s": 1778755963.022605,
+      "timestamp_local": "2026-05-14 18:52:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "waiting",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755963.022605,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 112,
+      "timestamp_epoch_s": 1778755963.4489443,
+      "timestamp_local": "2026-05-14 18:52:43",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755963.4489443,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 113,
+      "timestamp_epoch_s": 1778755963.9091024,
+      "timestamp_local": "2026-05-14 18:52:43",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "waiting",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755963.9091024,
+        "source": "final",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 114,
+      "timestamp_epoch_s": 1778755964.1991751,
+      "timestamp_local": "2026-05-14 18:52:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755964.1991751,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 115,
+      "timestamp_epoch_s": 1778755964.235183,
+      "timestamp_local": "2026-05-14 18:52:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "because of waiting so",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755964.235183,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 116,
+      "timestamp_epoch_s": 1778755964.4909906,
+      "timestamp_local": "2026-05-14 18:52:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "because of waiting certain",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755964.4909906,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 117,
+      "timestamp_epoch_s": 1778755964.7780187,
+      "timestamp_local": "2026-05-14 18:52:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "because of waiting self",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755964.7780187,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 118,
+      "timestamp_epoch_s": 1778755964.977273,
+      "timestamp_local": "2026-05-14 18:52:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "because of waiting self indulgent",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755964.977273,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 119,
+      "timestamp_epoch_s": 1778755965.4486232,
+      "timestamp_local": "2026-05-14 18:52:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755965.4486232,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 120,
+      "timestamp_epoch_s": 1778755966.4254215,
+      "timestamp_local": "2026-05-14 18:52:46",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "because of waiting self indulgent",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755966.4254215,
+        "source": "final",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 121,
+      "timestamp_epoch_s": 1778755967.062464,
+      "timestamp_local": "2026-05-14 18:52:47",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755967.062464,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 122,
+      "timestamp_epoch_s": 1778755967.7067149,
+      "timestamp_local": "2026-05-14 18:52:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "because of waiting self indulgent the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755967.7067149,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 123,
+      "timestamp_epoch_s": 1778755968.2742243,
+      "timestamp_local": "2026-05-14 18:52:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "because of waiting self indulgent the money",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778755968.2742243,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 124,
+      "timestamp_epoch_s": 1778755968.7179768,
+      "timestamp_local": "2026-05-14 18:52:48",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755968.7179768,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 125,
+      "timestamp_epoch_s": 1778755969.21832,
+      "timestamp_local": "2026-05-14 18:52:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755969.21832,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 126,
+      "timestamp_epoch_s": 1778755970.0704522,
+      "timestamp_local": "2026-05-14 18:52:50",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "because of waiting certain dodgy and the money",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778755970.0704522,
+        "source": "final",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 127,
+      "timestamp_epoch_s": 1778755977.467934,
+      "timestamp_local": "2026-05-14 18:52:57",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755977.467934,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 128,
+      "timestamp_epoch_s": 1778755977.969324,
+      "timestamp_local": "2026-05-14 18:52:57",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778755977.969324,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 129,
+      "timestamp_epoch_s": 1778756007.718961,
+      "timestamp_local": "2026-05-14 18:53:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756007.718961,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 130,
+      "timestamp_epoch_s": 1778756007.7571764,
+      "timestamp_local": "2026-05-14 18:53:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "what's",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756007.7571764,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 131,
+      "timestamp_epoch_s": 1778756008.2187595,
+      "timestamp_local": "2026-05-14 18:53:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756008.2187595,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 132,
+      "timestamp_epoch_s": 1778756039.222412,
+      "timestamp_local": "2026-05-14 18:53:59",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756039.222412,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 133,
+      "timestamp_epoch_s": 1778756039.257455,
+      "timestamp_local": "2026-05-14 18:53:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756039.257455,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 134,
+      "timestamp_epoch_s": 1778756039.5155532,
+      "timestamp_local": "2026-05-14 18:53:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756039.5155532,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 135,
+      "timestamp_epoch_s": 1778756040.2192714,
+      "timestamp_local": "2026-05-14 18:54:00",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756040.2192714,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 136,
+      "timestamp_epoch_s": 1778756053.2191615,
+      "timestamp_local": "2026-05-14 18:54:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756053.2191615,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 137,
+      "timestamp_epoch_s": 1778756053.2462482,
+      "timestamp_local": "2026-05-14 18:54:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than the smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756053.2462482,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 138,
+      "timestamp_epoch_s": 1778756053.7194698,
+      "timestamp_local": "2026-05-14 18:54:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756053.7194698,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 139,
+      "timestamp_epoch_s": 1778756057.469086,
+      "timestamp_local": "2026-05-14 18:54:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756057.469086,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 140,
+      "timestamp_epoch_s": 1778756057.5346751,
+      "timestamp_local": "2026-05-14 18:54:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than this marxism",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756057.5346751,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 141,
+      "timestamp_epoch_s": 1778756057.9726331,
+      "timestamp_local": "2026-05-14 18:54:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756057.9726331,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 142,
+      "timestamp_epoch_s": 1778756062.2249274,
+      "timestamp_local": "2026-05-14 18:54:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756062.2249274,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 143,
+      "timestamp_epoch_s": 1778756062.5510683,
+      "timestamp_local": "2026-05-14 18:54:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than the smart system like",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756062.5510683,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 144,
+      "timestamp_epoch_s": 1778756063.0580041,
+      "timestamp_local": "2026-05-14 18:54:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than the smart system for basketball",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756063.0580041,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 145,
+      "timestamp_epoch_s": 1778756063.7219489,
+      "timestamp_local": "2026-05-14 18:54:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756063.7219489,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 146,
+      "timestamp_epoch_s": 1778756063.972255,
+      "timestamp_local": "2026-05-14 18:54:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756063.972255,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 147,
+      "timestamp_epoch_s": 1778756064.3142004,
+      "timestamp_local": "2026-05-14 18:54:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than the smart system for basketball hundred",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756064.3142004,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 148,
+      "timestamp_epoch_s": 1778756064.6204212,
+      "timestamp_local": "2026-05-14 18:54:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "worse than the smart system that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778756064.6204212,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    },
+    {
+      "id": 149,
+      "timestamp_epoch_s": 1778756065.2228122,
+      "timestamp_local": "2026-05-14 18:54:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778756065.2228122,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1607,
+        "updated_at": 1778755953.0309098
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260514_185653.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260514_185653.md"
+  }
+}

@@ -1,0 +1,1174 @@
+{
+  "generated_at_local": "2026-05-06 22:38:42",
+  "generated_at_epoch_s": 1778078322.3455577,
+  "entry_count": 58,
+  "counts_by_role": {
+    "assistant": 7,
+    "system": 1,
+    "operator": 50
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "spoken_confirmation": 5,
+    "voice_transcript_partial": 37,
+    "voice_transcript_final": 8,
+    "voice_command": 5
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 56
+  },
+  "voice_transcript_summary": {
+    "partial_count": 37,
+    "final_count": 8,
+    "voice_command_count": 5,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "change your voice to anything lighting the run the overlay the buzzer in changes order summaries",
+  "latest_operator_request": "change your voice to anything lighting the run the overlay the buzzer in changes order summaries",
+  "latest_assistant_message": "I heard the request, but only the registered operator can change Smart Sentry settings.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1778078295.701504,
+      "timestamp_local": "2026-05-06 22:38:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "change your voice to anything lighting the overlay the buzzer in changes order",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078295.701504,
+        "source": "vosk",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1778078296.198643,
+      "timestamp_local": "2026-05-06 22:38:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "change your voice to anything lighting the overlay the buzzer in changes order face suppression",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078296.198643,
+        "source": "vosk",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1778078296.4462342,
+      "timestamp_local": "2026-05-06 22:38:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "change your voice to anything lighting the overlay the buzzer in changes order precision aiming",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078296.4462342,
+        "source": "vosk",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1778078296.848139,
+      "timestamp_local": "2026-05-06 22:38:16",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "change your voice to anything lighting the run the overlay the buzzer in changes order summaries",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778078296.848139,
+        "source": "final",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1778078297.1304905,
+      "timestamp_local": "2026-05-06 22:38:17",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "change your voice to anything lighting the run the overlay the buzzer in changes order summaries",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1778078297.8261764,
+      "timestamp_local": "2026-05-06 22:38:17",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I heard the request, but only the registered operator can change Smart Sentry settings.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1778078304.2222474,
+      "timestamp_local": "2026-05-06 22:38:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly trigger",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078304.2222474,
+        "source": "vosk",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1778078304.231767,
+      "timestamp_local": "2026-05-06 22:38:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078304.231767,
+        "source": "vosk",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1778078304.4694145,
+      "timestamp_local": "2026-05-06 22:38:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly smart sentry",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078304.4694145,
+        "source": "vosk",
+        "frequency_hz": 170.0,
+        "rms": 230,
+        "updated_at": 1778078304.458404
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1778078305.5055792,
+      "timestamp_local": "2026-05-06 22:38:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly keyboard movement",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078305.5055792,
+        "source": "vosk",
+        "frequency_hz": 170.0,
+        "rms": 230,
+        "updated_at": 1778078304.458404
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1778078305.6801145,
+      "timestamp_local": "2026-05-06 22:38:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly smart greeting",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078305.6801145,
+        "source": "vosk",
+        "frequency_hz": 168.6,
+        "rms": 584,
+        "updated_at": 1778078305.6720867
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1778078305.9330196,
+      "timestamp_local": "2026-05-06 22:38:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly smart guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078305.9330196,
+        "source": "vosk",
+        "frequency_hz": 168.6,
+        "rms": 584,
+        "updated_at": 1778078305.6720867
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778078186.5998118,
+      "timestamp_local": "2026-05-06 22:36:26",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778078186.601812,
+      "timestamp_local": "2026-05-06 22:36:26",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778078188.1710458,
+      "timestamp_local": "2026-05-06 22:36:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778078188.1710458,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778078225.0390637,
+      "timestamp_local": "2026-05-06 22:37:05",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Smart Sentry is online now, say the command.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778078229.116018,
+      "timestamp_local": "2026-05-06 22:37:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on lion output",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078229.116018,
+        "source": "vosk",
+        "frequency_hz": 381.2,
+        "rms": 303,
+        "updated_at": 1778078207.8704996
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778078229.1320796,
+      "timestamp_local": "2026-05-06 22:37:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on lion status",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078229.1320796,
+        "source": "vosk",
+        "frequency_hz": 381.2,
+        "rms": 303,
+        "updated_at": 1778078207.8704996
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778078229.6163564,
+      "timestamp_local": "2026-05-06 22:37:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on lion say that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078229.6163564,
+        "source": "vosk",
+        "frequency_hz": 381.2,
+        "rms": 303,
+        "updated_at": 1778078207.8704996
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778078233.2302067,
+      "timestamp_local": "2026-05-06 22:37:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078233.2302067,
+        "source": "vosk",
+        "frequency_hz": 283.0,
+        "rms": 304,
+        "updated_at": 1778078232.7229524
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778078233.4796317,
+      "timestamp_local": "2026-05-06 22:37:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "e lion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078233.4796317,
+        "source": "vosk",
+        "frequency_hz": 315.6,
+        "rms": 358,
+        "updated_at": 1778078233.473116
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778078233.729781,
+      "timestamp_local": "2026-05-06 22:37:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the loop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078233.729781,
+        "source": "vosk",
+        "frequency_hz": 315.6,
+        "rms": 358,
+        "updated_at": 1778078233.473116
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778078234.3154805,
+      "timestamp_local": "2026-05-06 22:37:14",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the loop",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778078234.3154805,
+        "source": "final",
+        "frequency_hz": 349.3,
+        "rms": 309,
+        "updated_at": 1778078234.2231462
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778078245.2313216,
+      "timestamp_local": "2026-05-06 22:37:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run diagnostics",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078245.2313216,
+        "source": "vosk",
+        "frequency_hz": 357.5,
+        "rms": 318,
+        "updated_at": 1778078244.4737701
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778078245.4803455,
+      "timestamp_local": "2026-05-06 22:37:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078245.4803455,
+        "source": "vosk",
+        "frequency_hz": 357.5,
+        "rms": 318,
+        "updated_at": 1778078244.4737701
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778078245.7289965,
+      "timestamp_local": "2026-05-06 22:37:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run smart sentry",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078245.7289965,
+        "source": "vosk",
+        "frequency_hz": 357.5,
+        "rms": 318,
+        "updated_at": 1778078244.4737701
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778078246.733846,
+      "timestamp_local": "2026-05-06 22:37:26",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778078246.733846,
+        "source": "final",
+        "frequency_hz": 354.9,
+        "rms": 297,
+        "updated_at": 1778078246.7233443
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778078246.7969747,
+      "timestamp_local": "2026-05-06 22:37:26",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778078247.2130966,
+      "timestamp_local": "2026-05-06 22:37:27",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Connecting Smart Sentry boards now.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778078260.490336,
+      "timestamp_local": "2026-05-06 22:37:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "pan",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078260.490336,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 1174,
+        "updated_at": 1778078259.843081
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778078260.9907277,
+      "timestamp_local": "2026-05-06 22:37:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "question",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078260.9907277,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 1174,
+        "updated_at": 1778078259.843081
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778078261.489928,
+      "timestamp_local": "2026-05-06 22:37:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "question another",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078261.489928,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 1174,
+        "updated_at": 1778078259.843081
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778078261.7351165,
+      "timestamp_local": "2026-05-06 22:37:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "question another command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078261.7351165,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 1174,
+        "updated_at": 1778078259.843081
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778078262.2344906,
+      "timestamp_local": "2026-05-06 22:37:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "question another command to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078262.2344906,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 1174,
+        "updated_at": 1778078259.843081
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778078262.483709,
+      "timestamp_local": "2026-05-06 22:37:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "question another command one running",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078262.483709,
+        "source": "vosk",
+        "frequency_hz": 62.0,
+        "rms": 1174,
+        "updated_at": 1778078259.843081
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778078263.0936248,
+      "timestamp_local": "2026-05-06 22:37:43",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "question another command one running",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778078263.0936248,
+        "source": "final",
+        "frequency_hz": 416.0,
+        "rms": 320,
+        "updated_at": 1778078262.9790082
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778078268.0799024,
+      "timestamp_local": "2026-05-06 22:37:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "can you change your voice to ml keep human voice guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078268.0799024,
+        "source": "vosk",
+        "frequency_hz": 180.0,
+        "rms": 252,
+        "updated_at": 1778078267.8219407
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778078268.333377,
+      "timestamp_local": "2026-05-06 22:37:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "can you change your voice to ml keep human voice guard the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078268.333377,
+        "source": "vosk",
+        "frequency_hz": 180.0,
+        "rms": 252,
+        "updated_at": 1778078267.8219407
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778078269.0210118,
+      "timestamp_local": "2026-05-06 22:37:49",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "you change your voice to ml keep human voice guard",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778078269.0210118,
+        "source": "final",
+        "frequency_hz": 180.0,
+        "rms": 252,
+        "updated_at": 1778078267.8219407
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1778078269.237309,
+      "timestamp_local": "2026-05-06 22:37:49",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "you change your voice to ml keep human voice guard",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1778078269.0773294,
+      "timestamp_local": "2026-05-06 22:37:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "adaptive",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078269.0773294,
+        "source": "vosk",
+        "frequency_hz": 180.0,
+        "rms": 252,
+        "updated_at": 1778078267.8219407
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1778078269.5786996,
+      "timestamp_local": "2026-05-06 22:37:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "movement",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078269.5786996,
+        "source": "vosk",
+        "frequency_hz": 180.0,
+        "rms": 252,
+        "updated_at": 1778078267.8219407
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1778078273.6862025,
+      "timestamp_local": "2026-05-06 22:37:53",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "running",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778078273.6862025,
+        "source": "final",
+        "frequency_hz": 346.1,
+        "rms": 314,
+        "updated_at": 1778078272.8222132
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1778078276.5903354,
+      "timestamp_local": "2026-05-06 22:37:56",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "change your",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078276.5903354,
+        "source": "vosk",
+        "frequency_hz": 356.4,
+        "rms": 297,
+        "updated_at": 1778078275.3216176
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1778078277.2616606,
+      "timestamp_local": "2026-05-06 22:37:57",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "change your voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078277.2616606,
+        "source": "vosk",
+        "frequency_hz": 356.4,
+        "rms": 297,
+        "updated_at": 1778078275.3216176
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1778078278.4441876,
+      "timestamp_local": "2026-05-06 22:37:58",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "change your voice",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778078278.4441876,
+        "source": "final",
+        "frequency_hz": 416.0,
+        "rms": 308,
+        "updated_at": 1778078277.8219392
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1778078278.561587,
+      "timestamp_local": "2026-05-06 22:37:58",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "change your voice",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1778078279.101685,
+      "timestamp_local": "2026-05-06 22:37:59",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I can switch between multiple voices. You can ask for accents like British, and specify male or female.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1778078286.2064533,
+      "timestamp_local": "2026-05-06 22:38:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ai can switch visual mode servo voice human ask for actions light brightness",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078286.2064533,
+        "source": "vosk",
+        "frequency_hz": 340.5,
+        "rms": 318,
+        "updated_at": 1778078280.9385262
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1778078286.4480655,
+      "timestamp_local": "2026-05-06 22:38:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ai can switch visual mode servo voice human ask for actions light brightness and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078286.4480655,
+        "source": "vosk",
+        "frequency_hz": 340.5,
+        "rms": 318,
+        "updated_at": 1778078280.9385262
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1778078286.7008293,
+      "timestamp_local": "2026-05-06 22:38:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ai can switch visual mode servo voice human ask for actions light brightness known faces",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078286.7008293,
+        "source": "vosk",
+        "frequency_hz": 340.5,
+        "rms": 318,
+        "updated_at": 1778078280.9385262
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1778078286.9461684,
+      "timestamp_local": "2026-05-06 22:38:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ai can switch visual mode servo voice human ask for actions light brightness ml refinement",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078286.9461684,
+        "source": "vosk",
+        "frequency_hz": 340.5,
+        "rms": 318,
+        "updated_at": 1778078280.9385262
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1778078287.713844,
+      "timestamp_local": "2026-05-06 22:38:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ai can switch visual mode servo voice human ask for actions light brightness ml refinement on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078287.713844,
+        "source": "vosk",
+        "frequency_hz": 340.5,
+        "rms": 318,
+        "updated_at": 1778078280.9385262
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1778078287.9542384,
+      "timestamp_local": "2026-05-06 22:38:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ai can switch visual mode servo voice human ask for actions light brightness ml refinement what is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078287.9542384,
+        "source": "vosk",
+        "frequency_hz": 340.5,
+        "rms": 318,
+        "updated_at": 1778078280.9385262
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1778078288.35689,
+      "timestamp_local": "2026-05-06 22:38:08",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "ai can switch visual to mode servo voice human ask for actions light brightness ml refinement",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778078288.35689,
+        "source": "final",
+        "frequency_hz": 340.5,
+        "rms": 318,
+        "updated_at": 1778078280.9385262
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1778078288.7334862,
+      "timestamp_local": "2026-05-06 22:38:08",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "ai can switch visual to mode servo voice human ask for actions light brightness ml refinement",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1778078289.2484763,
+      "timestamp_local": "2026-05-06 22:38:09",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I heard the request, but only the registered operator can change Smart Sentry settings.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1778078295.5933268,
+      "timestamp_local": "2026-05-06 22:38:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "change your voice to anything lighting the overlay the buzzer in changes on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078295.5933268,
+        "source": "vosk",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1778078295.701504,
+      "timestamp_local": "2026-05-06 22:38:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "change your voice to anything lighting the overlay the buzzer in changes order",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078295.701504,
+        "source": "vosk",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1778078296.198643,
+      "timestamp_local": "2026-05-06 22:38:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "change your voice to anything lighting the overlay the buzzer in changes order face suppression",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078296.198643,
+        "source": "vosk",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1778078296.4462342,
+      "timestamp_local": "2026-05-06 22:38:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "change your voice to anything lighting the overlay the buzzer in changes order precision aiming",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078296.4462342,
+        "source": "vosk",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1778078296.848139,
+      "timestamp_local": "2026-05-06 22:38:16",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "change your voice to anything lighting the run the overlay the buzzer in changes order summaries",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778078296.848139,
+        "source": "final",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1778078297.1304905,
+      "timestamp_local": "2026-05-06 22:38:17",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "change your voice to anything lighting the run the overlay the buzzer in changes order summaries",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1778078297.8261764,
+      "timestamp_local": "2026-05-06 22:38:17",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I heard the request, but only the registered operator can change Smart Sentry settings.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1778078304.2222474,
+      "timestamp_local": "2026-05-06 22:38:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly trigger",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078304.2222474,
+        "source": "vosk",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1778078304.231767,
+      "timestamp_local": "2026-05-06 22:38:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078304.231767,
+        "source": "vosk",
+        "frequency_hz": 100.1,
+        "rms": 1153,
+        "updated_at": 1778078293.6880007
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1778078304.4694145,
+      "timestamp_local": "2026-05-06 22:38:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly smart sentry",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078304.4694145,
+        "source": "vosk",
+        "frequency_hz": 170.0,
+        "rms": 230,
+        "updated_at": 1778078304.458404
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1778078305.5055792,
+      "timestamp_local": "2026-05-06 22:38:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly keyboard movement",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078305.5055792,
+        "source": "vosk",
+        "frequency_hz": 170.0,
+        "rms": 230,
+        "updated_at": 1778078304.458404
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1778078305.6801145,
+      "timestamp_local": "2026-05-06 22:38:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly smart greeting",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078305.6801145,
+        "source": "vosk",
+        "frequency_hz": 168.6,
+        "rms": 584,
+        "updated_at": 1778078305.6720867
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1778078305.9330196,
+      "timestamp_local": "2026-05-06 22:38:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi what e lion i order status what leon what's anomaly smart guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778078305.9330196,
+        "source": "vosk",
+        "frequency_hz": 168.6,
+        "rms": 584,
+        "updated_at": 1778078305.6720867
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260506_223842.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260506_223842.md"
+  }
+}

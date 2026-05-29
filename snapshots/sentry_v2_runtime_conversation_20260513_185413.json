@@ -1,0 +1,291 @@
+{
+  "generated_at_local": "2026-05-13 18:54:13",
+  "generated_at_epoch_s": 1778669653.8850718,
+  "entry_count": 8,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 1,
+    "operator": 5
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 4,
+    "voice_transcript_final": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 6
+  },
+  "voice_transcript_summary": {
+    "partial_count": 4,
+    "final_count": 1,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "how the smart sentry is now online command said",
+  "latest_operator_request": "how the smart sentry is now online command said",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778669431.3726292,
+      "timestamp_local": "2026-05-13 18:50:31",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778669431.3736367,
+      "timestamp_local": "2026-05-13 18:50:31",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778669433.152397,
+      "timestamp_local": "2026-05-13 18:50:33",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778669433.152397,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778669478.7716632,
+      "timestamp_local": "2026-05-13 18:51:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "how the smart century is now on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778669478.7716632,
+        "source": "vosk",
+        "frequency_hz": 150.0,
+        "rms": 1203,
+        "updated_at": 1778669478.751505
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778669479.0342624,
+      "timestamp_local": "2026-05-13 18:51:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "how the smart century is now online",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778669479.0342624,
+        "source": "vosk",
+        "frequency_hz": 150.0,
+        "rms": 1203,
+        "updated_at": 1778669478.751505
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778669487.0974283,
+      "timestamp_local": "2026-05-13 18:51:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "how the smart century is now online command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778669487.0974283,
+        "source": "vosk",
+        "frequency_hz": 150.0,
+        "rms": 1203,
+        "updated_at": 1778669478.751505
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778669533.5597546,
+      "timestamp_local": "2026-05-13 18:52:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "how the smart century is now online command said",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778669533.5597546,
+        "source": "vosk",
+        "frequency_hz": 150.0,
+        "rms": 1203,
+        "updated_at": 1778669478.751505
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778669537.005166,
+      "timestamp_local": "2026-05-13 18:52:17",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "how the smart sentry is now online command said",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778669537.005166,
+        "source": "final",
+        "frequency_hz": 150.0,
+        "rms": 1203,
+        "updated_at": 1778669478.751505
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778669431.3726292,
+      "timestamp_local": "2026-05-13 18:50:31",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778669431.3736367,
+      "timestamp_local": "2026-05-13 18:50:31",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778669433.152397,
+      "timestamp_local": "2026-05-13 18:50:33",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778669433.152397,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778669478.7716632,
+      "timestamp_local": "2026-05-13 18:51:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "how the smart century is now on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778669478.7716632,
+        "source": "vosk",
+        "frequency_hz": 150.0,
+        "rms": 1203,
+        "updated_at": 1778669478.751505
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778669479.0342624,
+      "timestamp_local": "2026-05-13 18:51:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "how the smart century is now online",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778669479.0342624,
+        "source": "vosk",
+        "frequency_hz": 150.0,
+        "rms": 1203,
+        "updated_at": 1778669478.751505
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778669487.0974283,
+      "timestamp_local": "2026-05-13 18:51:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "how the smart century is now online command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778669487.0974283,
+        "source": "vosk",
+        "frequency_hz": 150.0,
+        "rms": 1203,
+        "updated_at": 1778669478.751505
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778669533.5597546,
+      "timestamp_local": "2026-05-13 18:52:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "how the smart century is now online command said",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778669533.5597546,
+        "source": "vosk",
+        "frequency_hz": 150.0,
+        "rms": 1203,
+        "updated_at": 1778669478.751505
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778669537.005166,
+      "timestamp_local": "2026-05-13 18:52:17",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "how the smart sentry is now online command said",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778669537.005166,
+        "source": "final",
+        "frequency_hz": 150.0,
+        "rms": 1203,
+        "updated_at": 1778669478.751505
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260513_185413.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260513_185413.md"
+  }
+}

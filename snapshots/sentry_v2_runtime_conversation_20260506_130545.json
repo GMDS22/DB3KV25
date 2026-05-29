@@ -1,0 +1,2144 @@
+{
+  "generated_at_local": "2026-05-06 13:05:45",
+  "generated_at_epoch_s": 1778043945.9935336,
+  "entry_count": 115,
+  "counts_by_role": {
+    "assistant": 7,
+    "system": 1,
+    "operator": 107
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 3,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_final": 19,
+    "spoken_confirmation": 3,
+    "voice_transcript_partial": 82,
+    "voice_command": 6
+  },
+  "counts_by_channel": {
+    "text": 4,
+    "voice": 111
+  },
+  "voice_transcript_summary": {
+    "partial_count": 82,
+    "final_count": 19,
+    "voice_command_count": 6,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "tracking no one targets in view",
+  "latest_operator_request": "tracking no one targets in view",
+  "latest_assistant_message": "Assistant update. Assistant [Deterministic fallback / gpt-oss:20b] Parsed Intent: - action=none confidence=1.00 clarification=False I am Elion Mosk, Elion for short, Smart Sentry's runtime assistant built by GM Labs as Gino's personal project. I handle live analysis, diagnostics, and supported runtime commands.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 104,
+      "timestamp_epoch_s": 1778043920.5565038,
+      "timestamp_local": "2026-05-06 13:05:20",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "video loop running",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043920.5565038,
+        "source": "final",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 105,
+      "timestamp_epoch_s": 1778043920.6499367,
+      "timestamp_local": "2026-05-06 13:05:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ml",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043920.6499367,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 106,
+      "timestamp_epoch_s": 1778043920.905257,
+      "timestamp_local": "2026-05-06 13:05:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ml scoring",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043920.905257,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 107,
+      "timestamp_epoch_s": 1778043921.1583939,
+      "timestamp_local": "2026-05-06 13:05:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ml refinement",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043921.1583939,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 108,
+      "timestamp_epoch_s": 1778043921.407117,
+      "timestamp_local": "2026-05-06 13:05:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ml",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043921.407117,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 109,
+      "timestamp_epoch_s": 1778043922.4852042,
+      "timestamp_local": "2026-05-06 13:05:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for human",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043922.4852042,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 110,
+      "timestamp_epoch_s": 1778043922.4958882,
+      "timestamp_local": "2026-05-06 13:05:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for human voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043922.4958882,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 111,
+      "timestamp_epoch_s": 1778043923.4625335,
+      "timestamp_local": "2026-05-06 13:05:23",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "ml human",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043923.4625335,
+        "source": "final",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 112,
+      "timestamp_epoch_s": 1778043928.1515858,
+      "timestamp_local": "2026-05-06 13:05:28",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "logging",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043928.1515858,
+        "source": "final",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 113,
+      "timestamp_epoch_s": 1778043934.0519757,
+      "timestamp_local": "2026-05-06 13:05:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking no one targets",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043934.0519757,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 114,
+      "timestamp_epoch_s": 1778043934.575857,
+      "timestamp_local": "2026-05-06 13:05:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking no one targets in view",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043934.575857,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 115,
+      "timestamp_epoch_s": 1778043935.402905,
+      "timestamp_local": "2026-05-06 13:05:35",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "tracking no one targets in view",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043935.402905,
+        "source": "final",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778043755.2962878,
+      "timestamp_local": "2026-05-06 13:02:35",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778043755.297288,
+      "timestamp_local": "2026-05-06 13:02:35",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778043757.6656344,
+      "timestamp_local": "2026-05-06 13:02:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778043757.6656344,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778043793.5737948,
+      "timestamp_local": "2026-05-06 13:03:13",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "hey",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043793.5737948,
+        "source": "final",
+        "frequency_hz": 306.0,
+        "rms": 294,
+        "updated_at": 1778043759.009161
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778043796.3817692,
+      "timestamp_local": "2026-05-06 13:03:16",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Smart Sentry AI is online. Ask a question or give a command when ready.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778043802.126252,
+      "timestamp_local": "2026-05-06 13:03:22",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "smart sentry ai is on light",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043802.126252,
+        "source": "final",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778043802.2170868,
+      "timestamp_local": "2026-05-06 13:03:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "mask",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043802.2170868,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778043802.459382,
+      "timestamp_local": "2026-05-06 13:03:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ask a question",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043802.459382,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778043803.2097635,
+      "timestamp_local": "2026-05-06 13:03:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ask a question give acoustic",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043803.2097635,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778043803.5328572,
+      "timestamp_local": "2026-05-06 13:03:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ask a question give",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043803.5328572,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778043803.710061,
+      "timestamp_local": "2026-05-06 13:03:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ask a question give command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043803.710061,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778043803.9603882,
+      "timestamp_local": "2026-05-06 13:03:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ask a question give command to rest",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043803.9603882,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778043804.2108781,
+      "timestamp_local": "2026-05-06 13:03:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ask a question give command running",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043804.2108781,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778043804.7335598,
+      "timestamp_local": "2026-05-06 13:03:24",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "mask a question give command running",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043804.7335598,
+        "source": "final",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778043807.7427113,
+      "timestamp_local": "2026-05-06 13:03:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043807.7427113,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778043809.0948155,
+      "timestamp_local": "2026-05-06 13:03:29",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "run the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043809.0948155,
+        "source": "final",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778043814.4909,
+      "timestamp_local": "2026-05-06 13:03:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043814.4909,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778043814.7405777,
+      "timestamp_local": "2026-05-06 13:03:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run smart sentry",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043814.7405777,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778043815.9961922,
+      "timestamp_local": "2026-05-06 13:03:35",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043815.9961922,
+        "source": "final",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778043816.0496595,
+      "timestamp_local": "2026-05-06 13:03:36",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778043816.8626575,
+      "timestamp_local": "2026-05-06 13:03:36",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Connecting Smart Sentry boards now.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778043820.0473819,
+      "timestamp_local": "2026-05-06 13:03:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "setting guard no active",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043820.0473819,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778043820.5507207,
+      "timestamp_local": "2026-05-06 13:03:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "setting guard no active target matching",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043820.5507207,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778043820.7954628,
+      "timestamp_local": "2026-05-06 13:03:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "setting guard no active target",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043820.7954628,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778043821.0429816,
+      "timestamp_local": "2026-05-06 13:03:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "setting guard no active target matching",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043821.0429816,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778043821.2924218,
+      "timestamp_local": "2026-05-06 13:03:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "setting guard no active target no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043821.2924218,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778043822.917708,
+      "timestamp_local": "2026-05-06 13:03:42",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "setting guard no active target no",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043822.917708,
+        "source": "final",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1778043823.99679,
+      "timestamp_local": "2026-05-06 13:03:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043823.99679,
+        "source": "vosk",
+        "frequency_hz": 286.0,
+        "rms": 491,
+        "updated_at": 1778043801.7014751
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1778043831.8294737,
+      "timestamp_local": "2026-05-06 13:03:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "aiming on no fire",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043831.8294737,
+        "source": "vosk",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1778043832.0756867,
+      "timestamp_local": "2026-05-06 13:03:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "aiming on no fire no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043832.0756867,
+        "source": "vosk",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1778043832.950312,
+      "timestamp_local": "2026-05-06 13:03:52",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "aiming guard no targets running no",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043832.950312,
+        "source": "final",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1778043834.7306082,
+      "timestamp_local": "2026-05-06 13:03:54",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "overlay",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043834.7306082,
+        "source": "vosk",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1778043835.2299619,
+      "timestamp_local": "2026-05-06 13:03:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "overlay guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043835.2299619,
+        "source": "vosk",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1778043835.4743948,
+      "timestamp_local": "2026-05-06 13:03:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "overlay guard zone",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043835.4743948,
+        "source": "vosk",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1778043835.7233217,
+      "timestamp_local": "2026-05-06 13:03:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "overlay guard targets",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043835.7233217,
+        "source": "vosk",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1778043836.2234893,
+      "timestamp_local": "2026-05-06 13:03:56",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "overlay guard targets in view",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043836.2234893,
+        "source": "vosk",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1778043837.5332103,
+      "timestamp_local": "2026-05-06 13:03:57",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "overlay guard targets in view",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043837.5332103,
+        "source": "final",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1778043841.551641,
+      "timestamp_local": "2026-05-06 13:04:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "open the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043841.551641,
+        "source": "vosk",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1778043841.7947228,
+      "timestamp_local": "2026-05-06 13:04:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "open ai",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043841.7947228,
+        "source": "vosk",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1778043842.312501,
+      "timestamp_local": "2026-05-06 13:04:02",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "open ai tab",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043842.312501,
+        "source": "vosk",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1778043843.1395915,
+      "timestamp_local": "2026-05-06 13:04:03",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "open tab",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043843.1395915,
+        "source": "final",
+        "frequency_hz": 260.0,
+        "rms": 256,
+        "updated_at": 1778043828.0666745
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1778043843.28961,
+      "timestamp_local": "2026-05-06 13:04:03",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "open tab",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1778043844.551069,
+      "timestamp_local": "2026-05-06 13:04:04",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I could not map that to a command yet. Please say it again.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1778043849.867942,
+      "timestamp_local": "2026-05-06 13:04:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the guard targets on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043849.867942,
+        "source": "vosk",
+        "frequency_hz": 153.2,
+        "rms": 456,
+        "updated_at": 1778043848.8328474
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1778043850.1203759,
+      "timestamp_local": "2026-05-06 13:04:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the guard targets running",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043850.1203759,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1778043850.7708027,
+      "timestamp_local": "2026-05-06 13:04:10",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "the guard targets running",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043850.7708027,
+        "source": "final",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1778043852.060515,
+      "timestamp_local": "2026-05-06 13:04:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043852.060515,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1778043852.8680801,
+      "timestamp_local": "2026-05-06 13:04:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043852.8680801,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1778043853.1263397,
+      "timestamp_local": "2026-05-06 13:04:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you checking",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043853.1263397,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1778043853.4830687,
+      "timestamp_local": "2026-05-06 13:04:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043853.4830687,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1778043853.8760471,
+      "timestamp_local": "2026-05-06 13:04:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043853.8760471,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1778043854.128831,
+      "timestamp_local": "2026-05-06 13:04:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual overlay",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043854.128831,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1778043854.3723967,
+      "timestamp_local": "2026-05-06 13:04:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043854.3723967,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1778043854.8668222,
+      "timestamp_local": "2026-05-06 13:04:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound announcements",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043854.8668222,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1778043855.1230156,
+      "timestamp_local": "2026-05-06 13:04:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound of threat",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043855.1230156,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1778043855.625552,
+      "timestamp_local": "2026-05-06 13:04:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound of threat scores",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043855.625552,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1778043856.3803475,
+      "timestamp_local": "2026-05-06 13:04:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound of threat",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043856.3803475,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1778043856.62597,
+      "timestamp_local": "2026-05-06 13:04:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound of threat disable is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043856.62597,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 59,
+      "timestamp_epoch_s": 1778043856.8710315,
+      "timestamp_local": "2026-05-06 13:04:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound of threat disable is event blink",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043856.8710315,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 60,
+      "timestamp_epoch_s": 1778043857.0821407,
+      "timestamp_local": "2026-05-06 13:04:17",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 61,
+      "timestamp_epoch_s": 1778043857.1309083,
+      "timestamp_local": "2026-05-06 13:04:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound of threat disable is of of face",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043857.1309083,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 62,
+      "timestamp_epoch_s": 1778043857.3680375,
+      "timestamp_local": "2026-05-06 13:04:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound of threat disable is of of face id",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043857.3680375,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 63,
+      "timestamp_epoch_s": 1778043858.205319,
+      "timestamp_local": "2026-05-06 13:04:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound of threat disable is of of face id current",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043858.205319,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 64,
+      "timestamp_epoch_s": 1778043858.3740246,
+      "timestamp_local": "2026-05-06 13:04:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound of threat disable is of of face id current status",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043858.3740246,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 65,
+      "timestamp_epoch_s": 1778043859.4081829,
+      "timestamp_local": "2026-05-06 13:04:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alion who are you guard detection on visual sound of threat disable is of of face id current status guarding mode",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043859.4081829,
+        "source": "vosk",
+        "frequency_hz": 126.9,
+        "rms": 226,
+        "updated_at": 1778043850.1118643
+      }
+    },
+    {
+      "id": 66,
+      "timestamp_epoch_s": 1778043859.7344556,
+      "timestamp_local": "2026-05-06 13:04:19",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 67,
+      "timestamp_epoch_s": 1778043862.1554153,
+      "timestamp_local": "2026-05-06 13:04:22",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion who are you guard detection on visual sound of threat disable is of of face id current status guarding",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043862.1554153,
+        "source": "final",
+        "frequency_hz": 78.0,
+        "rms": 595,
+        "updated_at": 1778043859.9019544
+      }
+    },
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1778043862.5394957,
+      "timestamp_local": "2026-05-06 13:04:22",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion who are you guard detection on visual sound of threat disable is of of face id current status guarding",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1778043863.1248682,
+      "timestamp_local": "2026-05-06 13:04:23",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Assistant update. Assistant [Deterministic fallback / gpt-oss:20b] Parsed Intent: - action=none confidence=1.00 clarification=False I am Elion Mosk, or Elion for short, the AI runtime assistant for Smart Sentry. I was created by GM Labs as a personal project by Gino. Right now, I provide live runtime awareness and operator support inside the running app: I can analyze current behavior, explain what the system is doing, surface likely causes when something is not loading, handle supported local control commands, and apply supported setting updates while keeping replies grounded in real runtime state. I also assist with face, tracking, trigger, guard, and assistant-related diagnostics using the app's current telemetry and configuration. Some areas are still a work in progress, and this assistant is actively evolving. Planned future capabilities include deeper autonomous diagnostics, smarter cross-subsystem fault correlation, broader natural-language command coverage, more proactive safety checks, richer memory/context handling across longer sessions, improved multimodal understanding, and tighter integration with future Smart Sentry hardware and automation workflows. I stay grounded in the running app and its supported controls. I do not invent hardware state or pretend unsupported actions already happened. I am actively improving while remaining grounded in what the app is actually doing now.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": true
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1778043863.2661147,
+      "timestamp_local": "2026-05-06 13:04:23",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "who are you",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043863.2661147,
+        "source": "final",
+        "frequency_hz": 78.0,
+        "rms": 595,
+        "updated_at": 1778043859.9019544
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1778043863.5227053,
+      "timestamp_local": "2026-05-06 13:04:23",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "who are you",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1778043863.8294048,
+      "timestamp_local": "2026-05-06 13:04:23",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Assistant update. Assistant [Deterministic fallback / gpt-oss:20b] Parsed Intent: - action=none confidence=1.00 clarification=False I am Elion Mosk, Elion for short, Smart Sentry's runtime assistant built by GM Labs as Gino's personal project. I handle live analysis, diagnostics, and supported runtime commands.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": true
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1778043864.7373388,
+      "timestamp_local": "2026-05-06 13:04:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043864.7373388,
+        "source": "vosk",
+        "frequency_hz": 78.0,
+        "rms": 595,
+        "updated_at": 1778043859.9019544
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1778043864.761873,
+      "timestamp_local": "2026-05-06 13:04:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the pan",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043864.761873,
+        "source": "vosk",
+        "frequency_hz": 78.0,
+        "rms": 595,
+        "updated_at": 1778043859.9019544
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1778043864.8372774,
+      "timestamp_local": "2026-05-06 13:04:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the pan commands",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043864.8372774,
+        "source": "vosk",
+        "frequency_hz": 78.0,
+        "rms": 595,
+        "updated_at": 1778043859.9019544
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1778043865.060742,
+      "timestamp_local": "2026-05-06 13:04:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the pan command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043865.060742,
+        "source": "vosk",
+        "frequency_hz": 78.0,
+        "rms": 595,
+        "updated_at": 1778043859.9019544
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1778043865.3121958,
+      "timestamp_local": "2026-05-06 13:04:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the pan command tuning",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043865.3121958,
+        "source": "vosk",
+        "frequency_hz": 78.0,
+        "rms": 595,
+        "updated_at": 1778043859.9019544
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1778043865.563989,
+      "timestamp_local": "2026-05-06 13:04:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the pan command a joke",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043865.563989,
+        "source": "vosk",
+        "frequency_hz": 78.0,
+        "rms": 595,
+        "updated_at": 1778043859.9019544
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1778043877.833268,
+      "timestamp_local": "2026-05-06 13:04:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "inversion no confidence",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043877.833268,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 80,
+      "timestamp_epoch_s": 1778043878.5313752,
+      "timestamp_local": "2026-05-06 13:04:38",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "inversion no confidence is the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043878.5313752,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 81,
+      "timestamp_epoch_s": 1778043879.054141,
+      "timestamp_local": "2026-05-06 13:04:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "inversion no confidence is the one pir",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043879.054141,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 82,
+      "timestamp_epoch_s": 1778043879.0656607,
+      "timestamp_local": "2026-05-06 13:04:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "inversion no confidence is the one pir sensors",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043879.0656607,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 83,
+      "timestamp_epoch_s": 1778043879.5301197,
+      "timestamp_local": "2026-05-06 13:04:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "inversion no confidence is the one pir sensors lion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043879.5301197,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1778043879.77903,
+      "timestamp_local": "2026-05-06 13:04:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "inversion no confidence is the one pir sensors lighting of the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043879.77903,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1778043880.2791677,
+      "timestamp_local": "2026-05-06 13:04:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "inversion no confidence is the one pir sensors lighting of the ai",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043880.2791677,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1778043881.0550044,
+      "timestamp_local": "2026-05-06 13:04:41",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "inversion no confidence is the one pir sensors lighting of the aim",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043881.0550044,
+        "source": "final",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1778043905.537861,
+      "timestamp_local": "2026-05-06 13:05:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043905.537861,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1778043906.0305884,
+      "timestamp_local": "2026-05-06 13:05:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active targets running",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043906.0305884,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1778043906.2905772,
+      "timestamp_local": "2026-05-06 13:05:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active targets running known",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043906.2905772,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1778043906.530677,
+      "timestamp_local": "2026-05-06 13:05:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "standby guard no active targets running no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043906.530677,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 91,
+      "timestamp_epoch_s": 1778043907.4127948,
+      "timestamp_local": "2026-05-06 13:05:07",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "standby guard no active targets running no",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043907.4127948,
+        "source": "final",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 92,
+      "timestamp_epoch_s": 1778043909.533573,
+      "timestamp_local": "2026-05-06 13:05:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043909.533573,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 93,
+      "timestamp_epoch_s": 1778043911.1226578,
+      "timestamp_local": "2026-05-06 13:05:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking known one target",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043911.1226578,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 94,
+      "timestamp_epoch_s": 1778043911.6217668,
+      "timestamp_local": "2026-05-06 13:05:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking known one target view",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043911.6217668,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 95,
+      "timestamp_epoch_s": 1778043911.8825855,
+      "timestamp_local": "2026-05-06 13:05:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking known one target view keyboard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043911.8825855,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 96,
+      "timestamp_epoch_s": 1778043912.1278198,
+      "timestamp_local": "2026-05-06 13:05:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking known one target view pir guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043912.1278198,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 97,
+      "timestamp_epoch_s": 1778043912.3759942,
+      "timestamp_local": "2026-05-06 13:05:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking known one target view pir guard hey",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043912.3759942,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 98,
+      "timestamp_epoch_s": 1778043912.8716333,
+      "timestamp_local": "2026-05-06 13:05:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking known one target view pir guard hey position",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043912.8716333,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 99,
+      "timestamp_epoch_s": 1778043913.3745031,
+      "timestamp_local": "2026-05-06 13:05:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking known one target view pir guard hey position no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043913.3745031,
+        "source": "vosk",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 100,
+      "timestamp_epoch_s": 1778043914.8678365,
+      "timestamp_local": "2026-05-06 13:05:14",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "tracking known one target in view pir guard hey position no",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043914.8678365,
+        "source": "final",
+        "frequency_hz": 128.9,
+        "rms": 458,
+        "updated_at": 1778043876.0229776
+      }
+    },
+    {
+      "id": 101,
+      "timestamp_epoch_s": 1778043917.9053729,
+      "timestamp_local": "2026-05-06 13:05:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "human voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043917.9053729,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 102,
+      "timestamp_epoch_s": 1778043919.4254155,
+      "timestamp_local": "2026-05-06 13:05:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for human voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043919.4254155,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 103,
+      "timestamp_epoch_s": 1778043919.6563342,
+      "timestamp_local": "2026-05-06 13:05:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop running",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043919.6563342,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 104,
+      "timestamp_epoch_s": 1778043920.5565038,
+      "timestamp_local": "2026-05-06 13:05:20",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "video loop running",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043920.5565038,
+        "source": "final",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 105,
+      "timestamp_epoch_s": 1778043920.6499367,
+      "timestamp_local": "2026-05-06 13:05:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ml",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043920.6499367,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 106,
+      "timestamp_epoch_s": 1778043920.905257,
+      "timestamp_local": "2026-05-06 13:05:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ml scoring",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043920.905257,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 107,
+      "timestamp_epoch_s": 1778043921.1583939,
+      "timestamp_local": "2026-05-06 13:05:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ml refinement",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043921.1583939,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 108,
+      "timestamp_epoch_s": 1778043921.407117,
+      "timestamp_local": "2026-05-06 13:05:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ml",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043921.407117,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 109,
+      "timestamp_epoch_s": 1778043922.4852042,
+      "timestamp_local": "2026-05-06 13:05:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for human",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043922.4852042,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 110,
+      "timestamp_epoch_s": 1778043922.4958882,
+      "timestamp_local": "2026-05-06 13:05:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for human voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043922.4958882,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 111,
+      "timestamp_epoch_s": 1778043923.4625335,
+      "timestamp_local": "2026-05-06 13:05:23",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "ml human",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043923.4625335,
+        "source": "final",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 112,
+      "timestamp_epoch_s": 1778043928.1515858,
+      "timestamp_local": "2026-05-06 13:05:28",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "logging",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043928.1515858,
+        "source": "final",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 113,
+      "timestamp_epoch_s": 1778043934.0519757,
+      "timestamp_local": "2026-05-06 13:05:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking no one targets",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043934.0519757,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 114,
+      "timestamp_epoch_s": 1778043934.575857,
+      "timestamp_local": "2026-05-06 13:05:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "tracking no one targets in view",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778043934.575857,
+        "source": "vosk",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    },
+    {
+      "id": 115,
+      "timestamp_epoch_s": 1778043935.402905,
+      "timestamp_local": "2026-05-06 13:05:35",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "tracking no one targets in view",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778043935.402905,
+        "source": "final",
+        "frequency_hz": 74.0,
+        "rms": 282,
+        "updated_at": 1778043915.3938632
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/conversation_exports/sentry_v2_runtime_conversation_20260506_130545.json",
+    "markdown": "snapshots/conversation_exports/sentry_v2_runtime_conversation_20260506_130545.md"
+  }
+}

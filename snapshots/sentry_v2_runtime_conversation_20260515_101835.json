@@ -1,0 +1,1850 @@
+{
+  "generated_at_local": "2026-05-15 10:18:35",
+  "generated_at_epoch_s": 1778811515.8603468,
+  "entry_count": 95,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 29,
+    "operator": 64
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 29,
+    "voice_transcript_partial": 60,
+    "voice_transcript_final": 4
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 93
+  },
+  "voice_transcript_summary": {
+    "partial_count": 60,
+    "final_count": 4,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "is any player and so i phone right now there is no manage like going to get us",
+  "latest_operator_request": "is any player and so i phone right now there is no manage like going to get us",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup.",
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1778811391.2469954,
+      "timestamp_local": "2026-05-15 10:16:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811391.2469954,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1778811392.2476833,
+      "timestamp_local": "2026-05-15 10:16:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811392.2476833,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1778811392.2665458,
+      "timestamp_local": "2026-05-15 10:16:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my of the no major are going to go",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811392.2665458,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1778811392.998631,
+      "timestamp_local": "2026-05-15 10:16:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811392.998631,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1778811407.2483125,
+      "timestamp_local": "2026-05-15 10:16:47",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811407.2483125,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1778811407.7490513,
+      "timestamp_local": "2026-05-15 10:16:47",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811407.7490513,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1778811408.7481453,
+      "timestamp_local": "2026-05-15 10:16:48",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811408.7481453,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 91,
+      "timestamp_epoch_s": 1778811409.0292609,
+      "timestamp_local": "2026-05-15 10:16:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my of the no major are going to go steelers",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811409.0292609,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 92,
+      "timestamp_epoch_s": 1778811409.498524,
+      "timestamp_local": "2026-05-15 10:16:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811409.498524,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 93,
+      "timestamp_epoch_s": 1778811469.2520294,
+      "timestamp_local": "2026-05-15 10:17:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811469.2520294,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 94,
+      "timestamp_epoch_s": 1778811469.2995086,
+      "timestamp_local": "2026-05-15 10:17:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my of the no major are going to go steal his workshop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811469.2995086,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 95,
+      "timestamp_epoch_s": 1778811469.7518868,
+      "timestamp_local": "2026-05-15 10:17:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811469.7518868,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778811347.460499,
+      "timestamp_local": "2026-05-15 10:15:47",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778811347.462002,
+      "timestamp_local": "2026-05-15 10:15:47",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778811352.8762977,
+      "timestamp_local": "2026-05-15 10:15:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811352.8762977,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778811353.4035358,
+      "timestamp_local": "2026-05-15 10:15:53",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811353.4035358,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1603,
+        "updated_at": 1778811353.4035358
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778811356.8489757,
+      "timestamp_local": "2026-05-15 10:15:56",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811356.8489757,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1603,
+        "updated_at": 1778811353.4035358
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778811356.8489757,
+      "timestamp_local": "2026-05-15 10:15:56",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811356.8489757,
+        "source": "vosk",
+        "frequency_hz": 258.0,
+        "rms": 1603,
+        "updated_at": 1778811353.4035358
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778811358.3922606,
+      "timestamp_local": "2026-05-15 10:15:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811358.3922606,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778811358.5243535,
+      "timestamp_local": "2026-05-15 10:15:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no major",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811358.5243535,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778811358.7359579,
+      "timestamp_local": "2026-05-15 10:15:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no page",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811358.7359579,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778811358.9927728,
+      "timestamp_local": "2026-05-15 10:15:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no page like i'm",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811358.9927728,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778811359.1885378,
+      "timestamp_local": "2026-05-15 10:15:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no page like",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811359.1885378,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778811359.4103158,
+      "timestamp_local": "2026-05-15 10:15:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no page like i'm",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811359.4103158,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778811359.629365,
+      "timestamp_local": "2026-05-15 10:15:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no page are going to go",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811359.629365,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778811360.1137362,
+      "timestamp_local": "2026-05-15 10:16:00",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no page or so ago tandem of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811360.1137362,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778811360.25789,
+      "timestamp_local": "2026-05-15 10:16:00",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no page or so ago tandem of of a lot",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811360.25789,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778811360.39392,
+      "timestamp_local": "2026-05-15 10:16:00",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no page or so ago tandem of i'm gonna",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811360.39392,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778811361.1354766,
+      "timestamp_local": "2026-05-15 10:16:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no page or so ago tandem ah yes",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811361.1354766,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778811361.4072924,
+      "timestamp_local": "2026-05-15 10:16:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "there's no page or so ago tandem a full scholarship",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811361.4072924,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778811362.6670318,
+      "timestamp_local": "2026-05-15 10:16:02",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "there s no page like i m so ago tandem hello yes",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778811362.6670318,
+        "source": "final",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778811362.9688275,
+      "timestamp_local": "2026-05-15 10:16:02",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811362.9688275,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778811363.0316317,
+      "timestamp_local": "2026-05-15 10:16:03",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811363.0316317,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 1044,
+        "updated_at": 1778811357.1013498
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778811363.282236,
+      "timestamp_local": "2026-05-15 10:16:03",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is that you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811363.282236,
+        "source": "vosk",
+        "frequency_hz": 178.0,
+        "rms": 712,
+        "updated_at": 1778811363.2192447
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778811364.520348,
+      "timestamp_local": "2026-05-15 10:16:04",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "is that you",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778811364.520348,
+        "source": "final",
+        "frequency_hz": 178.0,
+        "rms": 712,
+        "updated_at": 1778811363.2192447
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778811364.6272044,
+      "timestamp_local": "2026-05-15 10:16:04",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811364.6272044,
+        "source": "vosk",
+        "frequency_hz": 178.0,
+        "rms": 712,
+        "updated_at": 1778811363.2192447
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778811364.8008003,
+      "timestamp_local": "2026-05-15 10:16:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "really",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811364.8008003,
+        "source": "vosk",
+        "frequency_hz": 178.0,
+        "rms": 712,
+        "updated_at": 1778811363.2192447
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778811365.7934415,
+      "timestamp_local": "2026-05-15 10:16:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "really determined to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811365.7934415,
+        "source": "vosk",
+        "frequency_hz": 178.0,
+        "rms": 712,
+        "updated_at": 1778811363.2192447
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778811366.0034153,
+      "timestamp_local": "2026-05-15 10:16:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "really determined to go",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811366.0034153,
+        "source": "vosk",
+        "frequency_hz": 178.0,
+        "rms": 712,
+        "updated_at": 1778811363.2192447
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1778811366.9808297,
+      "timestamp_local": "2026-05-15 10:16:06",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "really determined to go",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778811366.9808297,
+        "source": "final",
+        "frequency_hz": 178.0,
+        "rms": 712,
+        "updated_at": 1778811363.2192447
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1778811367.2588341,
+      "timestamp_local": "2026-05-15 10:16:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811367.2588341,
+        "source": "vosk",
+        "frequency_hz": 178.0,
+        "rms": 712,
+        "updated_at": 1778811363.2192447
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1778811369.3098748,
+      "timestamp_local": "2026-05-15 10:16:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811369.3098748,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1778811369.5284913,
+      "timestamp_local": "2026-05-15 10:16:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811369.5284913,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1778811369.7895215,
+      "timestamp_local": "2026-05-15 10:16:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811369.7895215,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1778811370.323361,
+      "timestamp_local": "2026-05-15 10:16:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811370.323361,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1778811370.7598948,
+      "timestamp_local": "2026-05-15 10:16:10",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811370.7598948,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1778811371.0096476,
+      "timestamp_local": "2026-05-15 10:16:11",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811371.0096476,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1778811371.064065,
+      "timestamp_local": "2026-05-15 10:16:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player in psychology",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811371.064065,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1778811371.3108666,
+      "timestamp_local": "2026-05-15 10:16:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and sign up on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811371.3108666,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1778811371.7601042,
+      "timestamp_local": "2026-05-15 10:16:11",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811371.7601042,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1778811372.760066,
+      "timestamp_local": "2026-05-15 10:16:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811372.760066,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1778811372.8356671,
+      "timestamp_local": "2026-05-15 10:16:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i phone right now",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811372.8356671,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1778811373.0396287,
+      "timestamp_local": "2026-05-15 10:16:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i phone right now but",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811373.0396287,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1778811373.5544238,
+      "timestamp_local": "2026-05-15 10:16:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i don't want another",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811373.5544238,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1778811373.8021994,
+      "timestamp_local": "2026-05-15 10:16:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i phone right now that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811373.8021994,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1778811374.0208015,
+      "timestamp_local": "2026-05-15 10:16:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i phone right now there is no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811374.0208015,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1778811374.2722847,
+      "timestamp_local": "2026-05-15 10:16:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i phone right now there is no major",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811374.2722847,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1778811374.5548863,
+      "timestamp_local": "2026-05-15 10:16:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i phone right now there is no manage",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811374.5548863,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1778811374.807203,
+      "timestamp_local": "2026-05-15 10:16:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i phone right now there is no manage like going to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811374.807203,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1778811375.260087,
+      "timestamp_local": "2026-05-15 10:16:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811375.260087,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1778811376.5096095,
+      "timestamp_local": "2026-05-15 10:16:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811376.5096095,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1778811376.6101806,
+      "timestamp_local": "2026-05-15 10:16:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i phone right now there is no manage like going to get",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811376.6101806,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1778811376.7879653,
+      "timestamp_local": "2026-05-15 10:16:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i phone right now there is no manage like going to get yourself",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811376.7879653,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1778811377.0397232,
+      "timestamp_local": "2026-05-15 10:16:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i phone right now there is no manage like going to get us",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811377.0397232,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1778811377.7932038,
+      "timestamp_local": "2026-05-15 10:16:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "is any player and so i phone right now there is no manage like going to get us going",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811377.7932038,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1778811378.3590574,
+      "timestamp_local": "2026-05-15 10:16:18",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "is any player and so i phone right now there is no manage like going to get us",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778811378.3590574,
+        "source": "final",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1778811379.2460294,
+      "timestamp_local": "2026-05-15 10:16:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811379.2460294,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1778811379.2677448,
+      "timestamp_local": "2026-05-15 10:16:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811379.2677448,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1778811379.292212,
+      "timestamp_local": "2026-05-15 10:16:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like me",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811379.292212,
+        "source": "vosk",
+        "frequency_hz": 172.0,
+        "rms": 317,
+        "updated_at": 1778811367.5094743
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1778811379.7632122,
+      "timestamp_local": "2026-05-15 10:16:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811379.7632122,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 59,
+      "timestamp_epoch_s": 1778811380.4965806,
+      "timestamp_local": "2026-05-15 10:16:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811380.4965806,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 60,
+      "timestamp_epoch_s": 1778811380.9963188,
+      "timestamp_local": "2026-05-15 10:16:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811380.9963188,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 61,
+      "timestamp_epoch_s": 1778811381.0599475,
+      "timestamp_local": "2026-05-15 10:16:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being in a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811381.0599475,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 62,
+      "timestamp_epoch_s": 1778811381.3207004,
+      "timestamp_local": "2026-05-15 10:16:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being relayed through",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811381.3207004,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 63,
+      "timestamp_epoch_s": 1778811381.5604837,
+      "timestamp_local": "2026-05-15 10:16:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811381.5604837,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 64,
+      "timestamp_epoch_s": 1778811381.9958718,
+      "timestamp_local": "2026-05-15 10:16:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811381.9958718,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 65,
+      "timestamp_epoch_s": 1778811384.996902,
+      "timestamp_local": "2026-05-15 10:16:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811384.996902,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 66,
+      "timestamp_epoch_s": 1778811385.2623198,
+      "timestamp_local": "2026-05-15 10:16:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being an eight year ago because",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811385.2623198,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 67,
+      "timestamp_epoch_s": 1778811385.5154529,
+      "timestamp_local": "2026-05-15 10:16:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811385.5154529,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1778811385.767909,
+      "timestamp_local": "2026-05-15 10:16:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player instead",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811385.767909,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1778811386.0222316,
+      "timestamp_local": "2026-05-15 10:16:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811386.0222316,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1778811386.2669976,
+      "timestamp_local": "2026-05-15 10:16:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player and so",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811386.2669976,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1778811386.7764306,
+      "timestamp_local": "2026-05-15 10:16:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player inside of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811386.7764306,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1778811387.0723147,
+      "timestamp_local": "2026-05-15 10:16:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811387.0723147,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1778811387.320033,
+      "timestamp_local": "2026-05-15 10:16:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player inside and two",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811387.320033,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1778811387.7902606,
+      "timestamp_local": "2026-05-15 10:16:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811387.7902606,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1778811388.2469842,
+      "timestamp_local": "2026-05-15 10:16:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811388.2469842,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1778811388.7470498,
+      "timestamp_local": "2026-05-15 10:16:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811388.7470498,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1778811388.76408,
+      "timestamp_local": "2026-05-15 10:16:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811388.76408,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1778811389.5386834,
+      "timestamp_local": "2026-05-15 10:16:29",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now i'm i'm",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811389.5386834,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1778811389.7927635,
+      "timestamp_local": "2026-05-15 10:16:29",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my of the know",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811389.7927635,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 80,
+      "timestamp_epoch_s": 1778811390.008321,
+      "timestamp_local": "2026-05-15 10:16:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my of the no major",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811390.008321,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 81,
+      "timestamp_epoch_s": 1778811390.266866,
+      "timestamp_local": "2026-05-15 10:16:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my of the no major like",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811390.266866,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 82,
+      "timestamp_epoch_s": 1778811390.5287166,
+      "timestamp_local": "2026-05-15 10:16:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my of the no major like i'm",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811390.5287166,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 83,
+      "timestamp_epoch_s": 1778811390.766094,
+      "timestamp_local": "2026-05-15 10:16:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my of the no major like i'm so",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811390.766094,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1778811391.2469954,
+      "timestamp_local": "2026-05-15 10:16:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811391.2469954,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1778811392.2476833,
+      "timestamp_local": "2026-05-15 10:16:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811392.2476833,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1778811392.2665458,
+      "timestamp_local": "2026-05-15 10:16:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my of the no major are going to go",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811392.2665458,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1778811392.998631,
+      "timestamp_local": "2026-05-15 10:16:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811392.998631,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1778811407.2483125,
+      "timestamp_local": "2026-05-15 10:16:47",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811407.2483125,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1778811407.7490513,
+      "timestamp_local": "2026-05-15 10:16:47",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811407.7490513,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1778811408.7481453,
+      "timestamp_local": "2026-05-15 10:16:48",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811408.7481453,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 91,
+      "timestamp_epoch_s": 1778811409.0292609,
+      "timestamp_local": "2026-05-15 10:16:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my of the no major are going to go steelers",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811409.0292609,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 92,
+      "timestamp_epoch_s": 1778811409.498524,
+      "timestamp_local": "2026-05-15 10:16:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811409.498524,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 93,
+      "timestamp_epoch_s": 1778811469.2520294,
+      "timestamp_local": "2026-05-15 10:17:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811469.2520294,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 94,
+      "timestamp_epoch_s": 1778811469.2995086,
+      "timestamp_local": "2026-05-15 10:17:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "you like being late july the go be player insight into on right now my of the no major are going to go steal his workshop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778811469.2995086,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    },
+    {
+      "id": 95,
+      "timestamp_epoch_s": 1778811469.7518868,
+      "timestamp_local": "2026-05-15 10:17:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778811469.7518868,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 1604,
+        "updated_at": 1778811379.745279
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260515_101835.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260515_101835.md"
+  }
+}

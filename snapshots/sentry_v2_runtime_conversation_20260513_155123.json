@@ -1,0 +1,655 @@
+{
+  "generated_at_local": "2026-05-13 15:51:23",
+  "generated_at_epoch_s": 1778658683.4838629,
+  "entry_count": 27,
+  "counts_by_role": {
+    "assistant": 5,
+    "system": 1,
+    "operator": 21
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 14,
+    "voice_transcript_final": 4,
+    "voice_command": 3,
+    "spoken_confirmation": 3
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 25
+  },
+  "voice_transcript_summary": {
+    "partial_count": 14,
+    "final_count": 4,
+    "voice_command_count": 3,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "sentry do yourself",
+  "latest_operator_request": "turn use yourself preset to rest yourself",
+  "latest_assistant_message": "I heard the request, but only the registered operator can change Smart Sentry settings.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778658643.186751,
+      "timestamp_local": "2026-05-13 15:50:43",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion turn use yourself preset to rest yourself",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778658643.186751,
+        "source": "final",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778658643.6322815,
+      "timestamp_local": "2026-05-13 15:50:43",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "turn use yourself preset to rest yourself",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778658644.0910954,
+      "timestamp_local": "2026-05-13 15:50:44",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I could not find that coordinated profile. Say list profiles if you want the available options.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778658655.9321828,
+      "timestamp_local": "2026-05-13 15:50:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sentry do",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658655.9321828,
+        "source": "vosk",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778658656.4234922,
+      "timestamp_local": "2026-05-13 15:50:56",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sentry do shortcuts",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658656.4234922,
+        "source": "vosk",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778658657.822519,
+      "timestamp_local": "2026-05-13 15:50:57",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "sentry do shortcuts",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778658657.822519,
+        "source": "final",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778658666.999485,
+      "timestamp_local": "2026-05-13 15:51:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sentry do yourself",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658666.999485,
+        "source": "vosk",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778658668.2756047,
+      "timestamp_local": "2026-05-13 15:51:08",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "sentry do yourself",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778658668.2756047,
+        "source": "final",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778658673.4928493,
+      "timestamp_local": "2026-05-13 15:51:13",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "turn use yourself preset to rest yourself",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778658673.8971083,
+      "timestamp_local": "2026-05-13 15:51:13",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I heard the request, but only the registered operator can change Smart Sentry settings.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778658680.2481966,
+      "timestamp_local": "2026-05-13 15:51:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sentry do yourself",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658680.2481966,
+        "source": "vosk",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778658680.677546,
+      "timestamp_local": "2026-05-13 15:51:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sentry do yourself alion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658680.677546,
+        "source": "vosk",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778654826.2215896,
+      "timestamp_local": "2026-05-13 14:47:06",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778654826.2225935,
+      "timestamp_local": "2026-05-13 14:47:06",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778654828.6711633,
+      "timestamp_local": "2026-05-13 14:47:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778654828.6711633,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778658624.5788026,
+      "timestamp_local": "2026-05-13 15:50:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alien",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658624.5788026,
+        "source": "vosk",
+        "frequency_hz": 177.4,
+        "rms": 2234,
+        "updated_at": 1778658611.0793066
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778658626.4149137,
+      "timestamp_local": "2026-05-13 15:50:26",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778658626.4149137,
+        "source": "final",
+        "frequency_hz": 177.4,
+        "rms": 2234,
+        "updated_at": 1778658611.0793066
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778658626.940881,
+      "timestamp_local": "2026-05-13 15:50:26",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "elion",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778658627.6029203,
+      "timestamp_local": "2026-05-13 15:50:27",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I am here and ready. Go ahead.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778658632.4252474,
+      "timestamp_local": "2026-05-13 15:50:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "elliot",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658632.4252474,
+        "source": "vosk",
+        "frequency_hz": 177.4,
+        "rms": 2234,
+        "updated_at": 1778658611.0793066
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778658632.97329,
+      "timestamp_local": "2026-05-13 15:50:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "elliot turn gesture status",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658632.97329,
+        "source": "vosk",
+        "frequency_hz": 177.4,
+        "rms": 2234,
+        "updated_at": 1778658611.0793066
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778658639.988287,
+      "timestamp_local": "2026-05-13 15:50:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "elliot turn use yourself",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658639.988287,
+        "source": "vosk",
+        "frequency_hz": 177.4,
+        "rms": 2234,
+        "updated_at": 1778658611.0793066
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778658640.185675,
+      "timestamp_local": "2026-05-13 15:50:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "elliot turn use yourself alien",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658640.185675,
+        "source": "vosk",
+        "frequency_hz": 320.0,
+        "rms": 1856,
+        "updated_at": 1778658640.1711519
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778658640.8541038,
+      "timestamp_local": "2026-05-13 15:50:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "elliot turn use yourself alien blink",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658640.8541038,
+        "source": "vosk",
+        "frequency_hz": 320.0,
+        "rms": 1856,
+        "updated_at": 1778658640.1711519
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778658640.9389813,
+      "timestamp_local": "2026-05-13 15:50:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "elliot turn use yourself alien preset",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658640.9389813,
+        "source": "vosk",
+        "frequency_hz": 320.0,
+        "rms": 1856,
+        "updated_at": 1778658640.1711519
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778658641.1938484,
+      "timestamp_local": "2026-05-13 15:50:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "elliot turn use yourself alien preset to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658641.1938484,
+        "source": "vosk",
+        "frequency_hz": 320.0,
+        "rms": 1856,
+        "updated_at": 1778658640.1711519
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778658641.6745412,
+      "timestamp_local": "2026-05-13 15:50:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "elliot turn use yourself alien preset to rest yourself",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658641.6745412,
+        "source": "vosk",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778658643.186751,
+      "timestamp_local": "2026-05-13 15:50:43",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "elion turn use yourself preset to rest yourself",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778658643.186751,
+        "source": "final",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778658643.6322815,
+      "timestamp_local": "2026-05-13 15:50:43",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "turn use yourself preset to rest yourself",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778658644.0910954,
+      "timestamp_local": "2026-05-13 15:50:44",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I could not find that coordinated profile. Say list profiles if you want the available options.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778658655.9321828,
+      "timestamp_local": "2026-05-13 15:50:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sentry do",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658655.9321828,
+        "source": "vosk",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778658656.4234922,
+      "timestamp_local": "2026-05-13 15:50:56",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sentry do shortcuts",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658656.4234922,
+        "source": "vosk",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778658657.822519,
+      "timestamp_local": "2026-05-13 15:50:57",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "sentry do shortcuts",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778658657.822519,
+        "source": "final",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778658666.999485,
+      "timestamp_local": "2026-05-13 15:51:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sentry do yourself",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658666.999485,
+        "source": "vosk",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778658668.2756047,
+      "timestamp_local": "2026-05-13 15:51:08",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "sentry do yourself",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778658668.2756047,
+        "source": "final",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778658673.4928493,
+      "timestamp_local": "2026-05-13 15:51:13",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "turn use yourself preset to rest yourself",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778658673.8971083,
+      "timestamp_local": "2026-05-13 15:51:13",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "I heard the request, but only the registered operator can change Smart Sentry settings.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778658680.2481966,
+      "timestamp_local": "2026-05-13 15:51:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sentry do yourself",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658680.2481966,
+        "source": "vosk",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778658680.677546,
+      "timestamp_local": "2026-05-13 15:51:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sentry do yourself alion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778658680.677546,
+        "source": "vosk",
+        "frequency_hz": 332.0,
+        "rms": 1761,
+        "updated_at": 1778658641.6664565
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260513_155123.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260513_155123.md"
+  }
+}

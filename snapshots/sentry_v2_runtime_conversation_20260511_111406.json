@@ -1,0 +1,290 @@
+{
+  "generated_at_local": "2026-05-11 11:14:06",
+  "generated_at_epoch_s": 1778469246.3201096,
+  "entry_count": 8,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 1,
+    "operator": 5
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 5
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 6
+  },
+  "voice_transcript_summary": {
+    "partial_count": 5,
+    "final_count": 0,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "",
+  "latest_operator_request": "",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778469127.6829276,
+      "timestamp_local": "2026-05-11 11:12:07",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778469127.6839287,
+      "timestamp_local": "2026-05-11 11:12:07",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778469129.459755,
+      "timestamp_local": "2026-05-11 11:12:09",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778469129.459755,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778469169.473684,
+      "timestamp_local": "2026-05-11 11:12:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on lion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778469169.473684,
+        "source": "vosk",
+        "frequency_hz": 156.0,
+        "rms": 914,
+        "updated_at": 1778469130.2393546
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778469169.4873664,
+      "timestamp_local": "2026-05-11 11:12:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778469169.4873664,
+        "source": "vosk",
+        "frequency_hz": 156.0,
+        "rms": 914,
+        "updated_at": 1778469130.2393546
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778469169.6380632,
+      "timestamp_local": "2026-05-11 11:12:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on no say that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778469169.6380632,
+        "source": "vosk",
+        "frequency_hz": 156.0,
+        "rms": 914,
+        "updated_at": 1778469130.2393546
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778469169.8890326,
+      "timestamp_local": "2026-05-11 11:12:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on no say the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778469169.8890326,
+        "source": "vosk",
+        "frequency_hz": 156.0,
+        "rms": 914,
+        "updated_at": 1778469130.2393546
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778469170.372802,
+      "timestamp_local": "2026-05-11 11:12:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on no say the connect",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778469170.372802,
+        "source": "vosk",
+        "frequency_hz": 156.0,
+        "rms": 914,
+        "updated_at": 1778469130.2393546
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778469127.6829276,
+      "timestamp_local": "2026-05-11 11:12:07",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778469127.6839287,
+      "timestamp_local": "2026-05-11 11:12:07",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778469129.459755,
+      "timestamp_local": "2026-05-11 11:12:09",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778469129.459755,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778469169.473684,
+      "timestamp_local": "2026-05-11 11:12:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on lion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778469169.473684,
+        "source": "vosk",
+        "frequency_hz": 156.0,
+        "rms": 914,
+        "updated_at": 1778469130.2393546
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778469169.4873664,
+      "timestamp_local": "2026-05-11 11:12:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on no",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778469169.4873664,
+        "source": "vosk",
+        "frequency_hz": 156.0,
+        "rms": 914,
+        "updated_at": 1778469130.2393546
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778469169.6380632,
+      "timestamp_local": "2026-05-11 11:12:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on no say that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778469169.6380632,
+        "source": "vosk",
+        "frequency_hz": 156.0,
+        "rms": 914,
+        "updated_at": 1778469130.2393546
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778469169.8890326,
+      "timestamp_local": "2026-05-11 11:12:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on no say the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778469169.8890326,
+        "source": "vosk",
+        "frequency_hz": 156.0,
+        "rms": 914,
+        "updated_at": 1778469130.2393546
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778469170.372802,
+      "timestamp_local": "2026-05-11 11:12:50",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry is on no say the connect",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778469170.372802,
+        "source": "vosk",
+        "frequency_hz": 156.0,
+        "rms": 914,
+        "updated_at": 1778469130.2393546
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260511_111406.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260511_111406.md"
+  }
+}

@@ -1,0 +1,996 @@
+{
+  "generated_at_local": "2026-05-14 13:14:16",
+  "generated_at_epoch_s": 1778735656.3745193,
+  "entry_count": 45,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 18,
+    "operator": 25
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 18,
+    "voice_transcript_partial": 25
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 43
+  },
+  "voice_transcript_summary": {
+    "partial_count": 25,
+    "final_count": 0,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "",
+  "latest_operator_request": "",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup.",
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1778733833.9313836,
+      "timestamp_local": "2026-05-14 12:43:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself as a on for ruining the wolf when the smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733833.9313836,
+        "source": "vosk",
+        "frequency_hz": 410.0,
+        "rms": 2111,
+        "updated_at": 1778733831.1614478
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1778733834.1963007,
+      "timestamp_local": "2026-05-14 12:43:54",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself as a on for ruining the wolf when the smarts and three",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733834.1963007,
+        "source": "vosk",
+        "frequency_hz": 410.0,
+        "rms": 2111,
+        "updated_at": 1778733831.1614478
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1778733834.6617746,
+      "timestamp_local": "2026-05-14 12:43:54",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733834.6617746,
+        "source": "vosk",
+        "frequency_hz": 410.0,
+        "rms": 2111,
+        "updated_at": 1778733831.1614478
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1778733835.1617496,
+      "timestamp_local": "2026-05-14 12:43:55",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733835.1617496,
+        "source": "vosk",
+        "frequency_hz": 416.0,
+        "rms": 3644,
+        "updated_at": 1778733835.1617496
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1778733835.661338,
+      "timestamp_local": "2026-05-14 12:43:55",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733835.661338,
+        "source": "vosk",
+        "frequency_hz": 416.0,
+        "rms": 3644,
+        "updated_at": 1778733835.1617496
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1778733836.4116046,
+      "timestamp_local": "2026-05-14 12:43:56",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733836.4116046,
+        "source": "vosk",
+        "frequency_hz": 416.0,
+        "rms": 3644,
+        "updated_at": 1778733835.1617496
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1778733842.2685726,
+      "timestamp_local": "2026-05-14 12:44:02",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "processing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733842.2685726,
+        "source": "state",
+        "frequency_hz": 396.0,
+        "rms": 2313,
+        "updated_at": 1778733836.9118416
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1778733842.2685726,
+      "timestamp_local": "2026-05-14 12:44:02",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733842.2685726,
+        "source": "state",
+        "frequency_hz": 396.0,
+        "rms": 2313,
+        "updated_at": 1778733836.9118416
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1778733845.5183442,
+      "timestamp_local": "2026-05-14 12:44:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733845.5183442,
+        "source": "vosk",
+        "frequency_hz": 396.0,
+        "rms": 2313,
+        "updated_at": 1778733836.9118416
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1778733846.2691698,
+      "timestamp_local": "2026-05-14 12:44:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733846.2691698,
+        "source": "vosk",
+        "frequency_hz": 396.0,
+        "rms": 2313,
+        "updated_at": 1778733836.9118416
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1778733846.5184968,
+      "timestamp_local": "2026-05-14 12:44:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733846.5184968,
+        "source": "vosk",
+        "frequency_hz": 418.0,
+        "rms": 7182,
+        "updated_at": 1778733846.5184968
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1778733847.7788346,
+      "timestamp_local": "2026-05-14 12:44:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733847.7788346,
+        "source": "vosk",
+        "frequency_hz": 370.2,
+        "rms": 4062,
+        "updated_at": 1778733847.2704043
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778733409.5026362,
+      "timestamp_local": "2026-05-14 12:36:49",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778733409.503636,
+      "timestamp_local": "2026-05-14 12:36:49",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778733411.3749363,
+      "timestamp_local": "2026-05-14 12:36:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733411.3749363,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778733412.3596463,
+      "timestamp_local": "2026-05-14 12:36:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733412.3596463,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778733413.904084,
+      "timestamp_local": "2026-05-14 12:36:53",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733413.904084,
+        "source": "vosk",
+        "frequency_hz": 173.9,
+        "rms": 1608,
+        "updated_at": 1778733412.8596623
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778733413.904084,
+      "timestamp_local": "2026-05-14 12:36:53",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733413.904084,
+        "source": "vosk",
+        "frequency_hz": 173.9,
+        "rms": 1608,
+        "updated_at": 1778733412.8596623
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778733418.4521623,
+      "timestamp_local": "2026-05-14 12:36:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733418.4521623,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778733418.7090557,
+      "timestamp_local": "2026-05-14 12:36:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shut",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733418.7090557,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778733418.9783854,
+      "timestamp_local": "2026-05-14 12:36:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733418.9783854,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778733419.1721072,
+      "timestamp_local": "2026-05-14 12:36:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733419.1721072,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778733419.9421847,
+      "timestamp_local": "2026-05-14 12:36:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733419.9421847,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778733420.16977,
+      "timestamp_local": "2026-05-14 12:37:00",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733420.16977,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778733420.696616,
+      "timestamp_local": "2026-05-14 12:37:00",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733420.696616,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778733421.1945682,
+      "timestamp_local": "2026-05-14 12:37:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733421.1945682,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778733421.432932,
+      "timestamp_local": "2026-05-14 12:37:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733421.432932,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778733421.6726966,
+      "timestamp_local": "2026-05-14 12:37:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733421.6726966,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778733421.9616258,
+      "timestamp_local": "2026-05-14 12:37:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733421.9616258,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778733422.1736195,
+      "timestamp_local": "2026-05-14 12:37:02",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733422.1736195,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778733422.429573,
+      "timestamp_local": "2026-05-14 12:37:02",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733422.429573,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778733422.6721587,
+      "timestamp_local": "2026-05-14 12:37:02",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733422.6721587,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778733422.9419403,
+      "timestamp_local": "2026-05-14 12:37:02",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help him",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733422.9419403,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778733423.1864586,
+      "timestamp_local": "2026-05-14 12:37:03",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733423.1864586,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778733423.4211595,
+      "timestamp_local": "2026-05-14 12:37:03",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself as",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733423.4211595,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778733423.6878524,
+      "timestamp_local": "2026-05-14 12:37:03",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself as a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733423.6878524,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778733423.9706624,
+      "timestamp_local": "2026-05-14 12:37:03",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself as a i'm from",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733423.9706624,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778733424.2085533,
+      "timestamp_local": "2026-05-14 12:37:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself as a on for ruining",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733424.2085533,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778733424.4262521,
+      "timestamp_local": "2026-05-14 12:37:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself as a on for ruining the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733424.4262521,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1778733424.9038663,
+      "timestamp_local": "2026-05-14 12:37:04",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733424.9038663,
+        "source": "vosk",
+        "frequency_hz": 243.9,
+        "rms": 401,
+        "updated_at": 1778733414.1606357
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1778733831.1614478,
+      "timestamp_local": "2026-05-14 12:43:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733831.1614478,
+        "source": "vosk",
+        "frequency_hz": 410.0,
+        "rms": 2111,
+        "updated_at": 1778733831.1614478
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1778733831.6617205,
+      "timestamp_local": "2026-05-14 12:43:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733831.6617205,
+        "source": "vosk",
+        "frequency_hz": 410.0,
+        "rms": 2111,
+        "updated_at": 1778733831.1614478
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1778733832.9155135,
+      "timestamp_local": "2026-05-14 12:43:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733832.9155135,
+        "source": "vosk",
+        "frequency_hz": 410.0,
+        "rms": 2111,
+        "updated_at": 1778733831.1614478
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1778733832.928287,
+      "timestamp_local": "2026-05-14 12:43:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself as a on for ruining the wolf",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733832.928287,
+        "source": "vosk",
+        "frequency_hz": 410.0,
+        "rms": 2111,
+        "updated_at": 1778733831.1614478
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1778733833.454256,
+      "timestamp_local": "2026-05-14 12:43:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself as a on for ruining the wolf when the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733833.454256,
+        "source": "vosk",
+        "frequency_hz": 410.0,
+        "rms": 2111,
+        "updated_at": 1778733831.1614478
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1778733833.9313836,
+      "timestamp_local": "2026-05-14 12:43:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself as a on for ruining the wolf when the smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733833.9313836,
+        "source": "vosk",
+        "frequency_hz": 410.0,
+        "rms": 2111,
+        "updated_at": 1778733831.1614478
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1778733834.1963007,
+      "timestamp_local": "2026-05-14 12:43:54",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for the i shots human civilization down so sanders travel back in time to find a group of rebels will help himself as a on for ruining the wolf when the smarts and three",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778733834.1963007,
+        "source": "vosk",
+        "frequency_hz": 410.0,
+        "rms": 2111,
+        "updated_at": 1778733831.1614478
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1778733834.6617746,
+      "timestamp_local": "2026-05-14 12:43:54",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733834.6617746,
+        "source": "vosk",
+        "frequency_hz": 410.0,
+        "rms": 2111,
+        "updated_at": 1778733831.1614478
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1778733835.1617496,
+      "timestamp_local": "2026-05-14 12:43:55",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733835.1617496,
+        "source": "vosk",
+        "frequency_hz": 416.0,
+        "rms": 3644,
+        "updated_at": 1778733835.1617496
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1778733835.661338,
+      "timestamp_local": "2026-05-14 12:43:55",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733835.661338,
+        "source": "vosk",
+        "frequency_hz": 416.0,
+        "rms": 3644,
+        "updated_at": 1778733835.1617496
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1778733836.4116046,
+      "timestamp_local": "2026-05-14 12:43:56",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733836.4116046,
+        "source": "vosk",
+        "frequency_hz": 416.0,
+        "rms": 3644,
+        "updated_at": 1778733835.1617496
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1778733842.2685726,
+      "timestamp_local": "2026-05-14 12:44:02",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "processing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733842.2685726,
+        "source": "state",
+        "frequency_hz": 396.0,
+        "rms": 2313,
+        "updated_at": 1778733836.9118416
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1778733842.2685726,
+      "timestamp_local": "2026-05-14 12:44:02",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733842.2685726,
+        "source": "state",
+        "frequency_hz": 396.0,
+        "rms": 2313,
+        "updated_at": 1778733836.9118416
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1778733845.5183442,
+      "timestamp_local": "2026-05-14 12:44:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733845.5183442,
+        "source": "vosk",
+        "frequency_hz": 396.0,
+        "rms": 2313,
+        "updated_at": 1778733836.9118416
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1778733846.2691698,
+      "timestamp_local": "2026-05-14 12:44:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733846.2691698,
+        "source": "vosk",
+        "frequency_hz": 396.0,
+        "rms": 2313,
+        "updated_at": 1778733836.9118416
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1778733846.5184968,
+      "timestamp_local": "2026-05-14 12:44:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733846.5184968,
+        "source": "vosk",
+        "frequency_hz": 418.0,
+        "rms": 7182,
+        "updated_at": 1778733846.5184968
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1778733847.7788346,
+      "timestamp_local": "2026-05-14 12:44:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778733847.7788346,
+        "source": "vosk",
+        "frequency_hz": 370.2,
+        "rms": 4062,
+        "updated_at": 1778733847.2704043
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260514_131416.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260514_131416.md"
+  }
+}

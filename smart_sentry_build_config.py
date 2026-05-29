@@ -38,6 +38,7 @@ def existing_include_files(include_models: bool) -> list[tuple[str, str]]:
     base_entries = [
         ("app/sentry_v2", "app/sentry_v2"),
         ("app/config", "app/config"),
+        ("models", "models"),
         ("app/LOGO.png", "app/LOGO.png"),
         ("smart_sentry_icon.ico", "smart_sentry_icon.ico"),
         ("requirements-sentry-v2-portable.txt", "requirements-sentry-v2-portable.txt"),
@@ -87,8 +88,16 @@ def build_packages(include_sklearn: bool, include_ytdlp: bool) -> list[str]:
         "cv2",
         "numpy",
         "serial",
+        "sounddevice",
+        "soundfile",
+        "language_tags",
+        "vosk",
+        "espeakng_loader",
         "ultralytics",
         "torch",
+        "edge_tts",
+        "kokoro_onnx",
+        "azure.cognitiveservices.speech",
     ]
     if include_sklearn:
         packages.append("sklearn")

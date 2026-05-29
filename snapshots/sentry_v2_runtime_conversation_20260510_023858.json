@@ -1,0 +1,145 @@
+{
+  "generated_at_local": "2026-05-10 02:38:58",
+  "generated_at_epoch_s": 1778351938.7177465,
+  "entry_count": 4,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 1
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "spoken_confirmation": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 2
+  },
+  "voice_transcript_summary": {
+    "partial_count": 0,
+    "final_count": 0,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "",
+  "latest_operator_request": "",
+  "latest_assistant_message": "The smart Sentry is online now. Say the command.",
+  "analysis_hints": [],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778351879.6404078,
+      "timestamp_local": "2026-05-10 02:37:59",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778351879.6419113,
+      "timestamp_local": "2026-05-10 02:37:59",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778351881.0993085,
+      "timestamp_local": "2026-05-10 02:38:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778351881.0993085,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778351918.5105693,
+      "timestamp_local": "2026-05-10 02:38:38",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "The smart Sentry is online now. Say the command.",
+      "metadata": {
+        "interrupt": true,
+        "assistant_output": false,
+        "spoken": false
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778351879.6404078,
+      "timestamp_local": "2026-05-10 02:37:59",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778351879.6419113,
+      "timestamp_local": "2026-05-10 02:37:59",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778351881.0993085,
+      "timestamp_local": "2026-05-10 02:38:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778351881.0993085,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778351918.5105693,
+      "timestamp_local": "2026-05-10 02:38:38",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "The smart Sentry is online now. Say the command.",
+      "metadata": {
+        "interrupt": true,
+        "assistant_output": false,
+        "spoken": false
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260510_023858.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260510_023858.md"
+  }
+}

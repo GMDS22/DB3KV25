@@ -11,19 +11,19 @@ If firmware is changed, this file MUST be updated in the same change.
 For the current Smart Sentry desktop app, treat the ESP32 WiFi plus Debug Board USB path as the live firmware contract unless a newer app-side release protocol explicitly says otherwise.
 
 - Current app topology: ESP32 WiFi + Debug Board USB
-- Current app firmware: [arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino](arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino)
+- Current app firmware: [arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino](arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino)
 - Current app note: Waveshare single-board files are on hold and are not part of the current Smart Sentry app runtime.
 
 ## Current Required Sketches
 
 1. USB Serial IO / Dual-Port IO (debug board still owns pan/tilt)
-- Current ESP32 sketch: [arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino](arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino)
+- Current ESP32 sketch: [arduino/DB3000_ESP32_IO_Telemetry_PIR/DB3000_ESP32_IO_Telemetry_PIR.ino](arduino/DB3000_ESP32_IO_Telemetry_PIR/DB3000_ESP32_IO_Telemetry_PIR.ino)
 - New Nano replacement sketch: [arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino](arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino)
 - Why: Both sketches satisfy the current serial IO contract for Smart Sentry's dual-USB mode, while the Nano variant replaces only the USB accessory board and keeps the existing desktop transport logic unchanged.
 - Used with: Smart Sentry v2 connection modes where the IO board is on serial tokens and the Debug Board remains on its own USB link.
 
 2. Full WiFi UDP Runtime (ESP32 receives motion + IO over UDP JSON)
-- Current sketch: [arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino](arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino)
+- Current sketch: [arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino](arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino)
 - Why: This is the current content-stable Smart Sentry WiFi baseline for the DB3000 IO board. It keeps PIR support, GPIO2 status/blink output, runtime trigger-servo tuning, optional PIR-event blink suppression, periodic pan/tilt/total current telemetry, keeps GPIO0 reserved strictly for ESP32 BOOT behavior, moves sweep execution to an app-triggered UDP action instead of a local GPIO0 input, accepts an explicit UDP rest-position contract (`rest` config plus `{"action":"rest"}`) while continuing to drive buzzer tones through the existing `{"action":"sound"}` path, and now enters a link-loss safe mode that turns off relays, stops fire output, and suppresses PIR event emission when the app goes inactive.
 - Used with: Smart Sentry v2 mode 3 Full WiFi runtime and as the current baseline for the primary ESP32 WiFi board, including desktop app releases that do not change the firmware contract.
 
@@ -46,7 +46,7 @@ For the current Smart Sentry desktop app, treat the ESP32 WiFi plus Debug Board 
 
 ## Accessory PWM Support (MOSFET driver — **ENABLED and flashed as of 2026-04-16**)
 
-Both `SMART_SENTRY_V2_3_1_ESP32_UDP_PIR` and `SMART_SENTRY_V2_3_DB3000_ESP32_UDP_PIR_FLYSKY` sketches now contain an optional 8-bit LEDC PWM driver for LED, Laser, ACC, and Spare outputs. **PWM is currently ACTIVE** (`#define ACCESSORY_PWM_ENABLED 1`). MOSFET driver hardware is installed on all four output channels (GPIO32/33/25/26). The firmware was compiled (951 792 bytes, 72% flash) and flashed to COM28 on 2026-04-16 with hash verified and hard reset confirmed.
+Both `SMART_SENTRY_ESP32_UDP_PIR` and `SMART_SENTRY_V2_3_DB3000_ESP32_UDP_PIR_FLYSKY` sketches now contain an optional 8-bit LEDC PWM driver for LED, Laser, ACC, and Spare outputs. **PWM is currently ACTIVE** (`#define ACCESSORY_PWM_ENABLED 1`). MOSFET driver hardware is installed on all four output channels (GPIO32/33/25/26). The firmware was compiled (951 792 bytes, 72% flash) and flashed to COM28 on 2026-04-16 with hash verified and hard reset confirmed.
 
 To revert to relay/ON-OFF mode: set `#define ACCESSORY_PWM_ENABLED  0`, recompile, and re-flash.
 
@@ -64,10 +64,10 @@ From repository root:
 
 ```powershell
 # Full WiFi UDP sketch (primary ESP32)
-.\tools\flash_esp32_udp.ps1 -Port COM28 -Sketch "arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino"
+.\tools\flash_esp32_udp.ps1 -Port COM28 -Sketch "arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino"
 
 # USB Serial IO + PIR sketch
-.\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino"
+.\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/DB3000_ESP32_IO_Telemetry_PIR/DB3000_ESP32_IO_Telemetry_PIR.ino"
 
 # Arduino Nano USB Serial IO + PIR sketch
 .\tools\arduino-cli\arduino-cli.exe compile --fqbn arduino:avr:nano "arduino\SMART_SENTRY_V3_0_NANO_USB_IO_PIR"

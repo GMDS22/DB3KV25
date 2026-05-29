@@ -21,7 +21,7 @@ VOICE_TOGGLE_SPECS: tuple[dict[str, object], ...] = (
         "control_attr": "_chk_show_video",
         "enable_command": "enable video feed",
         "disable_command": "disable video feed",
-        "aliases": ("video feed", "video display", "camera feed"),
+        "aliases": ("video feed", "video display", "camera feed", "camera", "camera view"),
         "enable_verbs": SHOW_ENABLE_VERBS,
         "disable_verbs": SHOW_DISABLE_VERBS,
     },
@@ -199,11 +199,18 @@ VOICE_TOGGLE_SPECS: tuple[dict[str, object], ...] = (
     },
     {
         "key": "tracking_voice_reports",
-        "label": "Tracking voice reports",
+        "label": "System reporting speech",
         "control_attr": "_chk_autotracking_voice_reports",
-        "enable_command": "enable tracking voice reports",
-        "disable_command": "disable tracking voice reports",
-        "aliases": ("tracking voice reports", "autotracking voice reports", "tracking voice updates"),
+        "enable_command": "enable system reporting speech",
+        "disable_command": "disable system reporting speech",
+        "aliases": (
+            "system reporting speech",
+            "system reporting",
+            "system report speech",
+            "tracking voice reports",
+            "autotracking voice reports",
+            "tracking voice updates",
+        ),
         "enable_verbs": DEFAULT_ENABLE_VERBS,
         "disable_verbs": DEFAULT_DISABLE_VERBS,
     },
@@ -469,6 +476,16 @@ VOICE_TOGGLE_SPECS: tuple[dict[str, object], ...] = (
         "disable_verbs": SHOW_DISABLE_VERBS,
     },
     {
+        "key": "fire_veto_overlay",
+        "label": "Fire veto overlay",
+        "control_attr": "_chk_fire_veto_overlay",
+        "enable_command": "enable fire veto overlay",
+        "disable_command": "disable fire veto overlay",
+        "aliases": ("fire veto overlay", "veto overlay", "identity veto overlay"),
+        "enable_verbs": SHOW_ENABLE_VERBS,
+        "disable_verbs": SHOW_DISABLE_VERBS,
+    },
+    {
         "key": "mask_trace_diagnostics",
         "label": "Mask trace diagnostics",
         "control_attr": "_chk_mask_trace",
@@ -504,9 +521,11 @@ VOICE_TOGGLE_SPECS: tuple[dict[str, object], ...] = (
         "control_attr": "_chk_pir_enabled",
         "enable_command": "enable pir sensors",
         "disable_command": "disable pir sensors",
-        "aliases": ("pir sensors", "pir guard"),
+        "aliases": ("pir sensors", "pir sensor", "pir guard", "pir detector", "pir detectors"),
         "enable_verbs": START_ENABLE_VERBS,
         "disable_verbs": START_DISABLE_VERBS,
+        "status_enabled_word": "active",
+        "status_disabled_word": "not active",
     },
     {
         "key": "pir_event_blink",
@@ -632,6 +651,8 @@ def voice_toggle_status_command(spec: dict[str, object]) -> str:
 
 def iter_voice_toggle_grammar_fragments() -> tuple[str, ...]:
     phrases: list[str] = []
+    active_state_tokens = ("enabled", "active", "running", "visible")
+    inactive_state_tokens = ("disabled", "inactive", "stopped", "hidden")
     for spec in VOICE_TOGGLE_SPECS:
         enable_command = str(spec["enable_command"])
         disable_command = str(spec["disable_command"])
@@ -651,14 +672,47 @@ def iter_voice_toggle_grammar_fragments() -> tuple[str, ...]:
                 phrases.append(f"{verb} the {alias}")
             phrases.append(f"{alias} on")
             phrases.append(f"{alias} off")
+            phrases.append(f"turn {alias} on")
+            phrases.append(f"turn the {alias} on")
+            phrases.append(f"turn {alias} off")
+            phrases.append(f"turn the {alias} off")
+            phrases.append(f"switch {alias} on")
+            phrases.append(f"switch the {alias} on")
+            phrases.append(f"switch {alias} off")
+            phrases.append(f"switch the {alias} off")
+            for state_word in active_state_tokens:
+                phrases.append(f"make {alias} {state_word}")
+                phrases.append(f"make the {alias} {state_word}")
+                phrases.append(f"keep {alias} {state_word}")
+                phrases.append(f"keep the {alias} {state_word}")
+                phrases.append(f"i want {alias} {state_word}")
+                phrases.append(f"i want the {alias} {state_word}")
+                phrases.append(f"i need {alias} {state_word}")
+                phrases.append(f"i need the {alias} {state_word}")
+            for state_word in inactive_state_tokens:
+                phrases.append(f"make {alias} {state_word}")
+                phrases.append(f"make the {alias} {state_word}")
+                phrases.append(f"keep {alias} {state_word}")
+                phrases.append(f"keep the {alias} {state_word}")
+                phrases.append(f"i want {alias} {state_word}")
+                phrases.append(f"i want the {alias} {state_word}")
+                phrases.append(f"i need {alias} {state_word}")
+                phrases.append(f"i need the {alias} {state_word}")
             phrases.append(f"status {alias}")
             phrases.append(f"status of {alias}")
+            phrases.append(f"status for {alias}")
             phrases.append(f"what is the status of {alias}")
+            phrases.append(f"what is the status for {alias}")
+            phrases.append(f"whats the status of {alias}")
+            phrases.append(f"whats the status for {alias}")
             phrases.append(f"what is the current status of {alias}")
             phrases.append(f"what's the status of {alias}")
+            phrases.append(f"what's the status for {alias}")
+            phrases.append(f"whats the current status of {alias}")
             phrases.append(f"what's the current status of {alias}")
             phrases.append(f"what is {alias} status")
             phrases.append(f"what's {alias} status")
+            phrases.append(f"whats {alias} status")
             phrases.append(f"is {alias} enabled")
             phrases.append(f"is {alias} disabled")
             phrases.append(f"is {alias} running")
@@ -684,8 +738,10 @@ def iter_voice_toggle_grammar_fragments() -> tuple[str, ...]:
 
 
 def iter_voice_toggle_command_patterns() -> tuple[tuple[str, str], ...]:
-    polite_prefix = r"(?:(?:please|can\s+you|could\s+you|would\s+you)\s+)?"
-    courtesy_suffix = r"(?:\s+(?:please|now))?"
+    polite_prefix = r"(?:(?:please|can\s+you|could\s+you|would\s+you|i\s+want\s+you\s+to|i\s+need\s+you\s+to)\s+)?"
+    courtesy_suffix = r"(?:\s+(?:please|now|right\s+now|for\s+now))?"
+    active_state_pattern = r"(?:on|enabled?|active|running|visible)"
+    inactive_state_pattern = r"(?:off|disabled?|inactive|stopped|hidden)"
     patterns: list[tuple[str, str]] = []
     for spec in VOICE_TOGGLE_SPECS:
         status_command = voice_toggle_status_command(spec)
@@ -719,22 +775,58 @@ def iter_voice_toggle_command_patterns() -> tuple[tuple[str, str], ...]:
                 str(spec["disable_command"]),
             )
         )
+        patterns.append(
+            (
+                rf"^{polite_prefix}(?:turn|switch)\s+(?:the\s+)?{alias_pattern}\s+{active_state_pattern}{courtesy_suffix}$",
+                str(spec["enable_command"]),
+            )
+        )
+        patterns.append(
+            (
+                rf"^{polite_prefix}(?:turn|switch)\s+(?:the\s+)?{alias_pattern}\s+{inactive_state_pattern}{courtesy_suffix}$",
+                str(spec["disable_command"]),
+            )
+        )
+        patterns.append(
+            (
+                rf"^{polite_prefix}(?:make|keep)\s+(?:the\s+)?{alias_pattern}\s+(?:stay\s+)?{active_state_pattern}{courtesy_suffix}$",
+                str(spec["enable_command"]),
+            )
+        )
+        patterns.append(
+            (
+                rf"^{polite_prefix}(?:make|keep)\s+(?:the\s+)?{alias_pattern}\s+(?:stay\s+)?{inactive_state_pattern}{courtesy_suffix}$",
+                str(spec["disable_command"]),
+            )
+        )
+        patterns.append(
+            (
+                rf"^(?:i\s+(?:want|need)|we\s+(?:want|need))\s+(?:the\s+)?{alias_pattern}\s+{active_state_pattern}{courtesy_suffix}$",
+                str(spec["enable_command"]),
+            )
+        )
+        patterns.append(
+            (
+                rf"^(?:i\s+(?:want|need)|we\s+(?:want|need))\s+(?:the\s+)?{alias_pattern}\s+{inactive_state_pattern}{courtesy_suffix}$",
+                str(spec["disable_command"]),
+            )
+        )
         if status_command:
             patterns.append(
                 (
-                    rf"^{polite_prefix}status(?:\s+of)?\s+(?:the\s+)?{alias_pattern}{courtesy_suffix}$",
+                    rf"^{polite_prefix}status(?:\s+(?:of|for))?\s+(?:the\s+)?{alias_pattern}{courtesy_suffix}$",
                     status_command,
                 )
             )
             patterns.append(
                 (
-                    rf"^{polite_prefix}(?:what\s+is|what's)\s+the\s+(?:current\s+)?status\s+of\s+(?:the\s+)?{alias_pattern}{courtesy_suffix}$",
+                    rf"^{polite_prefix}(?:what\s+is|what's|whats)\s+the\s+(?:current\s+)?status\s+(?:of|for)\s+(?:the\s+)?{alias_pattern}{courtesy_suffix}$",
                     status_command,
                 )
             )
             patterns.append(
                 (
-                    rf"^{polite_prefix}(?:what\s+is|what's)\s+(?:the\s+)?{alias_pattern}\s+status{courtesy_suffix}$",
+                    rf"^{polite_prefix}(?:what\s+is|what's|whats)\s+(?:the\s+)?{alias_pattern}\s+status{courtesy_suffix}$",
                     status_command,
                 )
             )

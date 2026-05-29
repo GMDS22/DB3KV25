@@ -1,6 +1,12 @@
 # SMART SENTRY SHORTCUT KEYS
 
+Date: 2026-05-13
+Status: Factory-default operator shortcut reference; the in-app Quick Keys window shows the live current bindings
+Audience: Operators and developers
+
 Smart Sentry keyboard shortcuts are window-focused. They only fire while the Smart Sentry window is the active window.
+
+If you customize bindings in the `Shortcut Keys` tab, use the app's `Quick Keys` button or keyboard shortcut to view the live current key map. This markdown document remains the factory default reference.
 
 ## Quick Reference
 

@@ -1,0 +1,352 @@
+{
+  "generated_at_local": "2026-05-13 12:42:57",
+  "generated_at_epoch_s": 1778647377.12834,
+  "entry_count": 10,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 1,
+    "operator": 6
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 4,
+    "voice_transcript_final": 2,
+    "spoken_reply": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 8
+  },
+  "voice_transcript_summary": {
+    "partial_count": 4,
+    "final_count": 2,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "not is the",
+  "latest_operator_request": "not is the",
+  "latest_assistant_message": "Smart Sentry is engaging person target 14 in precision phase. End of analysys report.",
+  "analysis_hints": [],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778644499.1770105,
+      "timestamp_local": "2026-05-13 11:54:59",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778644499.1780174,
+      "timestamp_local": "2026-05-13 11:54:59",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778644501.5024037,
+      "timestamp_local": "2026-05-13 11:55:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778644501.5024037,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778644546.2980156,
+      "timestamp_local": "2026-05-13 11:55:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778644546.2980156,
+        "source": "vosk",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778644546.926597,
+      "timestamp_local": "2026-05-13 11:55:46",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "smart sentry on",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778644546.926597,
+        "source": "final",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778644937.6427257,
+      "timestamp_local": "2026-05-13 12:02:17",
+      "role": "assistant",
+      "event_type": "spoken_reply",
+      "channel": "voice",
+      "text": "Smart Sentry is engaging person target 14 in precision phase. End of analysys report.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": true,
+        "spoken": true
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778644944.2903383,
+      "timestamp_local": "2026-05-13 12:02:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "not is face",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778644944.2903383,
+        "source": "vosk",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778644944.5263646,
+      "timestamp_local": "2026-05-13 12:02:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "not is the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778644944.5263646,
+        "source": "vosk",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778644972.7742674,
+      "timestamp_local": "2026-05-13 12:02:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "not is face",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778644972.7742674,
+        "source": "vosk",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778644974.993443,
+      "timestamp_local": "2026-05-13 12:02:54",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "not is the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778644974.993443,
+        "source": "final",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778644499.1770105,
+      "timestamp_local": "2026-05-13 11:54:59",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778644499.1780174,
+      "timestamp_local": "2026-05-13 11:54:59",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778644501.5024037,
+      "timestamp_local": "2026-05-13 11:55:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778644501.5024037,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778644546.2980156,
+      "timestamp_local": "2026-05-13 11:55:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart sentry on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778644546.2980156,
+        "source": "vosk",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778644546.926597,
+      "timestamp_local": "2026-05-13 11:55:46",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "smart sentry on",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778644546.926597,
+        "source": "final",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778644937.6427257,
+      "timestamp_local": "2026-05-13 12:02:17",
+      "role": "assistant",
+      "event_type": "spoken_reply",
+      "channel": "voice",
+      "text": "Smart Sentry is engaging person target 14 in precision phase. End of analysys report.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": true,
+        "spoken": true
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778644944.2903383,
+      "timestamp_local": "2026-05-13 12:02:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "not is face",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778644944.2903383,
+        "source": "vosk",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778644944.5263646,
+      "timestamp_local": "2026-05-13 12:02:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "not is the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778644944.5263646,
+        "source": "vosk",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778644972.7742674,
+      "timestamp_local": "2026-05-13 12:02:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "not is face",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778644972.7742674,
+        "source": "vosk",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778644974.993443,
+      "timestamp_local": "2026-05-13 12:02:54",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "not is the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778644974.993443,
+        "source": "final",
+        "frequency_hz": 284.0,
+        "rms": 1200,
+        "updated_at": 1778644505.143721
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260513_124257.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260513_124257.md"
+  }
+}

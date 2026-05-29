@@ -226,8 +226,14 @@ class ThreatScorer:
         if self._ml_model is not None:
             features = [proximity, size, conf, class_score, speed_score, persistence_score, approach_score]
             try:
-                ml_score = float(self._ml_model.predict([features])[0])  # type: ignore[union-attr]
-                threat = 0.6 * threat + 0.4 * max(0.0, min(1.0, ml_score))
+                pred_result = self._ml_model.predict([features])  # type: ignore[union-attr]
+                if len(pred_result) == 0:
+                    raise ValueError("ML model returned empty prediction array")
+                ml_score = float(pred_result[0])
+                if math.isnan(ml_score) or math.isinf(ml_score):
+                    raise ValueError(f"ML score invalid: {ml_score}")
+                ml_score = max(0.0, min(1.0, ml_score))
+                threat = 0.6 * threat + 0.4 * ml_score
             except Exception as exc:
                 self._log_ml_warning(
                     "ML threat refinement failed; using weighted scoring fallback",

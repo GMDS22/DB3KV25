@@ -1,0 +1,463 @@
+{
+  "generated_at_local": "2026-05-08 03:15:54",
+  "generated_at_epoch_s": 1778181354.8349206,
+  "entry_count": 14,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 1,
+    "operator": 10
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "spoken_confirmation": 1,
+    "voice_transcript_partial": 10
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 12
+  },
+  "voice_transcript_summary": {
+    "partial_count": 10,
+    "final_count": 0,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "",
+  "latest_operator_request": "",
+  "latest_assistant_message": "Smart Sentry is now online, say the command.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778181248.262169,
+      "timestamp_local": "2026-05-08 03:14:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778181248.262169,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778181283.725945,
+      "timestamp_local": "2026-05-08 03:14:43",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Smart Sentry is now online, say the command.",
+      "metadata": {
+        "interrupt": true,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778181311.0306268,
+      "timestamp_local": "2026-05-08 03:15:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "current",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181311.0306268,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778181311.7741015,
+      "timestamp_local": "2026-05-08 03:15:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "off",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181311.7741015,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778181313.2682405,
+      "timestamp_local": "2026-05-08 03:15:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181313.2682405,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778181314.5201447,
+      "timestamp_local": "2026-05-08 03:15:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the matching",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181314.5201447,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778181316.018685,
+      "timestamp_local": "2026-05-08 03:15:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the manual light",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181316.018685,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778181320.020814,
+      "timestamp_local": "2026-05-08 03:15:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "automatic export",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181320.020814,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778181323.8080554,
+      "timestamp_local": "2026-05-08 03:15:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the manual light exit on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181323.8080554,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778181324.7781303,
+      "timestamp_local": "2026-05-08 03:15:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the manual light exit app",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181324.7781303,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778181339.269738,
+      "timestamp_local": "2026-05-08 03:15:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the manual light",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181339.269738,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778181348.0789473,
+      "timestamp_local": "2026-05-08 03:15:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the manual light media loop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181348.0789473,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778181247.3426785,
+      "timestamp_local": "2026-05-08 03:14:07",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778181247.3436825,
+      "timestamp_local": "2026-05-08 03:14:07",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778181248.262169,
+      "timestamp_local": "2026-05-08 03:14:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778181248.262169,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778181283.725945,
+      "timestamp_local": "2026-05-08 03:14:43",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Smart Sentry is now online, say the command.",
+      "metadata": {
+        "interrupt": true,
+        "assistant_output": false,
+        "spoken": false
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778181311.0306268,
+      "timestamp_local": "2026-05-08 03:15:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "current",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181311.0306268,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778181311.7741015,
+      "timestamp_local": "2026-05-08 03:15:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "off",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181311.7741015,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778181313.2682405,
+      "timestamp_local": "2026-05-08 03:15:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181313.2682405,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778181314.5201447,
+      "timestamp_local": "2026-05-08 03:15:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the matching",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181314.5201447,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778181316.018685,
+      "timestamp_local": "2026-05-08 03:15:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the manual light",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181316.018685,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778181320.020814,
+      "timestamp_local": "2026-05-08 03:15:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "automatic export",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181320.020814,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778181323.8080554,
+      "timestamp_local": "2026-05-08 03:15:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the manual light exit on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181323.8080554,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778181324.7781303,
+      "timestamp_local": "2026-05-08 03:15:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the manual light exit app",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181324.7781303,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778181339.269738,
+      "timestamp_local": "2026-05-08 03:15:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the manual light",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181339.269738,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778181348.0789473,
+      "timestamp_local": "2026-05-08 03:15:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the manual light media loop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778181348.0789473,
+        "source": "vosk",
+        "frequency_hz": 276.0,
+        "rms": 1016,
+        "updated_at": 1778181282.0098739
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260508_031554.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260508_031554.md"
+  }
+}

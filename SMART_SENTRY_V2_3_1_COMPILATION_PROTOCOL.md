@@ -7,7 +7,7 @@ Use it before compiling firmware, packaging the app, or publishing release artif
 ## 1. Release Targets
 
 - App version string: `v2.3.1`
-- Primary ESP32 WiFi sketch: `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+- Primary ESP32 WiFi sketch: `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino`
 - Primary ESP32 WiFi SSID: `SMART-SENTRY-V2.3`
 - Primary ESP32 WiFi password: `db3000pass`
 - Primary UDP endpoint: `192.168.4.1:9000`
@@ -144,7 +144,7 @@ Run this check sequence before release packaging:
 From repository root:
 
 ```powershell
-& ".\SMART SENTRY\tools\flash_esp32_udp.ps1" -Port COM28 -Sketch "arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino"
+& ".\SMART SENTRY\tools\flash_esp32_udp.ps1" -Port COM28 -Sketch "arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino"
 ```
 
 ## 9. Desktop Build Command For v2.3.1

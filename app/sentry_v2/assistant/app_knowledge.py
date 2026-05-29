@@ -241,11 +241,17 @@ class AppKnowledgeBase:
 
 
 _KNOWLEDGE_SOURCES: List[KnowledgeSource] = [
+    KnowledgeSource("AI Blueprint", "SMART SENTRY AI BLUEPRINT.md", ("assistant", "conversation", "diagnostic", "diagnostics", "face detection", "runtime analysis", "wake word"), "doc", 1600),
+    KnowledgeSource("Documentation Hub", "SMART_SENTRY_DOCUMENTATION_HUB.md", ("documentation", "docs", "documents", "where to start", "doc map", "document hub"), "doc", 1200),
+    KnowledgeSource("Documentation Style Standard", "SMART_SENTRY_DOCUMENTATION_STYLE_STANDARD.md", ("documentation style", "formatting", "doc standard", "metadata", "docs formatting"), "doc", 1200),
     KnowledgeSource("Smart Sentry Manual", "SMART_SENTRY_MANUAL.md", ("manual", "operator", "feature", "button", "target loss", "reacquire", "guard", "settings"), "doc", 1800),
+    KnowledgeSource("Face Import Voice Guide", "SMART_SENTRY_FACE_IMPORT_VOICE_GUIDE.md", ("face", "photo", "import", "preview inbox", "batch", "profile batches"), "doc", 1400),
+    KnowledgeSource("Document Browser Guide", "SMART_SENTRY_DOCUMENT_BROWSER_GUIDE.md", ("document browser", "docs browser", "browse documents", "search docs"), "doc", 1200),
     KnowledgeSource("Issue Log", "SMART_SENTRY_ISSUE_LOG.md", ("issue", "fix", "target loss", "recovery", "preview", "performance", "reacquire"), "doc", 1400),
     KnowledgeSource("App Change Impact", "SMART_SENTRY_APP_CHANGE_IMPACT.md", ("contract", "impact", "target loss", "recovery", "return to guard"), "doc", 1400),
     KnowledgeSource("Live Validation Checklist", "SMART_SENTRY_V2_3_2_LIVE_VALIDATION_CHECKLIST.md", ("validation", "checklist", "target loss", "recovery", "handoff"), "doc", 1400),
     KnowledgeSource("Runtime Export Guide", "SMART_SENTRY_RUNTIME_DATA_EXPORT.md", ("runtime", "snapshot", "export", "analysis"), "doc", 1200),
+    KnowledgeSource("PIR At A Glance", "PIR_AT_A_GLANCE.md", ("pir", "sensor id", "cue hold", "search rounds", "current contract", "nano"), "doc", 1200),
     KnowledgeSource("PIR Quick Start", "PIR_GUARD_QUICK_START.md", ("pir", "search style", "fast reacquire", "hunting"), "doc", 1200),
     KnowledgeSource("PIR Implementation", "PIR_GUARD_IMPLEMENTATION_COMPLETE.md", ("pir", "search style", "cue hold", "target loss"), "doc", 1200),
     KnowledgeSource("Main UI Tab", "app/sentry_v2/sentry_v2_tab.py", ("button", "ui", "toggle", "camera", "connection", "home", "rest", "analyze"), "code", 1600),
@@ -257,9 +263,14 @@ _KNOWLEDGE_SOURCES: List[KnowledgeSource] = [
     KnowledgeSource("Face Identity", "app/sentry_v2/face_identity.py", ("face", "identity", "recognition", "friendly"), "code", 1000),
 ]
 
-_DEFAULT_SOURCES: Sequence[KnowledgeSource] = (
-    _KNOWLEDGE_SOURCES[0],
-    _KNOWLEDGE_SOURCES[1],
-    _KNOWLEDGE_SOURCES[8],
-    _KNOWLEDGE_SOURCES[9],
+_DEFAULT_SOURCE_TITLES: Sequence[str] = (
+    "AI Blueprint",
+    "Smart Sentry Manual",
+    "PIR At A Glance",
+    "PIR Quick Start",
+)
+
+_DEFAULT_SOURCES: Sequence[KnowledgeSource] = tuple(
+    next(source for source in _KNOWLEDGE_SOURCES if source.title == title)
+    for title in _DEFAULT_SOURCE_TITLES
 )

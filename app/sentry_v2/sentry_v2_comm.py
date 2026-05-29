@@ -66,6 +66,13 @@ class SentryV2Comm:
         "Dual ESP32 WiFi",
     ]
 
+    # Number of consecutive UDP send failures that must occur before
+    # _reset_io_runtime_state is triggered.  Keeping this above 1 prevents a
+    # single dropped packet on a busy WiFi network from tearing down the session
+    # and forcing the operator to manually reconnect.  Raise the value in
+    # environments with persistent packet loss; lower it for faster failover.
+    _UDP_FAILURE_RESET_THRESHOLD: int = 3
+
     @staticmethod
     def _normalize_serial_port_name(raw_port: str) -> str:
         try:
@@ -110,11 +117,12 @@ class SentryV2Comm:
         self.laser_on: bool = False
         self.acc_on: bool = False          # GPIO 25 accessory relay
         self.spare_on: bool = False        # GPIO 26 spare relay
-        self.safety_armed: bool = False   # False=LOCKED (S1), True=ARMED (S0)
+        self.safety_armed: bool = True    # False=LOCKED (S1), True=ARMED (S0)
         self.trigger_mode_bb: bool = False  # False=Water M0, True=BB M1
         self.trigger_mosfet_pulse_ms: int = 120
         self.trigger_mosfet_cycle_count: int = 1
         self.trigger_mosfet_cycle_off_ms: int = 50
+        self.trigger_output_active_low: bool = False
         self.trigger_servo_rest_deg: int = 0
         self.trigger_servo_fire_deg: int = 45
         self.trigger_servo_speed_dps: int = 360
@@ -147,6 +155,14 @@ class SentryV2Comm:
         self._last_udp_state_trace: str = ""
         self._last_udp_state_trace_s: float = 0.0
 
+        # UDP transient-failure guard (D-CRITICAL-1)
+        # Incremented on every consecutive send failure; reset to 0 on success.
+        # _reset_io_runtime_state is only triggered once this reaches
+        # _UDP_FAILURE_RESET_THRESHOLD (3) OR 30 s have elapsed since the last
+        # successful send, so a single WiFi blip does not tear down the session.
+        self._udp_consecutive_failures: int = 0
+        self._last_udp_success_ts: float = 0.0   # time.monotonic() of last OK send
+
         # Bus-servo feedback telemetry (modes 1, 2)
         self._servo_feedback: Dict[str, Any] = {
             "active": False,
@@ -176,6 +192,12 @@ class SentryV2Comm:
         self._feedback_pause_until_s: float = 0.0
         self._last_bus_pan_ticks: Optional[int] = None
         self._last_bus_tilt_ticks: Optional[int] = None
+
+        # Diagnostics poll throttle (D-CRITICAL-2)
+        # monotonic timestamp of the most recent _poll_bus_servo_diagnostics call.
+        # Diagnostics are capped at once per 10 s and suppressed while the turret
+        # is moving so that 4 × 50 ms register reads cannot stall motion dispatch.
+        self._last_diagnostics_poll_ts: float = 0.0
 
         self._io_runtime: Dict[str, Any] = {
             "active": False,
@@ -812,6 +834,24 @@ class SentryV2Comm:
                 self._last_error = "No COM port specified"
                 return False
 
+            try:
+                available_ports = {
+                    self._normalize_serial_port_name(str(device or "")): str(description or "")
+                    for device, description in self.list_serial_ports()
+                }
+            except Exception:
+                available_ports = {}
+            if available_ports and normalized_port not in available_ports:
+                visible_ports = ", ".join(sorted(port_name for port_name in available_ports if port_name))
+                if visible_ports:
+                    self._last_error = (
+                        f"{normalized_port} was not found in any available COM port. "
+                        f"Visible ports: {visible_ports}"
+                    )
+                else:
+                    self._last_error = f"{normalized_port} was not found in any available COM port"
+                return False
+
             try_ports = [normalized_port]
             if (
                 os.name == "nt"
@@ -833,7 +873,10 @@ class SentryV2Comm:
                 except Exception as e:
                     last_error = str(e)
                     err_text = str(e).lower()
-                    if "access is denied" in err_text or "permissionerror" in err_text:
+                    winerr = getattr(e, "winerror", None) or (e.args[1] if isinstance(e, OSError) and len(e.args) > 1 and isinstance(e.args[1], int) else None)
+                    if "not functioning" in err_text or winerr == 31:
+                        last_error = f"{normalized_port} — USB device not functioning (Windows error 31). Unplug and replug the Debug Board USB cable, then reconnect."
+                    elif "access is denied" in err_text or (isinstance(e, PermissionError) and winerr == 5):
                         last_error = f"{normalized_port} is already in use by another process ({e})"
                     ser = None
 
@@ -997,14 +1040,35 @@ class SentryV2Comm:
             udp_target = self._udp_target
         try:
             if sock is None or udp_target is None:
+                # Setup error (no socket / no target) — not a transient send failure.
+                # Do not increment the transient counter; caller sees False immediately.
                 return False
             data = self._build_udp_packet(payload)
             sock.sendto(data, udp_target)
             self._last_cmd = label
+            # Successful send: clear the consecutive-failure state.
+            self._udp_consecutive_failures = 0
+            self._last_udp_success_ts = time.monotonic()
             return True
         except Exception as e:
             self._last_error = str(e)
-            self._reset_io_runtime_state(active=True, source="waiting", last_error=self._last_error)
+            self._udp_consecutive_failures += 1
+            _now_mono = time.monotonic()
+            # Decide whether this is a persistent outage:
+            #   • _UDP_FAILURE_RESET_THRESHOLD+ consecutive failures, OR
+            #   • first failure after >30 s of silence (success timestamp already set).
+            _persistent = self._udp_consecutive_failures >= self._UDP_FAILURE_RESET_THRESHOLD or (
+                self._last_udp_success_ts > 0.0
+                and _now_mono - self._last_udp_success_ts > 30.0
+            )
+            print(
+                f"[SENTRY_V2_COMM] UDP send failure"
+                f" #{self._udp_consecutive_failures}: {e}"
+                + (" (persistent — resetting IO runtime state)" if _persistent else ""),
+                flush=True,
+            )
+            if _persistent:
+                self._reset_io_runtime_state(active=True, source="waiting", last_error=self._last_error)
             return False
 
     def _send_udp_message(self, message_type: str, payload: Optional[Dict[str, Any]] = None, *, label: str) -> bool:
@@ -1013,15 +1077,32 @@ class SentryV2Comm:
             udp_target = self._udp_target
         try:
             if sock is None or udp_target is None:
+                # Setup error — not a transient send failure; skip counter.
                 return False
             data = self._build_udp_message(message_type, payload)
             sock.sendto(data, udp_target)
             self._last_cmd = label
+            # Successful send: clear the consecutive-failure state.
+            self._udp_consecutive_failures = 0
+            self._last_udp_success_ts = time.monotonic()
             return True
         except Exception as e:
             self._last_error = str(e)
-            self._reset_io_runtime_state(active=True, source="waiting", last_error=self._last_error)
-            self._reset_bridge_caps_state(active=True, source="waiting", last_error=self._last_error)
+            self._udp_consecutive_failures += 1
+            _now_mono = time.monotonic()
+            _persistent = self._udp_consecutive_failures >= self._UDP_FAILURE_RESET_THRESHOLD or (
+                self._last_udp_success_ts > 0.0
+                and _now_mono - self._last_udp_success_ts > 30.0
+            )
+            print(
+                f"[SENTRY_V2_COMM] UDP send failure"
+                f" #{self._udp_consecutive_failures}: {e}"
+                + (" (persistent — resetting IO/caps runtime state)" if _persistent else ""),
+                flush=True,
+            )
+            if _persistent:
+                self._reset_io_runtime_state(active=True, source="waiting", last_error=self._last_error)
+                self._reset_bridge_caps_state(active=True, source="waiting", last_error=self._last_error)
             return False
 
     def _send_udp_payload_secondary(self, payload: Dict[str, Any], *, label: str) -> bool:
@@ -1460,10 +1541,34 @@ class SentryV2Comm:
                 }
             )
             self._feedback_next_poll_time = now + self._feedback_poll_interval_s
-        self._poll_bus_servo_diagnostics(now, pan_servo_id, tilt_servo_id)
+        # D-CRITICAL-2: Only run diagnostics when idle and no more often than
+        # every 10 s.  Diagnostics perform up to 4 × 50 ms serial reads; calling
+        # them on every feedback cycle (≤50 ms in tracking mode) starves motion
+        # dispatch and causes turret stutter.
+        #
+        # Idle guard: skip if a motion command was issued within the last 2 s.
+        # Using _feedback_last_motion_time (updated by _send_bus_servo) as the
+        # proxy for "turret is actively moving" avoids a separate tracking flag.
+        _diag_mono = time.monotonic()
+        if (
+            _diag_mono - self._last_diagnostics_poll_ts >= 10.0
+            and now - self._feedback_last_motion_time >= 2.0
+        ):
+            self._last_diagnostics_poll_ts = _diag_mono
+            self._poll_bus_servo_diagnostics(now, pan_servo_id, tilt_servo_id)
 
     def _poll_bus_servo_diagnostics(self, now: float, pan_servo_id: int, tilt_servo_id: int) -> None:
         if now < self._feedback_diag_next_poll_time:
+            return
+        # Do not run diagnostics while the turret is actively moving.
+        # The 4 × 50 ms serial reads block the receiver thread; running them
+        # during active tracking starves motion dispatch and causes turret stutter.
+        # Using _feedback_last_motion_time (updated by _send_bus_servo on every
+        # successful or failed write) as the "turret is moving" proxy avoids a
+        # separate tracking flag and ensures this guard is effective even if
+        # _poll_bus_servo_diagnostics is called from a future call site that
+        # bypasses the outer idle check in _poll_bus_servo_feedback.
+        if now - self._feedback_last_motion_time < 2.0:
             return
         pan_load_raw = self._read_bus_servo_register(pan_servo_id, 0x3C, 2, timeout_s=0.05)
         tilt_load_raw = self._read_bus_servo_register(tilt_servo_id, 0x3C, 2, timeout_s=0.05)
@@ -1513,6 +1618,13 @@ class SentryV2Comm:
         if not chunk:
             return
         self._serial_rx_buffer += chunk.decode("utf-8", errors="ignore")
+        if len(self._serial_rx_buffer) > 4096:
+            print(
+                f"[SENTRY_V2_COMM] serial RX buffer overrun "
+                f"({len(self._serial_rx_buffer)} bytes) — discarding oldest data",
+                flush=True,
+            )
+            self._serial_rx_buffer = self._serial_rx_buffer[-2048:]
         while "\n" in self._serial_rx_buffer:
             line, self._serial_rx_buffer = self._serial_rx_buffer.split("\n", 1)
             self._handle_serial_line(line.strip())
@@ -1696,13 +1808,21 @@ class SentryV2Comm:
         self.safety_armed = armed
         return self.send_command(pan, tilt)
 
+    def arm_safety(self, pan: float, tilt: float) -> bool:
+        """Arm the safety system to enable trigger servo firing"""
+        return self.set_safety(True, pan, tilt)
+
+    def disarm_safety(self, pan: float, tilt: float) -> bool:
+        """Disarm the safety system to prevent trigger servo firing"""
+        return self.set_safety(False, pan, tilt)
+
     def send_shutdown_state(self, pan: float, tilt: float) -> bool:
         """Send a final safe outputs-off state before disconnecting transport."""
         self.led_pwm = 0
         self.laser_on = False
         self.acc_on = False
         self.spare_on = False
-        self.safety_armed = False
+        self.safety_armed = False   # Ensure safety is disarmed on shutdown
 
         pan_out, tilt_out = self._normalize_output_angles(pan, tilt)
         m = self._mode
@@ -1729,6 +1849,7 @@ class SentryV2Comm:
                 "mosfet_pulse_ms": int(max(10, min(2000, int(self.trigger_mosfet_pulse_ms)))),
                 "mosfet_cycle_count": int(max(1, min(20, int(self.trigger_mosfet_cycle_count)))),
                 "mosfet_cycle_off_ms": int(max(10, min(2000, int(self.trigger_mosfet_cycle_off_ms)))),
+                "output_active_low": 1 if self.trigger_output_active_low else 0,
                 "servo_rest_deg": int(max(0, min(180, int(self.trigger_servo_rest_deg)))),
                 "servo_fire_deg": int(max(0, min(180, int(self.trigger_servo_fire_deg)))),
                 "servo_speed_dps": int(max(10, min(5000, int(self.trigger_servo_speed_dps)))),
@@ -1776,6 +1897,7 @@ class SentryV2Comm:
             pulse_ms = int(max(10, min(2000, int(self.trigger_mosfet_pulse_ms))))
             cycle_count = int(max(1, min(20, int(self.trigger_mosfet_cycle_count))))
             cycle_off_ms = int(max(10, min(2000, int(self.trigger_mosfet_cycle_off_ms))))
+            output_active_low = 1 if self.trigger_output_active_low else 0
             rest_deg = int(max(0, min(180, int(self.trigger_servo_rest_deg))))
             fire_deg = int(max(rest_deg, min(180, int(self.trigger_servo_fire_deg))))
             speed_dps = int(max(10, min(5000, int(self.trigger_servo_speed_dps))))
@@ -1783,12 +1905,13 @@ class SentryV2Comm:
             ser.write(f"J{pulse_ms}\n".encode("utf-8"))
             ser.write(f"K{cycle_count}\n".encode("utf-8"))
             ser.write(f"N{cycle_off_ms}\n".encode("utf-8"))
+            ser.write(f"X{output_active_low}\n".encode("utf-8"))
             ser.write(f"U{rest_deg}\n".encode("utf-8"))
             ser.write(f"V{fire_deg}\n".encode("utf-8"))
             ser.write(f"H{speed_dps}\n".encode("utf-8"))
             ser.write(f"B{pir_blink}\n".encode("utf-8"))
             self._last_cmd = (
-                f"SER CFG J{pulse_ms} K{cycle_count} N{cycle_off_ms} "
+                f"SER CFG J{pulse_ms} K{cycle_count} N{cycle_off_ms} X{output_active_low} "
                 f"U{rest_deg} V{fire_deg} H{speed_dps} B{pir_blink}"
             )
             self._last_error = ""
@@ -1811,7 +1934,8 @@ class SentryV2Comm:
         spare = 1 if self.spare_on else 0
         safety = 0 if self.safety_armed else 1
         mode = 1 if self.trigger_mode_bb else 0
-        return f"P{p}T{t}F{f}L{led}R{laser}G{acc}A{spare}S{safety}M{mode}\n"
+        output_active_low = 1 if self.trigger_output_active_low else 0
+        return f"P{p}T{t}F{f}L{led}R{laser}G{acc}A{spare}S{safety}M{mode}X{output_active_low}\n"
 
     def _send_ascii(self, pan: float, tilt: float, fire: int, *, via_serial: bool) -> bool:
         cmd = self._build_ascii(pan, tilt, fire)
@@ -2076,27 +2200,35 @@ class SentryV2Comm:
         # deadlock into repeated write timeouts on marginal hardware.
         """Send pan/tilt to debug board via bus servo binary packets."""
         now = time.time()
+        # Tick conversion is pure arithmetic — safe to compute before acquiring the lock.
+        pan_ticks = self._deg_to_ticks(pan)
+        tilt_ticks = self._deg_to_ticks(tilt)
         with self._lock:
             bus_ser = self._bus_ser
             pan_servo_id = self.pan_servo_id
             tilt_servo_id = self.tilt_servo_id
             checksum_mode = str(self._bus_checksum_mode or "auto").lower()
             default_move_time = self.bus_servo_time_ms
-            last_pan_ticks = self._last_bus_pan_ticks
-            last_tilt_ticks = self._last_bus_tilt_ticks
             allow_axis_dedup = self._has_fresh_servo_feedback_locked(now)
+            send_pan = True
+            send_tilt = True
+            if allow_axis_dedup:
+                send_pan = (self._last_bus_pan_ticks is None
+                            or pan_ticks != int(self._last_bus_pan_ticks))
+                send_tilt = (self._last_bus_tilt_ticks is None
+                             or tilt_ticks != int(self._last_bus_tilt_ticks))
+            # Speculatively record the new target so a concurrent caller sees the
+            # updated value immediately.  _reset_bus_motion_cache() clears both
+            # fields if the I/O write fails below.
+            if send_pan:
+                self._last_bus_pan_ticks = pan_ticks
+            if send_tilt:
+                self._last_bus_tilt_ticks = tilt_ticks
         try:
             if bus_ser is None or not bus_ser.is_open:
                 return False
             move_time = int(default_move_time if move_time_ms is None else move_time_ms)
             move_time = max(0, min(1000, move_time))
-            pan_ticks = self._deg_to_ticks(pan)
-            tilt_ticks = self._deg_to_ticks(tilt)
-            send_pan = True
-            send_tilt = True
-            if allow_axis_dedup:
-                send_pan = last_pan_ticks is None or pan_ticks != int(last_pan_ticks)
-                send_tilt = last_tilt_ticks is None or tilt_ticks != int(last_tilt_ticks)
 
             if not send_pan and not send_tilt:
                 self._last_cmd = f"BUS hold P{pan:.0f} T{tilt:.0f} @{move_time}ms [{checksum_mode}]"
@@ -2119,11 +2251,7 @@ class SentryV2Comm:
                         bus_ser.flush()
                     except Exception:
                         pass
-                with self._lock:
-                    if pan_pkt is not None:
-                        self._last_bus_pan_ticks = pan_ticks
-                    if tilt_pkt is not None:
-                        self._last_bus_tilt_ticks = tilt_ticks
+                # Cache already updated speculatively in the initial lock block above.
 
             if checksum_mode == "auto":
                 for candidate_mode in ("sub", "xor"):
@@ -2179,11 +2307,13 @@ class SentryV2Comm:
             io = self._build_io_tokens(fire)
             ser.write(f"S{io['safety']}\n".encode("utf-8"))
             ser.write(f"M{io['mode']}\n".encode("utf-8"))
+            ser.write(f"X{1 if self.trigger_output_active_low else 0}\n".encode("utf-8"))
             ser.write(
                 f"F{io['fire']}L{io['led']}R{io['laser']}G{io['acc']}A{io['spare']}\n".encode("utf-8")
             )
             self._last_cmd += (
-                f" | IO F{io['fire']}L{io['led']}R{io['laser']}"
+                f" | IO X{1 if self.trigger_output_active_low else 0}"
+                f" F{io['fire']}L{io['led']}R{io['laser']}"
                 f"G{io['acc']}A{io['spare']}"
             )
             return True

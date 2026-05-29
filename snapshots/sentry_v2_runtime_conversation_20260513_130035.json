@@ -1,0 +1,469 @@
+{
+  "generated_at_local": "2026-05-13 13:00:35",
+  "generated_at_epoch_s": 1778648435.6109824,
+  "entry_count": 14,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 1,
+    "operator": 11
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 11
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 12
+  },
+  "voice_transcript_summary": {
+    "partial_count": 11,
+    "final_count": 0,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "",
+  "latest_operator_request": "",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup.",
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778648332.071873,
+      "timestamp_local": "2026-05-13 12:58:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778648332.071873,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778648374.266756,
+      "timestamp_local": "2026-05-13 12:59:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648374.266756,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778648374.511892,
+      "timestamp_local": "2026-05-13 12:59:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion status",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648374.511892,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778648374.7616398,
+      "timestamp_local": "2026-05-13 12:59:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion save configuration",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648374.7616398,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778648375.0135221,
+      "timestamp_local": "2026-05-13 12:59:35",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648375.0135221,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778648376.3688958,
+      "timestamp_local": "2026-05-13 12:59:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648376.3688958,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778648379.7614474,
+      "timestamp_local": "2026-05-13 12:59:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command e",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648379.7614474,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778648384.2704577,
+      "timestamp_local": "2026-05-13 12:59:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command alien",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648384.2704577,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778648384.5113788,
+      "timestamp_local": "2026-05-13 12:59:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command alien alion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648384.5113788,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778648408.2623272,
+      "timestamp_local": "2026-05-13 13:00:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command alien alion hey",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648408.2623272,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778648412.017526,
+      "timestamp_local": "2026-05-13 13:00:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command alien alion hey is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648412.017526,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778648421.7618246,
+      "timestamp_local": "2026-05-13 13:00:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command alien alion hey save",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648421.7618246,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778648328.2173545,
+      "timestamp_local": "2026-05-13 12:58:48",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778648328.2183545,
+      "timestamp_local": "2026-05-13 12:58:48",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778648332.071873,
+      "timestamp_local": "2026-05-13 12:58:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778648332.071873,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778648374.266756,
+      "timestamp_local": "2026-05-13 12:59:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648374.266756,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778648374.511892,
+      "timestamp_local": "2026-05-13 12:59:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion status",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648374.511892,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778648374.7616398,
+      "timestamp_local": "2026-05-13 12:59:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion save configuration",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648374.7616398,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778648375.0135221,
+      "timestamp_local": "2026-05-13 12:59:35",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648375.0135221,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778648376.3688958,
+      "timestamp_local": "2026-05-13 12:59:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648376.3688958,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778648379.7614474,
+      "timestamp_local": "2026-05-13 12:59:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command e",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648379.7614474,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778648384.2704577,
+      "timestamp_local": "2026-05-13 12:59:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command alien",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648384.2704577,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778648384.5113788,
+      "timestamp_local": "2026-05-13 12:59:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command alien alion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648384.5113788,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778648408.2623272,
+      "timestamp_local": "2026-05-13 13:00:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command alien alion hey",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648408.2623272,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778648412.017526,
+      "timestamp_local": "2026-05-13 13:00:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command alien alion hey is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648412.017526,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778648421.7618246,
+      "timestamp_local": "2026-05-13 13:00:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart sentry is no on lion hey the command alien alion hey save",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778648421.7618246,
+        "source": "vosk",
+        "frequency_hz": 190.0,
+        "rms": 660,
+        "updated_at": 1778648332.8534212
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260513_130035.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260513_130035.md"
+  }
+}

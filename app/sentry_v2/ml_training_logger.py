@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -44,7 +44,12 @@ class MLTrainingLogger:
 
     def __init__(self, data_file: str = "config/ml_training_data.json"):
         self.data_file = Path(data_file)
-        self.examples: List[TrainingExample] = []
+        # Cap in-memory examples so a long-running session can never exhaust
+        # RAM.  deque(maxlen=N) evicts the oldest entry automatically on append
+        # once the cap is reached — all consumers (.append, for-in, len,
+        # list-comprehension, .clear) are fully compatible with deque.
+        self.max_examples: int = 10_000
+        self.examples: deque = deque(maxlen=self.max_examples)
         self._load_existing()
         self._last_ignore_sample_time = time.time()
         self._ignore_sample_interval = 2.0  # sample ignore targets every 2 sec

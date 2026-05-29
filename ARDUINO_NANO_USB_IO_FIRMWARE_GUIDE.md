@@ -73,6 +73,7 @@ Water / MOSFET trigger runtime mapping:
 - `J` = MOSFET pulse ON time in milliseconds
 - `K` = number of ON pulses to fire for one water-mode fire request
 - `N` = OFF gap between MOSFET pulses in milliseconds
+- `X` = trigger output polarity (`0` active-HIGH for MOSFET drivers, `1` active-LOW for relay modules)
 
 In water mode, one fire request now runs the configured MOSFET pulse train on `D8`.
 This is separate from the app's engagement burst count, which still controls how many
@@ -132,7 +133,7 @@ Replace `COM5` with the actual Nano port.
 - LED button and auto-lighting send `L0..255` and change brightness on `D5`
 - Sound cues produce buzzer output on `D4`
 - PIR hits emit `PIR_EVENT` lines and drive the existing app PIR workflow
-- Trigger runtime config updates respond to `J`, `K`, `N`, `U`, `V`, `H`, and `B`
+- Trigger runtime config updates respond to `J`, `K`, `N`, `X`, `U`, `V`, `H`, and `B`
 
 ## Current App-Side Notes
 
@@ -141,3 +142,5 @@ Replace `COM5` with the actual Nano port.
   `SOUND`, and `J/K/N/U/V/H/B`.
 - The trigger settings panel now swaps by mode: Water/MOSFET shows pulse-train
   settings, while Projectile shows trigger-servo travel settings.
+- In Water/MOSFET mode, use the Trigger Output Polarity setting to match hardware:
+  active-HIGH for MOSFET gate drivers, active-LOW for relay modules.

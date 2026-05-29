@@ -1,0 +1,291 @@
+{
+  "generated_at_local": "2026-05-11 23:24:49",
+  "generated_at_epoch_s": 1778513089.0398493,
+  "entry_count": 8,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 1,
+    "operator": 5
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 4,
+    "voice_transcript_final": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 6
+  },
+  "voice_transcript_summary": {
+    "partial_count": 4,
+    "final_count": 1,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "startup to rest on",
+  "latest_operator_request": "startup to rest on",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778512424.630577,
+      "timestamp_local": "2026-05-11 23:13:44",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778512424.630577,
+      "timestamp_local": "2026-05-11 23:13:44",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778512425.947809,
+      "timestamp_local": "2026-05-11 23:13:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778512425.947809,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778512432.650303,
+      "timestamp_local": "2026-05-11 23:13:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778512432.650303,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 295,
+        "updated_at": 1778512427.3918774
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778512559.6508563,
+      "timestamp_local": "2026-05-11 23:15:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "startup",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778512559.6508563,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 295,
+        "updated_at": 1778512427.3918774
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778512559.9057415,
+      "timestamp_local": "2026-05-11 23:15:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "stop that again",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778512559.9057415,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 295,
+        "updated_at": 1778512427.3918774
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778512562.4091775,
+      "timestamp_local": "2026-05-11 23:16:02",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "startup to rest",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778512562.4091775,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 295,
+        "updated_at": 1778512427.3918774
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778512584.7777405,
+      "timestamp_local": "2026-05-11 23:16:24",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "startup to rest on",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778512584.7777405,
+        "source": "final",
+        "frequency_hz": 294.0,
+        "rms": 295,
+        "updated_at": 1778512427.3918774
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778512424.630577,
+      "timestamp_local": "2026-05-11 23:13:44",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778512424.630577,
+      "timestamp_local": "2026-05-11 23:13:44",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778512425.947809,
+      "timestamp_local": "2026-05-11 23:13:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778512425.947809,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778512432.650303,
+      "timestamp_local": "2026-05-11 23:13:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778512432.650303,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 295,
+        "updated_at": 1778512427.3918774
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778512559.6508563,
+      "timestamp_local": "2026-05-11 23:15:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "startup",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778512559.6508563,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 295,
+        "updated_at": 1778512427.3918774
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778512559.9057415,
+      "timestamp_local": "2026-05-11 23:15:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "stop that again",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778512559.9057415,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 295,
+        "updated_at": 1778512427.3918774
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778512562.4091775,
+      "timestamp_local": "2026-05-11 23:16:02",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "startup to rest",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778512562.4091775,
+        "source": "vosk",
+        "frequency_hz": 294.0,
+        "rms": 295,
+        "updated_at": 1778512427.3918774
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778512584.7777405,
+      "timestamp_local": "2026-05-11 23:16:24",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "startup to rest on",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778512584.7777405,
+        "source": "final",
+        "frequency_hz": 294.0,
+        "rms": 295,
+        "updated_at": 1778512427.3918774
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260511_232449.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260511_232449.md"
+  }
+}

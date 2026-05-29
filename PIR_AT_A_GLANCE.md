@@ -1,12 +1,18 @@
 # PIR Sensor Integration - At a Glance
 
-Status: current contract audit refreshed for Smart Sentry v2.3.2 on 2026-04-10.
+Date: 2026-05-13
+Status: Current contract audit for the live Smart Sentry PIR workflow
+Audience: Developers, validators, integrators
 
 ## What Matches Right Now
 
-Current live app firmware path:
+Current active app firmware path:
 
-`arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+`arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino`
+
+Current WiFi reference path:
+
+`arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino`
 
 Current desktop runtime path:
 
@@ -17,10 +23,10 @@ Current desktop runtime path:
 
 The firmware and desktop code currently match on these points:
 
-- PIR events are emitted back to the app as `pir_event` over UDP in WiFi modes.
-- PIR events are also still readable as `PIR_EVENT sensor_id=... timestamp=...` on the serial path.
-- PIR enable is controlled by the app with `pir_enabled` in UDP bridge modes.
-- Serial compatibility for `P0` and `P1` is still present in USB modes.
+- The active dual-USB app contract receives PIR events as `PIR_EVENT sensor_id=... timestamp=...` on the Nano serial IO path.
+- The WiFi reference path can still emit `pir_event` over UDP for WiFi-specific builds, but it is not the primary current app path.
+- PIR enable remains app-owned and is persisted through the canonical Smart Sentry settings file.
+- Serial compatibility for `P0` and `P1` remains present in USB modes.
 - PIR event LED blink is carried by the runtime config payload under `pir.event_blink`.
 - The app receives PIR events in `sentry_v2_comm.py`, forwards them into the engine, and the engine converts them into cue, confirm, hunt, and return-home behavior.
 
@@ -68,7 +74,7 @@ Important distinction:
 There are two different truths to keep separate:
 
 - Firmware transport contract: sensor ids `0`, `1`, and `2`.
-- Desktop aiming contract: cue angles stored in `app/config/smart_sentry_v2_3_2_settings.json`.
+- Desktop aiming contract: cue angles stored in `app/config/smart_sentry_settings.json`.
 
 Default dataclass cue layout in code:
 
@@ -76,19 +82,36 @@ Default dataclass cue layout in code:
 - Sensor 1 -> `135 deg`
 - Sensor 2 -> `225 deg`
 
-Current saved operator profile in `app/config/smart_sentry_v2_3_2_settings.json`:
+Current saved operator profile in `app/config/smart_sentry_settings.json`:
 
-- Sensor 0 -> `270.0 deg`, tilt `55.0 deg`
-- Sensor 1 -> `152.0 deg`, tilt `52.0 deg`
-- Sensor 2 -> `29.0 deg`, tilt `54.0 deg`
+- Sensor 0 -> `45.0 deg`, tilt `35.0 deg`
+- Sensor 1 -> `135.0 deg`, tilt `35.0 deg`
+- Sensor 2 -> `225.0 deg`, tilt `35.0 deg`
 
 That saved profile is not a firmware mismatch. It is an operator-level cue map stored in the desktop config.
 
 ## Current Control Contract
 
-### WiFi / UDP Modes
+### Active Dual-USB Serial Path
 
-In the current live WiFi bridge path, the app does not depend on old single-letter PIR commands. It sends JSON payloads.
+The current live app contract uses the Nano serial IO path.
+
+Serial control compatibility remains:
+
+```text
+P0
+P1
+```
+
+And PIR events appear as:
+
+```text
+PIR_EVENT sensor_id=0 timestamp=123456789
+```
+
+### WiFi / UDP Reference Path
+
+In the WiFi reference path, the app does not depend on old single-letter PIR commands. It sends JSON payloads.
 
 Enable PIR:
 
@@ -126,56 +149,45 @@ Firmware PIR event back to app:
 }
 ```
 
-### USB / Serial Compatibility
-
-Serial modes still support:
-
-```text
-P0
-P1
-```
-
-And PIR events can still appear as:
-
-```text
-PIR_EVENT sensor_id=0 timestamp=123456789
-```
-
 ## Live Runtime Settings Seen In The Current Config
 
 The current saved profile shows these relevant values:
 
 - `pir_enabled = true`
-- `pir_event_blink_enabled = true`
+- `pir_event_blink_enabled = false`
+- per-sensor `enabled = false` until the operator activates the individual sensor rows
 - `scan_on_no_detect = true`
 - `cue_hold_time_s = 0.18`
-- `confirmation_timeout = 1.0`
-- `cross_sensor_lockout_ms = 800`
-- `target_loss_timeout = 2.5`
+- `confirmation_timeout = 1.2`
+- `cross_sensor_lockout_ms = 120`
+- `target_loss_timeout = 1.4`
 - `adaptive_loss_recovery_enabled = true`
-- `loss_search_style = fast_reacquire`
-- `loss_search_rounds = 2`
-- `pir_guard.search_style = fast_reacquire`
-- `pir_guard.search_rounds = 2`
+- `loss_search_style = hunting`
+- `loss_search_rounds = 1`
+- `pir_guard.search_style = hunting`
+- `pir_guard.search_rounds = 1`
 
 This is the expected aligned state for the shared loss/PIR hunt settings.
 
 ## Operator Checklist
 
-1. Flash `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` when running the live WiFi plus Debug Board path.
+1. Flash `arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino` when running the current active dual-USB app path.
 2. Keep PIR enable controlled from the Smart Sentry Guard tab in normal operation.
-3. Treat `P0` and `P1` as serial compatibility controls, not the primary live WiFi control path.
-4. If PIR cues look wrong, inspect the saved cue angles in `app/config/smart_sentry_v2_3_2_settings.json` before changing firmware.
-5. If after-loss behavior looks wrong, inspect `target_loss_timeout`, adaptive recovery, and shared hunt settings together because they are intentionally coupled.
+3. Treat `P0` and `P1` as serial compatibility controls for the dual-USB path, not a separate firmware family.
+4. Use `SMART_SENTRY_ESP32_UDP_PIR.ino` only when you are intentionally validating the WiFi reference path.
+5. If PIR cues look wrong, inspect the saved cue angles in `app/config/smart_sentry_settings.json` before changing firmware.
+6. If after-loss behavior looks wrong, inspect `target_loss_timeout`, adaptive recovery, and shared hunt settings together because they are intentionally coupled.
 
 ## Source Of Truth
 
 Use these files as the authoritative references:
 
-- `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+- `arduino/SMART_SENTRY_V3_0_NANO_USB_IO_PIR/SMART_SENTRY_V3_0_NANO_USB_IO_PIR.ino`
+- `ARDUINO_NANO_USB_IO_FIRMWARE_GUIDE.md`
+- `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino` (WiFi reference path)
 - `app/sentry_v2/sentry_v2_comm.py`
 - `app/sentry_v2/sentry_v2_engine.py`
 - `app/sentry_v2/sentry_v2_pir_manager.py`
 - `app/sentry_v2/sentry_v2_tab.py`
-- `app/config/smart_sentry_v2_3_2_settings.json`
+- `app/config/smart_sentry_settings.json`
 - `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md`

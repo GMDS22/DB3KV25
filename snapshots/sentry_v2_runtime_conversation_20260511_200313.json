@@ -1,0 +1,1536 @@
+{
+  "generated_at_local": "2026-05-11 20:03:13",
+  "generated_at_epoch_s": 1778500993.6009693,
+  "entry_count": 79,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 1,
+    "operator": 76
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 75,
+    "voice_transcript_final": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 77
+  },
+  "voice_transcript_summary": {
+    "partial_count": 75,
+    "final_count": 1,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "local what s led reports anomaly auto what s on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan tilt color",
+  "latest_operator_request": "local what s led reports anomaly auto what s on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan tilt color",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup.",
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1778490703.9089634,
+      "timestamp_local": "2026-05-11 17:11:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490703.9089634,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1778490704.6725123,
+      "timestamp_local": "2026-05-11 17:11:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine action execution",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490704.6725123,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1778490705.660155,
+      "timestamp_local": "2026-05-11 17:11:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490705.660155,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1778490705.9108891,
+      "timestamp_local": "2026-05-11 17:11:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on human",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490705.9108891,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1778490706.1594028,
+      "timestamp_local": "2026-05-11 17:11:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490706.1594028,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1778490706.9118376,
+      "timestamp_local": "2026-05-11 17:11:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490706.9118376,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1778490707.6683247,
+      "timestamp_local": "2026-05-11 17:11:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan inversion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490707.6683247,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1778490707.9140763,
+      "timestamp_local": "2026-05-11 17:11:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan is assistant",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490707.9140763,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1778490708.1603909,
+      "timestamp_local": "2026-05-11 17:11:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan tilt",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490708.1603909,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1778492716.006054,
+      "timestamp_local": "2026-05-11 17:45:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan tilt color",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778492716.006054,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1778494147.4653468,
+      "timestamp_local": "2026-05-11 18:09:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan tilt color mode",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778494147.4653468,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1778494396.1590817,
+      "timestamp_local": "2026-05-11 18:13:16",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "local what s led reports anomaly auto what s on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan tilt color",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778494396.1590817,
+        "source": "final",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778490649.7791014,
+      "timestamp_local": "2026-05-11 17:10:49",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778490649.7801015,
+      "timestamp_local": "2026-05-11 17:10:49",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778490650.8900702,
+      "timestamp_local": "2026-05-11 17:10:50",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778490650.8900702,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778490669.6768892,
+      "timestamp_local": "2026-05-11 17:11:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490669.6768892,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778490669.9319592,
+      "timestamp_local": "2026-05-11 17:11:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "accessory",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490669.9319592,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778490670.1785288,
+      "timestamp_local": "2026-05-11 17:11:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger off window",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490670.1785288,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778490670.4277327,
+      "timestamp_local": "2026-05-11 17:11:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger off assistant",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490670.4277327,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778490670.6795363,
+      "timestamp_local": "2026-05-11 17:11:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger off with of fire",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490670.6795363,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778490670.9292872,
+      "timestamp_local": "2026-05-11 17:11:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger off with of fire leon",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490670.9292872,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778490671.4257302,
+      "timestamp_local": "2026-05-11 17:11:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger off with of fire leon is the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490671.4257302,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778490671.6761239,
+      "timestamp_local": "2026-05-11 17:11:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger off with of fire leon is the human",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490671.6761239,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778490671.9267144,
+      "timestamp_local": "2026-05-11 17:11:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger off with of fire leon is the your",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490671.9267144,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778490672.1756873,
+      "timestamp_local": "2026-05-11 17:11:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger off with of fire leon is the your voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490672.1756873,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778490672.428651,
+      "timestamp_local": "2026-05-11 17:11:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger off with of fire leon is the your pointer",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490672.428651,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778490672.6784198,
+      "timestamp_local": "2026-05-11 17:11:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger off with of fire leon is the use tiny pointer",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490672.6784198,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778490672.9255946,
+      "timestamp_local": "2026-05-11 17:11:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "trigger off with of fire leon is the your voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490672.9255946,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778490673.8336842,
+      "timestamp_local": "2026-05-11 17:11:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "close",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490673.8336842,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778490674.3268683,
+      "timestamp_local": "2026-05-11 17:11:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local actions",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490674.3268683,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778490675.3330793,
+      "timestamp_local": "2026-05-11 17:11:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's led",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490675.3330793,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778490675.8280494,
+      "timestamp_local": "2026-05-11 17:11:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's led reports",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490675.8280494,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778490676.085151,
+      "timestamp_local": "2026-05-11 17:11:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490676.085151,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778490676.3337846,
+      "timestamp_local": "2026-05-11 17:11:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's led reports announcements",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490676.3337846,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778490676.5771735,
+      "timestamp_local": "2026-05-11 17:11:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's led reports no fire",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490676.5771735,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778490676.8291717,
+      "timestamp_local": "2026-05-11 17:11:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490676.8291717,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778490677.3315277,
+      "timestamp_local": "2026-05-11 17:11:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490677.3315277,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778490678.076308,
+      "timestamp_local": "2026-05-11 17:11:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490678.076308,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778490678.331738,
+      "timestamp_local": "2026-05-11 17:11:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490678.331738,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1778490678.5762916,
+      "timestamp_local": "2026-05-11 17:11:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490678.5762916,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1778490679.6587,
+      "timestamp_local": "2026-05-11 17:11:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490679.6587,
+        "source": "vosk",
+        "frequency_hz": 230.0,
+        "rms": 942,
+        "updated_at": 1778490674.3213487
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1778490680.1629143,
+      "timestamp_local": "2026-05-11 17:11:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status disconnect",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490680.1629143,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1778490680.408867,
+      "timestamp_local": "2026-05-11 17:11:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490680.408867,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1778490680.9105508,
+      "timestamp_local": "2026-05-11 17:11:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490680.9105508,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1778490681.1587584,
+      "timestamp_local": "2026-05-11 17:11:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event blink",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490681.1587584,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1778490681.4086242,
+      "timestamp_local": "2026-05-11 17:11:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490681.4086242,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1778490681.6601295,
+      "timestamp_local": "2026-05-11 17:11:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire for",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490681.6601295,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1778490682.1602778,
+      "timestamp_local": "2026-05-11 17:11:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490682.1602778,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1778490682.9106586,
+      "timestamp_local": "2026-05-11 17:11:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire face greeting",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490682.9106586,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1778490683.9104555,
+      "timestamp_local": "2026-05-11 17:11:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490683.9104555,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1778490684.6630306,
+      "timestamp_local": "2026-05-11 17:11:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490684.6630306,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1778490685.4103565,
+      "timestamp_local": "2026-05-11 17:11:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire disabled",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490685.4103565,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1778490686.1634264,
+      "timestamp_local": "2026-05-11 17:11:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is sound",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490686.1634264,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1778490686.4082425,
+      "timestamp_local": "2026-05-11 17:11:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is show camera",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490686.4082425,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1778490686.9099667,
+      "timestamp_local": "2026-05-11 17:11:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is show video",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490686.9099667,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1778490687.4168828,
+      "timestamp_local": "2026-05-11 17:11:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490687.4168828,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1778490688.16091,
+      "timestamp_local": "2026-05-11 17:11:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490688.16091,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1778490689.410366,
+      "timestamp_local": "2026-05-11 17:11:29",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace on refinement",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490689.410366,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1778490691.1616907,
+      "timestamp_local": "2026-05-11 17:11:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace on request",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490691.1616907,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1778490691.4123447,
+      "timestamp_local": "2026-05-11 17:11:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490691.4123447,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1778490692.4115365,
+      "timestamp_local": "2026-05-11 17:11:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunt trace active",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490692.4115365,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1778490693.1649156,
+      "timestamp_local": "2026-05-11 17:11:33",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490693.1649156,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1778490693.9108567,
+      "timestamp_local": "2026-05-11 17:11:33",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the current status",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490693.9108567,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1778490694.160558,
+      "timestamp_local": "2026-05-11 17:11:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous hunt",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490694.160558,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1778490694.4170508,
+      "timestamp_local": "2026-05-11 17:11:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490694.4170508,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1778490694.661573,
+      "timestamp_local": "2026-05-11 17:11:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous on gesture",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490694.661573,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1778490694.9108436,
+      "timestamp_local": "2026-05-11 17:11:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order scan",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490694.9108436,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1778490695.1594744,
+      "timestamp_local": "2026-05-11 17:11:35",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490695.1594744,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1778490696.4119098,
+      "timestamp_local": "2026-05-11 17:11:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490696.4119098,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1778490697.6625073,
+      "timestamp_local": "2026-05-11 17:11:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media loop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490697.6625073,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 59,
+      "timestamp_epoch_s": 1778490698.415925,
+      "timestamp_local": "2026-05-11 17:11:38",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media no detection",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490698.415925,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 60,
+      "timestamp_epoch_s": 1778490698.9106352,
+      "timestamp_local": "2026-05-11 17:11:38",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490698.9106352,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 61,
+      "timestamp_epoch_s": 1778490699.1619081,
+      "timestamp_local": "2026-05-11 17:11:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the current",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490699.1619081,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 62,
+      "timestamp_epoch_s": 1778490699.4120245,
+      "timestamp_local": "2026-05-11 17:11:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490699.4120245,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 63,
+      "timestamp_epoch_s": 1778490700.1593897,
+      "timestamp_local": "2026-05-11 17:11:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490700.1593897,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 64,
+      "timestamp_epoch_s": 1778490700.914482,
+      "timestamp_local": "2026-05-11 17:11:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490700.914482,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 65,
+      "timestamp_epoch_s": 1778490702.1602643,
+      "timestamp_local": "2026-05-11 17:11:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490702.1602643,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 66,
+      "timestamp_epoch_s": 1778490702.4126143,
+      "timestamp_local": "2026-05-11 17:11:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490702.4126143,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 67,
+      "timestamp_epoch_s": 1778490702.6604486,
+      "timestamp_local": "2026-05-11 17:11:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490702.6604486,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1778490703.9089634,
+      "timestamp_local": "2026-05-11 17:11:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490703.9089634,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1778490704.6725123,
+      "timestamp_local": "2026-05-11 17:11:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine action execution",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490704.6725123,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1778490705.660155,
+      "timestamp_local": "2026-05-11 17:11:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490705.660155,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1778490705.9108891,
+      "timestamp_local": "2026-05-11 17:11:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on human",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490705.9108891,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1778490706.1594028,
+      "timestamp_local": "2026-05-11 17:11:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490706.1594028,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1778490706.9118376,
+      "timestamp_local": "2026-05-11 17:11:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490706.9118376,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1778490707.6683247,
+      "timestamp_local": "2026-05-11 17:11:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan inversion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490707.6683247,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1778490707.9140763,
+      "timestamp_local": "2026-05-11 17:11:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan is assistant",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490707.9140763,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1778490708.1603909,
+      "timestamp_local": "2026-05-11 17:11:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan tilt",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778490708.1603909,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1778492716.006054,
+      "timestamp_local": "2026-05-11 17:45:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan tilt color",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778492716.006054,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1778494147.4653468,
+      "timestamp_local": "2026-05-11 18:09:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "local what's microphone anomaly auto what's on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan tilt color mode",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778494147.4653468,
+        "source": "vosk",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1778494396.1590817,
+      "timestamp_local": "2026-05-11 18:13:16",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "local what s led reports anomaly auto what s on current voice status the pir event fire sound reports active fire is scope hey fire mask trace hunter faster is acc the continuous order status travel media zone off the auto color is friendly gesture off machine actions on e pan tilt color",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778494396.1590817,
+        "source": "final",
+        "frequency_hz": 148.0,
+        "rms": 969,
+        "updated_at": 1778490680.1533778
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260511_200313.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260511_200313.md"
+  }
+}

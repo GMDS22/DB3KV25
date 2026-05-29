@@ -16,6 +16,7 @@ If any older protocol document conflicts with this file, this file wins.
 - Legacy `smart_sentry_v*_*.json` files are migration inputs only.
 - Build output drive remains `F:` unless the build helper is intentionally changed.
 - Every release build must include the current saved canonical runtime settings and current saved canonical custom profile file from source `app/config/`.
+- Every release build must include the bundled voice/runtime model tree under `models/`, including `models/kokoro/kokoro-v1.0.onnx` and `models/kokoro/voices-v1.0.bin`.
 
 ## 2. Source of truth files
 
@@ -60,6 +61,11 @@ Verify release folder `F:\SMART SENTRY V<version>`:
 - `app/config/smart_sentry_custom_presets.json`
 - `app/config/smart_sentry_prompted_targets.json`
 - `app/config/smart_sentry_faces.json`
+
+2.2 Packaged support folder contains required voice/runtime assets:
+- `models/kokoro/kokoro-v1.0.onnx`
+- `models/kokoro/voices-v1.0.bin`
+- bundled AI voice backends for `edge_tts`, `kokoro_onnx`, and `azure.cognitiveservices.speech`
 
 2.1 Canonical profile parity rule:
 - Packaged `app/config/smart_sentry_custom_presets.json` must match the source file byte-for-byte (same custom profiles/operators presets).

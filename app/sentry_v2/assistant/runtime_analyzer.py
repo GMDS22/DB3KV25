@@ -54,7 +54,9 @@ class RuntimeAnalyzer:
         comm = snapshot.get("comm_telemetry") or {}
         camera = snapshot.get("camera_status") or {}
         yolo = snapshot.get("yolo_status") or {}
+        face_runtime = snapshot.get("face_runtime") or {}
         assistant_runtime = snapshot.get("assistant_runtime") or {}
+        recent_log_lines = [str(line or "") for line in list(snapshot.get("recent_log_lines") or []) if str(line or "").strip()]
         io_runtime = comm.get("io_runtime") or {}
         servo_feedback = comm.get("servo_feedback") or {}
         ai_cfg = config.get("ai_assistant") or {}
@@ -87,6 +89,15 @@ class RuntimeAnalyzer:
         guard_mode = int(guard_cfg.get("guard_mode", 0) or 0)
         guard_mode_name = _guard_mode_label(guard_mode)
         face_enabled = bool(face_cfg.get("enabled", False))
+        face_backend = str(face_runtime.get("active_backend") or "legacy_dct")
+        face_preferred_backend = str(face_runtime.get("preferred_backend") or face_backend)
+        face_backend_status = str(face_runtime.get("backend_status") or face_backend)
+        face_backend_ready = bool(face_runtime.get("detection_backend_ready"))
+        face_known_profiles = int(face_runtime.get("known_profile_count") or 0)
+        face_ready_profiles = int(face_runtime.get("ready_profile_count") or 0)
+        face_required_samples = int(face_runtime.get("required_profile_samples") or 1)
+        face_unavailable_profiles = int(face_runtime.get("unavailable_backend_profile_count") or 0)
+        face_incompatible_profiles = int(face_runtime.get("incompatible_sample_profile_count") or 0)
         pir_enabled = bool(pir_cfg.get("pir_enabled", False))
 
         findings.append(
@@ -145,6 +156,40 @@ class RuntimeAnalyzer:
         if face_enabled and int(face_cfg.get("min_profile_samples", 1) or 1) > 1 and int(face_cfg.get("recognition_refresh_interval_ms", 250) or 250) < 120:
             findings.append(AssistantFinding("low", "Aggressive face refresh cadence", "Face recognition is enabled with a fast refresh interval, which can increase UI load on slower systems."))
 
+        if face_enabled and not bool(face_runtime.get("has_live_frame")) and bool(camera.get("capture_open")):
+            findings.append(AssistantFinding("medium", "Face pipeline has no live frame yet", "Face recognition is enabled, but the camera has not produced a live frame for the face pipeline yet."))
+            recommendations.append("Wait for the first good frame or reopen the camera before expecting live face results.")
+
+        if face_enabled and not face_backend_ready:
+            findings.append(AssistantFinding("high", "Face detection backend unavailable", f"The active face backend {face_backend} is not ready. {face_backend_status}"))
+            recommendations.append("Verify the face runtime backend assets and OpenCV face runtime before expecting face detection or recognition.")
+        elif face_enabled and bool(face_runtime.get("preferred_backend_degraded")):
+            findings.append(AssistantFinding("medium", "Face runtime degraded", f"Preferred face backend {face_preferred_backend} did not load cleanly. Current status: {face_backend_status}"))
+            recommendations.append("Review the configured face detector and recognizer model paths if you expect the preferred face backend to load.")
+
+        if face_enabled and face_known_profiles <= 0:
+            findings.append(AssistantFinding("medium", "Known-face library empty", "Face recognition is enabled, but no saved face profiles are available for identity matching."))
+            recommendations.append("Register at least one face profile if you expect recognized identities instead of generic face boxes.")
+        elif face_enabled and face_ready_profiles <= 0:
+            findings.append(AssistantFinding("medium", "No usable face profiles for current backend", f"Saved profiles exist, but none meet the active backend/sample requirement. backend={face_backend}, required_samples={face_required_samples}."))
+            recommendations.append("Rebuild face samples for the active backend or lower the required sample count so at least one profile becomes usable.")
+        elif face_enabled and face_incompatible_profiles > 0:
+            findings.append(AssistantFinding("low", "Some face samples are incompatible", f"{face_incompatible_profiles} saved face profiles have only partial compatibility with the current backend or sample requirement."))
+
+        if face_enabled and face_unavailable_profiles > 0:
+            findings.append(AssistantFinding("low", "Some face profiles use an unavailable backend", f"{face_unavailable_profiles} saved face profiles cannot be matched by the current runtime backend set."))
+
+        recent_face_issue = ""
+        for line in reversed(recent_log_lines):
+            lower_line = line.lower()
+            if "face" not in lower_line:
+                continue
+            if any(token in lower_line for token in ("unavailable", "failed", "missing", "no live frame", "no preview frame", "no faces detected")):
+                recent_face_issue = line
+                break
+        if recent_face_issue:
+            findings.append(AssistantFinding("medium", "Recent face runtime warning", recent_face_issue))
+
         if pir_enabled:
             sensors = list(pir_cfg.get("sensors") or [])
             enabled_sensors = [sensor for sensor in sensors if bool((sensor or {}).get("enabled", False))]
@@ -157,7 +202,7 @@ class RuntimeAnalyzer:
             prompt_model_ready = bool(assistant_runtime.get("selected_prompt_installed"))
             conversational = str(ai_cfg.get("mode") or "").strip().lower() == "conversational_voice"
             auto_speak = bool(assistant_runtime.get("auto_speak"))
-            human_voice_enabled = bool(assistant_runtime.get("human_voice_enabled"))
+            human_voice_enabled = bool(assistant_runtime.get("human_voice_enabled", True))
             speech_supported = bool(assistant_runtime.get("speech_supported"))
             selected_prompt_model = str(assistant_runtime.get("selected_prompt_model") or ai_cfg.get("model") or "llama3.2:latest")
 
@@ -172,8 +217,8 @@ class RuntimeAnalyzer:
                 findings.append(AssistantFinding("medium", "Auto-speak armed but human voice is off", "Conversational Voice mode is selected and auto-speak is enabled, but the human voice path is disabled."))
                 recommendations.append("Enable Human voice in Controls or turn off auto-speak if you want a text-only assistant.")
             elif conversational and auto_speak and not speech_supported:
-                findings.append(AssistantFinding("high", "Speech backend unavailable", "Conversational Voice mode is selected, but Qt text-to-speech is unavailable in the current runtime."))
-                recommendations.append("Validate the Qt speech backend before relying on spoken assistant replies.")
+                findings.append(AssistantFinding("high", "Speech backend unavailable", "Conversational Voice mode is selected, but no supported human voice runtime is currently ready."))
+                recommendations.append("Validate the active human voice path before relying on spoken assistant replies.")
             elif conversational and not auto_speak:
                 findings.append(AssistantFinding("low", "Conversational mode is text-only", "Conversational Voice mode is selected, but assistant auto-speak is turned off."))
 
@@ -224,6 +269,7 @@ class RuntimeAnalyzer:
         summary = (
             f"State={state}; connected={bool(comm.get('is_connected'))}; camera_open={bool(camera.get('capture_open'))}; "
             f"visible_targets={visible_targets}; yolo_loaded={bool(yolo.get('detector_loaded'))}; "
+            f"face_backend={face_backend}; face_profiles_ready={face_ready_profiles}/{face_known_profiles}; "
             f"detection_mode={detection_mode_name}; tracking_scope={tracked_scope}; guard_mode={guard_mode_name}; "
             f"speed={engagement_speed}({engagement_speed_style}); trigger={trigger_label}; burst={burst_count}@{burst_interval_ms}ms; return_delay={return_delay:.2f}s; "
             f"assistant_provider={bool(assistant_runtime.get('provider_available'))}; speech_ready={bool(assistant_runtime.get('speech_supported')) and bool(assistant_runtime.get('human_voice_enabled'))}; "

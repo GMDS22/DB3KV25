@@ -332,21 +332,21 @@ class KokoroTTS:
             pass
 
     def stop(self) -> None:
-        """Stop any in-progress speech and clear the queue."""
-        self._stop.set()
+        """Stop any in-progress speech and clear the queue.
+
+        Only drains the pending queue — the worker thread is kept alive so that
+        the Kokoro model does not need to be reloaded on every stop/speak cycle.
+        Any phrase currently being synthesised will finish playing (Kokoro ONNX
+        does not support mid-synthesis interruption), but queued phrases are
+        discarded immediately.
+        """
         try:
-            # Clear the queue by draining it
+            # Drain the queue so pending phrases are discarded
             while not self._queue.empty():
                 try:
                     self._queue.get_nowait()
                 except queue.Empty:
                     break
-            # Reset the stop event for future use
-            self._stop.clear()
-            # Restart the worker if it was stopped
-            if self._worker is not None and not self._worker.is_alive():
-                self._worker = threading.Thread(target=self._worker_loop, name="sentry-voice-kokoro", daemon=True)
-                self._worker.start()
         except Exception as exc:
             self._on_log(f"[VOICE] Kokoro stop error: {exc}")
 
@@ -1005,7 +1005,7 @@ class VoskCommandListener:
         cleaned = re.sub(r"\s+", " ", str(text or "").strip())
         if not cleaned:
             return False
-        words = [token for token in cleaned.split(" ") if token]
+        words = [token for token in cleaned.split() if token]
         word_ok = len(words) >= int(getattr(self, "_min_final_words", 2) or 2)
         current_time = float(now if now is not None else time.time())
         started_s = float(getattr(self, "_active_speech_started_s", 0.0) or 0.0)
@@ -1013,7 +1013,20 @@ class VoskCommandListener:
         confidence_ok = True
         if confidence is not None:
             try:
-                confidence_ok = float(confidence) >= float(getattr(self, "_min_final_confidence", 0.45) or 0.45)
+                c = float(confidence)
+                min_conf = float(getattr(self, "_min_final_confidence", 0.45) or 0.45)
+                # Inside an active command window the operator has already confirmed
+                # attention via wake word.  Relax the floor so that a follow-up
+                # utterance with high background noise can still pass to command
+                # matching.  Short noise bursts are still gated by duration_ok
+                # because they won't reach the 1.2 s sustained-speech threshold.
+                in_window = current_time <= float(getattr(self, "_command_window_until_s", 0.0) or 0.0)
+                if in_window:
+                    if duration_ok:
+                        min_conf = min(min_conf, 0.12)
+                    else:
+                        min_conf = min(min_conf, 0.20)
+                confidence_ok = c >= min_conf
             except Exception:
                 confidence_ok = True
         return (word_ok or duration_ok) and confidence_ok
@@ -1022,7 +1035,7 @@ class VoskCommandListener:
         normalized = re.sub(r"\s+", " ", str(text or "").strip().lower())
         if not normalized:
             return False
-        known_fragments = set(self._command_grammar_fragments())
+        known_fragments = set(self._command_grammar_fragments())  # Ensure we have the command grammar fragments
         if normalized in known_fragments:
             return True
         if self._fuzzy_command_fragment_match(normalized):
@@ -1648,12 +1661,33 @@ class VoskCommandListener:
     def _windows_speech_grammar_phrases(self) -> list[str]:
         wake_aliases = self._wake_word_aliases(self._wake_word)
         command_fragments = self._command_grammar_fragments()
+        # Build the same "alias + fragment" cross-product as _recognizer_grammar_phrases so
+        # that Windows SR's phrase grammar can match whole utterances like
+        # "Elion run the smart sentry" at high confidence instead of falling back to
+        # DictationGrammar which produces garbage confidence for combined phrases.
+        prefixed_phrases = [
+            f"{alias} {fragment}".strip()
+            for alias in wake_aliases
+            for fragment in command_fragments
+            if alias and fragment
+        ]
         phrases = [
             *wake_aliases,
             self._wake_word,
             *command_fragments,
+            *prefixed_phrases,
         ]
         return list(dict.fromkeys(str(item).strip().lower() for item in phrases if str(item).strip()))
+
+    def _use_windows_dictation_grammar(self) -> bool:
+        raw = str(os.getenv("SMART_SENTRY_WINDOWS_STT_DICTATION", "") or "").strip().lower()
+        if raw in {"1", "true", "yes", "on"}:
+            return True
+        if raw in {"0", "false", "no", "off"}:
+            return False
+        # Default to phrase grammar only on Windows. DictationGrammar can degrade
+        # wake+command accuracy in noisy environments.
+        return False
 
     def _fuzzy_command_fragment_match(self, text: str) -> str:
         normalized = re.sub(r"\s+", " ", str(text or "").strip().lower())
@@ -2081,6 +2115,7 @@ class VoskCommandListener:
             (r"\bsmart entry\b", "smart sentry"),
             (r"\bsmarts? entry\b", "smart sentry"),
             (r"\bsmarts?\s+and\s+(?:tree|three|drink)\b", "smart sentry"),
+            (r"\bsmart\s+sentry\s+to\s+(?:rob|run)\b", "run smart sentry"),
             (r"\brun\s+(?:the\s+)?smarts?\s+and\b", "run smart sentry"),
             (r"\brun\s+(?:the\s+)?smart\s+sent\s+(?:tree|three)\b", "run smart sentry"),
             (r"\brun\s+(?:the\s+)?smarts?\s+and\s+(?:tree|three|drink)\b", "run smart sentry"),
@@ -2239,6 +2274,12 @@ class VoskCommandListener:
         recovered_core_intent = self._recover_core_intent_phrase(corrected)
         if recovered_core_intent:
             return recovered_core_intent
+        wake_word = str(getattr(self, "_wake_word", "") or "").strip().lower()
+        if wake_word:
+            for alias in self._wake_word_aliases(wake_word):
+                normalized_alias = re.sub(r"\s+", " ", str(alias or "").strip().lower())
+                if normalized_alias and (corrected == normalized_alias or corrected.startswith(f"{normalized_alias} ")):
+                    return corrected
         fuzzy_match = self._fuzzy_command_fragment_match(corrected)
         if fuzzy_match:
             return fuzzy_match
@@ -2461,6 +2502,12 @@ class VoskCommandListener:
             self._emit_transcript("final", final_text, source="final", confidence=confidence)
             return final_text
         wake_aliases = self._wake_word_aliases(wake_word)
+        strict_high_intent_patterns = (
+            r"\bconnect\b.*\benable\b.*\bsmart\s+sentry\b",
+            r"\bconnect\b.*\b(board|boards|com|port|serial)\b",
+            r"\benable\b.*\bsmart\s+sentry\b",
+            r"\b(?:run|start)\b.*\bsmart\s+sentry\b",
+        )
         pattern = r"\b(?:" + "|".join(re.escape(alias) for alias in wake_aliases) + r")\b"
         wake_matched = bool(re.search(pattern, corrected))
         if not wake_matched and wake_aliases:
@@ -2507,8 +2554,13 @@ class VoskCommandListener:
                 return wake_word
             self._append_listening_text(stripped)
             if not self._passes_final_transcript_gate(stripped, confidence=confidence, now=now):
-                self._on_log(f"[VOICE-DIAG] wake-followup-gate-rejected text='{stripped}'")
-                return ""
+                if any(re.search(expr, stripped) for expr in strict_high_intent_patterns):
+                    self._on_log(
+                        f"[VOICE-DIAG] wake-followup-gate-bypassed-high-intent text='{stripped}'"
+                    )
+                else:
+                    self._on_log(f"[VOICE-DIAG] wake-followup-gate-rejected text='{stripped}'")
+                    return ""
             if not self._is_allowed_command_or_intent(stripped):
                 self._on_log(f"[VOICE-DIAG] wake-followup-unknown-command text='{stripped}'")
                 return ""
@@ -2521,8 +2573,13 @@ class VoskCommandListener:
         self._emit_transcript("final", final_text, source="final", confidence=confidence)
 
         if not self._passes_final_transcript_gate(final_text, confidence=confidence, now=now):
-            self._on_log(f"[VOICE-DIAG] final-transcript-gate-rejected text='{final_text}'")
-            return ""
+            if any(re.search(expr, final_text) for expr in strict_high_intent_patterns):
+                self._on_log(
+                    f"[VOICE-DIAG] final-transcript-gate-bypassed-high-intent text='{final_text}'"
+                )
+            else:
+                self._on_log(f"[VOICE-DIAG] final-transcript-gate-rejected text='{final_text}'")
+                return ""
         if not self._is_allowed_command_or_intent(final_text):
             self._on_log(f"[VOICE-DIAG] final-transcript-unknown-command text='{final_text}'")
             return ""
@@ -2551,6 +2608,7 @@ class VoskCommandListener:
             r"\bdisconnect\b.*\b(board|boards|smart\s+sentry|link|controller|com|port|ports|serial)\b",
             r"\benable\b.*\bsmart\s+sentry\b",
             r"\bdisable\b.*\bsmart\s+sentry\b",
+            r"\b(?:run|start)\b.*\bsmart\s+sentry\b",
             r"\bstart\b.*\btracking\b",
             r"\bresume\b.*\b(auto\s*tracking|autotracking|guard(ing)?\s*mode)\b",
             r"\b(?:open|close)\b.*\b(camera|video)\b",
@@ -2893,6 +2951,8 @@ class WindowsSpeechCommandListener(VoskCommandListener):
 
     def _powershell_listener_script(self) -> str:
         phrases = self._windows_speech_grammar_phrases()
+        dictation_enabled = self._use_windows_dictation_grammar()
+        dictation_literal = "$true" if dictation_enabled else "$false"
         phrase_literals = ", ".join(
             "'" + phrase.replace("'", "''") + "'"
             for phrase in phrases
@@ -2908,7 +2968,10 @@ $engine.InitialSilenceTimeout = [TimeSpan]::FromSeconds(4)
 $engine.BabbleTimeout = [TimeSpan]::FromSeconds(0)
 $engine.EndSilenceTimeout = [TimeSpan]::FromMilliseconds(1800)
 $engine.EndSilenceTimeoutAmbiguous = [TimeSpan]::FromMilliseconds(1700)
-$engine.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))
+$dictationEnabled = {dictation_literal}
+if ($dictationEnabled) {{
+    $engine.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))
+}}
 $choices = New-Object System.Speech.Recognition.Choices
 foreach ($phrase in @({phrase_literals})) {{
     if (-not [string]::IsNullOrWhiteSpace($phrase)) {{
@@ -3084,11 +3147,12 @@ def _can_use_windows_speech_backend(device_name: str) -> bool:
     if os.name != "nt":
         return False
     requested = str(device_name or "").strip()
-    default_name = _default_windows_input_device_name().strip()
-    if not default_name:
-        return False
     if not requested:
-        return True
+        raw = str(os.getenv("SMART_SENTRY_USE_WINDOWS_NATIVE_STT", "") or "").strip().lower()
+        if raw not in {"1", "true", "yes", "on"}:
+            return False
+        default_name = _default_windows_input_device_name().strip()
+        return bool(default_name)
     # Windows native speech can only bind to the current default input device.
     # When the operator explicitly selects a microphone, keep STT on Vosk so the
     # configured device is actually honored.

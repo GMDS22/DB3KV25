@@ -1,9 +1,14 @@
 # SMART SENTRY V2 — COMPLETE REFERENCE MANUAL
 
-> **Version:** 4.0.0  
-> **Module Path:** `app/sentry_v2/`  
-> **Last Updated:** 2026-05-05  
-> **Status:** Verified against the current standalone Smart Sentry v4.0.0 release candidate. The canonical runtime settings file is versionless at `app/config/smart_sentry_settings.json`; older versioned settings paths remain compatibility fallbacks only and are migrated forward on load. The active dual-USB hardware contract is `NANO BOARD USB + DEBUG BOARD USB`. The full settings system defines 13 tabs, with `Facial Recognition` active in the runtime surface and `AI Assistant` still temporarily hidden by release hold for the current release line.
+Date: 2026-05-14
+Status: Verified current standalone runtime reference for the Smart Sentry v4.0.0 release candidate
+Audience: Operators, developers, validators
+Version: 4.0.0
+Hardware Contract: NANO BOARD USB + DEBUG BOARD USB
+Settings File: app/config/smart_sentry_settings.json
+Module Path: app/sentry_v2/
+
+Canonical runtime note: older versioned settings paths remain compatibility fallbacks only and are migrated forward on load. The full settings system defines 14 active tabs, including live `Facial Recognition`, `AI Assistant`, and `Documentation` surfaces inside the current settings stack.
 
 Primary behavior-contract note: for the current authoritative tracking, PIR, target-loss, center-aim, and fire-gating blueprint, read `SMART_SENTRY_AUTOTRACKING_BEHAVIOR_BLUEPRINT.md` first before changing engine or preset behavior.
 
@@ -52,16 +57,23 @@ On single-camera systems, Smart Sentry should normally use camera index `0` unle
 - **Sound system:** procedural non-blocking buzzer cues now route through `sound_engine.py` and `SentryV2Comm` with transport-aware status and persisted volume
 - **Voice output modes:** Smart Sentry now supports both robot buzzer cues and optional human-like local speech through Qt text-to-speech, so identity alerts and assistant replies can use either path or both together
 - **Enhanced voice support:** Windows SAPI voice enumeration now includes `Microsoft Mark` (male voice) alongside `Microsoft Zira Desktop` and `Microsoft David Desktop` after OneCore-to-classic SAPI registry bridging; speech runtime state handling has been hardened against stale stops and queued interrupts for continuous announcements
+- **Voice-first conversation expansion:** direct voice conversation now covers richer identity, purpose, and creator prompts, non-repeating joke follow-ups such as `another one`, voice-family follow-ups like `British female` or `try another one`, direct voice utility requests such as current voice, voice scan, save settings, and runtime export actions, plus coordinated master-profile requests such as `current profile`, `list profiles`, and `load profile <name>`
+- **Family and playful conversation expansion:** cue-only `Elion` / `hey Elion` wakeups now rotate through a broader acknowledgement pool, recognized enrolled friendly faces can be greeted by name during family introductions, the assistant now keeps short-term session memory for recently recognized friendly names, and it has deterministic replies for prompts such as `my kids are here and they want to meet you, can you introduce yourself`, `do you remember us`, `how can I improve the aiming precision`, `how can I make it more playful`, `what can we ask you`, `what games can we play`, `give us another challenge`, `give us a freeze dance challenge`, and `give us a splash mission`
+- **Voice-first tuning preset commands:** operators can now ask for the current preset, list available presets, or load a preset by name across the individual Detection, Target Filter, Threat AI, Engagement, and Servo Move Time preset groups
+- **Voice-first face commands:** direct spoken commands now cover face-recognition status, known-face profile summaries, preview face detection, preview-inbox photo loading, saving detected face candidates, known-face testing with `who is in view` style prompts, direct photo-batch imports with `import face photos for <name>`, plus live face-library management commands such as `register face as <name>`, `remove face <name>`, `update face <name>`, `rename face <old> to <new>`, and `mark face <name> as target` / `set face <name> to friendly`
+- **Document browser:** Smart Sentry now exposes the same searchable formatted documentation browser in three operator-access paths: the dedicated `Documentation` settings tab for in-app reading, the pinned top-strip `Docs` shortcut, and the Controls page `Docs Browser` quick action for a separate window; the voice runtime still accepts `open document browser` style requests for the detached browser window, and all documentation surfaces now share the same colorized renderer, prioritized overview documents, documentation-writing standard, and live theme alignment
+- **Shutdown speech cleanup:** once shutdown begins, Smart Sentry now stops active speech immediately and suppresses delayed voice callbacks so the app does not continue talking after the window is closing
+- **Portable AI voice packaging:** portable release builds now bundle the `models/` voice-runtime tree plus the Kokoro, Edge, and Azure speech backends so offline Kokoro voices and online neural voice routes remain available in packaged builds instead of only in the source workspace
 - **Model-backed face recognition:** Facial recognition now supports an optional OpenCV YuNet + SFace backend using downloaded ONNX models for improved accuracy over the legacy Haar-based matcher; backend selection is configurable and requires re-enrollment when switching backends
 - **Return/home behavior stability:** Fixed return-to-guard and Home button bounce-back by ensuring `RETURNING` state completes into fresh `GUARDING` without re-engaging visible targets, clearing stale queue/cooldown state on arrival, and properly finalizing direct guard moves after motion completion
 - **Camera/UI performance optimization:** Reduced live face recognition overhead by downscaling large ROIs before YuNet inference, lengthening refresh cadences, and reducing jitter-triggered rematching to prevent UI thread stalls during `opencv_sface` operation
 - **Runtime diagnostics:** the status area now includes pinned hardware-monitor cards plus a live sound-link readout
 - **Runtime data export:** the Controls page can write timestamped JSON and Markdown runtime captures under the repo snapshot folder and expose a direct open-folder action for the saved files
 - **Preview resiliency:** local camera preview now keeps a reduced-overlay live fallback active when detector callbacks lag and records blackout-frame counts in runtime snapshots; sustained successful-but-near-black webcam frames now trigger source recovery instead of silently remaining black
-- **Operator expansion:** the runtime surface now includes active Facial Recognition and Shortcut Keys surfaces plus a pinned top-row `Quick Keys` action; the AI Assistant surface remains available in code but is still hidden by release hold for the current release line
-- **Known-face support:** Smart Sentry can now load and persist a lightweight face library, register new identities from images or the current live frame, label recognized faces in the preview, automatically clear enrollment overlays after save, return from enrollment photos to live camera, and suppress recognized friendly identities from engagement in the autotracking path
+- **Operator expansion:** the runtime surface now includes active Facial Recognition, AI Assistant, Shortcut Keys, and Documentation surfaces plus pinned top-row `Quick Keys` and `Docs` actions for fast access without leaving the current page
+- **Known-face support:** Smart Sentry can now load and persist a lightweight face library, register new identities from images or the current live frame, label recognized faces in the preview, automatically clear enrollment overlays after save, return from enrollment photos to live camera, suppress recognized friendly identities from engagement in the autotracking path, load the latest preview-inbox import photo by voice, and import per-profile face photo batches from fixed folders under `face_imports/`
 - **Settings compatibility:** the canonical runtime settings file remains authoritative while the legacy nested settings file is kept synchronized for compatibility
-- **Acoustic Guard:** USB microphone anomaly detection now runs as a background thread using adaptive EWMA baseline tracking; on anomaly, the turret performs a quick smooth three-point initial search (45° → 135° → 230°) followed by a slow full-range secondary sweep with slight tilt bobbing; visual target detection stays active during acoustic movement and immediately takes priority if a target is found
+- **Acoustic Guard:** USB microphone anomaly detection now runs only while Smart Sentry itself is enabled, uses adaptive EWMA baseline tracking plus a short sustained-anomaly debounce before reporting, and on anomaly the turret performs a quick smooth three-point initial search (45° → 135° → 230°) followed by a slow full-range secondary sweep with slight tilt bobbing; visual target detection stays active during acoustic movement and immediately takes priority if a target is found
 - **QA bar sensor toggles:** the Quick Access chip bar under the video panel now includes dedicated one-click toggle buttons for Acoustic Guard (🎤) and PIR Sensors (🟥), bidirectionally synced with their corresponding Guard tab checkboxes
 - **Acoustic sensitivity presets:** the Guard tab Acoustic Guard group now exposes a Sensitivity dropdown (Very High / High / Medium / Low / Very Low) that live-applies matched threshold and z-score values for fast tuning without manual number entry
 - **Acoustic test trigger:** a Trigger Test Alert button in the Acoustic Guard group injects a synthetic anomaly event immediately, so operators can verify the movement protocol without needing real microphone input
@@ -197,16 +209,17 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 9. **Theme** — visual preset selection plus live accent, transparency, contrast, radius, and contrast tuning; panel font zoom remains supported through the hidden Shift+wheel shortcut rather than a visible slider
 10. **Controls** — Manual pan/tilt matrix, visible `Wake Up` / `Go Rest` actions, sound controls, runtime data export and open-folder actions, LED/laser/safety toggles, Auto Lighting Control group (auto enable toggle, manual PWM slider, dark threshold, min/max PWM range, live scene luma readout)
 11. **Facial Recognition** — active known-face workflow with photo-browse enrollment, per-face naming, per-face target/non-target tagging, preview overlays, and live suppression support
-12. **Shortcut Keys** — live shortcut status, assigned key summary, and quick-reference access
-13. **AI Assistant** — local Ollama assistant workflow remains implemented in code but is still hidden by release hold for the active release line
+12. **AI Assistant** — active local Ollama assistant workflow with deterministic runtime fallback, live model/session controls, and operator-facing reasoning or execution support
+13. **Shortcut Keys** — live shortcut status, assigned key summary, and quick-reference access
+14. **Documentation** — embedded searchable manual, guide, report, and checklist browser with formatted in-app reading
 
-**Verified current layout note:** the underlying settings architecture still defines 13 icon-forward settings tabs inside a full-height right-side panel, with a pinned header and top-row `Quick Keys` button above the tabs and compact Status/Log areas below the video rather than as separate tabs. For the active release line, Facial Recognition is active while AI Assistant remains temporarily hidden through the documented release-hold convention.
+**Verified current layout note:** the underlying settings architecture now defines 14 icon-forward settings tabs inside a full-height right-side panel, with a pinned header, top-row `Docs` and `Quick Keys` shortcuts above the tabs, a live embedded `Documentation` tab for formatted document reading, an active AI Assistant tab, and compact Status/Log areas below the video rather than as separate tabs.
 
 **Verified current runtime note:** the Controls page now includes persisted Sound ON/OFF and volume controls, visible `Wake Up` / `Go Rest` buttons, read-only runtime data export controls, and an open-folder shortcut for saved exports, while the Status area surfaces live sound-link transport state alongside the hardware monitor. The Serial Output panel now also supports timestamped log export plus a direct open-folder action for AI analysis and troubleshooting.
 
 **Verified current identity note:** the Facial Recognition implementation persists its face library at the versionless canonical path `app/config/smart_sentry_faces.json`, still supports legacy versioned face-library files as migration fallbacks, and uses a lightweight Haar-cascade plus embedding workflow. The tab is active in the current runtime surface and includes preview enrollment, save/update profile flows, friendly/target tagging, and engagement suppression controls.
 
-**Verified current shortcut note:** the top-row `Quick Keys` button and the Shortcut Keys tab both point operators to `SMART_SENTRY_SHORTCUT_KEYS.md`, and the live shortcut runtime stays window-focused so hotkeys only fire while the Smart Sentry window is active. Manual movement now accepts both `W/A/S/D` and `Left/Right/Up/Down` arrows when the manual keyboard toggle is enabled.
+**Verified current shortcut note:** the top-row `Quick Keys` button and the Shortcut Keys tab both point operators to `SMART_SENTRY_SHORTCUT_KEYS.md`, while the top-row `Docs` button opens the detached document browser without changing tabs. The live shortcut runtime stays window-focused so hotkeys only fire while the Smart Sentry window is active. Manual movement now accepts both `W/A/S/D` and `Left/Right/Up/Down` arrows when the manual keyboard toggle is enabled.
 
 **Verified current buzzer-control note:** the Sound ON/OFF toggle (including the QA mute chip) controls whether buzzer cues are sent at all, and the Sound volume slider controls `volume_pct` on the buzzer transport payload (`SOUND:freq:duration:volume` on serial and `volume_pct` in UDP sound packets). When human voice mode is enabled with buzzer suppression, buzzer output is intentionally muted.
 
@@ -214,12 +227,12 @@ The main QWidget that hosts all UI tabs and orchestrates the pipeline.
 
 **Verified current WiFi adapter note:** the Connection tab WiFi UDP panel includes a `WiFi Adapter` dropdown that lists all Windows WiFi interfaces detected via `netsh`. Setting it to a dedicated USB dongle (e.g. `SMART SENTRY CON`) locks the auto-reconnect watchdog to that adapter for all `netsh wlan connect` calls, preventing the app from accidentally joining the ESP32 SSID on the wrong adapter. The selection is saved to `ConnectionConfig.wifi_interface`.
 
-**Verified current AI assistant note:** the underlying local Ollama-backed assistant implementation remains in the codebase with deterministic runtime analysis and fallback behavior, but the AI Assistant tab is intentionally on release hold for the active release line and is not part of the active release surface.
+**Verified current AI assistant note:** the underlying local Ollama-backed assistant implementation is part of the current active release surface. The AI Assistant tab is live in the settings stack, and it combines local-model controls with deterministic runtime analysis and fallback behavior when the model bridge is unavailable.
 
 **AI + Speech readiness summary (current app):**
 - **Text-to-speech (Qt / Windows SAPI):** implemented and wired for identity announcements, AI spoken replies, test/fallback phrases, voice style/rate/pitch/volume control, diagnostics, and speech-state tracking.
 - **AI local assistant:** implemented with local Ollama connectivity checks, model listing, runtime-analysis/recommendation/prompt tasks, deterministic fallback when Ollama is unavailable, and a bounded set of supported local actions (mode switching, camera/link toggles, face-recognition toggle, shortcuts toggle, voice toggles, home/rest/position commands).
-- **Release state:** AI tab remains under release hold; implementation is present but not part of the active release surface until the hold is removed and validation is completed.
+- **Release state:** AI tab is part of the active release surface. Local-model availability still determines whether Ollama-backed responses are available at runtime, but deterministic fallback and operator controls remain present inside the tab.
 
 **Verified current Threat AI note:** the Threat AI page now shows saved-data and model status text, exposes an `Open ML Folder` action only when real saved data or model artifacts exist, and includes an operator-facing description of how logged training examples and optional ML refinement interact with the weighted threat scorer.
 
@@ -470,7 +483,7 @@ tilt = current_tilt + offset_y
 - Motion and IO are sent as JSON payloads with CRC32 integrity check
 - Typical payload fields are `pan_cmd`, `tilt_cmd`, `fire`, `safety`, `mode`, `led`, `laser`, and optional `move_time_ms`
 - ESP32 relays bus servo commands to debug board via UART2
-- The current WiFi firmware baseline for app-managed ESP32 work is still `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+- The current WiFi firmware baseline for app-managed ESP32 work is still `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino`
 
 ### Current Firmware Warning
 
@@ -596,8 +609,8 @@ Named presets are hue-anchored but shade-tolerant. Moderate darkening or desatur
 ### YOLO Model Management
 
 - Source-side models are stored in `YOLO_MODELS/` at the workspace root
-- Packaged-release operator model drop folder is `F:\SMART SENTRY V2.3.2\YOLO_MODELS`
-- Packaged default fallback weights may also exist under `F:\SMART SENTRY V2.3.2\SMART_SENTRY_V2_3_2_FILES\YOLO_MODELS`
+- Packaged-release operator model drop folder is the release-root `YOLO_MODELS/` folder inside the promoted Smart Sentry package
+- Packaged default fallback weights may also exist under the package support folder copy of `YOLO_MODELS/`
 - Model selector combo box scans for `*.pt` files
 - Load button calls `detector.load_yolo(path)`
 - Class filter text input controls which YOLO classes are detected
@@ -1007,9 +1020,11 @@ When the engine is ENGAGING, the center reticle adds a subtle pulse ring. This i
 
 ### Current Layout Constraints
 
-- The settings side is currently a scroll area on the right side of the video feed.
+- The settings side is now a full-height right-side panel with a pinned AI header, a top utility strip, and icon-first settings tabs below it.
 - The settings side is now hosted in a horizontal splitter so operators can resize it against the video feed.
-- The current implementation uses icon-first tabs, large previous/next navigation arrows, a stacked `Wake Up` / `Go Rest` header control, and a pinned `Quick Keys` utility action in the top strip.
+- The left side also uses a vertical splitter between the video panel and the bottom information band, so video height can be adjusted directly from the main workspace.
+- The bottom-left information area now uses its own horizontal splitter: `System Telemetry` on the left and `Speech To Text` on the right, with an equal-width default split and persisted operator resizing.
+- The current implementation uses icon-first tabs, large previous/next navigation arrows, a visible `SETTINGS` navigation label, a contextual `?` help action in the settings nav, top-strip `Wake Up` / `Go Rest` quick actions, and pinned `Docs` plus `Quick Keys` utility actions in the header strip.
 - The earlier bottom `Panel Width` slider is no longer part of the current operator workflow; width is managed by the splitter and persisted settings.
 
 ### Guard Tab
@@ -1046,9 +1061,9 @@ Once the underlying `cleanup()` call completes the overlay transitions to **"All
 
 ### Acoustic Guard Behavior
 
-Acoustic Guard is a USB microphone anomaly detection system that runs independently of the camera pipeline as a background thread. It uses an adaptive EWMA (exponential weighted moving average) baseline that continuously tracks the ambient noise floor. A sound event is flagged when the RMS level exceeds either the configured `anomaly_threshold_db` above baseline or the configured `anomaly_zscore_threshold` standard deviations above the rolling mean — whichever fires first.
+Acoustic Guard is a USB microphone anomaly detection system that runs independently of the camera pipeline as a background thread, but it is only allowed to run while Smart Sentry is actively enabled. It uses an adaptive EWMA (exponential weighted moving average) baseline that continuously tracks the ambient noise floor. A sound event is flagged only when the RMS level stays anomalous for a short sustained window and exceeds both the configured `anomaly_threshold_db` above baseline and the configured `anomaly_zscore_threshold` standard deviations above the rolling mean.
 
-On detection the event is queued. The alert only executes when the engine is in GUARDING state with no active visual target or PIR cue. If a visual target appears at any point during the acoustic sequence, the sequence is cancelled immediately and engagement takes priority.
+On detection the event is queued. The alert only executes when the engine is in GUARDING state with no active visual target or PIR cue. If Smart Sentry is disabled, closing, or loses the active runtime gate, the acoustic detector is stopped instead of continuing to listen in the background. If a visual target appears at any point during the acoustic sequence, the sequence is cancelled immediately and engagement takes priority.
 
 **Acoustic alert movement protocol:**
 
@@ -1070,11 +1085,11 @@ On detection the event is queued. The alert only executes when the engine is in 
 
 | Preset | Threshold (dB) | Z-score | Best for |
 |---|---|---|---|
-| Very High | 2.5 | 1.2 | Lab/bench testing, near silence |
-| High | 3.5 | 1.6 | Quiet indoor environments |
-| Medium | 5.5 | 2.2 | Normal indoor |
-| Low | 8.0 | 2.8 | Noisy environments |
-| Very Low | 11.0 | 3.4 | High background noise |
+| Very High | 5.0 | 2.0 | Quiet bench testing when you still want quick response |
+| High | 6.5 | 2.4 | Quiet indoor environments |
+| Medium | 8.0 | 2.8 | Normal indoor baseline |
+| Low | 10.5 | 3.2 | Noisy rooms or fan noise |
+| Very Low | 13.0 | 3.8 | High background noise and rough field conditions |
 
 **Quick access toggles:** the QA bar under the video panel includes 🎤 (Acoustic Guard) and 🟥 (PIR Sensors) toggle buttons. Both are bidirectionally synced with the Guard tab checkboxes.
 
@@ -1170,7 +1185,11 @@ This behavior matters operationally because the turret should no longer appear t
 
 ### Theme and Panel Zoom
 
-The Theme page still persists `font_scale_pct`, but the current UI does not expose it as a normal slider. Operators can adjust panel zoom with `Shift` + mouse wheel while the settings panel has focus, or with the dedicated shortcut keys documented in `SMART_SENTRY_SHORTCUT_KEYS.md`. The zoom is clamped to the live supported range and saved back into theme config.
+The Theme page now exposes direct sliders for font scale, header glow, and border strength alongside preset, opacity, and contrast controls. Operators can still adjust panel zoom with `Shift` + mouse wheel while the settings panel has focus, or with the dedicated shortcut keys documented in `SMART_SENTRY_SHORTCUT_KEYS.md`. The zoom is clamped to the live supported range and saved back into theme config.
+
+Theme profiles can now be exported and imported from the Theme summary section (`Export Profile` / `Import Profile`) as JSON, including settings-panel width and all supported theme tuning fields.
+
+The Theme tab also includes a `Saved Theme Presets` section for storing named snapshots locally, then applying, updating, or deleting them later.
 
 ### Controls and Header Actions
 
@@ -1181,16 +1200,24 @@ The pinned header and Controls page now share the operator workflow for explicit
 - both actions follow the guided move profile instead of the generic manual jump behavior.
 - manual movement arrows and absolute-position helpers still operate independently of automatic tracking, subject to the live motion-enable gate and transport availability.
 - `Quick Keys` stays visible in the top strip and opens the dedicated shortcut-reference document without changing the header sizing contract.
+- `Docs` stays visible in the top strip and opens the detached documentation browser without forcing a tab change.
 - The Controls page now also exposes local human voice controls for Smart Sentry speech output, including enable or disable, speech-style presets, voice choice, rate, pitch, volume, a direct test button, an option to mute the ESP32 buzzer while human voice mode is enabled, and a dedicated Voice Diagnostics group.
 - The Voice Diagnostics group shows the active speech backend, selected voice, current speech state, route note, a one-click fallback phrase, a stop-voice action, a refresh action for logging the current human-voice diagnostic state, and a `Validate Voices` action that confirms each detected Qt voice can be selected and driven into a valid speech state.
+- The live voice listener now also accepts direct spoken voice-utility requests for current voice, voice options, voice test, full voice scan, settings save, runtime snapshot export, conversation export, and runtime export folder opening.
+- The live voice listener now also accepts `open document browser`, `open docs browser`, and `browse documents`, which open the separate in-app document browser window without leaving the runtime UI.
+- The live voice listener now also accepts direct spoken coordinated-profile requests for current active profile, available profile list, and direct `load profile <name>` switching through the master-profile runtime store.
+- The live voice listener now also accepts direct spoken face-recognition requests for face status, known-face profile summaries, preview face detection, preview-inbox photo loading, saving detected face candidates, and running a known-face check on the current frame.
+- The live voice listener now also accepts direct spoken face-library management requests to register the current visible face under a spoken name, optionally mark it as a target, remove a saved face profile by name without manually selecting it in the list first, and import photo batches for a named face profile from the fixed `face_imports/profile_batches/<name>/` folder structure.
+- Voice-selection follow-ups such as `British female`, `American male`, `male`, `female`, and `try another one` remain active during the held voice-selection window so operators can refine the voice without repeating the full request.
 
 ### Facial Recognition Tab
 
-For the active release line, the Facial Recognition tab is intentionally hidden from the active tab strip through the release-hold convention. Removing its hold entry restores the normal tab.
+The Facial Recognition tab is active in the current runtime surface.
 
-- The unfinished face-library workflow stays in the codebase for later release activation.
-- The tab stays visible so operators and editors can see that the feature exists.
-- The disabled state prevents the unfinished workflow from affecting normal active-release runtime behavior.
+- It exposes the live face-library workflow rather than a release-held placeholder.
+- It supports preview enrollment, save and update profile flows, friendly or target tagging, and engagement suppression for known friendly identities.
+- The face import folder contract is now fixed under `face_imports/preview_inbox/` and `face_imports/profile_batches/<face name>/` so operators can use voice-first photo loading without relying on spoken file paths.
+- The Photo Enrollment group exposes `Load Latest Inbox Photo` and `Open Import Folder` alongside the existing browse and detect actions.
 
 ### Shortcut Keys Tab
 
@@ -1201,13 +1228,30 @@ The Shortcut Keys tab is now the runtime status page for operator hotkeys.
 - It shows the assigned key list inside the app.
 - It mirrors the same quick-reference document opened by the top-row `Quick Keys` button.
 
+### Documentation Tab
+
+The Documentation tab now embeds the Smart Sentry document browser directly into the settings stack.
+
+- It indexes the same Smart Sentry markdown and text documents as the separate `Docs Browser` window.
+- It now places a quick-search bar at the top of the tab so operators can immediately search before scanning the rest of the page.
+- It keeps the same category filter, formatted reader, `Refresh`, `Open File`, and `Open Folder` actions.
+- It now keeps the left pane compact at one line per file name while still allowing the quick search to match document body text as well as file names and paths.
+- It now applies the shared documentation presentation layer, including colorized headings, metadata chips for standard header lines, consistent styling for tables, code, callouts, and links, and the live Smart Sentry theme colors instead of a fixed standalone palette.
+- It prioritizes overview documents such as `SMART_SENTRY_DOCUMENTATION_HUB.md` so operators have a clear in-app entry point into the current document set.
+- It is the preferred in-app reading surface when operators want documentation without opening a second window.
+- The top-strip `Docs` shortcut, separate `Docs Browser` quick action, and voice request remain available for detached browsing on another monitor or while leaving the current settings page unchanged.
+- The settings-nav `?` action also opens the detached documentation browser and pre-fills the search field with a query related to the current settings tab so operators can jump straight into the relevant guide set.
+
 ### AI Assistant Tab
 
-For the active release line, the AI Assistant tab is intentionally hidden from the active tab strip through the release-hold convention. Removing its hold entry restores the normal tab.
+The AI Assistant tab is active in the current runtime surface.
 
-- The unfinished local assistant workflow stays in the codebase for later release activation.
-- The tab stays visible so operators and editors can see that the feature exists.
-- The disabled state prevents unfinished assistant workflows from affecting normal active-release runtime behavior.
+- It exposes the live local assistant workflow directly inside the settings stack rather than behind a release hold.
+- It includes local model bridge controls, assistant mode and personality selection, endpoint configuration, and runtime-facing assistant actions.
+- When the Ollama bridge is unavailable, deterministic runtime analysis and fallback behavior remain available so the tab still provides operator value.
+- Immediate conversational voice replies now cover self-introduction, identity, purpose, creator or origin questions, compliments, and joke follow-ups such as `another one` or `one more`.
+- Voice-change conversations now avoid the prior silent failure path by re-enabling local human voice when a new voice is selected and using preview speech fallback when a live voice demonstration still cannot speak through the standard path.
+- Shutdown now suppresses any pending spoken confirmations, preview phrases, or deferred voice actions once the close path begins, which prevents Smart Sentry from continuing to talk after the app has been closed.
 - **AI report speech closing protocol:** spoken runtime analysis/report output must end with the phrase `End of analysys report.` so operators get an explicit verbal end-marker.
 
 ### Engage Tab
@@ -1718,6 +1762,18 @@ Before changing Smart Sentry v2, review these Smart Sentry-specific references:
 
 Smart Sentry documentation is intentionally split into three layers so future changes stay traceable without turning the manual into a diary:
 
+### Documentation Hub
+
+- File: `SMART_SENTRY_DOCUMENTATION_HUB.md`
+- Purpose: current entry point for the live document set, including which files are live, proposal-only, or historical
+- Update when the documentation set, documentation priorities, or current-app document map changes
+
+### Documentation Style Standard
+
+- File: `SMART_SENTRY_DOCUMENTATION_STYLE_STANDARD.md`
+- Purpose: source-writing and formatting standard for all Smart Sentry documents shown in the Documentation tab and detached browser
+- Update when the documentation presentation contract or required authoring format changes
+
 ### Reference Manual
 
 - File: `SMART_SENTRY_MANUAL.md`
@@ -1754,7 +1810,7 @@ Smart Sentry documentation is intentionally split into three layers so future ch
 - Purpose: proposed future tracking and behavior work that is not yet the live runtime contract
 - Update when planning a verified future behavior change before the implementation is promoted into the blueprint and manual
 
-This split keeps the manual stable, the issue log concise, and the tooltip text maintainable.
+This split keeps the documentation entry point clear, the presentation standard consistent, the manual stable, the issue log concise, and the tooltip text maintainable.
 
 Before submitting changes to Smart Sentry v2:
 

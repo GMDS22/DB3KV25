@@ -6,7 +6,7 @@ Canonical sketch mapping is maintained in [ESP32_CURRENT_SKETCH.md](ESP32_CURREN
 
 Selected runtime topology: Smart Sentry WiFi baseline.
 
-Pinned current app path: use the ESP32 WiFi + Debug Board USB firmware contract backed by `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`. Waveshare single-board firmware files are on hold and are not part of the current Smart Sentry app workflow.
+Pinned current app path: use the ESP32 WiFi + Debug Board USB firmware contract backed by `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino`. Waveshare single-board firmware files are on hold and are not part of the current Smart Sentry app workflow.
 
 Firmware sketch names are treated as content-stable identifiers. An app release bump does not require a sketch rename unless the firmware itself changed or the team intentionally wants a new firmware identity.
 
@@ -43,7 +43,7 @@ From repo root:
 
 ```powershell
 # Primary ESP32 (IO/accessories) - Full WiFi UDP baseline sketch
-.\tools\flash_esp32_udp.ps1 -Port COM28 -Sketch "arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino"
+.\tools\flash_esp32_udp.ps1 -Port COM28 -Sketch "arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino"
 
 # Secondary ESP32 (servos) - Yahboom Servo Driver UDP sketch
 .\tools\flash_esp32_udp.ps1 -Port COM6 -Sketch "arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino"
@@ -55,7 +55,7 @@ For fully wireless operation with separate boards for IO and servos:
 
 ```powershell
 # Primary ESP32 (IO/accessories/fire/safety/LED/laser/PIR)
-.\tools\flash_esp32_udp.ps1 -Port COM28 -Sketch "arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino"
+.\tools\flash_esp32_udp.ps1 -Port COM28 -Sketch "arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino"
 
 # Secondary ESP32 (Yahboom servo driver board)
 .\tools\flash_esp32_udp.ps1 -Port COM6 -Sketch "arduino/DB3000_ESP32_Yahboom_Servo/DB3000_ESP32_Yahboom_Servo.ino"
@@ -89,12 +89,12 @@ Add -InstallCore if you want the script to attempt core install:
 
 ## Sketch Locations
 - Full WiFi UDP runtime for the current Smart Sentry WiFi baseline:
-	- arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino
+	- arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino
 - Waveshare v3 single-board UDP bus bridge:
 	- archived and on hold for the current app
 	- arduino/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE/SMART_SENTRY_V3_0_WAVESHARE_UDP_BUS_BRIDGE.ino
 - USB Serial IO + PIR runtime (current serial/dual-port firmware):
-	- arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
+	- arduino/DB3000_ESP32_IO_Telemetry_PIR/DB3000_ESP32_IO_Telemetry_PIR.ino
 
 The current Smart Sentry WiFi baseline sketch currently adds:
 - GPIO2 status LED / external blink mirror support
@@ -108,7 +108,7 @@ The current Smart Sentry WiFi baseline sketch currently adds:
 Upload the Smart Sentry WiFi baseline sketch:
 
 ```powershell
-.\tools\flash_esp32_udp.ps1 -Port COM28 -Sketch "arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino"
+.\tools\flash_esp32_udp.ps1 -Port COM28 -Sketch "arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino"
 ```
 
 Upload the Waveshare v3 bridge sketch only for archived bench work, not for the current app:
@@ -120,7 +120,7 @@ Upload the Waveshare v3 bridge sketch only for archived bench work, not for the 
 Upload USB Serial IO + PIR sketch:
 
 ```powershell
-.\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino"
+.\tools\flash_esp32_udp.ps1 -Port COM5 -Sketch "arduino/DB3000_ESP32_IO_Telemetry_PIR/DB3000_ESP32_IO_Telemetry_PIR.ino"
 ```
 
 ## Library Note

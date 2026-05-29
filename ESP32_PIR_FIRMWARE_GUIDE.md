@@ -7,11 +7,11 @@ This guide describes the DB3000 ESP32 IO firmware family, not the archived Waves
 
 Current live Smart Sentry app topology note:
 
-- Current live WiFi + Debug Board app firmware: `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
-- Current DB3000 USB serial IO firmware covered by this guide: `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
+- Current live WiFi + Debug Board app firmware: `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino`
+- Current DB3000 USB serial IO firmware covered by this guide: `arduino/DB3000_ESP32_IO_Telemetry_PIR/DB3000_ESP32_IO_Telemetry_PIR.ino`
 
 **Original File**: `DB3000_ESP32_IO_Telemetry_2026.ino`  
-**New File**: `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`  
+**New File**: `DB3000_ESP32_IO_Telemetry_PIR.ino`  
 **Status**: Original remains unchanged; new version is fully independent
 
 ## Key Features
@@ -176,7 +176,7 @@ P1L1F1S0    → Combined example: enable PIR, LED, fire, unsafe arm
 
 ### File Structure
 ```
-DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino
+DB3000_ESP32_IO_Telemetry_PIR.ino
 ├── Configuration Section (lines 30-60)
 │   ├── ENABLE_PIR_SUPPORT define
 │   ├── Pin assignments (all outputs)
@@ -224,7 +224,7 @@ Current status:
 
 - `sentry_v2_comm.py` already supports PIR event callbacks.
 - The serial path parses `PIR_EVENT sensor_id=... timestamp=...` lines.
-- The live WiFi path parses UDP JSON `pir_event` packets from `SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`.
+- The live WiFi path parses UDP JSON `pir_event` packets from `SMART_SENTRY_ESP32_UDP_PIR.ino`.
 - The app can still inject a manual PIR event for bench testing, but real parser support is no longer future work.
 
 Current live WiFi event example:
@@ -253,7 +253,7 @@ Current live WiFi event example:
 Current contract split:
 
 - Use this DB3000 sketch when validating direct serial IO / dual-port ESP32 behavior.
-- Use `SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` when validating the current live WiFi + Debug Board desktop app path.
+- Use `SMART_SENTRY_ESP32_UDP_PIR.ino` when validating the current live WiFi + Debug Board desktop app path.
 
 ## Testing & Validation
 
@@ -298,7 +298,7 @@ Current contract split:
 ## Build Instructions
 
 ### Arduino IDE
-1. Open `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino`
+1. Open `DB3000_ESP32_IO_Telemetry_PIR.ino`
 2. Select Board: **ESP32 Dev Module**
 3. Set Baud: **115200**
 4. Modify line 30 if needed:
@@ -306,7 +306,7 @@ Current contract split:
    - `#define ENABLE_PIR_SUPPORT 0` (to exclude PIR, smaller binary)
 5. **Sketch → Upload**
 6. Open Serial Monitor (115200 baud, line feed)
-7. Should see: `[BOOT] DB3000_ESP32_IO_Telemetry_2026_w_PIR ready`
+7. Should see: `[BOOT] DB3000_ESP32_IO_Telemetry_PIR ready`
 
 ### PlatformIO
 ```ini
@@ -321,13 +321,13 @@ build_flags = -DENABLE_PIR_SUPPORT=1
 
 ### Option 1: Drop-in Replacement (Easiest)
 1. Backup original: `DB3000_ESP32_IO_Telemetry_2026.ino`
-2. Flash new: `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino` (keep PIR disabled by default)
+2. Flash new: `DB3000_ESP32_IO_Telemetry_PIR.ino` (keep PIR disabled by default)
 3. All original tokens work identically
 4. Enable PIR later when ready: P1
 
 ### Option 2: Parallel Deployment
 1. Keep original board with `DB3000_ESP32_IO_Telemetry_2026.ino`
-2. Flash new board with `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino` with `ENABLE_PIR_SUPPORT=0`
+2. Flash new board with `DB3000_ESP32_IO_Telemetry_PIR.ino` with `ENABLE_PIR_SUPPORT=0`
 3. Gradually migrate to new firmware as PIR support matures
 
 ### Option 3: Gradual Integration
@@ -382,9 +382,9 @@ build_flags = -DENABLE_PIR_SUPPORT=1
 | File | Purpose | Status |
 |------|---------|--------|
 | `DB3000_ESP32_IO_Telemetry_2026.ino` | Original (no PIR) | Kept as-is |
-| `DB3000_ESP32_IO_Telemetry_2026_w_PIR.ino` | New (PIR support) | New feature branch |
+| `DB3000_ESP32_IO_Telemetry_PIR.ino` | New (PIR support) | New feature branch |
 | Directory | `arduino/DB3000_ESP32_IO_Telemetry_2026/` | Original sketch folder |
-| Directory | `arduino/DB3000_ESP32_IO_Telemetry_2026_w_PIR/` | New sketch folder |
+| Directory | `arduino/DB3000_ESP32_IO_Telemetry_PIR/` | New sketch folder |
 
 ---
 

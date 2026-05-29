@@ -403,10 +403,7 @@ class _DummySingleShotTimer:
         self.active = False
 
 
-def test_manual_fire_projectile_mode_latches_release_long_enough_for_gpio13_pulse():
-    """Projectile-mode manual fire should not clear the fire bit before the ESP32 can latch it."""
-    print("[Test 13/13] Manual Fire Projectile Pulse Latch...")
-
+def _build_manual_fire_test_tab(*, trigger_mode_bb: bool, pulse_ms: int = 120, cycle_count: int = 1, cycle_off_ms: int = 50):
     queued_calls = []
     dummy_timer = _DummySingleShotTimer()
 
@@ -415,7 +412,10 @@ def test_manual_fire_projectile_mode_latches_release_long_enough_for_gpio13_puls
     tab._closing = False
     tab.engine = SimpleNamespace(current_pan=140.0, current_tilt=87.0)
     tab._comm = SimpleNamespace(
-        trigger_mode_bb=True,
+        trigger_mode_bb=trigger_mode_bb,
+        trigger_mosfet_pulse_ms=pulse_ms,
+        trigger_mosfet_cycle_count=cycle_count,
+        trigger_mosfet_cycle_off_ms=cycle_off_ms,
         MODE_WIFI_DEBUG_USB=2,
         _mode=2,
         _sock=object(),
@@ -430,6 +430,14 @@ def test_manual_fire_projectile_mode_latches_release_long_enough_for_gpio13_puls
     tab._get_manual_move_time_ms = lambda: 35
     tab._log = lambda message: None
     tab.manual_fire_requested = SimpleNamespace(emit=lambda state: queued_calls.append(("emit", (state,), {})))
+    return tab, queued_calls, dummy_timer
+
+
+def test_manual_fire_projectile_mode_latches_release_long_enough_for_gpio13_pulse():
+    """Projectile-mode manual fire should not clear the fire bit before the ESP32 can latch it."""
+    print("[Test 13/13] Manual Fire Projectile Pulse Latch...")
+
+    tab, queued_calls, dummy_timer = _build_manual_fire_test_tab(trigger_mode_bb=True)
 
     tab._on_manual_fire(1)
     tab._on_manual_fire(0)
@@ -445,6 +453,32 @@ def test_manual_fire_projectile_mode_latches_release_long_enough_for_gpio13_puls
     assert queued_calls[1][2].get("fire") == 0, "Delayed projectile release should queue fire=0"
 
     print("  ✓ Projectile manual fire keeps fire=1 latched long enough for the GPIO13 trigger pulse")
+
+
+def test_manual_fire_water_mode_single_press_releases_after_mosfet_sequence_completes():
+    """Water-mode single press should delay release until the MOSFET pulse train can complete."""
+    print("[Test 14/14] Manual Fire Water Pulse Train Release...")
+
+    tab, queued_calls, dummy_timer = _build_manual_fire_test_tab(
+        trigger_mode_bb=False,
+        pulse_ms=200,
+        cycle_count=2,
+        cycle_off_ms=50,
+    )
+
+    tab._on_manual_fire_single_press(False)
+
+    assert len(queued_calls) == 1, "Water manual fire single press should queue only the fire=1 command immediately"
+    assert queued_calls[0][0] == "send_command", "Water manual fire should still queue a fire command"
+    assert queued_calls[0][2].get("fire") == 1, "Water manual fire single press should queue fire=1"
+    assert dummy_timer.started_ms == [490], "Water manual fire should delay release until the configured MOSFET pulse train can finish"
+
+    tab._flush_manual_projectile_fire_release()
+
+    assert len(queued_calls) == 2, "Water manual fire should send a delayed fire=0 release"
+    assert queued_calls[1][2].get("fire") == 0, "Delayed water release should queue fire=0"
+
+    print("  ✓ Water manual fire keeps fire=1 asserted for the full MOSFET pulse train and then releases")
 
 
 def main():
@@ -464,8 +498,9 @@ def main():
         test_comm_udp_state_trace_is_visible_without_flooding_duplicates()
         test_pin_assignment_dialog_content_lists_explicit_pir_gpio_mapping()
         test_manual_fire_projectile_mode_latches_release_long_enough_for_gpio13_pulse()
+        test_manual_fire_water_mode_single_press_releases_after_mosfet_sequence_completes()
         
-        print("\n✓ All 13 tests passed!\n")
+        print("\n✓ All 14 tests passed!\n")
         return 0
     
     except AssertionError as e:

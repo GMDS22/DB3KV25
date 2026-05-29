@@ -500,6 +500,78 @@ class LocalAssistantService:
         )
         return self._matches_prompt_variants(normalized, regex_patterns=family_patterns, token_groups=family_token_groups)
 
+    def _prompt_mentions_scene_query(self, prompt_text: str) -> bool:
+        normalized = self._normalize_conversation_text(prompt_text)
+        if not normalized:
+            return False
+        patterns = (
+            r"\bwhat can you see\b",
+            r"\bwhat do you see\b",
+            r"\bwhat are you seeing\b",
+            r"\bwhat objects\b.*\b(?:see|seeing|detect)\b",
+            r"\bdescribe\b.*\b(?:what you see|camera view|current scene|scene on camera)\b",
+            r"\btell me what(?:'s| is) (?:on|in) (?:the )?camera\b",
+            r"\breport what you (?:can )?see\b",
+            r"\bwhat(?:'s| is) in (?:the )?(?:camera|frame|view)\b",
+            r"\b(?:describe|report)\b.*\b(?:scene|view|frame|area)\b",
+        )
+        return any(re.search(pattern, normalized) for pattern in patterns)
+
+    def _scene_query_reply(self, prompt_text: str, snapshot: Dict[str, Any]) -> str | None:
+        if not self._prompt_mentions_scene_query(prompt_text):
+            return None
+        
+        scene_objects = list(snapshot.get("scene_objects") or [])
+        camera_status = dict(snapshot.get("camera_status") or {})
+        engine_state = dict(snapshot.get("engine_state") or {})
+        face_runtime = dict(snapshot.get("face_runtime") or {})
+        
+        camera_open = bool(camera_status.get("capture_open", False))
+        state_name = str(engine_state.get("state") or "PAUSED").upper()
+        
+        if not camera_open:
+            return "The camera is not currently open, so I cannot see anything right now."
+        
+        if not scene_objects:
+            return "The camera is active but I am not detecting any objects in the current view. That could mean the scene is clear, or the detection model is not loaded."
+        
+        # Build semantic counts
+        from collections import Counter
+        counts: Counter = Counter()
+        recognized: list[str] = []
+        for obj in scene_objects[:16]:
+            cls = str(obj.get("class_name") or "").strip().lower()
+            if cls:
+                counts[cls] += 1
+            label = str(obj.get("identity_label") or "").strip()
+            if label and label not in recognized:
+                recognized.append(label)
+        
+        top = counts.most_common(5)
+        parts = []
+        for cls, count in top:
+            if cls == "person" and count > 1:
+                parts.append(f"{count} people")
+            else:
+                parts.append(f"{count} {cls}" + ("s" if count > 1 and cls != "person" else ""))
+        
+        if not parts:
+            return "The camera is open but nothing significant is visible right now."
+        
+        things = ", ".join(parts)
+        reply = f"Right now I can see {things} in the camera view."
+        
+        if recognized:
+            names = ", ".join(recognized[:3])
+            reply += f" I also recognize {names} in the frame."
+        
+        if state_name == "ENGAGING":
+            reply += " Smart Sentry is actively engaging a target."
+        elif state_name == "GUARDING":
+            reply += " I am on guard and watching the area."
+        
+        return reply
+
     def _family_introduction_reply(self, prompt_text: str, conversation_context: Dict[str, Any] | None = None) -> str | None:
         query_kind = self._profile_query_kind(prompt_text)
         if query_kind not in {"introduction", "identity", "capabilities"}:
@@ -959,8 +1031,8 @@ class LocalAssistantService:
             "I can talk with you normally, help with Smart Sentry questions, and switch into diagnostics when you ask."
         )
         short_capabilities = (
-            "I can chat normally, answer questions about Smart Sentry, help with diagnostics when you ask, and handle supported commands. "
-            "More advanced automation is still being built."
+            "I can chat with you, help explain Smart Sentry, answer tuning questions, and switch into a more playful style for family splash time.",
+            "I can talk normally, help with Smart Sentry questions, guide runtime tuning, and join in with more playful family-style conversations too.",
         )
         full_intro_variants = (
             f"{_ASSISTANT_INTRODUCTION_FULL} {_ASSISTANT_IDENTITY_BOUNDARY}",
@@ -973,7 +1045,7 @@ class LocalAssistantService:
             "Elion Mesk here. I am Smart Sentry's conversational AI assistant.",
         )
         short_capability_variants = (
-            short_capabilities,
+            *short_capabilities,
             "Right now I can answer questions, help explain Smart Sentry, run diagnostics when you ask, and handle supported commands.",
             "My current scope is normal conversation, Smart Sentry help, diagnostics on request, and supported command handling.",
         )
@@ -983,7 +1055,7 @@ class LocalAssistantService:
             "Elion Mesk here. I am Smart Sentry's AI assistant, and yes, you are talking to me directly.",
         )
         capability_intro_variants = (
-            short_capabilities,
+            *short_capabilities,
             "I can talk normally, answer Smart Sentry questions, help diagnose issues when you ask, and handle supported commands.",
             "My role is normal conversation first, then Smart Sentry help, diagnostics, and supported command handling when needed.",
         )
@@ -1003,7 +1075,7 @@ class LocalAssistantService:
             short_capability_pick = self._pick_profile_reply(short_capability_variants)
             return self._pick_profile_reply(
                 (
-                    f"{short_identity} {short_capabilities}",
+                    f"{short_identity} {short_capabilities[0]}",
                     f"{short_identity_pick} {short_capability_pick}",
                 )
             )
@@ -1018,6 +1090,9 @@ class LocalAssistantService:
     ) -> str | None:
         raw_prompt = str(prompt_text or "").strip()
         lookup_prompt = str(canonical_prompt or raw_prompt).strip() or raw_prompt
+        # Scene queries need live detection data — can't answer them in the fast offline path.
+        if self._prompt_mentions_scene_query(raw_prompt):
+            return None
         self._remember_social_context(conversation_context)
         reply = self._profile_protocol_reply(raw_prompt, conversation_context)
         if reply is None:
@@ -1469,6 +1544,43 @@ class LocalAssistantService:
     def answer_operator_prompt(self, prompt_text: str, snapshot: Dict[str, Any], *, model: str, include_logs: bool = True) -> AssistantReply:
         parsed_actions = self._parse_actions(prompt_text)
         profile_reply = self._profile_protocol_reply(prompt_text)
+
+        # Scene query — describe what the camera currently sees using detection context.
+        scene_reply = self._scene_query_reply(prompt_text, snapshot)
+        if scene_reply is not None:
+            anchor = scene_reply
+            conversation_prompt = self._conversation_prompt(prompt_text, anchor)
+            if self.is_available():
+                try:
+                    reply_text = self._client.generate(
+                        model=model,
+                        prompt=conversation_prompt,
+                        system=self._conversation_system_prompt(),
+                        timeout_s=min(self._request_timeout_s(), 20.0),
+                        options=self._llm_options(max_output_tokens=180, temperature=0.30),
+                    )
+                    cleaned = str(reply_text or "").strip()
+                    if cleaned:
+                        return AssistantReply(
+                            text=cleaned, source="ollama", model=model,
+                            raw_response=reply_text, prompt_used=conversation_prompt,
+                            intent=self._default_conversation_intent(),
+                            memory_context=self._memory_context(),
+                        )
+                except Exception as exc:
+                    return AssistantReply(
+                        text=anchor, source="deterministic", model=model,
+                        raw_response="scene_query_fallback", prompt_used=conversation_prompt,
+                        intent=self._default_conversation_intent(),
+                        memory_context=self._memory_context(),
+                        error=str(exc),
+                    )
+            return AssistantReply(
+                text=anchor, source="deterministic", model=model,
+                raw_response="scene_query_fallback", prompt_used="scene_query_fallback",
+                intent=self._default_conversation_intent(),
+                memory_context=self._memory_context(),
+            )
         conversational_reply = self._conversational_protocol_reply(prompt_text)
         guided_conversation_reply = profile_reply if profile_reply is not None else conversational_reply
         general_conversation = bool(guided_conversation_reply is not None or self._should_use_general_conversation(prompt_text, parsed_actions))
@@ -2167,13 +2279,13 @@ class LocalAssistantService:
             f"camera_open={bool(camera.get('capture_open'))}",
             f"yolo_loaded={bool(yolo.get('detector_loaded'))}",
             f"face_backend={face_runtime.get('active_backend', 'n/a')}",
-            f"face_profiles_ready={face_runtime.get('ready_profile_count', 'n/a')}/{face_runtime.get('known_profile_count', 'n/a')}",
+            f"face_profiles_ready={face_runtime.get('ready_profile_count', 'n/a')}",
             f"mode={detection_cfg.get('detection_mode', 'n/a')}",
             f"tracking_scope={tracked_scope}",
         ]
         if engagement_cfg:
             summary_parts.append(
-                f"loss_protocols={engagement_cfg.get('loss_recovery_protocol_new_target', 'n/a')}/{engagement_cfg.get('loss_recovery_protocol_no_detection', 'n/a')}"
+                f"loss_protocols={engagement_cfg.get('loss_recovery_protocol_new_target', 'n/a')}"
             )
             summary_parts.append(
                 f"speed={engagement_cfg.get('engagement_speed', 'n/a')} trigger={'projectile' if bool(engagement_cfg.get('trigger_mode_bb', False)) else 'water'} burst={engagement_cfg.get('burst_count', 'n/a')}@{engagement_cfg.get('burst_interval_ms', 'n/a')}ms"

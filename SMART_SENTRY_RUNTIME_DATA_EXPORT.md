@@ -1,5 +1,9 @@
 # SMART SENTRY Runtime Data Export
 
+Date: 2026-05-13
+Status: Live runtime export contract for the current Smart Sentry app
+Audience: Operators, developers, AI-analysis workflows
+
 ## Purpose
 
 Smart Sentry exposes a runtime data export from the Controls page so the current session can be captured as structured evidence for debugging, tuning, and future AI-assisted analysis.

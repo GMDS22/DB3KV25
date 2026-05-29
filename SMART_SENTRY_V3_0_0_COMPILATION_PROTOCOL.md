@@ -6,7 +6,7 @@ This document is the active release-prep checklist for the Smart Sentry v3.0.0 r
 
 - App version string: `v3.0.0`
 - Active version marker: `SMART_SENTRY_V3_0_VERSION.txt`
-- Primary ESP32 WiFi sketch: `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+- Primary ESP32 WiFi sketch: `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino`
 - Primary ESP32 WiFi SSID: `SMART-SENTRY-V2.3`
 - Primary ESP32 WiFi password: `db3000pass`
 - Primary UDP endpoint: `192.168.4.1:9000`

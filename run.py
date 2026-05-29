@@ -143,9 +143,11 @@ def _run_main_with_retry() -> int:
             time.sleep(0.75)
             continue
         return code
+        
     return 1
 
 if __name__ == "__main__":
+    
     sys.excepthook = _log_unhandled_exception
     try:
         _NATIVE_CRASH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -155,5 +157,6 @@ if __name__ == "__main__":
         faulthandler.enable(file=_NATIVE_CRASH_FH, all_threads=True)
     except Exception:
         _NATIVE_CRASH_FH = None
-    _append_startup_log("launcher bootstrap")
+    _append_startup_log("launcher bootstrap"
+                        )
     raise SystemExit(_run_main_with_retry())

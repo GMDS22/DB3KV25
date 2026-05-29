@@ -1,0 +1,772 @@
+{
+  "generated_at_local": "2026-05-13 18:07:16",
+  "generated_at_epoch_s": 1778666836.2484043,
+  "entry_count": 32,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 1,
+    "operator": 28
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 21,
+    "voice_transcript_final": 6,
+    "voice_command": 1,
+    "spoken_confirmation": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 30
+  },
+  "voice_transcript_summary": {
+    "partial_count": 21,
+    "final_count": 6,
+    "voice_command_count": 1,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "back to god systems right",
+  "latest_operator_request": "back to god systems right",
+  "latest_assistant_message": "Connecting Smart Sentry boards now.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778666682.2962146,
+      "timestamp_local": "2026-05-13 18:04:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666682.2962146,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778666682.5339165,
+      "timestamp_local": "2026-05-13 18:04:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666682.5339165,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778666682.7855268,
+      "timestamp_local": "2026-05-13 18:04:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666682.7855268,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778666683.0437884,
+      "timestamp_local": "2026-05-13 18:04:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable the prc",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666683.0437884,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778666683.274138,
+      "timestamp_local": "2026-05-13 18:04:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable the pr sence",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666683.274138,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778666683.5382106,
+      "timestamp_local": "2026-05-13 18:04:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable the pr sence or",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666683.5382106,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778666683.788816,
+      "timestamp_local": "2026-05-13 18:04:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable the pr sensors",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666683.788816,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1202,
+        "updated_at": 1778666683.7614071
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1778666694.1565075,
+      "timestamp_local": "2026-05-13 18:04:54",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "disable the pr sence worse",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666694.1565075,
+        "source": "final",
+        "frequency_hz": 266.9,
+        "rms": 1200,
+        "updated_at": 1778666694.0124784
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1778666705.0491679,
+      "timestamp_local": "2026-05-13 18:05:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back to god",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666705.0491679,
+        "source": "vosk",
+        "frequency_hz": 272.6,
+        "rms": 1201,
+        "updated_at": 1778666695.011486
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1778666706.0238512,
+      "timestamp_local": "2026-05-13 18:05:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back to god systems",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666706.0238512,
+        "source": "vosk",
+        "frequency_hz": 272.6,
+        "rms": 1201,
+        "updated_at": 1778666695.011486
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1778666706.2969277,
+      "timestamp_local": "2026-05-13 18:05:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back to god systems right",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666706.2969277,
+        "source": "vosk",
+        "frequency_hz": 272.6,
+        "rms": 1201,
+        "updated_at": 1778666695.011486
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1778666707.4068785,
+      "timestamp_local": "2026-05-13 18:05:07",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "back to god systems right",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666707.4068785,
+        "source": "final",
+        "frequency_hz": 272.6,
+        "rms": 1201,
+        "updated_at": 1778666695.011486
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778666599.1562116,
+      "timestamp_local": "2026-05-13 18:03:19",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778666599.1572125,
+      "timestamp_local": "2026-05-13 18:03:19",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778666600.870586,
+      "timestamp_local": "2026-05-13 18:03:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778666600.870586,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778666643.5348253,
+      "timestamp_local": "2026-05-13 18:04:03",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he's smart sentries online now say the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666643.5348253,
+        "source": "vosk",
+        "frequency_hz": 267.9,
+        "rms": 354,
+        "updated_at": 1778666613.7575781
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778666643.7999675,
+      "timestamp_local": "2026-05-13 18:04:03",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he's smart sentries online now say the command",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666643.7999675,
+        "source": "vosk",
+        "frequency_hz": 267.9,
+        "rms": 354,
+        "updated_at": 1778666613.7575781
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778666661.6637273,
+      "timestamp_local": "2026-05-13 18:04:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "he's smart sentries online now say the command the smarts",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666661.6637273,
+        "source": "vosk",
+        "frequency_hz": 267.9,
+        "rms": 354,
+        "updated_at": 1778666613.7575781
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778666662.878474,
+      "timestamp_local": "2026-05-13 18:04:22",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "he s smart sentries is online now say the command the smarts",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666662.878474,
+        "source": "final",
+        "frequency_hz": 278.4,
+        "rms": 1200,
+        "updated_at": 1778666662.7585537
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778666664.3511205,
+      "timestamp_local": "2026-05-13 18:04:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "ilya",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666664.3511205,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1200,
+        "updated_at": 1778666664.2581394
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778666664.5335624,
+      "timestamp_local": "2026-05-13 18:04:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alien",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666664.5335624,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1200,
+        "updated_at": 1778666664.2581394
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778666665.0347667,
+      "timestamp_local": "2026-05-13 18:04:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alien run the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666665.0347667,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1200,
+        "updated_at": 1778666664.2581394
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778666665.2728932,
+      "timestamp_local": "2026-05-13 18:04:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alien run the smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666665.2728932,
+        "source": "vosk",
+        "frequency_hz": 300.8,
+        "rms": 1200,
+        "updated_at": 1778666664.2581394
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778666665.7799199,
+      "timestamp_local": "2026-05-13 18:04:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "alien run the smart century",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666665.7799199,
+        "source": "vosk",
+        "frequency_hz": 262.7,
+        "rms": 1201,
+        "updated_at": 1778666665.7582538
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778666666.2677193,
+      "timestamp_local": "2026-05-13 18:04:26",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666666.2677193,
+        "source": "final",
+        "frequency_hz": 241.1,
+        "rms": 1201,
+        "updated_at": 1778666666.2592099
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778666666.3501503,
+      "timestamp_local": "2026-05-13 18:04:26",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778666666.4002612,
+      "timestamp_local": "2026-05-13 18:04:26",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Connecting Smart Sentry boards now.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778666677.5289989,
+      "timestamp_local": "2026-05-13 18:04:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "connecting smile central now he i sense a one detective",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666677.5289989,
+        "source": "vosk",
+        "frequency_hz": 202.9,
+        "rms": 1201,
+        "updated_at": 1778666666.5087214
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778666678.8785048,
+      "timestamp_local": "2026-05-13 18:04:38",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "connecting smile central now he i sense a one detective",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666678.8785048,
+        "source": "final",
+        "frequency_hz": 202.9,
+        "rms": 1201,
+        "updated_at": 1778666666.5087214
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778666680.5094578,
+      "timestamp_local": "2026-05-13 18:04:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "connecting smile central now he i sense a one detective",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666680.5094578,
+        "source": "vosk",
+        "frequency_hz": 272.0,
+        "rms": 1202,
+        "updated_at": 1778666679.5094335
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1778666680.5663977,
+      "timestamp_local": "2026-05-13 18:04:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "connecting smile central now he i sense a one detectives or it's",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666680.5663977,
+        "source": "vosk",
+        "frequency_hz": 238.4,
+        "rms": 1203,
+        "updated_at": 1778666680.5104609
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1778666681.6832168,
+      "timestamp_local": "2026-05-13 18:04:41",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "connecting smile central it s now he i are censor one detective or it s",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666681.6832168,
+        "source": "final",
+        "frequency_hz": 197.5,
+        "rms": 958,
+        "updated_at": 1778666681.2608507
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1778666682.2962146,
+      "timestamp_local": "2026-05-13 18:04:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666682.2962146,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1778666682.5339165,
+      "timestamp_local": "2026-05-13 18:04:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666682.5339165,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1778666682.7855268,
+      "timestamp_local": "2026-05-13 18:04:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666682.7855268,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1778666683.0437884,
+      "timestamp_local": "2026-05-13 18:04:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable the prc",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666683.0437884,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1778666683.274138,
+      "timestamp_local": "2026-05-13 18:04:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable the pr sence",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666683.274138,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1778666683.5382106,
+      "timestamp_local": "2026-05-13 18:04:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable the pr sence or",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666683.5382106,
+        "source": "vosk",
+        "frequency_hz": 269.9,
+        "rms": 1201,
+        "updated_at": 1778666682.2633564
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1778666683.788816,
+      "timestamp_local": "2026-05-13 18:04:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "disable the pr sensors",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666683.788816,
+        "source": "vosk",
+        "frequency_hz": 154.0,
+        "rms": 1202,
+        "updated_at": 1778666683.7614071
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1778666694.1565075,
+      "timestamp_local": "2026-05-13 18:04:54",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "disable the pr sence worse",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666694.1565075,
+        "source": "final",
+        "frequency_hz": 266.9,
+        "rms": 1200,
+        "updated_at": 1778666694.0124784
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1778666705.0491679,
+      "timestamp_local": "2026-05-13 18:05:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back to god",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666705.0491679,
+        "source": "vosk",
+        "frequency_hz": 272.6,
+        "rms": 1201,
+        "updated_at": 1778666695.011486
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1778666706.0238512,
+      "timestamp_local": "2026-05-13 18:05:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back to god systems",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666706.0238512,
+        "source": "vosk",
+        "frequency_hz": 272.6,
+        "rms": 1201,
+        "updated_at": 1778666695.011486
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1778666706.2969277,
+      "timestamp_local": "2026-05-13 18:05:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back to god systems right",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666706.2969277,
+        "source": "vosk",
+        "frequency_hz": 272.6,
+        "rms": 1201,
+        "updated_at": 1778666695.011486
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1778666707.4068785,
+      "timestamp_local": "2026-05-13 18:05:07",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "back to god systems right",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666707.4068785,
+        "source": "final",
+        "frequency_hz": 272.6,
+        "rms": 1201,
+        "updated_at": 1778666695.011486
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260513_180716.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260513_180716.md"
+  }
+}

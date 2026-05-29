@@ -2,7 +2,7 @@
 
 **Objective**: Historical Waveshare ESP32 + Pan/Tilt Servo bench checklist
 
-> Status note (2026-04-09): this checklist is historical only. The Waveshare single-board attempt is on hold and is not part of the current Smart Sentry app. For live app work, use the ESP32 WiFi + Debug Board USB path with `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` and treat this file as archive material only.
+> Status note (2026-04-09): this checklist is historical only. The Waveshare single-board attempt is on hold and is not part of the current Smart Sentry app. For live app work, use the ESP32 WiFi + Debug Board USB path with `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino` and treat this file as archive material only.
 
 ---
 

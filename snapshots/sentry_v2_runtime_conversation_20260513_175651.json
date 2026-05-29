@@ -1,0 +1,411 @@
+{
+  "generated_at_local": "2026-05-13 17:56:51",
+  "generated_at_epoch_s": 1778666211.0546384,
+  "entry_count": 12,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 1,
+    "operator": 8
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 5,
+    "voice_transcript_final": 2,
+    "voice_command": 1,
+    "spoken_confirmation": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 10
+  },
+  "voice_transcript_summary": {
+    "partial_count": 5,
+    "final_count": 2,
+    "voice_command_count": 1,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "connect boards and enable smart sentry",
+  "latest_operator_request": "connect boards and enable smart sentry",
+  "latest_assistant_message": "Connecting Smart Sentry boards now.",
+  "analysis_hints": [],
+  "recent_turns": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778666095.043015,
+      "timestamp_local": "2026-05-13 17:54:55",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778666095.044013,
+      "timestamp_local": "2026-05-13 17:54:55",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778666096.873889,
+      "timestamp_local": "2026-05-13 17:54:56",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778666096.873889,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778666154.4326174,
+      "timestamp_local": "2026-05-13 17:55:54",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart century is now on a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666154.4326174,
+        "source": "vosk",
+        "frequency_hz": 108.9,
+        "rms": 896,
+        "updated_at": 1778666109.4226093
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778666155.0425084,
+      "timestamp_local": "2026-05-13 17:55:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart century is now on a the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666155.0425084,
+        "source": "vosk",
+        "frequency_hz": 108.9,
+        "rms": 896,
+        "updated_at": 1778666109.4226093
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778666158.1076033,
+      "timestamp_local": "2026-05-13 17:55:58",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "how the smart sentry is now on a the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666158.1076033,
+        "source": "final",
+        "frequency_hz": 110.0,
+        "rms": 1139,
+        "updated_at": 1778666155.183984
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778666170.4509323,
+      "timestamp_local": "2026-05-13 17:56:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666170.4509323,
+        "source": "vosk",
+        "frequency_hz": 358.3,
+        "rms": 4137,
+        "updated_at": 1778666169.9336765
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778666170.9630952,
+      "timestamp_local": "2026-05-13 17:56:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666170.9630952,
+        "source": "vosk",
+        "frequency_hz": 358.3,
+        "rms": 4137,
+        "updated_at": 1778666169.9336765
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778666171.4479034,
+      "timestamp_local": "2026-05-13 17:56:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart sentry",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666171.4479034,
+        "source": "vosk",
+        "frequency_hz": 303.6,
+        "rms": 1720,
+        "updated_at": 1778666171.184479
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778666187.0137577,
+      "timestamp_local": "2026-05-13 17:56:27",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666187.0137577,
+        "source": "final",
+        "frequency_hz": 338.7,
+        "rms": 4507,
+        "updated_at": 1778666171.6843345
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778666187.1436443,
+      "timestamp_local": "2026-05-13 17:56:27",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778666187.4467313,
+      "timestamp_local": "2026-05-13 17:56:27",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Connecting Smart Sentry boards now.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778666095.043015,
+      "timestamp_local": "2026-05-13 17:54:55",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778666095.044013,
+      "timestamp_local": "2026-05-13 17:54:55",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778666096.873889,
+      "timestamp_local": "2026-05-13 17:54:56",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778666096.873889,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778666154.4326174,
+      "timestamp_local": "2026-05-13 17:55:54",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart century is now on a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666154.4326174,
+        "source": "vosk",
+        "frequency_hz": 108.9,
+        "rms": 896,
+        "updated_at": 1778666109.4226093
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778666155.0425084,
+      "timestamp_local": "2026-05-13 17:55:55",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "the smart century is now on a the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666155.0425084,
+        "source": "vosk",
+        "frequency_hz": 108.9,
+        "rms": 896,
+        "updated_at": 1778666109.4226093
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778666158.1076033,
+      "timestamp_local": "2026-05-13 17:55:58",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "how the smart sentry is now on a the",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666158.1076033,
+        "source": "final",
+        "frequency_hz": 110.0,
+        "rms": 1139,
+        "updated_at": 1778666155.183984
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778666170.4509323,
+      "timestamp_local": "2026-05-13 17:56:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666170.4509323,
+        "source": "vosk",
+        "frequency_hz": 358.3,
+        "rms": 4137,
+        "updated_at": 1778666169.9336765
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778666170.9630952,
+      "timestamp_local": "2026-05-13 17:56:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666170.9630952,
+        "source": "vosk",
+        "frequency_hz": 358.3,
+        "rms": 4137,
+        "updated_at": 1778666169.9336765
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778666171.4479034,
+      "timestamp_local": "2026-05-13 17:56:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "run the smart sentry",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778666171.4479034,
+        "source": "vosk",
+        "frequency_hz": 303.6,
+        "rms": 1720,
+        "updated_at": 1778666171.184479
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778666187.0137577,
+      "timestamp_local": "2026-05-13 17:56:27",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778666187.0137577,
+        "source": "final",
+        "frequency_hz": 338.7,
+        "rms": 4507,
+        "updated_at": 1778666171.6843345
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778666187.1436443,
+      "timestamp_local": "2026-05-13 17:56:27",
+      "role": "operator",
+      "event_type": "voice_command",
+      "channel": "voice",
+      "text": "connect boards and enable smart sentry",
+      "metadata": {
+        "normalized": true
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778666187.4467313,
+      "timestamp_local": "2026-05-13 17:56:27",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Connecting Smart Sentry boards now.",
+      "metadata": {
+        "interrupt": false,
+        "assistant_output": false,
+        "spoken": true
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260513_175651.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260513_175651.md"
+  }
+}

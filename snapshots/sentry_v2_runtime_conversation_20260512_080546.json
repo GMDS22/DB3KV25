@@ -1,0 +1,541 @@
+{
+  "generated_at_local": "2026-05-12 08:05:46",
+  "generated_at_epoch_s": 1778544346.7899475,
+  "entry_count": 18,
+  "counts_by_role": {
+    "assistant": 2,
+    "system": 1,
+    "operator": 15
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 1,
+    "voice_transcript_partial": 14,
+    "voice_transcript_final": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 16
+  },
+  "voice_transcript_summary": {
+    "partial_count": 14,
+    "final_count": 1,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "hi",
+  "latest_operator_request": "hi",
+  "latest_assistant_message": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup.",
+    "Assistant text replies were generated without matching spoken assistant lines. Inspect human voice availability or auto-speak configuration."
+  ],
+  "recent_turns": [
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778544018.4098747,
+      "timestamp_local": "2026-05-12 08:00:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544018.4098747,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778544018.659131,
+      "timestamp_local": "2026-05-12 08:00:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544018.659131,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778544018.9093158,
+      "timestamp_local": "2026-05-12 08:00:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop enabled",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544018.9093158,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778544019.1724434,
+      "timestamp_local": "2026-05-12 08:00:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544019.1724434,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778544019.417372,
+      "timestamp_local": "2026-05-12 08:00:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544019.417372,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778544020.1604054,
+      "timestamp_local": "2026-05-12 08:00:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion automatic",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544020.1604054,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778544020.411443,
+      "timestamp_local": "2026-05-12 08:00:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544020.411443,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778544020.6609883,
+      "timestamp_local": "2026-05-12 08:00:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of overlay",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544020.6609883,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778544021.1624217,
+      "timestamp_local": "2026-05-12 08:00:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of order hey",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544021.1624217,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778544021.4127347,
+      "timestamp_local": "2026-05-12 08:00:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of overlay target matching",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544021.4127347,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778544244.9153812,
+      "timestamp_local": "2026-05-12 08:04:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of order hey not working",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544244.9153812,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778544259.9151278,
+      "timestamp_local": "2026-05-12 08:04:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of overlay target matching off",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544259.9151278,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1778544007.8689487,
+      "timestamp_local": "2026-05-12 08:00:07",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1778544007.8709483,
+      "timestamp_local": "2026-05-12 08:00:07",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1778544008.7823002,
+      "timestamp_local": "2026-05-12 08:00:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1778544008.7823002,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1778544017.4090388,
+      "timestamp_local": "2026-05-12 08:00:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544017.4090388,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1778544017.924056,
+      "timestamp_local": "2026-05-12 08:00:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "hi activate",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544017.924056,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1778544018.2573676,
+      "timestamp_local": "2026-05-12 08:00:18",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "hi",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1778544018.2573676,
+        "source": "final",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1778544018.4098747,
+      "timestamp_local": "2026-05-12 08:00:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544018.4098747,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1778544018.659131,
+      "timestamp_local": "2026-05-12 08:00:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544018.659131,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1778544018.9093158,
+      "timestamp_local": "2026-05-12 08:00:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop enabled",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544018.9093158,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1778544019.1724434,
+      "timestamp_local": "2026-05-12 08:00:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544019.1724434,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1778544019.417372,
+      "timestamp_local": "2026-05-12 08:00:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544019.417372,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1778544020.1604054,
+      "timestamp_local": "2026-05-12 08:00:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion automatic",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544020.1604054,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1778544020.411443,
+      "timestamp_local": "2026-05-12 08:00:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544020.411443,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1778544020.6609883,
+      "timestamp_local": "2026-05-12 08:00:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of overlay",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544020.6609883,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1778544021.1624217,
+      "timestamp_local": "2026-05-12 08:00:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of order hey",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544021.1624217,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1778544021.4127347,
+      "timestamp_local": "2026-05-12 08:00:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of overlay target matching",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544021.4127347,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1778544244.9153812,
+      "timestamp_local": "2026-05-12 08:04:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of order hey not working",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544244.9153812,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1778544259.9151278,
+      "timestamp_local": "2026-05-12 08:04:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "video loop the lion auto of overlay target matching off",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1778544259.9151278,
+        "source": "vosk",
+        "frequency_hz": 183.7,
+        "rms": 1201,
+        "updated_at": 1778544010.9036942
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260512_080546.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260512_080546.md"
+  }
+}

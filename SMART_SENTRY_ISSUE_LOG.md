@@ -673,7 +673,7 @@ un.py, SMART SENTRY/build_smart_sentry_v2_3_2_portable.ps1
 - **Symptoms**: Turret pan/tilt movements are jerky, snappy. Small target changes cause visible jitter. Pan and tilt settle at different times.
 - **Root Cause**: ESP32 WiFi + Debug Board USB sketch wrote each new target angle directly to servos with only coarse 4-bucket timing estimates. No motion smoothing or axis synchronization.
 - **Fix/Solution**: Added internal synchronized motion plan, fixed update interval, and settle deadband to ESP32 firmware. PWM outputs now ramp toward targets instead of snapping. Both axes use one synchronized plan time.
-- **Files Modified**: `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino`
+- **Files Modified**: `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino`
 - **Notes**: No changes to the desktop app UDP protocol. Firmware-only change.
 
 ---
@@ -832,7 +832,7 @@ un.py, SMART SENTRY/build_smart_sentry_v2_3_2_portable.ps1
 **Firmware Docs Pointed to Wrong Active Sketch**
 
 - **Symptoms**: Editor-facing docs made on-hold Waveshare bridge look like current firmware.
-- **Fix/Solution**: Pinned `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` as current firmware. Marked Waveshare bridge files as archived/on-hold.
+- **Fix/Solution**: Pinned `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino` as current firmware. Marked Waveshare bridge files as archived/on-hold.
 - **Files Modified**: `ESP32_CURRENT_SKETCH.md`, `ESP32_UDP_FLASH.md`, `SMART_SENTRY_MANUAL.md`, `SMART_SENTRY_APP_CHANGE_IMPACT.md`, `SMART_SENTRY_V3_0_0_COMPILATION_PROTOCOL.md`, `PHASE_0_FILES_REQUIRED.md`
 
 ---

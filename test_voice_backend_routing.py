@@ -243,6 +243,12 @@ def test_vosk_listener_used_when_device_name_set() -> None:
     assert isinstance(ctrl._listener, VoskCommandListener)
 
 
+def test_vosk_listener_used_by_default_for_empty_device() -> None:
+    """Without explicit opt-in, Windows defaults to Vosk even on the system default mic."""
+    ctrl, _ = _make_controller(device_name="")
+    assert isinstance(ctrl._listener, VoskCommandListener)
+
+
 def test_windows_speech_backend_returns_false_when_device_set() -> None:
     """_can_use_windows_speech_backend returns False when device_name is non-empty."""
     assert _can_use_windows_speech_backend("USB Microphone") is False
@@ -250,11 +256,18 @@ def test_windows_speech_backend_returns_false_when_device_set() -> None:
 
 
 def test_windows_speech_backend_returns_false_for_empty_device() -> None:
-    """_can_use_windows_speech_backend allows Windows backend only on Windows without a device override."""
-    result = _can_use_windows_speech_backend("")
-    # On non-Windows CI, result is False; on Windows it could be True or False.
-    # Just verify the function does not raise and returns a bool.
-    assert isinstance(result, bool)
+    """_can_use_windows_speech_backend stays off by default for an unpinned mic."""
+    assert _can_use_windows_speech_backend("") is False
+
+
+def test_windows_speech_backend_can_be_opted_in_for_empty_device() -> None:
+    """Explicit env opt-in re-enables Windows native speech on the default input device."""
+    with patch.dict(os.environ, {"SMART_SENTRY_USE_WINDOWS_NATIVE_STT": "1"}, clear=False):
+        with patch("app.sentry_v2.voice_runtime._default_windows_input_device_name", return_value="Default Mic"):
+            if os.name == "nt":
+                assert _can_use_windows_speech_backend("") is True
+            else:
+                assert _can_use_windows_speech_backend("") is False
 
 
 # ── Log message tests ─────────────────────────────────────────────────────────

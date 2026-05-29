@@ -49,6 +49,7 @@ static const uint32_t TRIGGER_PULSE_MS = 120;         // minimum projectile hold
 static const uint32_t MOSFET_PULSE_MS_DEFAULT = 120;
 static const uint8_t MOSFET_CYCLE_COUNT_DEFAULT = 1;
 static const uint32_t MOSFET_CYCLE_OFF_MS_DEFAULT = 50;
+static const uint32_t RELAY_ACTIVE_LOW_MIN_PULSE_MS = 250;
 
 #if ENABLE_PIR_SUPPORT
 static const uint8_t PIR_SENSOR_COUNT = 3;
@@ -79,6 +80,7 @@ static int trigger_servo_speed_dps = SERVO_SPEED_DPS_DEFAULT;
 static int trigger_mosfet_pulse_ms = (int)MOSFET_PULSE_MS_DEFAULT;
 static int trigger_mosfet_cycle_count = (int)MOSFET_CYCLE_COUNT_DEFAULT;
 static int trigger_mosfet_cycle_off_ms = (int)MOSFET_CYCLE_OFF_MS_DEFAULT;
+static bool trigger_output_active_low = false;
 static float trigger_servo_current_deg = (float)SERVO_REST_DEG_DEFAULT;
 static float trigger_servo_target_deg = (float)SERVO_REST_DEG_DEFAULT;
 static uint32_t trigger_servo_last_step_ms = 0;
@@ -420,12 +422,25 @@ static void updateTriggerServoMotion() {
   triggerServoWriteDeg((int)(trigger_servo_current_deg + 0.5f));
 }
 
+static void setTriggerMosfetOutput(bool logical_on) {
+  bool pin_high = trigger_output_active_low ? !logical_on : logical_on;
+  digitalWrite(PIN_TRIGGER_MOSFET, pin_high ? HIGH : LOW);
+}
+
+static uint32_t effectiveMosfetPulseMs() {
+  uint32_t pulse_ms = (uint32_t)max(10, trigger_mosfet_pulse_ms);
+  if (trigger_output_active_low && pulse_ms < RELAY_ACTIVE_LOW_MIN_PULSE_MS) {
+    pulse_ms = RELAY_ACTIVE_LOW_MIN_PULSE_MS;
+  }
+  return pulse_ms;
+}
+
 static void stopMosfetSequence() {
   mosfet_sequence_active = false;
   mosfet_sequence_output_high = false;
   mosfet_cycles_remaining = 0;
   mosfet_phase_start_ms = 0;
-  digitalWrite(PIN_TRIGGER_MOSFET, LOW);
+  setTriggerMosfetOutput(false);
 }
 
 static void startMosfetSequence() {
@@ -433,17 +448,23 @@ static void startMosfetSequence() {
   mosfet_sequence_output_high = true;
   mosfet_cycles_remaining = max(1, trigger_mosfet_cycle_count);
   mosfet_phase_start_ms = millis();
-  digitalWrite(PIN_TRIGGER_MOSFET, HIGH);
+  setTriggerMosfetOutput(true);
+  Serial.print(F("TRIG_RELAY_START pulse_ms="));
+  Serial.print(effectiveMosfetPulseMs());
+  Serial.print(F(" cycles="));
+  Serial.print(mosfet_cycles_remaining);
+  Serial.print(F(" active_low="));
+  Serial.println(trigger_output_active_low ? 1 : 0);
 }
 
 static void updateMosfetSequence(uint32_t now_ms) {
   if (!mosfet_sequence_active) {
-    digitalWrite(PIN_TRIGGER_MOSFET, LOW);
+    setTriggerMosfetOutput(false);
     return;
   }
 
   if (mosfet_sequence_output_high) {
-    if ((now_ms - mosfet_phase_start_ms) < (uint32_t)max(10, trigger_mosfet_pulse_ms)) {
+    if ((now_ms - mosfet_phase_start_ms) < effectiveMosfetPulseMs()) {
       return;
     }
     --mosfet_cycles_remaining;
@@ -454,7 +475,7 @@ static void updateMosfetSequence(uint32_t now_ms) {
     }
     mosfet_sequence_output_high = false;
     mosfet_phase_start_ms = now_ms;
-    digitalWrite(PIN_TRIGGER_MOSFET, LOW);
+    setTriggerMosfetOutput(false);
     return;
   }
 
@@ -463,7 +484,7 @@ static void updateMosfetSequence(uint32_t now_ms) {
   }
   mosfet_sequence_output_high = true;
   mosfet_phase_start_ms = now_ms;
-  digitalWrite(PIN_TRIGGER_MOSFET, HIGH);
+  setTriggerMosfetOutput(true);
 }
 
 static void writeLedOutput(int led_pwm_value) {
@@ -538,6 +559,12 @@ static void applyOutputs() {
     projectile_pulse_active = true;
     projectile_pulse_start_ms = now_ms;
     setTriggerServoTarget(true);
+    Serial.print(F("TRIG_SERVO_START rest="));
+    Serial.print(trigger_servo_rest_deg);
+    Serial.print(F(" fire="));
+    Serial.print(trigger_servo_fire_deg);
+    Serial.print(F(" speed_dps="));
+    Serial.println(trigger_servo_speed_dps);
   }
 
   if (projectile_pulse_active) {
@@ -566,6 +593,7 @@ static void printStateLine(const __FlashStringHelper *prefix) {
   Serial.print(F(" J=")); Serial.print(trigger_mosfet_pulse_ms);
   Serial.print(F(" K=")); Serial.print(trigger_mosfet_cycle_count);
   Serial.print(F(" N=")); Serial.print(trigger_mosfet_cycle_off_ms);
+  Serial.print(F(" X=")); Serial.print(trigger_output_active_low ? 1 : 0);
   Serial.print(F(" U=")); Serial.print(trigger_servo_rest_deg);
   Serial.print(F(" V=")); Serial.print(trigger_servo_fire_deg);
   Serial.print(F(" H=")); Serial.print(trigger_servo_speed_dps);
@@ -608,6 +636,7 @@ static void handleLine(const char *line) {
   int mosfet_pulse_ms = parseTokenInt(line, 'J', trigger_mosfet_pulse_ms);
   int mosfet_cycle_count = parseTokenInt(line, 'K', trigger_mosfet_cycle_count);
   int mosfet_cycle_off_ms = parseTokenInt(line, 'N', trigger_mosfet_cycle_off_ms);
+  int trigger_output_low = parseTokenInt(line, 'X', trigger_output_active_low ? 1 : 0);
   int rest_deg = parseTokenInt(line, 'U', trigger_servo_rest_deg);
   int fire_deg = parseTokenInt(line, 'V', trigger_servo_fire_deg);
   int speed_dps = parseTokenInt(line, 'H', trigger_servo_speed_dps);
@@ -618,10 +647,11 @@ static void handleLine(const char *line) {
   trigger_mosfet_pulse_ms = clampInt(mosfet_pulse_ms, 10, 2000);
   trigger_mosfet_cycle_count = clampInt(mosfet_cycle_count, 1, 20);
   trigger_mosfet_cycle_off_ms = clampInt(mosfet_cycle_off_ms, 10, 2000);
+  trigger_output_active_low = (trigger_output_low != 0);
   trigger_servo_rest_deg = clampServoAngle(rest_deg);
   trigger_servo_fire_deg = clampServoAngle(fire_deg);
-  if (trigger_servo_fire_deg < trigger_servo_rest_deg) {
-    trigger_servo_fire_deg = trigger_servo_rest_deg;
+  if (trigger_servo_fire_deg <= trigger_servo_rest_deg) {
+    trigger_servo_fire_deg = clampServoAngle(trigger_servo_rest_deg + 5);
   }
   trigger_servo_speed_dps = max(10, speed_dps);
   pir_event_blink_enabled = (pir_blink != 0);
@@ -656,7 +686,7 @@ void setup() {
   digitalWrite(PIN_BUZZER, LOW);
   digitalWrite(PIN_LASER, LOW);
   digitalWrite(PIN_ACC_RELAY, LOW);
-  digitalWrite(PIN_TRIGGER_MOSFET, LOW);
+  setTriggerMosfetOutput(false);
   digitalWrite(PIN_SPARE_RELAY, LOW);
   digitalWrite(PIN_STATUS_LED, LOW);
   analogWrite(PIN_LED_PWM, 0);
@@ -680,7 +710,7 @@ void setup() {
 
   Serial.println(F("[BOOT] SMART_SENTRY_V3_0_NANO_USB_IO_PIR ready"));
   Serial.println(F("[BOOT] Select this Nano COM port as the Smart Sentry IO/ESP32 port"));
-  Serial.println(F("[BOOT] Host tokens: S/M/F/L/R/G/A/J/K/N/U/V/H/B/P plus SOUND:<freq>:<ms>[:<volume>]"));
+  Serial.println(F("[BOOT] Host tokens: S/M/F/L/R/G/A/J/K/N/X/U/V/H/B/P plus SOUND:<freq>:<ms>[:<volume>]"));
 }
 
 void loop() {

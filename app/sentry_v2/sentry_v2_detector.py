@@ -265,7 +265,7 @@ class SentryV2Detector:
             self._prev_frame = gray.copy()
             return []
         if self._prev_frame is None:
-            self._prev_frame = gray
+            self._prev_frame = gray.copy()
             return []
         diff = cv2.absdiff(self._prev_frame, gray)
         self._prev_frame = gray.copy()
@@ -509,7 +509,7 @@ class SentryV2Detector:
             return False
         if self._prev_frame is None:
             if update_prev:
-                self._prev_frame = gray
+                self._prev_frame = gray.copy()
             return False
         diff = cv2.absdiff(self._prev_frame, gray)
         if update_prev:

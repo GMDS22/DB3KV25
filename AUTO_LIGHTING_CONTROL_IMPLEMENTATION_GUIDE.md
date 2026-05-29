@@ -70,7 +70,7 @@ ESP32 GPIO → 1kΩ gate resistor → MOSFET gate
 
 ### 1. Edit the sketch
 
-Open `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR.ino` and change:
+Open `arduino/SMART_SENTRY_ESP32_UDP_PIR/SMART_SENTRY_ESP32_UDP_PIR.ino` and change:
 
 ```cpp
 // Before:
@@ -88,10 +88,10 @@ From `f:\SMART SENTRY V2\SMART SENTRY`:
 
 ```powershell
 # Compile
-.\tools\arduino-cli\arduino-cli.exe compile --fqbn esp32:esp32:esp32 "arduino\SMART_SENTRY_V2_3_1_ESP32_UDP_PIR"
+.\tools\arduino-cli\arduino-cli.exe compile --fqbn esp32:esp32:esp32 "arduino\SMART_SENTRY_ESP32_UDP_PIR"
 
 # Flash (replace COM28 with your actual port)
-.\tools\arduino-cli\arduino-cli.exe upload -p COM28 --fqbn esp32:esp32:esp32 "arduino\SMART_SENTRY_V2_3_1_ESP32_UDP_PIR"
+.\tools\arduino-cli\arduino-cli.exe upload -p COM28 --fqbn esp32:esp32:esp32 "arduino\SMART_SENTRY_ESP32_UDP_PIR"
 ```
 
 ---
@@ -174,7 +174,7 @@ Config fields (stored in `config.lighting`):
 | `app/sentry_v2/sentry_v2_config.py` | Added `LightingConfig` dataclass, wired into `SentryV2Config` and `from_dict` |
 | `app/sentry_v2/sentry_v2_comm.py` | `led_on→led_pwm`, `set_led_pwm()`, `set_led()` shim, all 3 send methods updated |
 | `app/sentry_v2/sentry_v2_tab.py` | Instance vars, camera loop hook, `_update_auto_lighting()`, Controls UI group, video chip bar, `_on_led_toggled`, dispatcher, shortcut, handlers |
-| `arduino/SMART_SENTRY_V2_3_1_ESP32_UDP_PIR/…ino` | `ACCESSORY_PWM_ENABLED` define, conditional `ledcAttach` in `setup()`, conditional `ledcWrite` in `update_accessories()` |
+| `arduino/SMART_SENTRY_ESP32_UDP_PIR/…ino` | `ACCESSORY_PWM_ENABLED` define, conditional `ledcAttach` in `setup()`, conditional `ledcWrite` in `update_accessories()` |
 | `arduino/SMART_SENTRY_V2_3_DB3000_ESP32_UDP_PIR_FLYSKY/…ino` | Same as above + `validate_pins()` blink guard |
 | `SMART SENTRY/ESP32_CURRENT_SKETCH.md` | Accessory PWM Support section added |
 | `SMART SENTRY/RECENT_UPDATES.json` | Entry logged |

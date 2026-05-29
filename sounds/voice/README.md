@@ -15,3 +15,7 @@ Format recommendation:
 Behavior:
 - Playback is asynchronous and does not block tracking or camera loops.
 - Missing files are ignored silently.
+
+Additional behavior:
+- `app/sentry_v2/event_sound_library.py` can generate alternative event cue packs under `_generated_event_packs/` for styles such as `droid` and `scanner`.
+- The main runtime can switch between the shipped classic WAV set and generated style packs without changing the spoken TTS output folder.

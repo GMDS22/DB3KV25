@@ -57,6 +57,17 @@ static const int SERVO_REST_DEG = 0;
 static const int SERVO_FIRE_DEG = 40;
 static const uint32_t SERVO_FIRE_PULSE_MS = 120;
 
+// ========== Runtime Trigger Config (app-controlled tokens) ==========
+static uint32_t trigger_mosfet_pulse_ms = SERVO_FIRE_PULSE_MS;  // J token
+static int trigger_mosfet_cycle_count = 1;                      // K token
+static uint32_t trigger_mosfet_cycle_off_ms = 50;               // N token
+static bool trigger_output_active_low = false;                  // X token
+static int trigger_servo_rest_deg = SERVO_REST_DEG;             // U token
+static int trigger_servo_fire_deg = SERVO_FIRE_DEG;             // V token
+static int trigger_servo_speed_dps = 360;                       // H token (stored for parity)
+
+static bool pir_event_blink_enabled = false;                    // B token
+
 // ========== PIR Configuration ==========
 #if ENABLE_PIR_SUPPORT
 static const int PIR_SENSOR_COUNT = 3;
@@ -87,6 +98,12 @@ static int spare_token = 0;
 
 static bool projectile_pulse_active = false;
 static uint32_t projectile_pulse_start_ms = 0;
+
+static bool mosfet_cycle_active = false;
+static bool mosfet_cycle_on_phase = false;
+static uint32_t mosfet_cycle_phase_start_ms = 0;
+static int mosfet_cycle_pulses_remaining = 0;
+static int last_fire_cmd = 0;
 
 static String line_buf;
 
@@ -150,8 +167,24 @@ static uint32_t degToDutyTicks(int deg) {
   return ticks;
 }
 
+static void writeTriggerMosfet(bool logical_on) {
+  bool pin_high = trigger_output_active_low ? !logical_on : logical_on;
+  digitalWrite(PIN_TRIGGER_MOSFET, pin_high ? HIGH : LOW);
+}
+
 static void triggerServoSet(bool on) {
-  ledcWrite(PIN_TRIGGER_SERVO, degToDutyTicks(on ? SERVO_FIRE_DEG : SERVO_REST_DEG));
+  ledcWrite(PIN_TRIGGER_SERVO, degToDutyTicks(on ? trigger_servo_fire_deg : trigger_servo_rest_deg));
+}
+
+static uint32_t projectilePulseMsFromRuntime() {
+  const int delta_deg = abs(trigger_servo_fire_deg - trigger_servo_rest_deg);
+  const int speed = clampInt(trigger_servo_speed_dps, 10, 5000);
+  uint32_t travel_ms = (uint32_t)((1000UL * (uint32_t)delta_deg) / (uint32_t)speed);
+  uint32_t hold_ms = 40;
+  uint32_t total = travel_ms + hold_ms;
+  if (total < 20) total = 20;
+  if (total > 2000) total = 2000;
+  return total;
 }
 
 static int parseTokenInt(const String &line, char token, int fallback) {
@@ -184,21 +217,69 @@ static void applyOutputs() {
   digitalWrite(PIN_SPARE_RELAY, spare_token ? HIGH : LOW);
 
   if (safety_is_safe) {
-    digitalWrite(PIN_TRIGGER_MOSFET, LOW);
+    writeTriggerMosfet(false);
     triggerServoSet(false);
     fire_token = 0;
     projectile_pulse_active = false;
+    mosfet_cycle_active = false;
+    mosfet_cycle_on_phase = false;
+    mosfet_cycle_pulses_remaining = 0;
+    last_fire_cmd = 0;
     return;
   }
 
   if (!mode_projectile) {
-    // Water mode: direct MOSFET latch from fire token
-    digitalWrite(PIN_TRIGGER_MOSFET, fire_token ? HIGH : LOW);
+    // Water mode: fire token triggers configurable MOSFET pulse cycle.
+    const uint32_t now = millis();
+    if (fire_token && !last_fire_cmd && !mosfet_cycle_active) {
+      mosfet_cycle_active = true;
+      mosfet_cycle_on_phase = true;
+      mosfet_cycle_phase_start_ms = now;
+      mosfet_cycle_pulses_remaining = clampInt(trigger_mosfet_cycle_count, 1, 20);
+      writeTriggerMosfet(true);
+    }
+
+    if (mosfet_cycle_active) {
+      if (mosfet_cycle_on_phase) {
+        if ((now - mosfet_cycle_phase_start_ms) >= trigger_mosfet_pulse_ms) {
+          mosfet_cycle_on_phase = false;
+          mosfet_cycle_phase_start_ms = now;
+          mosfet_cycle_pulses_remaining--;
+          writeTriggerMosfet(false);
+          if (mosfet_cycle_pulses_remaining <= 0) {
+            mosfet_cycle_active = false;
+            fire_token = 0;
+          }
+        }
+      } else {
+        if ((now - mosfet_cycle_phase_start_ms) >= trigger_mosfet_cycle_off_ms) {
+          if (mosfet_cycle_pulses_remaining > 0) {
+            mosfet_cycle_on_phase = true;
+            mosfet_cycle_phase_start_ms = now;
+            writeTriggerMosfet(true);
+          } else {
+            mosfet_cycle_active = false;
+            fire_token = 0;
+            writeTriggerMosfet(false);
+          }
+        }
+      }
+    } else {
+      writeTriggerMosfet(false);
+      if (!fire_token) {
+        last_fire_cmd = 0;
+      }
+    }
+
+    last_fire_cmd = fire_token ? 1 : 0;
     triggerServoSet(false);
     projectile_pulse_active = false;
   } else {
     // Projectile mode: pulse servo on rising fire edge, auto-return after pulse window
-    digitalWrite(PIN_TRIGGER_MOSFET, LOW);
+    writeTriggerMosfet(false);
+    mosfet_cycle_active = false;
+    mosfet_cycle_on_phase = false;
+    mosfet_cycle_pulses_remaining = 0;
 
     if (fire_token && !projectile_pulse_active) {
       projectile_pulse_active = true;
@@ -207,7 +288,7 @@ static void applyOutputs() {
     }
 
     if (projectile_pulse_active) {
-      if ((millis() - projectile_pulse_start_ms) >= SERVO_FIRE_PULSE_MS) {
+      if ((millis() - projectile_pulse_start_ms) >= projectilePulseMsFromRuntime()) {
         triggerServoSet(false);
         projectile_pulse_active = false;
         fire_token = 0;
@@ -241,6 +322,9 @@ static void updatePIRSensors() {
 }
 
 static void reportPIREvent(int sensor_id, uint32_t timestamp) {
+  if (pir_event_blink_enabled) {
+    startStatusBlink(2);
+  }
   Serial.print("PIR_EVENT sensor_id=");
   Serial.print(sensor_id);
   Serial.print(" timestamp=");
@@ -280,6 +364,29 @@ static void handleLine(String line) {
   safety_is_safe = (s != 0);
   mode_projectile = (m != 0);
 
+    int x = parseTokenInt(line, 'X', trigger_output_active_low ? 1 : 0);
+    trigger_output_active_low = (x != 0);
+
+    trigger_mosfet_pulse_ms = (uint32_t)clampInt(
+      parseTokenInt(line, 'J', (int)trigger_mosfet_pulse_ms), 10, 2000);
+    trigger_mosfet_cycle_count = clampInt(
+      parseTokenInt(line, 'K', trigger_mosfet_cycle_count), 1, 20);
+    trigger_mosfet_cycle_off_ms = (uint32_t)clampInt(
+      parseTokenInt(line, 'N', (int)trigger_mosfet_cycle_off_ms), 10, 2000);
+
+    int u = clampInt(parseTokenInt(line, 'U', trigger_servo_rest_deg), 0, 180);
+    int v = clampInt(parseTokenInt(line, 'V', trigger_servo_fire_deg), 0, 180);
+    if (v <= u) {
+    v = clampInt(u + 1, 0, 180);
+    }
+    trigger_servo_rest_deg = u;
+    trigger_servo_fire_deg = v;
+    trigger_servo_speed_dps = clampInt(
+      parseTokenInt(line, 'H', trigger_servo_speed_dps), 10, 5000);
+
+    int b = parseTokenInt(line, 'B', pir_event_blink_enabled ? 1 : 0);
+    pir_event_blink_enabled = (b != 0);
+
   bool accessory_changed =
       (prev_led != led_token) ||
       (prev_laser != laser_token) ||
@@ -312,6 +419,14 @@ static void handleLine(String line) {
   Serial.print(" R="); Serial.print(laser_token);
   Serial.print(" G="); Serial.print(acc_token);
   Serial.print(" A="); Serial.print(spare_token);
+  Serial.print(" X="); Serial.print(trigger_output_active_low ? 1 : 0);
+  Serial.print(" J="); Serial.print((int)trigger_mosfet_pulse_ms);
+  Serial.print(" K="); Serial.print(trigger_mosfet_cycle_count);
+  Serial.print(" N="); Serial.print((int)trigger_mosfet_cycle_off_ms);
+  Serial.print(" U="); Serial.print(trigger_servo_rest_deg);
+  Serial.print(" V="); Serial.print(trigger_servo_fire_deg);
+  Serial.print(" H="); Serial.print(trigger_servo_speed_dps);
+  Serial.print(" B="); Serial.print(pir_event_blink_enabled ? 1 : 0);
 
 #if ENABLE_PIR_SUPPORT
   Serial.print(" P="); Serial.print(pir_enabled ? 1 : 0);
@@ -360,7 +475,7 @@ void setup() {
 #endif
 
   Serial.println("[BOOT] DB3000_ESP32_IO_Telemetry_2026_w_PIR ready");
-  Serial.println("[BOOT] Expected host tokens: S/M/F/L/R/G over USB serial");
+  Serial.println("[BOOT] Expected host tokens: S/M/F/L/R/G/A/X/J/K/N/U/V/H/B over USB serial");
 #if ENABLE_PIR_SUPPORT
   Serial.println("[BOOT] Additional token: P (PIR enable/disable)");
 #endif
@@ -402,6 +517,14 @@ void loop() {
     Serial.print(" R="); Serial.print(laser_token);
     Serial.print(" G="); Serial.print(acc_token);
     Serial.print(" A="); Serial.print(spare_token);
+    Serial.print(" X="); Serial.print(trigger_output_active_low ? 1 : 0);
+    Serial.print(" J="); Serial.print((int)trigger_mosfet_pulse_ms);
+    Serial.print(" K="); Serial.print(trigger_mosfet_cycle_count);
+    Serial.print(" N="); Serial.print((int)trigger_mosfet_cycle_off_ms);
+    Serial.print(" U="); Serial.print(trigger_servo_rest_deg);
+    Serial.print(" V="); Serial.print(trigger_servo_fire_deg);
+    Serial.print(" H="); Serial.print(trigger_servo_speed_dps);
+    Serial.print(" B="); Serial.print(pir_event_blink_enabled ? 1 : 0);
 
 #if ENABLE_PIR_SUPPORT
     Serial.print(" P="); Serial.print(pir_enabled ? 1 : 0);

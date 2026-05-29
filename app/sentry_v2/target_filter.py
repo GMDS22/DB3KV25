@@ -7,6 +7,7 @@ user-defined criteria (class, confidence, size, zone).
 
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
@@ -15,6 +16,12 @@ from .sentry_v2_config import TargetFilterConfig
 
 
 NON_SEMANTIC_CLASSES = {"motion", "foreground", "color", "moving_object"}
+
+# Normalized-coordinate distance threshold for detecting same-class re-ID jumps.
+# If a track_id's detection center moves more than this between frames, the
+# confirmation counter is reset to prevent an old object's hit count being
+# inherited by a newly assigned track ID.
+_REID_CENTER_JUMP_THRESHOLD = 0.3
 
 SHAPE_PROFILE_ALIASES = {
     "birds": "bird",
@@ -35,6 +42,10 @@ class _SemanticConfirmState:
     class_name: str
     hits: int = 0
     last_seen: float = 0.0
+    # Normalized center of the detection when this state was last updated.
+    # Used to detect same-class track-ID reuse (re-identification jumps).
+    last_cx: float = -1.0
+    last_cy: float = -1.0
 
 
 @dataclass
@@ -225,7 +236,16 @@ class TargetFilter:
         state = self._semantic_confirm.get(int(det.track_id))
         counted = float(det.confidence) >= confirm_conf
 
-        if state is None or state.class_name != det.class_name or (now - state.last_seen) > confirm_ttl:
+        # Detect same-class track-ID reuse: if the detection center has jumped
+        # beyond the re-ID threshold the previous hit count must not carry over.
+        center_jumped = False
+        if state is not None and state.last_cx >= 0.0 and state.last_cy >= 0.0:
+            ddx = det.norm_cx - state.last_cx
+            ddy = det.norm_cy - state.last_cy
+            if math.sqrt(ddx * ddx + ddy * ddy) > _REID_CENTER_JUMP_THRESHOLD:
+                center_jumped = True
+
+        if state is None or state.class_name != det.class_name or (now - state.last_seen) > confirm_ttl or center_jumped:
             hits = 1 if counted else 0
         else:
             hits = (state.hits + 1) if counted else 0
@@ -234,6 +254,8 @@ class TargetFilter:
             class_name=str(det.class_name),
             hits=hits,
             last_seen=now,
+            last_cx=det.norm_cx,
+            last_cy=det.norm_cy,
         )
         if hits >= required_frames:
             return True, "qualified", f"confirm={hits}/{required_frames}", hits, required_frames
