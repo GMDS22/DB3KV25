@@ -385,7 +385,7 @@
     "detector_model_path": "app/models/face/face_detection_yunet_2023mar.onnx",
     "recognizer_model_path": "app/models/face/face_recognition_sface_2021dec.onnx",
     "allow_legacy_fallback": true,
-    "recognition_threshold": 0.82,
+    "recognition_threshold": 0.78,
     "min_face_size_px": 56,
     "suppress_known_faces_from_engagement": true,
     "announce_known_faces": true,
@@ -440,29 +440,29 @@
   "scope_view_enabled": false,
   "scope_radius_pct": 35,
   "scope_vignette_opacity": 60,
-  "settings_panel_width": 557,
+  "settings_panel_width": 420,
   "main_splitter_sizes": [
-    1979,
-    557
+    1476,
+    420
   ],
   "layout_splitter_sizes": [
-    972,
-    360
+    744,
+    276
   ],
   "bottom_info_splitter_sizes": [
-    487,
-    914,
-    562
+    353,
+    700,
+    407
   ],
   "telemetry_voice_splitter_sizes": [
-    255,
-    224
+    184,
+    161
   ],
   "quick_access_expanded": false,
   "quick_access_pinned": false,
   "quick_access_panel_height": 156,
-  "window_x": 713,
-  "window_y": 215,
+  "window_x": -1280,
+  "window_y": 372,
   "window_width": 1280,
   "window_height": 860,
   "window_maximized": true,

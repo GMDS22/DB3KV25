@@ -12550,6 +12550,22 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             "quit the sentry",
             "close down smart sentry",
             "close down the smart sentry",
+            "close the smart sentry app",
+            "close smart sentry app",
+            "quit the smart sentry app",
+            "quit smart sentry app",
+            "exit the smart sentry app",
+            "exit smart sentry app",
+            "shutdown the smart sentry app",
+            "shutdown smart sentry app",
+            "shut down the smart sentry app",
+            "shut down smart sentry app",
+            "turn off the smart sentry app",
+            "turn off smart sentry app",
+            "stop the smart sentry app",
+            "stop smart sentry app",
+            "stop the app",
+            "stop app",
         )
         if any(token in cmd for token in _close_app_tokens):
             if bool(getattr(self, "_shutdown_in_progress", False)) or bool(getattr(self, "_cleanup_started", False)):
@@ -12587,6 +12603,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             "reset smart sentry",
             "reset the smart sentry",
             "reset and reload",
+            "restart the smart sentry app",
+            "restart smart sentry app",
+            "relaunch the smart sentry app",
+            "relaunch smart sentry app",
+            "reload the smart sentry app",
+            "reload smart sentry app",
+            "reboot the smart sentry app",
+            "reboot smart sentry app",
         )
         if any(token in cmd for token in _restart_app_tokens):
             if bool(getattr(self, "_shutdown_in_progress", False)) or bool(getattr(self, "_cleanup_started", False)):
@@ -21835,6 +21859,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "enable the smart sentry",
                 "disable smart sentry",
                 "disable the smart sentry",
+                "close the smart sentry app",
+                "close smart sentry app",
+                "quit the smart sentry app",
+                "exit the smart sentry app",
+                "restart the smart sentry app",
+                "restart smart sentry app",
+                "relaunch the smart sentry app",
+                "relaunch smart sentry app",
             ),
         )
 
