@@ -2536,13 +2536,28 @@ class VoskCommandListener:
             return ""
         sanitized = re.sub(r"[^a-z0-9 ]+", " ", normalized)
         sanitized = re.sub(r"\s+", " ", sanitized).strip()
+
+        wake_word = re.sub(r"[^a-z0-9 ]+", " ", str(self._wake_word or "").strip().lower())
+        wake_word = re.sub(r"\s+", " ", wake_word).strip()
+        wake_aliases = self._wake_word_aliases(wake_word) if wake_word else []
+        wake_pattern = r"\b(?:" + "|".join(re.escape(alias) for alias in wake_aliases) + r")\b" if wake_aliases else ""
+        wake_barge_in_requested = False
+        if wake_aliases:
+            wake_barge_in_requested = bool(re.search(wake_pattern, sanitized))
+            if not wake_barge_in_requested:
+                wake_barge_in_requested = self._fuzzy_contains_wake(sanitized, wake_aliases)
+
         now = time.time()
         if self._recent_output_input_block_active(now=now):
-            self._on_log(f"[VOICE-DIAG] self-echo-final-window-suppressed text='{sanitized}'")
-            return ""
+            if not wake_barge_in_requested:
+                self._on_log(f"[VOICE-DIAG] self-echo-final-window-suppressed text='{sanitized}'")
+                return ""
+            self._on_log(f"[VOICE-DIAG] self-echo-final-window-barge-in-allowed text='{sanitized}'")
         if self._matches_recent_output_echo(sanitized, partial=False):
-            self._on_log(f"[VOICE-DIAG] self-echo-final-suppressed text='{sanitized}'")
-            return ""
+            if not wake_barge_in_requested:
+                self._on_log(f"[VOICE-DIAG] self-echo-final-suppressed text='{sanitized}'")
+                return ""
+            self._on_log(f"[VOICE-DIAG] self-echo-final-barge-in-allowed text='{sanitized}'")
         corrected = self._canonicalize_command_text(sanitized)
         if not self._wake_word:
             final_text = corrected or sanitized or normalized
@@ -2557,21 +2572,18 @@ class VoskCommandListener:
             self._set_voice_state("PROCESSING", reason="final-no-wake")
             self._set_voice_state("IDLE", reason="final-no-wake-complete")
             return final_text
-        wake_word = re.sub(r"[^a-z0-9 ]+", " ", str(self._wake_word or "").strip().lower())
-        wake_word = re.sub(r"\s+", " ", wake_word).strip()
         if not wake_word:
             final_text = corrected or sanitized or normalized
             self._on_log(f"[VOICE-DIAG] transcript-final='{final_text}'")
             self._emit_transcript("final", final_text, source="final", confidence=confidence)
             return final_text
-        wake_aliases = self._wake_word_aliases(wake_word)
         strict_high_intent_patterns = (
             r"\bconnect\b.*\benable\b.*\bsmart\s+sentry\b",
             r"\bconnect\b.*\b(board|boards|com|port|serial)\b",
             r"\benable\b.*\bsmart\s+sentry\b",
             r"\b(?:run|start)\b.*\bsmart\s+sentry\b",
         )
-        pattern = r"\b(?:" + "|".join(re.escape(alias) for alias in wake_aliases) + r")\b"
+        pattern = wake_pattern
         wake_matched = bool(re.search(pattern, corrected))
         if not wake_matched and wake_aliases:
             wake_matched = self._fuzzy_contains_wake(corrected, wake_aliases)

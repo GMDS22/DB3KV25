@@ -7,6 +7,12 @@ from pathlib import Path
 
 def read_active_version(repo_root: Path, default: str = "2.3.2") -> str:
     for version_name in (
+        "SMART_SENTRY_V5_0_0_VERSION.txt",
+        "SMART_SENTRY_V4_0_0_VERSION.txt",
+        "SMART_SENTRY_V3_5_3_VERSION.txt",
+        "SMART_SENTRY_V3_5_2_VERSION.txt",
+        "SMART_SENTRY_V3_5_1_VERSION.txt",
+        "SMART_SENTRY_V3_5_0_VERSION.txt",
         "SMART_SENTRY_V3_0_VERSION.txt",
         "SMART_SENTRY_V2_3_2_VERSION.txt",
         "SMART_SENTRY_V2_3_1_VERSION.txt",

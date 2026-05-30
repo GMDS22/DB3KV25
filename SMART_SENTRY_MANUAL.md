@@ -1,9 +1,9 @@
 # SMART SENTRY V2 — COMPLETE REFERENCE MANUAL
 
 Date: 2026-05-14
-Status: Verified current standalone runtime reference for the Smart Sentry v4.0.0 release candidate
+Status: Verified current standalone runtime reference for the Smart Sentry v5.0.0 build-prep target (v4.0.0 runtime baseline)
 Audience: Operators, developers, validators
-Version: 4.0.0
+Version: 5.0.0 (build prep)
 Hardware Contract: NANO BOARD USB + DEBUG BOARD USB
 Settings File: app/config/smart_sentry_settings.json
 Module Path: app/sentry_v2/
@@ -64,6 +64,7 @@ On single-camera systems, Smart Sentry should normally use camera index `0` unle
 - **Document browser:** Smart Sentry now exposes the same searchable formatted documentation browser in three operator-access paths: the dedicated `Documentation` settings tab for in-app reading, the pinned top-strip `Docs` shortcut, and the Controls page `Docs Browser` quick action for a separate window; the voice runtime still accepts `open document browser` style requests for the detached browser window, and all documentation surfaces now share the same colorized renderer, prioritized overview documents, documentation-writing standard, and live theme alignment
 - **Shutdown speech cleanup:** once shutdown begins, Smart Sentry now stops active speech immediately and suppresses delayed voice callbacks so the app does not continue talking after the window is closing
 - **Portable AI voice packaging:** portable release builds now bundle the `models/` voice-runtime tree plus the Kokoro, Edge, and Azure speech backends so offline Kokoro voices and online neural voice routes remain available in packaged builds instead of only in the source workspace
+- **v5 build preflight/accountability:** release prep now requires both entrypoint validation and build-surface validation before packaging (`tools/validate_packaging_entrypoints.py` and `tools/validate_build_surface_v5.py`), and packaged canonical config parity is verified for settings, custom presets, prompted targets, and faces.
 - **Model-backed face recognition:** Facial recognition now supports an optional OpenCV YuNet + SFace backend using downloaded ONNX models for improved accuracy over the legacy Haar-based matcher; backend selection is configurable and requires re-enrollment when switching backends
 - **Return/home behavior stability:** Fixed return-to-guard and Home button bounce-back by ensuring `RETURNING` state completes into fresh `GUARDING` without re-engaging visible targets, clearing stale queue/cooldown state on arrival, and properly finalizing direct guard moves after motion completion
 - **Camera/UI performance optimization:** Reduced live face recognition overhead by downscaling large ROIs before YuNet inference, lengthening refresh cadences, and reducing jitter-triggered rematching to prevent UI thread stalls during `opencv_sface` operation

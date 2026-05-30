@@ -1,6 +1,15 @@
 ﻿{
     "updates":  [
                     {
+                        "version":  "5.0.0",
+                        "fix":  "Prepared the Smart Sentry v5.0.0 build line by adding a dedicated v5 version marker, extending runtime/build marker precedence to v5, requiring pre-build surface validation for dependency and asset accountability, and hardening packaged canonical-file parity checks so settings, custom presets, prompted targets, and face library are all preserved byte-for-byte.",
+                        "category":  "Build/Release",
+                        "date":  "2026-05-30",
+                        "issue":  "ISS-108",
+                        "title":  "v5.0.0 build prep: full canonical data preservation and preflight accountability",
+                        "status":  "Worked"
+                    },
+                    {
                         "version":  "4.0.0",
                         "fix":  "Fixed portable-build voice packaging so release bundles now include the `models/` runtime tree and the optional AI TTS backends (`edge_tts`, `kokoro_onnx`, and Azure speech). This restores Kokoro offline voices and neural voice routes in packaged builds instead of leaving them available only in the source workspace.",
                         "category":  "Build/Voice",

@@ -100,6 +100,9 @@ def test_explicit_hostile_identity_allows_fire() -> None:
     # Non-friendly cached identity should ALLOW fire (not veto).
     cached_target = _make_person_target(track_id=7)
     assert engine._target_meets_fire_requirements(cached_target, now=10.5) is True
+    # Repeat cycle: authorization must continue while cached hostile identity
+    # remains within the fire-authorization window.
+    assert engine._target_meets_fire_requirements(cached_target, now=10.8) is True
     assert engine.get_engagement_stats()["fire_veto_reason"] == ""
 
 

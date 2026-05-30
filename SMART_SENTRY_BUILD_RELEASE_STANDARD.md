@@ -6,7 +6,7 @@ If any older protocol document conflicts with this file, this file wins.
 
 ## 1. Scope and non-negotiable rules
 
-- One release version marker is authoritative for a build run: the highest-priority existing marker resolved by the app (`SMART_SENTRY_V4_0_0_VERSION.txt`, then older markers).
+- One release version marker is authoritative for a build run: the highest-priority existing marker resolved by the app (`SMART_SENTRY_V5_0_0_VERSION.txt`, then `SMART_SENTRY_V4_0_0_VERSION.txt`, then older markers).
 - Only the UI release identity changes per release (`SMART SENTRY V<version>` title and output folder/exe names).
 - Runtime config filenames are versionless and must not be renamed per release:
   - `app/config/smart_sentry_settings.json`
@@ -21,18 +21,32 @@ If any older protocol document conflicts with this file, this file wins.
 ## 2. Source of truth files
 
 - Build helper: `build_smart_sentry_v2_3_2_portable.ps1`
+- v5 preflight helper: `tools/validate_build_surface_v5.py`
 - Build config helper: `smart_sentry_build_config.py`
 - Runtime version resolver: `app/smart_sentry_meta.py`
 - Runtime config load/migration logic: `app/sentry_v2/sentry_v2_tab.py`
 - Runtime config defaults/schema: `app/sentry_v2/sentry_v2_config.py`
 - Release-hold policy: `SMART_SENTRY_RELEASE_HOLD_CONVENTION.md`
+- v5 release protocol: `SMART_SENTRY_V5_0_0_COMPILATION_PROTOCOL.md`
 
 ## 3. Standard build steps (all editors)
 
 1. Open PowerShell at repo root (`SMART SENTRY`).
 2. Ensure the intended version marker file exists and contains the correct version string.
 3. Confirm canonical config files exist under `app/config/` with versionless names.
-4. Run build helper:
+4. Run packaging entrypoint preflight:
+
+```powershell
+..\.venv\Scripts\python.exe tools\validate_packaging_entrypoints.py
+```
+
+5. Run v5 build-surface preflight:
+
+```powershell
+..\.venv\Scripts\python.exe tools\validate_build_surface_v5.py
+```
+
+6. Run build helper:
 
 ```powershell
 & ".\build_smart_sentry_v2_3_2_portable.ps1"
@@ -67,8 +81,12 @@ Verify release folder `F:\SMART SENTRY V<version>`:
 - `models/kokoro/voices-v1.0.bin`
 - bundled AI voice backends for `edge_tts`, `kokoro_onnx`, and `azure.cognitiveservices.speech`
 
-2.1 Canonical profile parity rule:
-- Packaged `app/config/smart_sentry_custom_presets.json` must match the source file byte-for-byte (same custom profiles/operators presets).
+2.1 Canonical persistence parity rule:
+- Packaged canonical runtime files must match their source files byte-for-byte:
+  - `app/config/smart_sentry_settings.json`
+  - `app/config/smart_sentry_custom_presets.json`
+  - `app/config/smart_sentry_prompted_targets.json`
+  - `app/config/smart_sentry_faces.json`
 
 3. In packaged `smart_sentry_settings.json`, verify:
 - `config_path` is `app/config/smart_sentry_settings.json`
@@ -100,6 +118,7 @@ Any change to build/release flow or runtime config persistence must update all:
 - `SMART_SENTRY_MANUAL.md` (runtime persistence text)
 - `SMART_SENTRY_APP_CHANGE_IMPACT.md` (canonical runtime facts/checklists)
 - `SENTRY_V2_PORTABLE_INCLUDE_LIST.md` (packaging include intent)
+- `SMART_SENTRY_V5_0_0_COMPILATION_PROTOCOL.md` (release-version protocol and preflight surface)
 - `RECENT_UPDATES.json` (concise note when release process/contract changes)
 
 ## 7. Anti-regression guardrails

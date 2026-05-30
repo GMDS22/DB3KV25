@@ -11796,7 +11796,6 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         current = time.time() if now is None else float(now)
         self._voice_operator_last_activity_s = current
         self._suspend_system_reporting_speech(reason="operator speech detected")
-        self._cancel_startup_voice_intro(reason="operator speech detected")
         self._stop_human_speech()
         if not self._assistant_busy and not self._human_voice_busy():
             self._on_ai_state_update("listening")
@@ -12137,15 +12136,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._startup_voice_intro_announced = True
         self._startup_voice_intro_pending = False
         self._refresh_ai_provider_status()
-        opening_lines = [
-            "Smart Sentry AI is online. You can ask a question directly or give a command when ready.",
-            "Elion is ready. Ask me a question, or give a Smart Sentry command when you want action.",
-            "System online and listening. You can ask about the runtime directly, or say Elion for a focused back and forth.",
-            "Good to go. Ask your question naturally, or say Elion first if you want a dedicated conversation window.",
-        ]
-        phrase = random.choice(opening_lines)
-        if self._speak_after_operator_quiet(phrase, interrupt=False, minimum_quiet_s=1.2):
-            self._log("Voice protocol: startup greeting queued after operator quiet (direct questions and voice commands are available)")
+        phrase = "Smart Sentry is ready."
+        if self._speak_after_operator_quiet(phrase, interrupt=True, minimum_quiet_s=0.0):
+            self._log("Voice protocol: startup greeting queued (Smart Sentry is ready)")
 
     def _request_voice_connect_confirmation(self) -> str:
         self._clear_voice_next_action_prompt()

@@ -1,4 +1,4 @@
-# Smart Sentry v2 Portable Build Include List
+# Smart Sentry Portable Build Include List
 
 This document defines the intended **portable-only** surface for Smart Sentry v2 packaging.
 
@@ -62,6 +62,19 @@ Use the interpreter selected by the build helper in this order: `SMART_SENTRY_PY
 ## Required dependency manifest
 
 - requirements-sentry-v2-portable.txt
+
+## Required build accountability manifests
+
+- SMART_SENTRY_BUILD_RELEASE_STANDARD.md
+- SMART_SENTRY_V5_0_0_COMPILATION_PROTOCOL.md
+
+## Dependency accountability groups (must remain represented in the manifest)
+
+- Core runtime: requests, numpy, opencv-python, pyserial, PyQt5, sounddevice, simpleaudio
+- Detection/tracking: ultralytics, torch, lap
+- Voice/runtime speech: vosk, edge-tts, kokoro-onnx, azure-cognitiveservices-speech
+- Optional packaged capabilities: scikit-learn, yt-dlp
+- Build tooling: PyInstaller, cx-Freeze
 
 ## Exclusion intent
 

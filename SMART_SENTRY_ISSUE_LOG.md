@@ -182,6 +182,17 @@ Issues numbered newest-first. Search by symptom, file name, or category with `Ct
 
 ---
 
+### ISS-106 | 2026-05-30 | v3.5.4 | Engine/Safety | Worked
+**Person Auto-Trigger Could Fire Once Then Stop When Face Labels Became Intermittent**
+
+- **Symptoms**: Auto-trigger fired initially on a person and then stopped firing on later cycles even though auto-trigger remained enabled and the target stayed eligible.
+- **Root Cause**: `SentryV2Engine._person_target_is_fire_authorized()` required a current hostile identity and incorrectly vetoed recent cached hostile identity (`hostile identity ... not current`). The same path also ignored configured `fire_on_unknown_persons` policy for unknown-person handling.
+- **Fix/Solution**: Updated person fire authorization to follow explicit policy: friendly identity remains vetoed; known hostile identity (current or recent cached) is allowed; unknown identity now follows `fire_on_unknown_persons`; and when face recognition is disabled, authorization also follows `fire_on_unknown_persons` instead of forcing a blanket veto.
+- **Files Modified**: `app/sentry_v2/sentry_v2_engine.py`, `test_person_identity_fire_gate.py`, `SMART_SENTRY_ISSUE_LOG.md`
+- **Notes**: Added focused regression coverage for repeated authorization on the same track after hostile identity is first observed and subsequent frames lose the label.
+
+---
+
 ### ISS-105 | 2026-05-03 | v3.5.3 | Engine/UI/Docs | Worked
 **Return-To-Guard And Home Could Bounce Back To The Previous Target Mid-Transit**
 

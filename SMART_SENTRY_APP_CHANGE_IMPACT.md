@@ -15,7 +15,8 @@ Its purpose is narrower: when Smart Sentry runtime behavior, firmware paths, pac
 ### App identity
 
 - Active desktop app family: Smart Sentry release-identity versioning with legacy compatibility launchers retained
-- Current documented desktop release target: Smart Sentry v4.0.0 (`SMART_SENTRY_V4_0_0_VERSION.txt`)
+- Current documented desktop release-prep target: Smart Sentry v5.0.0 (`SMART_SENTRY_V5_0_0_VERSION.txt`)
+- Last packaged baseline: Smart Sentry v4.0.0 (`SMART_SENTRY_V4_0_0_VERSION.txt`)
 - Main launcher from this repo: `run.py`
 
 ### Canonical settings path
@@ -190,11 +191,13 @@ Rule: treat guard-home behavior, rest-position behavior, PIR cue-confirm-scan be
 ### Packaging and release changes
 
 - Version marker files
+- v5 build-surface preflight (`tools/validate_build_surface_v5.py`)
 - Launcher text and window title metadata
 - Packaging specs and generated output naming
 - Release-root `YOLO_MODELS/` folder contract versus bundled support-folder defaults
 - Release notes and compilation protocol docs
 - `SMART_SENTRY_BUILD_RELEASE_STANDARD.md` (single authoritative editor workflow)
+- `SMART_SENTRY_V5_0_0_COMPILATION_PROTOCOL.md` (v5 packaging checklist and preflight contract)
 - `SMART_SENTRY_RELEASE_HOLD_CONVENTION.md` when unfinished tabs are intentionally kept visible but inactive
 
 ## 4. Workspace Canonical Vendor Folders
@@ -238,6 +241,7 @@ Before calling a firmware or runtime change complete, verify all of the followin
 - Runtime settings still load from the versionless canonical settings file (`app/config/smart_sentry_settings.json`) with older versioned files accepted only as migration fallbacks.
 - UI wording matches the real connection topology.
 - Version marker files and launcher text match the intended release.
+- `tools/validate_packaging_entrypoints.py` and `tools/validate_build_surface_v5.py` both pass before running the portable build helper.
 - `RECENT_UPDATES.json` includes a concise summary entry when behavior or release identity changed.
 - `SMART_SENTRY_ISSUE_LOG.md` records each Smart Sentry issue and fix attempt that materially changed runtime behavior.
 - Any release-held unfinished tab is documented and still disabled before packaging.

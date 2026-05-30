@@ -85,13 +85,14 @@ def test_stale_partial_dispatches_followup_command() -> None:
     )
 
 
-def test_wake_only_final_dispatches_after_partial_ack_suppression() -> None:
+def test_wake_only_final_is_suppressed_after_partial_ack() -> None:
     listener, _commands, _transcripts = _make_listener()
     listener._emit_partial_wake_ack("alion")
 
     command = listener._normalize_command_text("alion")
 
-    assert command == "elion"
+    # Wake-only finals immediately after partial wake ack are suppressed to avoid self-echo loops.
+    assert command == ""
 
 
 def test_wake_followup_strips_greeting_noise_after_partial_ack() -> None:
@@ -202,6 +203,24 @@ def test_quieter_chunks_can_retrain_recognizer_gate() -> None:
     assert listener._noise_rms_threshold == 84
 
 
+def test_wake_barge_in_can_bypass_recent_output_echo_block() -> None:
+    listener, _commands, _transcripts = _make_listener()
+    listener._recent_output_input_block_until_s = time.time() + 20.0
+
+    command = listener._normalize_command_text("elion who are you")
+
+    assert command == "who are you"
+
+
+def test_non_wake_phrase_still_blocked_during_output_echo_window() -> None:
+    listener, _commands, _transcripts = _make_listener()
+    listener._recent_output_input_block_until_s = time.time() + 20.0
+
+    command = listener._normalize_command_text("who are you")
+
+    assert command == ""
+
+
 def test_core_intent_recovery_handles_who_are_you_drift() -> None:
     listener, _commands, _transcripts = _make_listener()
 
@@ -299,7 +318,7 @@ def main() -> None:
     test_stale_partial_does_not_dispatch_false_wake_from_embedded_elliot_noise()
     test_stale_partial_dispatches_wake_only_final()
     test_stale_partial_dispatches_followup_command()
-    test_wake_only_final_dispatches_after_partial_ack_suppression()
+    test_wake_only_final_is_suppressed_after_partial_ack()
     test_wake_followup_strips_greeting_noise_after_partial_ack()
     test_wake_followup_buffer_clears_after_immediate_dispatch()
     test_vosk_phrase_grammar_is_opt_in()
@@ -308,6 +327,8 @@ def main() -> None:
     test_quiet_speech_is_boosted_past_recognizer_gate()
     test_recognizer_gate_is_softer_than_full_noise_threshold()
     test_quieter_chunks_can_retrain_recognizer_gate()
+    test_wake_barge_in_can_bypass_recent_output_echo_block()
+    test_non_wake_phrase_still_blocked_during_output_echo_window()
     test_core_intent_recovery_handles_who_are_you_drift()
     test_run_smart_sentry_drift_canonicalizes_to_connect_and_enable()
     test_single_word_command_passes_fast_final_gate()

@@ -168,6 +168,9 @@ class _DisconnectCompletionTab:
     def _sync_home_screen_visibility(self) -> None:
         return None
 
+    def _update_runtime_diagnostics(self, *, reason: str = "", force: bool = False) -> None:
+        return None
+
     def _clear_enable_sentry_after_connect(self) -> None:
         return None
 

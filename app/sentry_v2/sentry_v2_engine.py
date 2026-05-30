@@ -1809,8 +1809,15 @@ class SentryV2Engine:
         class_name = str(getattr(target.det, "class_name", "") or "").strip().lower()
         if class_name != "person":
             return True
+        allow_unknown = bool(getattr(self.cfg.face_recognition, "fire_on_unknown_persons", True))
         if not bool(getattr(self.cfg.face_recognition, "enabled", False)):
-            self._set_fire_veto_reason("person auto-fire blocked: face recognition disabled", now)
+            if allow_unknown:
+                self._last_fire_veto_reason = ""
+                return True
+            self._set_fire_veto_reason(
+                "person auto-fire blocked: face recognition disabled and unknown-person policy is deny",
+                now,
+            )
             return False
 
         direct_identity_entry = self._cache_track_identity_observation(target.det, now)
@@ -1834,11 +1841,16 @@ class SentryV2Engine:
             return False
 
         if identity_entry is not None:
-            label = str(identity_entry.get("label", "") or identity_entry.get("profile_id", "") or "hostile match").strip()
-            self._set_fire_veto_reason(f"person auto-fire blocked: hostile identity {label} not current", now)
-            return False
+            self._last_fire_veto_reason = ""
+            return True
 
-        self._set_fire_veto_reason("person auto-fire blocked: explicit hostile identity required", now)
+        if allow_unknown:
+            self._last_fire_veto_reason = ""
+            return True
+        self._set_fire_veto_reason(
+            "person auto-fire blocked: unknown person and policy requires known hostile identity",
+            now,
+        )
 
         return False
 
