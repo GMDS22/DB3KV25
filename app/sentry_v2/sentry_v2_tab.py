@@ -21227,6 +21227,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 f"Opened {tab_title} tab.",
                 f"Sure. I opened the {tab_title} tab.",
                 f"Done. {tab_title} tab is open.",
+                    "close the smart sentry",
+                    "close smart sentry",
+                    "restart smart sentry",
+                    "restart the smart sentry",
+                    "relaunch smart sentry",
+                    "relaunch the smart sentry",
             ),
         )
         return True, spoken, f"Opened {tab_title} tab from voice command."

@@ -1385,6 +1385,8 @@ class VoskCommandListener:
             "turn off smart sentry app",
             "stop the smart sentry app",
             "stop smart sentry app",
+            "close the smart sentry",
+            "close smart sentry",
             "restart smart sentry",
             "restart the smart sentry",
             "restart app",
@@ -2602,8 +2604,8 @@ class VoskCommandListener:
             r"\bconnect\b.*\b(board|boards|com|port|serial)\b",
             r"\benable\b.*\bsmart\s+sentry\b",
             r"\b(?:run|start)\b.*\bsmart\s+sentry\b",
-            r"\b(?:close|quit|exit|shutdown|shut\s+down|turn\s+off|stop)\b.*\b(?:smart\s+sentry|sentry)\b.*\bapp\b",
-            r"\b(?:restart|relaunch|reload|reboot|reset)\b.*\b(?:smart\s+sentry|sentry)\b.*\bapp\b",
+              r"\b(?:close|quit|exit|shutdown|shut\s+down|turn\s+off|stop)\b.*\b(?:smart\s+sentry|sentry)\b",
+              r"\b(?:restart|relaunch|reload|reboot|reset)\b.*\b(?:smart\s+sentry|sentry)\b",
         )
         pattern = wake_pattern
         wake_matched = bool(re.search(pattern, corrected))
