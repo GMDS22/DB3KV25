@@ -581,11 +581,28 @@ class SoundConfig:
     autotracking_voice_report_cooldown_s: float = 8.0
     voice_commands_enabled: bool = True
     voice_wake_word: str = "elion"
+    # When True, saying only the cue name opens a silent full-attention listen
+    # window without speaking a wake acknowledgement phrase.
+    voice_wake_silent_attention: bool = True
+    # How long Elion keeps a wake-pending window after cue-only activation.
+    voice_wake_pending_hold_s: float = 6.0
+    # Hold duration for the interaction window opened by a cue-only wake.
+    voice_wake_attention_hold_s: float = 18.0
     voice_command_cooldown_s: float = 0.35
     voice_operator_silence_hold_s: float = 0.18
     voice_response_delay_s: float = 0.0
     voice_command_confidence_threshold: float = 0.78
     voice_command_ambiguous_threshold: float = 0.92
+    # Voice control authorization policy.
+    voice_operator_require_verification_for_control_commands: bool = True
+    voice_operator_allow_pin_fallback: bool = True
+    # SHA256 hex digest of the operator PIN. Empty means PIN fallback is disabled
+    # until the operator sets one in configuration.
+    voice_operator_pin_hash: str = ""
+    # Successful verification grants a temporary control session.
+    voice_operator_verification_session_ttl_s: float = 300.0
+    voice_operator_pin_max_attempts: int = 3
+    voice_operator_pin_lockout_s: float = 45.0
     voice_brief_responses: bool = False
     voice_auto_resume_tracking: bool = False
     voice_auto_resume_delay_s: float = 6.0

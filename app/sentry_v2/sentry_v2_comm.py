@@ -126,6 +126,8 @@ class SentryV2Comm:
         self.trigger_servo_rest_deg: int = 0
         self.trigger_servo_fire_deg: int = 45
         self.trigger_servo_speed_dps: int = 360
+        self._trigger_runtime_config_dirty: bool = True
+        self._last_trigger_runtime_push_s: float = 0.0
         self.rest_pan: float = 90.0
         self.rest_tilt: float = 55.0
         self.pir_event_blink_enabled: bool = False
@@ -782,15 +784,16 @@ class SentryV2Comm:
                 if not ok_bus and not ok_udp:
                     self._last_error = f"Both failed — Debug: {bus_err} | WiFi: {udp_err}"
                 elif not ok_bus:
-                    self._last_error = f"Debug board failed: {bus_err}"
+                    self._last_error = f"Debug board failed (movement unavailable): {bus_err}"
                 elif not ok_udp:
-                    self._last_error = f"WiFi failed (Debug Board still connected): {udp_err}"
+                    self._last_error = f"WiFi failed (Debug Board movement still connected): {udp_err}"
+                else:
+                    self._last_error = ""
                 if ok_udp:
                     self._start_receiver()
-                # In WiFi+Debug mode, Debug Board is the critical movement link.
-                # Allow degraded operation when WiFi is down so manual movement
-                # and tracking-to-servo can still run.
-                return ok_bus
+                # Allow partial-mode operation in WiFi+Debug mode so the UI and
+                # operator can keep using the link that did come up.
+                return ok_bus or ok_udp
 
             elif self._mode == self.MODE_WIFI_FULL:
                 ok = self._open_udp(udp_host, udp_port)
@@ -1187,7 +1190,10 @@ class SentryV2Comm:
                 and self._bus_ser is not None and self._bus_ser.is_open
             )
         elif m == self.MODE_WIFI_DEBUG_USB:
-            return self._bus_ser is not None and self._bus_ser.is_open
+            return (
+                (self._bus_ser is not None and self._bus_ser.is_open)
+                or (self._sock is not None and self._udp_target is not None)
+            )
         elif m == self.MODE_WIFI_FULL:
             return self._sock is not None and self._udp_target is not None
         elif m == self.MODE_DUAL_ESP32_WIFI:
@@ -1195,6 +1201,19 @@ class SentryV2Comm:
                 self._sock is not None and self._udp_target is not None
                 and self._servo_sock is not None and self._servo_udp_target is not None
             )
+        return False
+
+    def has_motion_link(self) -> bool:
+        """Return True when pan/tilt movement transport is available."""
+        m = self._mode
+        if m == self.MODE_ESP32_USB:
+            return self._ser is not None and self._ser.is_open
+        if m in (self.MODE_DUAL_USB, self.MODE_WIFI_DEBUG_USB):
+            return self._bus_ser is not None and self._bus_ser.is_open
+        if m == self.MODE_WIFI_FULL:
+            return self._sock is not None and self._udp_target is not None
+        if m == self.MODE_DUAL_ESP32_WIFI:
+            return self._servo_sock is not None and self._servo_udp_target is not None
         return False
 
     def can_send_sound(self) -> bool:
@@ -1285,9 +1304,16 @@ class SentryV2Comm:
         elif m == self.MODE_DUAL_USB:
             return f"USB IO: {self._ser.port} | Debug: {self._bus_ser.port}"
         elif m == self.MODE_WIFI_DEBUG_USB:
+            parts = []
             if self._udp_target is not None:
-                return f"WiFi: {self._udp_target[0]}:{self._udp_target[1]} | Debug: {self._bus_ser.port}"
-            return f"Debug: {self._bus_ser.port} | WiFi: unavailable"
+                parts.append(f"WiFi: {self._udp_target[0]}:{self._udp_target[1]}")
+            else:
+                parts.append("WiFi: unavailable")
+            if self._bus_ser is not None and self._bus_ser.is_open:
+                parts.append(f"Debug: {self._bus_ser.port}")
+            else:
+                parts.append("Debug: unavailable (movement disabled)")
+            return " | ".join(parts)
         elif m == self.MODE_WIFI_FULL:
             return f"WiFi: {self._udp_target[0]}:{self._udp_target[1]} (full)"
         elif m == self.MODE_DUAL_ESP32_WIFI:
@@ -1425,6 +1451,8 @@ class SentryV2Comm:
         allow_rest_tilt: bool = False,
     ) -> bool:
         """Build and send a full protocol command. Returns True if sent."""
+        if int(bool(fire)) == 1:
+            self._ensure_trigger_runtime_config_before_fire()
         pan_out, tilt_out = self._normalize_output_angles(pan, tilt)
         m = self._mode
         if m == self.MODE_ESP32_USB:
@@ -1841,7 +1869,11 @@ class SentryV2Comm:
     def send_trigger_runtime_config(self) -> bool:
         m = self._mode
         if m in (self.MODE_ESP32_USB, self.MODE_DUAL_USB):
-            return self._send_trigger_runtime_config_serial()
+            ok = self._send_trigger_runtime_config_serial()
+            if ok:
+                self._trigger_runtime_config_dirty = False
+                self._last_trigger_runtime_push_s = time.time()
+            return ok
         payload: Dict[str, Any] = {
             "action": "config",
             "trigger": {
@@ -1865,7 +1897,19 @@ class SentryV2Comm:
         ok = self._send_udp_payload(payload, label="UDP CFG trigger-servo/pir-led")
         if ok:
             self._last_error = ""
+            self._trigger_runtime_config_dirty = False
+            self._last_trigger_runtime_push_s = time.time()
         return ok
+
+    def mark_trigger_runtime_config_dirty(self) -> None:
+        self._trigger_runtime_config_dirty = True
+
+    def _ensure_trigger_runtime_config_before_fire(self) -> None:
+        now = time.time()
+        recently_pushed = (now - float(getattr(self, "_last_trigger_runtime_push_s", 0.0) or 0.0)) <= 1.5
+        if not bool(getattr(self, "_trigger_runtime_config_dirty", True)) and recently_pushed:
+            return
+        self.send_trigger_runtime_config()
 
     def set_control_source_mode(self, mode: str) -> bool:
         requested_mode = str(mode or "app").strip().lower()
@@ -2226,6 +2270,7 @@ class SentryV2Comm:
                 self._last_bus_tilt_ticks = tilt_ticks
         try:
             if bus_ser is None or not bus_ser.is_open:
+                self._last_error = "Debug board serial movement link unavailable"
                 return False
             move_time = int(default_move_time if move_time_ms is None else move_time_ms)
             move_time = max(0, min(1000, move_time))

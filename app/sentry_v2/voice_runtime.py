@@ -765,12 +765,12 @@ class VoskCommandListener:
         self._diag_last_audio_log_s: float = 0.0
         self._diag_last_quiet_log_s: float = 0.0
         self._diag_last_gain_log_s: float = 0.0
-        self._diag_audio_log_interval_s: float = 2.0
+        self._diag_audio_log_interval_s: float = 3.0
         self._diag_quiet_log_interval_s: float = 8.0
         self._diag_audio_rms_min: int = 90
-        self._diag_gain_log_interval_s: float = 8.0
-        self._input_gain_target_rms: int = 1600
-        self._input_gain_max: float = 10.0
+        self._diag_gain_log_interval_s: float = 12.0
+        self._input_gain_target_rms: int = 1450
+        self._input_gain_max: float = 6.5
         self._recent_signature: dict[str, object] = {}
         self._recent_spoken_phrase_suppressions: list[dict[str, object]] = []
         self._recent_output_input_block_until_s: float = 0.0
@@ -794,7 +794,9 @@ class VoskCommandListener:
         self._dynamic_silence_threshold: float = 0.8
         self._last_partial_text: str = ""
         self._last_partial_updated_s: float = 0.0
-        self._stale_partial_finalize_s: float = 0.25
+        self._stale_partial_finalize_s: float = 1.15
+        self._last_emitted_command_text: str = ""
+        self._last_emitted_command_s: float = 0.0
         # Lock protecting the cross-thread suppression timestamps.
         # Written on the main thread (suppress_recent_output_text / clear_recent_output_suppression),
         # read on the audio-recognition thread (_flush_stale_partial_if_due,
@@ -819,6 +821,10 @@ class VoskCommandListener:
         self._last_audio_warn_s: float = 0.0
         # Throttle timestamp for the queue-full debug warning in _audio_callback.
         self._last_queue_full_warn_s: float = 0.0
+        self._queue_full_drop_count: int = 0
+        self._last_input_status_log_s: float = 0.0
+        self._input_overflow_count: int = 0
+        self._input_overflow_window_s: float = 5.0
         # How many consecutive stream restart attempts have been made.  Reset to 0
         # whenever the stream delivers a healthy, above-gate audio frame.
         self._stream_restart_attempts: int = 0
@@ -1001,6 +1007,29 @@ class VoskCommandListener:
         self._listen_window_buffer = []
         return merged
 
+    def _abort_listening_window(self, *, reason: str) -> None:
+        self._listen_window_buffer = []
+        self._listen_window_until_s = 0.0
+        self._set_voice_state("IDLE", reason=reason)
+
+    def _record_emitted_command(self, text: str, *, now: Optional[float] = None) -> None:
+        normalized = re.sub(r"\s+", " ", str(text or "").strip().lower())
+        if not normalized:
+            return
+        self._last_emitted_command_text = normalized
+        self._last_emitted_command_s = float(now if now is not None else time.time())
+
+    def _is_recent_duplicate_command(self, text: str, *, now: Optional[float] = None, window_s: float = 2.0) -> bool:
+        normalized = re.sub(r"\s+", " ", str(text or "").strip().lower())
+        if not normalized:
+            return False
+        last_text = re.sub(r"\s+", " ", str(getattr(self, "_last_emitted_command_text", "") or "").strip().lower())
+        if not last_text or normalized != last_text:
+            return False
+        current_time = float(now if now is not None else time.time())
+        last_time = float(getattr(self, "_last_emitted_command_s", 0.0) or 0.0)
+        return last_time > 0.0 and (current_time - last_time) <= float(max(0.1, window_s))
+
     def _passes_final_transcript_gate(self, text: str, *, confidence: Optional[float] = None, now: Optional[float] = None) -> bool:
         cleaned = re.sub(r"\s+", " ", str(text or "").strip())
         if not cleaned:
@@ -1113,6 +1142,7 @@ class VoskCommandListener:
             return
         try:
             self._on_log(f"[VOICE-DIAG] command-emitted-window='{combined}'")
+            self._record_emitted_command(combined, now=current_time)
             self._on_command(combined)
         finally:
             self._set_voice_state("IDLE", reason="listen-window-complete")
@@ -1146,11 +1176,23 @@ class VoskCommandListener:
                     self._emit_transcript("final", normalized, source="partial-timeout")
         if not normalized:
             return
+        if self._wake_word and normalized == str(self._wake_word or "").strip().lower():
+            with self._wake_suppress_lock:
+                suppress_until = float(getattr(self, "_suppress_wake_only_until_s", 0.0) or 0.0)
+            if current_time <= suppress_until:
+                self._on_log(
+                    f"[VOICE-DIAG] stale-partial-wake-suppressed text='{partial_text}' suppress_until={suppress_until:.2f}"
+                )
+                return
+        if self._is_recent_duplicate_command(normalized, now=current_time):
+            self._on_log(f"[VOICE-DIAG] stale-partial-command-deduped='{normalized}'")
+            return
         if self._command_cooldown_s > 0.0 and (current_time - self._last_emit_s) < self._command_cooldown_s:
             self._on_log("[VOICE-DIAG] stale-partial-command-throttled-by-cooldown")
             return
         self._last_emit_s = current_time
         self._on_log(f"[VOICE-DIAG] stale-partial-command-emitted='{normalized}'")
+        self._record_emitted_command(normalized, now=current_time)
         self._on_command(normalized)
 
     @staticmethod
@@ -2401,7 +2443,25 @@ class VoskCommandListener:
 
     def _audio_callback(self, indata, _frames, _time_info, status) -> None:
         if status:
-            self._on_log(f"Vosk input status: {status}")
+            status_text = str(status).strip()
+            if status_text:
+                now = time.monotonic()
+                is_overflow = "overflow" in status_text.lower()
+                if is_overflow:
+                    self._input_overflow_count += 1
+                    if (now - float(getattr(self, "_last_input_status_log_s", 0.0) or 0.0)) >= float(
+                        getattr(self, "_input_overflow_window_s", 5.0) or 5.0
+                    ):
+                        count = int(getattr(self, "_input_overflow_count", 0) or 0)
+                        self._last_input_status_log_s = now
+                        self._input_overflow_count = 0
+                        self._on_log(
+                            f"[VOICE-DIAG] input-overflow count={count} over "
+                            f"{float(getattr(self, '_input_overflow_window_s', 5.0) or 5.0):.1f}s"
+                        )
+                elif (now - float(getattr(self, "_last_input_status_log_s", 0.0) or 0.0)) >= 3.0:
+                    self._last_input_status_log_s = now
+                    self._on_log(f"Vosk input status: {status_text}")
         if self._stop.is_set():
             return
         chunk = self._coerce_stream_chunk(indata)
@@ -2417,12 +2477,15 @@ class VoskCommandListener:
             # Log a throttled debug warning so this is visible in diagnostics
             # without flooding the log under sustained overload.
             _qf_now = time.monotonic()
+            self._queue_full_drop_count += 1
             if (_qf_now - float(getattr(self, "_last_queue_full_warn_s", 0.0) or 0.0)) > 5.0:
+                dropped = int(getattr(self, "_queue_full_drop_count", 0) or 0)
                 self._last_queue_full_warn_s = _qf_now
                 self._on_log(
-                    "[VOICE-DIAG] audio-queue-full — oldest frame dropped; "
-                    "recognition loop may be falling behind"
+                    "[VOICE-DIAG] audio-queue-full — oldest frame dropped "
+                    f"{max(1, dropped)} time(s) in last 5s; recognition loop may be falling behind"
                 )
+                self._queue_full_drop_count = 0
             try:
                 self._audio_queue.get_nowait()
             except queue.Empty:
@@ -2523,6 +2586,7 @@ class VoskCommandListener:
                 self._on_log(
                     f"[VOICE-DIAG] wake-followup-noise-rejected wake='{wake_word}' text='{stripped}'"
                 )
+                self._abort_listening_window(reason="wake-followup-noise-reject")
                 with self._wake_suppress_lock:
                     _suppress_snap = float(getattr(self, "_suppress_wake_only_until_s", 0.0) or 0.0)
                 if now <= _suppress_snap:
@@ -2547,9 +2611,10 @@ class VoskCommandListener:
                         f"suppress_until={_suppress_snap:.2f}"
                     )
                     self._on_log(
-                        f"[VOICE-DIAG] wake-word-final-dispatched-after-partial text='{corrected}'"
+                        f"[VOICE-DIAG] wake-word-final-dropped-after-partial text='{corrected}'"
                     )
-                    return wake_word
+                    self._clear_pending_partial_text()
+                    return ""
                 self._on_log(f"[VOICE-DIAG] wake-word-final-dispatched text='{corrected}'")
                 return wake_word
             self._append_listening_text(stripped)
@@ -2560,9 +2625,11 @@ class VoskCommandListener:
                     )
                 else:
                     self._on_log(f"[VOICE-DIAG] wake-followup-gate-rejected text='{stripped}'")
+                    self._abort_listening_window(reason="wake-followup-gate-reject")
                     return ""
             if not self._is_allowed_command_or_intent(stripped):
                 self._on_log(f"[VOICE-DIAG] wake-followup-unknown-command text='{stripped}'")
+                self._abort_listening_window(reason="wake-followup-unknown-command")
                 return ""
             self._set_voice_state("PROCESSING", reason="wake-followup-final")
             self._set_voice_state("IDLE", reason="wake-followup-complete")
@@ -2825,8 +2892,12 @@ class VoskCommandListener:
                             if self._command_cooldown_s > 0.0 and (now - self._last_emit_s) < self._command_cooldown_s:
                                 self._on_log("[VOICE-DIAG] command-throttled-by-cooldown")
                                 continue
+                            if self._is_recent_duplicate_command(normalized, now=now):
+                                self._on_log(f"[VOICE-DIAG] command-deduped='{normalized}'")
+                                continue
                             self._last_emit_s = now
                             self._on_log(f"[VOICE-DIAG] command-emitted='{normalized}'")
+                            self._record_emitted_command(normalized, now=now)
                             self._on_command(normalized)
                         else:
                             try:

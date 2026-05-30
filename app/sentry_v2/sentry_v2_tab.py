@@ -19,6 +19,8 @@ Provides:
 from __future__ import annotations
 
 from collections import deque
+import hashlib
+import hmac
 import json
 import importlib
 import os
@@ -48,6 +50,7 @@ from PyQt5.QtWidgets import (
     QProgressBar,
     QFileDialog,
     QBoxLayout,
+    QInputDialog,
     QShortcut,
     QAbstractSpinBox,
     QStyle,
@@ -3859,9 +3862,18 @@ class SentryV2TabWidget(QWidget):
         self._voice_heard_partial_text: str = ""
         self._voice_heard_final_text: str = ""
         self._voice_heard_status_text: str = "idle"
+        self._last_runtime_diag_line: str = ""
+        self._last_runtime_diag_log_s: float = 0.0
         self._last_voice_signature: Dict[str, object] = {}
         self._authorized_voice_frequency_hz: float = 0.0
         self._authorized_voice_identity_label: str = ""
+        self._voice_operator_verification_until_s: float = 0.0
+        self._voice_operator_verification_attempts: int = 0
+        self._voice_operator_verification_lockout_until_s: float = 0.0
+        self._voice_operator_pending_command: str = ""
+        self._voice_operator_pending_reason: str = ""
+        self._voice_operator_pending_started_s: float = 0.0
+        self._voice_operator_pin_prompt_active: bool = False
         self._startup_voice_intro_announced: bool = False
         self._startup_voice_intro_pending: bool = False
         self._queued_human_speech_text: str = ""
@@ -7890,6 +7902,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._lbl_last_cmd.setStyleSheet(self._compact_status_style("neutral"))
         self._lbl_last_cmd.setWordWrap(True)
         lay.addWidget(self._lbl_last_cmd)
+
+        self._lbl_runtime_diag = QLabel("Runtime: movement unknown | io unknown | voice idle")
+        self._lbl_runtime_diag.setStyleSheet(self._compact_status_style("meta"))
+        self._lbl_runtime_diag.setWordWrap(True)
+        lay.addWidget(self._lbl_runtime_diag)
 
         lay.addStretch()
 
@@ -12504,7 +12521,44 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._speak_after_operator_quiet(response, interrupt=False)
             return "acknowledged"
 
-        if any(token in cmd for token in ("close the app", "close app", "quit the app", "quit app", "exit the app", "exit app")):
+        _close_app_tokens = (
+            "close the app",
+            "close app",
+            "quit the app",
+            "quit app",
+            "exit the app",
+            "exit app",
+            "close the smart sentry",
+            "close smart sentry",
+            "close the sentry",
+            "close sentry",
+            "shut down the app",
+            "shut down smart sentry",
+            "shut down the smart sentry",
+            "shut down the sentry",
+            "shut down sentry",
+            "shutdown smart sentry",
+            "shutdown the smart sentry",
+            "shutdown the sentry",
+            "shutdown sentry",
+            "shutdown the app",
+            "turn off the app",
+            "turn off smart sentry",
+            "turn off the smart sentry",
+            "turn off the sentry",
+            "power down smart sentry",
+            "power down the smart sentry",
+            "power down the sentry",
+            "exit smart sentry",
+            "exit the smart sentry",
+            "exit the sentry",
+            "quit smart sentry",
+            "quit the smart sentry",
+            "quit the sentry",
+            "close down smart sentry",
+            "close down the smart sentry",
+        )
+        if any(token in cmd for token in _close_app_tokens):
             if bool(getattr(self, "_shutdown_in_progress", False)) or bool(getattr(self, "_cleanup_started", False)):
                 self._speak_after_operator_quiet("The app is already closing.", interrupt=False)
                 return "acknowledged"
@@ -12517,7 +12571,31 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             )
             return "acknowledged"
 
-        if any(token in cmd for token in ("restart smart sentry", "restart the smart sentry", "restart app", "restart the app", "relaunch smart sentry", "relaunch the smart sentry")):
+        _restart_app_tokens = (
+            "restart smart sentry",
+            "restart the smart sentry",
+            "restart the sentry",
+            "restart sentry",
+            "restart app",
+            "restart the app",
+            "relaunch smart sentry",
+            "relaunch the smart sentry",
+            "relaunch the sentry",
+            "relaunch sentry",
+            "reload smart sentry",
+            "reload the smart sentry",
+            "reload the app",
+            "reload sentry",
+            "reboot smart sentry",
+            "reboot the smart sentry",
+            "reboot the sentry",
+            "reboot sentry",
+            "reboot the app",
+            "reset smart sentry",
+            "reset the smart sentry",
+            "reset and reload",
+        )
+        if any(token in cmd for token in _restart_app_tokens):
             if bool(getattr(self, "_shutdown_in_progress", False)) or bool(getattr(self, "_cleanup_started", False)):
                 self._speak_after_operator_quiet("The app is already restarting.", interrupt=False)
                 return "acknowledged"
@@ -13685,6 +13763,60 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if hasattr(self, "_lbl_conn_status") and self._lbl_conn_status is not None:
             self._set_label_content(self._lbl_conn_status, text, self._connection_status_style(self._connection_status_level))
 
+    def _voice_runtime_health_label(self) -> Tuple[str, str]:
+        runtime = getattr(self, "_voice_runtime", None)
+        if runtime is None:
+            return "stopped", "warn"
+        state = str(getattr(self, "_voice_heard_status_text", "") or "").strip().lower()
+        if not state:
+            return "unknown", "warn"
+        if state in {"mic_error", "error"}:
+            return state, "error"
+        if state in {"listening", "hearing", "processing"}:
+            return state, "ok"
+        if state in {"idle", "paused"}:
+            return state, "warn"
+        return state, "neutral"
+
+    def _runtime_link_health_labels(self) -> Tuple[str, str, str]:
+        mode = int(getattr(self._comm, "_mode", int(self.config.connection.connection_type)) or int(self.config.connection.connection_type))
+        connected = bool(self._comm.is_connected())
+        if not connected:
+            return "offline", "offline", "error"
+        if mode == 2:
+            motion_ok = bool(self._comm.has_motion_link()) if hasattr(self._comm, "has_motion_link") else connected
+            io_ok = bool(getattr(self._comm, "_sock", None) is not None and getattr(self._comm, "_udp_target", None) is not None)
+            if motion_ok and io_ok:
+                return "ready", "ready", "ok"
+            if motion_ok:
+                return "ready", "degraded", "warn"
+            if io_ok:
+                return "degraded", "ready", "warn"
+            return "degraded", "degraded", "error"
+        return "ready", "ready", "ok"
+
+    def _update_runtime_diagnostics(self, *, reason: str = "", force: bool = False) -> None:
+        motion_label, io_label, link_level = self._runtime_link_health_labels()
+        voice_label, voice_level = self._voice_runtime_health_label()
+        level_order = {"meta": 0, "neutral": 1, "ok": 1, "info": 1, "warn": 2, "error": 3}
+        chosen_level = link_level
+        if level_order.get(voice_level, 1) > level_order.get(link_level, 1):
+            chosen_level = voice_level
+        line = f"Runtime: movement {motion_label} | io {io_label} | voice {voice_label}"
+        if hasattr(self, "_lbl_runtime_diag") and self._lbl_runtime_diag is not None:
+            style_level = chosen_level if chosen_level in {"ok", "warn", "error", "info", "neutral"} else "neutral"
+            self._set_label_content(self._lbl_runtime_diag, line, self._compact_status_style(style_level))
+        now = time.time()
+        should_log = force or line != str(getattr(self, "_last_runtime_diag_line", "") or "")
+        if not should_log:
+            return
+        if not force and (now - float(getattr(self, "_last_runtime_diag_log_s", 0.0) or 0.0)) < 1.0:
+            return
+        self._last_runtime_diag_line = line
+        self._last_runtime_diag_log_s = now
+        suffix = f" reason={reason}" if reason else ""
+        self._log(f"{line}{suffix}")
+
     def _sync_camera_status_style(self) -> None:
         if hasattr(self, "_lbl_cam_status") and self._lbl_cam_status is not None:
             level = str(getattr(self, "_camera_status_level", "neutral") or "neutral")
@@ -14143,6 +14275,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             voice_disconnect_report = bool(getattr(self, "_voice_protocol_disconnect_via_voice_active", False))
             self._btn_connect.setText("Connect")
             self._set_connection_status("Disconnected", "error")
+            self._update_runtime_diagnostics(reason="disconnect", force=True)
             self._log("Disconnected")
             self._sync_home_screen_visibility()
             self._startup_autoconnect_active = False
@@ -14178,24 +14311,35 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if ok:
             self._btn_connect.setText("Disconnect")
             conn_text = self._format_connection_details(details, info)
+            mode2_selected = int(self.config.connection.connection_type) == 2
             mode2_degraded_io = (
-                int(self.config.connection.connection_type) == 2
+                mode2_selected
                 and (
                     getattr(self._comm, "_sock", None) is None
                     or getattr(self._comm, "_udp_target", None) is None
                 )
             )
-            self._set_connection_status(conn_text, "warn" if mode2_degraded_io else "ok")
+            mode2_degraded_motion = (
+                mode2_selected
+                and hasattr(self._comm, "has_motion_link")
+                and not bool(self._comm.has_motion_link())
+            )
+            self._set_connection_status(conn_text, "warn" if (mode2_degraded_io or mode2_degraded_motion) else "ok")
+            self._update_runtime_diagnostics(reason="connect", force=True)
             self._log(f"Connected: {info}")
             fire_mode = "Projectile (Trigger Servo)" if self._comm.trigger_mode_bb else "Water (MOSFET)"
             safety_state = "ARMED" if self._safety_armed else "LOCKED"
             auto_trigger_state = "ON" if bool(self.config.engagement.auto_trigger_enabled) else "OFF"
             self._log(f"Fire config: mode={fire_mode} | safety={safety_state} | auto-trigger={auto_trigger_state}")
+            if mode2_degraded_motion:
+                self._log(
+                    "Connection warning: ESP32 WiFi IO is connected, but Debug Board USB movement link is unavailable. Pan/tilt movement and autotracking are disabled until the Debug Board reconnects"
+                )
             if mode2_degraded_io:
                 self._log(
                     "Connection warning: Debug Board pan/tilt movement is available, but ESP32 WiFi IO is unavailable. GPIO13 trigger-servo and PIR enable commands will not work until the WiFi link reconnects"
                 )
-            else:
+            if not mode2_degraded_motion and not mode2_degraded_io:
                 self._queue_runtime_trigger_config_if_connected()
             self._startup_autoconnect_active = False
             self._startup_autoconnect_retry = 0
@@ -14231,6 +14375,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._btn_connect.setText("Connect")
             failure_text = self._format_connection_details(details, f"FAILED: {err or 'unknown error'}")
             self._set_connection_status(failure_text, "error")
+            self._update_runtime_diagnostics(reason="connect-failed", force=True)
             self._log(f"Connection failed: {err or 'unknown error'}")
             self._sync_home_screen_visibility()
             self._clear_enable_sentry_after_connect()
@@ -25540,19 +25685,27 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if ok:
             if detail:
                 self._update_last_command_label(detail)
+            if command_name in {"refresh_wifi_runtime_link", "send_pir_enabled", "move"}:
+                self._update_runtime_diagnostics(reason=f"cmd:{command_name}")
             if command_name == "refresh_wifi_runtime_link":
                 self._log(str(detail or "WiFi runtime link refreshed"))
             return
         detail_text = str(detail or "command failed")
         if command_name == "move":
-            if not self._host_controls_hardware() and not self._comm.is_connected():
-                self._log("Move skipped: hardware is not connected yet")
+            motion_ready = bool(self._comm.is_connected())
+            if hasattr(self._comm, "has_motion_link"):
+                motion_ready = bool(self._comm.has_motion_link())
+            if not self._host_controls_hardware() and not motion_ready:
+                self._update_runtime_diagnostics(reason="move-link-missing", force=True)
+                self._log("Move skipped: pan/tilt movement link is not connected yet")
                 return
             self._log(f"Move failed: {detail_text}")
         elif command_name == "refresh_wifi_runtime_link":
             self._log(f"WiFi runtime refresh failed: {detail_text}")
         else:
             self._log(f"{command_name} failed: {detail_text}")
+        if command_name in {"refresh_wifi_runtime_link", "send_pir_enabled", "move"}:
+            self._update_runtime_diagnostics(reason=f"cmd-failed:{command_name}")
 
     def _push_config(self, *, force: bool = False) -> None:
         """Push current config to engine, overlay, and detector.
@@ -26959,6 +27112,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             enable_wake_word_coordination=True,
         )
         self._voice_runtime.start()
+        self._update_runtime_diagnostics(reason="voice-runtime-start", force=True)
         if command_listener_enabled:
             self._log(f"[VOICE] Listener active (wake word: {wake_word}, model: {model_path})")
         else:
@@ -26990,6 +27144,197 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             if class_name == "person" and identity_label:
                 return identity_label
         return ""
+
+    def _voice_operator_verification_session_active(self) -> bool:
+        until_s = float(getattr(self, "_voice_operator_verification_until_s", 0.0) or 0.0)
+        return until_s > time.time()
+
+    def _voice_operator_verification_lockout_active(self) -> bool:
+        until_s = float(getattr(self, "_voice_operator_verification_lockout_until_s", 0.0) or 0.0)
+        return until_s > time.time()
+
+    def _voice_operator_pin_hash(self) -> str:
+        sound_cfg = getattr(self.config, "sound", None)
+        pin_hash = str(getattr(sound_cfg, "voice_operator_pin_hash", "") or "").strip().lower()
+        if re.fullmatch(r"[a-f0-9]{64}", pin_hash):
+            return pin_hash
+        return ""
+
+    def _voice_operator_pin_configured(self) -> bool:
+        return bool(self._voice_operator_pin_hash())
+
+    @staticmethod
+    def _hash_voice_operator_pin(pin_code: str) -> str:
+        return hashlib.sha256(str(pin_code or "").encode("utf-8")).hexdigest()
+
+    def _verify_voice_operator_pin(self, pin_code: str) -> bool:
+        configured = self._voice_operator_pin_hash()
+        if not configured:
+            return False
+        candidate = self._hash_voice_operator_pin(re.sub(r"\D+", "", str(pin_code or "")))
+        return hmac.compare_digest(configured, candidate)
+
+    def _extract_voice_operator_pin_candidate(self, command: str) -> str:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return ""
+
+        explicit = re.search(r"\b(?:pin|code)\b\s*(?:is|equals|=|:)??\s*([0-9][0-9\s\-]{2,20})\b", normalized)
+        if explicit:
+            digits = re.sub(r"\D+", "", explicit.group(1))
+            if 4 <= len(digits) <= 12:
+                return digits
+
+        if re.fullmatch(r"[0-9\s\-]{4,32}", normalized):
+            digits = re.sub(r"\D+", "", normalized)
+            if 4 <= len(digits) <= 12:
+                return digits
+
+        words = {
+            "zero": "0",
+            "oh": "0",
+            "one": "1",
+            "two": "2",
+            "three": "3",
+            "four": "4",
+            "five": "5",
+            "six": "6",
+            "seven": "7",
+            "eight": "8",
+            "nine": "9",
+        }
+        tokens = [tok for tok in re.split(r"\s+", normalized) if tok]
+        if "pin" in tokens or "code" in tokens:
+            collected: List[str] = []
+            for tok in tokens:
+                if tok in {"pin", "code", "is", "my", "operator", "the", "verify", "verification"}:
+                    continue
+                if tok.isdigit():
+                    collected.extend(list(tok))
+                    continue
+                mapped = words.get(tok, "")
+                if mapped:
+                    collected.append(mapped)
+            digits = "".join(collected)
+            if 4 <= len(digits) <= 12:
+                return digits
+        return ""
+
+    def _voice_operator_reset_pending_verification(self) -> None:
+        self._voice_operator_pending_command = ""
+        self._voice_operator_pending_reason = ""
+        self._voice_operator_pending_started_s = 0.0
+
+    def _voice_operator_start_verified_session(self) -> None:
+        ttl_s = float(getattr(self.config.sound, "voice_operator_verification_session_ttl_s", 300.0) or 300.0)
+        self._voice_operator_verification_until_s = time.time() + max(15.0, ttl_s)
+        self._voice_operator_verification_attempts = 0
+        self._voice_operator_verification_lockout_until_s = 0.0
+
+    def _voice_operator_finalize_verified_pending_command(self) -> None:
+        pending = str(getattr(self, "_voice_operator_pending_command", "") or "").strip()
+        self._voice_operator_reset_pending_verification()
+        if not pending:
+            return
+        self._speak_after_operator_quiet("Verification accepted. Executing now.", interrupt=False)
+        QTimer.singleShot(0, lambda replay_text=pending: self._on_voice_command_recognized(replay_text))
+
+    def _voice_operator_prompt_pin_dialog(self) -> None:
+        if self._voice_operator_pin_prompt_active or not self._voice_operator_pin_configured():
+            return
+        self._voice_operator_pin_prompt_active = True
+        try:
+            pin_code, ok = QInputDialog.getText(
+                self,
+                "Operator Verification",
+                "Enter operator PIN to authorize voice control:",
+                QLineEdit.Password,
+            )
+            if not ok:
+                return
+            candidate = re.sub(r"\D+", "", str(pin_code or ""))
+            if not candidate:
+                return
+            if self._verify_voice_operator_pin(candidate):
+                self._voice_operator_start_verified_session()
+                self._voice_operator_finalize_verified_pending_command()
+                return
+            self._voice_operator_verification_attempts += 1
+            max_attempts = int(getattr(self.config.sound, "voice_operator_pin_max_attempts", 3) or 3)
+            if self._voice_operator_verification_attempts >= max(1, max_attempts):
+                lockout_s = float(getattr(self.config.sound, "voice_operator_pin_lockout_s", 45.0) or 45.0)
+                self._voice_operator_verification_lockout_until_s = time.time() + max(5.0, lockout_s)
+                self._voice_operator_reset_pending_verification()
+                self._speak_after_operator_quiet("Verification is temporarily locked. Please wait and try again.", interrupt=False)
+            else:
+                self._speak_after_operator_quiet("PIN did not match. Please try again.", interrupt=False)
+        finally:
+            self._voice_operator_pin_prompt_active = False
+
+    def _voice_operator_begin_verification_challenge(self, command: str) -> None:
+        if self._voice_operator_verification_lockout_active():
+            remaining = int(max(1, round(self._voice_operator_verification_lockout_until_s - time.time())))
+            self._speak_after_operator_quiet(
+                f"Verification is temporarily locked. Please wait about {remaining} seconds and try again.",
+                interrupt=False,
+            )
+            return
+
+        self._voice_operator_pending_command = str(command or "").strip().lower()
+        self._voice_operator_pending_started_s = time.time()
+        self._voice_operator_pending_reason = "control-command"
+
+        if self._voice_operator_pin_configured() and bool(getattr(self.config.sound, "voice_operator_allow_pin_fallback", True)):
+            self._speak_after_operator_quiet(
+                "Verification required. Say pin followed by your code, or enter it in the PIN prompt.",
+                interrupt=False,
+            )
+            self._open_voice_conversation_intake(source="verification", hold_s=20.0, intake_phrase="")
+            QTimer.singleShot(0, self._voice_operator_prompt_pin_dialog)
+            return
+
+        self._speak_after_operator_quiet(
+            "Verification required. Please face the camera and repeat your command.",
+            interrupt=False,
+        )
+        self._open_voice_conversation_intake(source="verification-face", hold_s=12.0, intake_phrase="")
+
+    def _voice_operator_try_consume_verification_input(self, command: str) -> bool:
+        pending = str(getattr(self, "_voice_operator_pending_command", "") or "").strip()
+        if not pending:
+            return False
+
+        if self._voice_operator_verification_lockout_active():
+            remaining = int(max(1, round(self._voice_operator_verification_lockout_until_s - time.time())))
+            self._speak_after_operator_quiet(
+                f"Verification is temporarily locked. Please wait about {remaining} seconds and try again.",
+                interrupt=False,
+            )
+            return True
+
+        candidate = self._extract_voice_operator_pin_candidate(command)
+        if not candidate:
+            self._speak_after_operator_quiet(
+                "Verification pending. Say pin followed by your code, or use the PIN prompt.",
+                interrupt=False,
+            )
+            return True
+
+        if self._verify_voice_operator_pin(candidate):
+            self._voice_operator_start_verified_session()
+            self._voice_operator_finalize_verified_pending_command()
+            return True
+
+        self._voice_operator_verification_attempts += 1
+        max_attempts = int(getattr(self.config.sound, "voice_operator_pin_max_attempts", 3) or 3)
+        if self._voice_operator_verification_attempts >= max(1, max_attempts):
+            lockout_s = float(getattr(self.config.sound, "voice_operator_pin_lockout_s", 45.0) or 45.0)
+            self._voice_operator_verification_lockout_until_s = time.time() + max(5.0, lockout_s)
+            self._voice_operator_reset_pending_verification()
+            self._speak_after_operator_quiet("Verification is temporarily locked. Please wait and try again.", interrupt=False)
+        else:
+            self._speak_after_operator_quiet("PIN did not match. Please try again.", interrupt=False)
+        return True
 
     def _voice_prompt_requests_analysis(self, prompt_text: str) -> bool:
         prompt = str(prompt_text or "").strip().lower()
@@ -27044,6 +27389,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         return prompt.startswith(question_prefixes) and any(token in prompt for token in system_tokens)
 
     def _voice_control_request_requires_operator(self, text: str) -> bool:
+        if not bool(getattr(self.config.sound, "voice_operator_require_verification_for_control_commands", True)):
+            return False
         cmd = str(text or "").strip().lower()
         if not cmd:
             return False
@@ -27187,6 +27534,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if not self._voice_control_request_requires_operator(command):
             return True
 
+        if self._voice_operator_verification_session_active():
+            return True
+
         signature = self._voice_signature_snapshot()
         identity_label = self._current_voice_identity_label()
         current_freq = float(signature.get("frequency_hz", 0.0) or 0.0)
@@ -27214,10 +27564,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._authorized_voice_frequency_hz = (float(self._authorized_voice_frequency_hz) * 0.72) + (current_freq * 0.28)
                 return True
 
-        self._speak_after_operator_quiet(
-            "I heard the request, but only the registered operator can change Smart Sentry settings.",
-            interrupt=False,
-        )
+        self._voice_operator_begin_verification_challenge(command)
         self._log(
             "Voice operator authorization rejected "
             f"(freq={current_freq:.1f}Hz identity={identity_label or 'none'} enrolled_freq={self._authorized_voice_frequency_hz:.1f}Hz enrolled_identity={self._authorized_voice_identity_label or 'none'})"
@@ -27290,6 +27637,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             prior_status = self._voice_heard_status_text
             self._voice_heard_status_text = text or "listening"
             if self._voice_heard_status_text and self._voice_heard_status_text != prior_status:
+                self._update_runtime_diagnostics(reason=f"voice-status:{self._voice_heard_status_text}")
                 self._record_runtime_conversation_event(
                     "system",
                     self._voice_heard_status_text,
@@ -27471,9 +27819,30 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             (
                 "run the smart sentry",
                 "run smart sentry",
+                "run the sentry",
+                "run sentry",
                 "activate the smart sentry",
                 "activate smart sentry",
+                "activate the sentry",
+                "activate sentry",
                 "start the smart sentry",
+                "start sentry",
+                "start the sentry",
+                "boot up smart sentry",
+                "boot up the smart sentry",
+                "boot up sentry",
+                "power up smart sentry",
+                "power up the smart sentry",
+                "power up sentry",
+                "initialize smart sentry",
+                "initialize sentry",
+                "bring up smart sentry",
+                "bring up sentry",
+                "wake up smart sentry",
+                "wake up sentry",
+                "go live",
+                "go online",
+                "go active",
             ),
         ):
             return "connect boards and enable smart sentry"
@@ -27488,6 +27857,16 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "start autotracker",
                 "start auto tracker",
                 "start autotracking",
+                "turn on tracking",
+                "turn on autotracking",
+                "turn on auto tracking",
+                "turn on autotracker",
+                "engage tracking",
+                "engage autotracking",
+                "engage the tracker",
+                "enable autotracking",
+                "enable auto tracking",
+                "enable autotracker",
             ),
         ):
             return "resume tracking"
@@ -27523,11 +27902,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             # window so that the command body ("Elion, run the sentry" → "run the
             # sentry" arriving as a final transcript) can be captured and routed
             # through the normal command handler instead of being swallowed silently.
-            self._voice_wake_pending_until = time.time() + 2.5
+            wake_pending_hold_s = float(getattr(self.config.sound, "voice_wake_pending_hold_s", 6.0) or 6.0)
+            self._voice_wake_pending_until = time.time() + max(2.0, wake_pending_hold_s)
+            wake_intake_hold_s = float(getattr(self.config.sound, "voice_wake_attention_hold_s", 18.0) or 18.0)
+            silent_attention = bool(getattr(self.config.sound, "voice_wake_silent_attention", True))
             self._open_voice_conversation_intake(
                 source="wake-word",
-                hold_s=16.0,
-                intake_phrase=self._voice_pick_phrase("voice_wake_ack", self._voice_wake_acknowledgement_variants()),
+                hold_s=max(8.0, wake_intake_hold_s),
+                intake_phrase="" if silent_attention else self._voice_pick_phrase("voice_wake_ack", self._voice_wake_acknowledgement_variants()),
                 throttle_ack_s=1.5,
             )
             return
@@ -27540,6 +27922,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return
         command = self._normalize_stateful_voice_command_alias(command)
         if not command:
+            return
+
+        if self._voice_operator_try_consume_verification_input(command):
             return
 
         if self._voice_command_is_recent_wake_ack_echo(command):
@@ -27610,12 +27995,25 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "enable tracking",
                 "enable smart sentry",
                 "enable the smart sentry",
+                "enable the sentry",
                 "start smart sentry",
+                "start the sentry",
+                "start sentry",
                 "resume smart sentry",
                 "resume tracking",
                 "resume guarding mode",
+                "resume sentry",
+                "resume the sentry",
                 "activate smart sentry",
                 "activate the smart sentry",
+                "activate sentry",
+                "activate the sentry",
+                "engage sentry",
+                "engage the sentry",
+                "engage tracking",
+                "go live",
+                "go active",
+                "go online",
             ),
         ):
             already_enabled = bool(hasattr(self, "_chk_enable") and bool(self._chk_enable.isChecked()))
@@ -27644,10 +28042,21 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "disable tracking",
                 "disable smart sentry",
                 "disable the smart sentry",
+                "disable the sentry",
+                "disable sentry tracking",
                 "pause smart sentry",
                 "pause tracking",
                 "pause guarding mode",
+                "pause sentry",
+                "pause the sentry",
                 "stop smart sentry",
+                "stop the sentry",
+                "stop sentry",
+                "stand down",
+                "stand by",
+                "hold tracking",
+                "suspend tracking",
+                "suspend sentry",
             ),
         ):
             already_disabled = not bool(hasattr(self, "_chk_enable") and bool(self._chk_enable.isChecked()))
