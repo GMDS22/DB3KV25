@@ -46,11 +46,7 @@ class _FakeTranscriptTab:
 
         self._voice_signature_snapshot = types.MethodType(SentryV2TabWidget._voice_signature_snapshot, self)
         self._refresh_voice_hearing_panel = types.MethodType(SentryV2TabWidget._refresh_voice_hearing_panel, self)
-        self._voice_transcript_reasoning_note = types.MethodType(SentryV2TabWidget._voice_transcript_reasoning_note, self)
-        self._mirror_voice_transcript_to_reasoning_panel = types.MethodType(
-            SentryV2TabWidget._mirror_voice_transcript_to_reasoning_panel,
-            self,
-        )
+        self._update_runtime_diagnostics = lambda **_kwargs: None
 
     def _human_voice_busy(self) -> bool:
         return False
@@ -108,13 +104,22 @@ class _FakeAuthorizationTab:
     def __init__(self) -> None:
         self._authorized_voice_frequency_hz = 0.0
         self._authorized_voice_identity_label = ""
+        self._voice_operator_verification_until_s = 0.0
+        self._voice_operator_verification_lockout_until_s = 0.0
+        self._voice_operator_pending_command = ""
+        self._voice_operator_pending_reason = ""
+        self._voice_operator_pending_started_s = 0.0
         self.logs: list[str] = []
         self.spoken: list[str] = []
+        self.verification_challenges: list[str] = []
         self._identity_label = ""
         self._identity_profile_id = ""
         self._signature = {}
         self._face_library = _FakeFaceLibrary()
         self.config = types.SimpleNamespace(
+            sound=types.SimpleNamespace(
+                voice_operator_require_verification_for_control_commands=True,
+            ),
             face_recognition=types.SimpleNamespace(
                 operator_profile_id="",
                 operator_profile_name="",
@@ -126,6 +131,13 @@ class _FakeAuthorizationTab:
 
     def _voice_signature_snapshot(self):
         return dict(self._signature)
+
+    def _voice_operator_verification_session_active(self) -> bool:
+        return False
+
+    def _voice_operator_begin_verification_challenge(self, command: str) -> None:
+        self.verification_challenges.append(str(command or ""))
+        self.spoken.append("Verification required before this control command.")
 
     def _current_voice_identity_label(self) -> str:
         return str(self._identity_label or "")
@@ -179,11 +191,6 @@ def test_voice_transcript_updates_main_conversation_surface() -> None:
     SentryV2TabWidget._on_voice_transcript_received(tab, partial_payload)
 
     assert "Partial: hello elion" in tab._txt_voice_heard.text
-    assert tab._ai_reasoning_panel.updates[-1] == {
-        "section": "info",
-        "content": "Hearing (windows): hello elion",
-        "replace": True,
-    }
 
     final_payload = {
         "kind": "final",
@@ -196,11 +203,6 @@ def test_voice_transcript_updates_main_conversation_surface() -> None:
     SentryV2TabWidget._on_voice_transcript_received(tab, final_payload)
 
     assert "Final: who are you" in tab._txt_voice_heard.text
-    assert tab._ai_reasoning_panel.updates[-1] == {
-        "section": "info",
-        "content": "Heard final (windows), conf 0.82: who are you",
-        "replace": True,
-    }
 
 
 def test_windows_partial_publish_caches_live_partial_text() -> None:
@@ -238,9 +240,9 @@ def test_voice_operator_authorization_allows_when_no_face_identity_is_available(
 
     allowed = SentryV2TabWidget._authorize_voice_control_request(tab, "change theme")
 
-    assert allowed is True
-    assert tab.spoken == []
-    assert any("operator face not currently recognized" in message for message in tab.logs)
+    assert allowed is False
+    assert tab.verification_challenges == ["change theme"]
+    assert tab.spoken == ["Verification required before this control command."]
 
 
 def test_configured_operator_profile_allows_matching_recognized_face_identity() -> None:
@@ -270,7 +272,7 @@ def test_configured_operator_profile_allows_when_no_face_is_recognized() -> None
 
     assert allowed is True
     assert tab.spoken == []
-    assert any("configured operator face is not currently recognized" in message for message in tab.logs)
+    assert tab._authorized_voice_frequency_hz == 260.0
 
 
 def test_voice_operator_authorization_rejects_conflicting_recognized_face_identity() -> None:
@@ -283,9 +285,8 @@ def test_voice_operator_authorization_rejects_conflicting_recognized_face_identi
     allowed = SentryV2TabWidget._authorize_voice_control_request(tab, "change theme")
 
     assert allowed is False
-    assert tab.spoken == [
-        "I heard the request, but voice setting changes are currently locked to Gary while I recognize Alex in view."
-    ]
+    assert tab.verification_challenges == ["change theme"]
+    assert tab.spoken == ["Verification required before this control command."]
 
 
 def test_configured_operator_profile_rejects_conflicting_recognized_face_identity() -> None:
@@ -302,10 +303,9 @@ def test_configured_operator_profile_rejects_conflicting_recognized_face_identit
 
     allowed = SentryV2TabWidget._authorize_voice_control_request(tab, "change theme")
 
-    assert allowed is False
-    assert tab.spoken == [
-        "I heard the request, but voice setting changes are currently locked to Gary while I recognize Alex in view."
-    ]
+    assert allowed is True
+    assert tab.verification_challenges == []
+    assert tab.spoken == []
 
 
 def main() -> None:

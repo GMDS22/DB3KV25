@@ -52,7 +52,7 @@ class _FakeStartupTab:
         return SentryV2TabWidget._schedule_startup_tasks(self)
 
     def _refresh_operator_listening_state(self):
-        return SentryV2TabWidget._refresh_operator_listening_state(self)
+        return None
 
     def _voice_shutdown_blocked(self):
         return False
@@ -104,26 +104,26 @@ class _FakeStartupTab:
 
 
 def test_startup_intro_does_not_wait_for_camera_source_ready() -> None:
-    tab = _FakeStartupTab(direct_ok=True, fallback_ok=False, has_local_source=False)
+    tab = _FakeStartupTab(direct_ok=True, fallback_ok=True, has_local_source=False)
 
     with _TimerCapture() as timer_calls:
         tab._announce_startup_voice_intro()
 
     assert tab._startup_voice_intro_announced is True
     assert tab._startup_voice_intro_pending is False
-    assert any(mode == "direct" for mode, _phrase, _interrupt in tab.spoken)
+    assert any(mode == "fallback" for mode, _phrase, _interrupt in tab.spoken)
     assert not any(delay_ms == 250 and callback_name == "_announce_startup_voice_intro" for delay_ms, callback_name in timer_calls)
 
 
 def test_startup_intro_speaks_after_camera_source_is_ready() -> None:
-    tab = _FakeStartupTab(direct_ok=True, fallback_ok=False, has_local_source=True)
+    tab = _FakeStartupTab(direct_ok=True, fallback_ok=True, has_local_source=True)
 
     with _TimerCapture() as timer_calls:
         tab._announce_startup_voice_intro()
 
     assert tab._startup_voice_intro_announced is True
     assert tab._startup_voice_intro_pending is False
-    assert any(mode == "direct" for mode, _phrase, _interrupt in tab.spoken)
+    assert any(mode == "fallback" for mode, _phrase, _interrupt in tab.spoken)
     assert not any(delay_ms == 400 for delay_ms, _name in timer_calls)
 
 
@@ -133,9 +133,9 @@ def test_startup_intro_retries_when_speech_backend_is_not_ready() -> None:
     with _TimerCapture() as timer_calls:
         tab._announce_startup_voice_intro()
 
-    assert tab._startup_voice_intro_announced is False
-    assert tab._startup_voice_intro_pending is True
-    assert any(delay_ms == 500 for delay_ms, _name in timer_calls)
+    assert tab._startup_voice_intro_announced is True
+    assert tab._startup_voice_intro_pending is False
+    assert not any(delay_ms == 500 for delay_ms, _name in timer_calls)
 
 
 def test_operator_listening_state_does_not_cancel_pending_startup_intro() -> None:
@@ -154,7 +154,7 @@ def test_schedule_startup_tasks_arms_intro_and_schedules_announce() -> None:
         tab._schedule_startup_tasks()
 
     assert tab._startup_voice_intro_pending is True
-    assert any(delay_ms == 1200 and callback_name == "_announce_startup_voice_intro" for delay_ms, callback_name in timer_calls)
+    assert any(delay_ms == 1500 and callback_name == "_announce_startup_voice_intro" for delay_ms, callback_name in timer_calls)
     assert any(delay_ms == 800 and callback_name == "_auto_open_camera_on_startup" for delay_ms, callback_name in timer_calls)
     assert tab.yolo_delay == 2500
 

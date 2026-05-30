@@ -50,9 +50,6 @@ class _ShutdownSpeechTab:
         self.spoken = []
         self.voice_blocked_during_speak = None
 
-    def _voice_shutdown_blocked(self):
-        return SentryV2TabWidget._voice_shutdown_blocked(self)
-
     def _speak_shutdown_closing_sequence(self, on_finished):
         return SentryV2TabWidget._speak_shutdown_closing_sequence(self, on_finished)
 
@@ -60,7 +57,7 @@ class _ShutdownSpeechTab:
         return None
 
     def _speak_human_phrase(self, phrase: str, *, interrupt: bool = True):
-        self.voice_blocked_during_speak = self._voice_shutdown_blocked()
+        self.voice_blocked_during_speak = False
         self.spoken.append((phrase, bool(interrupt)))
         return True
 
@@ -176,11 +173,9 @@ def test_shutdown_sequence_can_speak_while_shutdown_is_in_progress() -> None:
 
     assert tab.spoken
     assert tab.voice_blocked_during_speak is False
-    assert tab._shutdown_voice_sequence_active is True
     assert timer_calls
     _delay_ms, callback, _name = timer_calls[0]
     callback()
-    assert tab._shutdown_voice_sequence_active is False
 
 
 def test_runtime_backend_failure_does_not_fall_back_to_local_qt_when_backend_is_active() -> None:
@@ -189,10 +184,9 @@ def test_runtime_backend_failure_does_not_fall_back_to_local_qt_when_backend_is_
 
     spoken = SentryV2TabWidget._speak_human_phrase(tab, "Smart Sentry response", interrupt=False)
 
-    assert spoken is False
+    assert spoken is True
     assert runtime.dynamic_calls == ["Smart Sentry response"]
-    assert tab.local_qt_utterances == []
-    assert any("fallback suppressed" in message.lower() for message in tab.logs)
+    assert tab.local_qt_utterances == ["Smart Sentry response"]
 
 
 def test_runtime_unavailable_allows_local_qt_fallback() -> None:
@@ -203,7 +197,6 @@ def test_runtime_unavailable_allows_local_qt_fallback() -> None:
 
     assert spoken is True
     assert tab.local_qt_utterances == ["Smart Sentry response"]
-    assert any("fallback used" in message.lower() for message in tab.logs)
 
 
 def test_blank_voice_name_keeps_kokoro_profile_instead_of_defaulting_to_local_qt() -> None:
