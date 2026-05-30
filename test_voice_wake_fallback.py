@@ -221,6 +221,16 @@ def test_non_wake_phrase_still_blocked_during_output_echo_window() -> None:
     assert command == ""
 
 
+def test_followup_phrase_is_allowed_inside_active_listen_window() -> None:
+    listener, _commands, _transcripts = _make_listener()
+    listener._recent_output_input_block_until_s = time.time() + 20.0
+    listener._command_window_until_s = time.time() + 20.0
+
+    command = listener._normalize_command_text("who are you")
+
+    assert command == "who are you"
+
+
 def test_core_intent_recovery_handles_who_are_you_drift() -> None:
     listener, _commands, _transcripts = _make_listener()
 
@@ -329,6 +339,7 @@ def main() -> None:
     test_quieter_chunks_can_retrain_recognizer_gate()
     test_wake_barge_in_can_bypass_recent_output_echo_block()
     test_non_wake_phrase_still_blocked_during_output_echo_window()
+    test_followup_phrase_is_allowed_inside_active_listen_window()
     test_core_intent_recovery_handles_who_are_you_drift()
     test_run_smart_sentry_drift_canonicalizes_to_connect_and_enable()
     test_single_word_command_passes_fast_final_gate()

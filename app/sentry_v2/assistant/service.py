@@ -1357,6 +1357,31 @@ class LocalAssistantService:
             return False
         if self._prompt_requests_analysis(normalized):
             return False
+
+        # Treat natural help/frustration phrasing as conversation before generic
+        # explicit-action prefix checks. This keeps normal voice UX responsive.
+        conversational_help_patterns = (
+            r"\bcan you help me understand\b",
+            r"\bhelp me understand\b",
+            r"\bcan you explain\b",
+            r"\bcould you explain\b",
+            r"\bi am feeling\b",
+            r"\bi m feeling\b",
+            r"\bfeeling frustrated\b",
+            r"\bfrustrated with\b",
+        )
+
+        command_like_conversation_exclusions = (
+            r"\bconnect\b",
+            r"\bdisconnect\b",
+            r"\bset\b.*\b(mode|speed|confidence|threshold|profile|voice style)\b",
+            r"\b(enable|disable|turn on|turn off|start|stop|restart|relaunch|open|close)\b",
+            r"\b(go home|go rest|move to|toggle camera)\b",
+        )
+        if any(re.search(pattern, normalized) for pattern in conversational_help_patterns):
+            if not any(re.search(pattern, normalized) for pattern in command_like_conversation_exclusions):
+                return True
+
         if self._is_explicit_action_request(normalized):
             return False
         

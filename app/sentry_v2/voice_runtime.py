@@ -2548,11 +2548,17 @@ class VoskCommandListener:
                 wake_barge_in_requested = self._fuzzy_contains_wake(sanitized, wake_aliases)
 
         now = time.time()
+        command_window_until = float(getattr(self, "_command_window_until_s", 0.0) or 0.0)
+        listen_window_until = float(getattr(self, "_listen_window_until_s", 0.0) or 0.0)
+        explicit_listen_window_active = now <= max(command_window_until, listen_window_until)
         if self._recent_output_input_block_active(now=now):
-            if not wake_barge_in_requested:
+            if not (wake_barge_in_requested or explicit_listen_window_active):
                 self._on_log(f"[VOICE-DIAG] self-echo-final-window-suppressed text='{sanitized}'")
                 return ""
-            self._on_log(f"[VOICE-DIAG] self-echo-final-window-barge-in-allowed text='{sanitized}'")
+            if wake_barge_in_requested:
+                self._on_log(f"[VOICE-DIAG] self-echo-final-window-barge-in-allowed text='{sanitized}'")
+            else:
+                self._on_log(f"[VOICE-DIAG] self-echo-final-window-listen-allowed text='{sanitized}'")
         if self._matches_recent_output_echo(sanitized, partial=False):
             if not wake_barge_in_requested:
                 self._on_log(f"[VOICE-DIAG] self-echo-final-suppressed text='{sanitized}'")
