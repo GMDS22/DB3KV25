@@ -264,6 +264,35 @@ def test_phrase_variants_are_allowed_by_runtime_and_tab_gate() -> None:
     assert all(tab._voice_prompt_has_supported_ai_intent(phrase) for phrase in phrases)
 
 
+def test_wake_ack_variants_avoid_yes_prefix() -> None:
+    from app.sentry_v2.sentry_v2_tab import SentryV2TabWidget
+
+    tab = SentryV2TabWidget.__new__(SentryV2TabWidget)
+
+    variants = tab._voice_wake_acknowledgement_variants()
+
+    assert variants
+    assert all(not str(phrase).strip().lower().startswith("yes") for phrase in variants)
+
+
+def test_recent_wake_ack_echo_is_ignored_only_without_pending_confirmation() -> None:
+    from app.sentry_v2.sentry_v2_tab import SentryV2TabWidget
+
+    tab = SentryV2TabWidget.__new__(SentryV2TabWidget)
+    tab._voice_wake_ack_last_s = time.time()
+    tab._voice_protocol_pending_connect_confirmation = False
+    tab._voice_protocol_pending_command_clarification = ""
+    tab._voice_protocol_awaiting_next_action = False
+    tab._voice_protocol_scenario = "conversation"
+    tab._voice_interaction_active_until_s = time.time() + 8.0
+
+    assert tab._voice_command_is_recent_wake_ack_echo("yes") is True
+    assert tab._voice_command_is_recent_wake_ack_echo("what can you see from the camera") is False
+
+    tab._voice_protocol_pending_connect_confirmation = True
+    assert tab._voice_command_is_recent_wake_ack_echo("yes") is False
+
+
 def main() -> None:
     test_partial_wake_detection_handles_on_lion_drift()
     test_partial_wake_detection_rejects_long_embedded_elliot_noise()
@@ -284,6 +313,8 @@ def main() -> None:
     test_single_word_command_passes_fast_final_gate()
     test_voice_state_transitions_emit_status_transcripts()
     test_phrase_variants_are_allowed_by_runtime_and_tab_gate()
+    test_wake_ack_variants_avoid_yes_prefix()
+    test_recent_wake_ack_echo_is_ignored_only_without_pending_confirmation()
     print("voice wake fallback checks passed")
 
 

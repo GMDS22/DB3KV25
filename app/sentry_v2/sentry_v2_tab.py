@@ -17333,6 +17333,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self.config.engagement.trigger_servo_rest_deg = rest_deg
         self.config.engagement.trigger_servo_fire_deg = fire_deg
         self.config.engagement.trigger_servo_speed_dps = int(self._spin_trigger_servo_speed_dps.value())
+        self._comm.mark_trigger_runtime_config_dirty()
         self._sync_comm_runtime_settings_from_config()
         self._refresh_trigger_servo_summary()
         self._push_config()
@@ -17344,6 +17345,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self.config.engagement.trigger_mosfet_pulse_ms = int(self._spin_trigger_mosfet_pulse_ms.value())
         self.config.engagement.trigger_mosfet_cycle_count = int(self._spin_trigger_mosfet_cycle_count.value())
         self.config.engagement.trigger_mosfet_cycle_off_ms = int(self._spin_trigger_mosfet_cycle_off_ms.value())
+        self._comm.mark_trigger_runtime_config_dirty()
         self._sync_comm_runtime_settings_from_config()
         self._refresh_trigger_mosfet_summary()
         self._push_config()
@@ -17355,6 +17357,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         is_bb = (index == 1)
         self.config.engagement.trigger_mode_bb = is_bb
         self._comm.trigger_mode_bb = is_bb
+        self._comm.mark_trigger_runtime_config_dirty()
         if hasattr(self, "_combo_trigger_mode_qa"):
             self._combo_trigger_mode_qa.blockSignals(True)
             self._combo_trigger_mode_qa.setCurrentIndex(index)
@@ -21174,6 +21177,39 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         }
         return normalized in exact_phrases
 
+    def _voice_command_is_recent_wake_ack_echo(self, command: str) -> bool:
+        normalized = re.sub(r"[^a-z0-9 ]+", " ", str(command or "").strip().lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        if not normalized:
+            return False
+        if bool(getattr(self, "_voice_protocol_pending_connect_confirmation", False)):
+            return False
+        if str(getattr(self, "_voice_protocol_pending_command_clarification", "") or "").strip():
+            return False
+        if bool(getattr(self, "_voice_protocol_awaiting_next_action", False)):
+            return False
+        scenario = str(getattr(self, "_voice_protocol_scenario", "idle") or "idle").strip().lower()
+        if scenario != "conversation" and not self._voice_interaction_window_active():
+            return False
+        last_ack_s = float(getattr(self, "_voice_wake_ack_last_s", 0.0) or 0.0)
+        if last_ack_s <= 0.0 or (time.time() - last_ack_s) > 4.5:
+            return False
+
+        ack_variants = {
+            re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]+", " ", phrase.lower())).strip()
+            for phrase in self._voice_wake_acknowledgement_variants()
+        }
+        ack_fragments = {
+            "yes",
+            "i am listening",
+            "im listening",
+            "i am here",
+            "ask your question",
+            "tell me your question",
+            "go ahead",
+        }
+        return normalized in ack_fragments or normalized in ack_variants
+
     def _voice_command_can_replace_pending_prompt(self, command: str) -> bool:
         normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
         if not normalized or self._voice_command_is_low_signal_followup(normalized):
@@ -21250,6 +21286,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if embedded:
             return embedded
         return normalized
+
+    def _voice_wake_acknowledgement_variants(self) -> tuple[str, ...]:
+        return (
+            "I am listening.",
+            "I am here. Ask your question.",
+            "Tell me your question.",
+        )
 
     def _open_voice_conversation_intake(
         self,
@@ -22235,6 +22278,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "kind": "int",
                 "step": 10,
             },
+            "lighting.auto_brightness_threshold": {
+                "label": "Auto brightness threshold",
+                "widget": getattr(self, "_spin_auto_brightness_threshold", None),
+                "kind": "int",
+                "step": 10,
+            },
             "lighting.auto_pwm_min": {
                 "label": "Auto PWM minimum",
                 "widget": getattr(self, "_spin_auto_pwm_min", None),
@@ -22247,7 +22296,136 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "kind": "int",
                 "step": 10,
             },
+            "sound.volume_pct": {
+                "label": "Sound volume",
+                "widget": getattr(self, "_slider_sound_volume", None)
+                or getattr(self, "_sld_volume_qa", None)
+                or getattr(self, "_sld_buzzer_volume_qa", None),
+                "kind": "int",
+                "step": 5,
+            },
+            "sound.human_voice_rate_pct": {
+                "label": "Voice rate",
+                "widget": getattr(self, "_slider_human_voice_rate", None),
+                "kind": "int",
+                "step": 5,
+            },
+            "sound.human_voice_pitch_pct": {
+                "label": "Voice pitch",
+                "widget": getattr(self, "_slider_human_voice_pitch", None),
+                "kind": "int",
+                "step": 5,
+            },
+            "sound.human_voice_volume_pct": {
+                "label": "Voice volume",
+                "widget": getattr(self, "_slider_human_voice_volume", None)
+                or getattr(self, "_sld_ai_voice_volume_qa", None),
+                "kind": "int",
+                "step": 5,
+            },
         }
+
+    def _voice_setting_runtime_specs(self) -> tuple[Dict[str, object], ...]:
+        runtime_specs = self._assistant_setting_runtime_specs()
+        spec_entries = (
+            ("lighting.led_pwm_value", ("led brightness", "light brightness"), ""),
+            (
+                "lighting.auto_brightness_threshold",
+                ("auto brightness threshold", "brightness threshold", "lighting threshold"),
+                "",
+            ),
+            ("lighting.auto_pwm_min", ("auto pwm minimum", "minimum auto pwm", "auto lighting minimum"), ""),
+            ("lighting.auto_pwm_max", ("auto pwm maximum", "maximum auto pwm", "auto lighting maximum"), ""),
+            ("engagement.engagement_speed_pct", ("engagement speed", "tracking speed"), "percent"),
+            ("sound.volume_pct", ("sound volume", "buzzer volume"), "percent"),
+            ("sound.human_voice_rate_pct", ("voice rate", "speech rate"), "percent"),
+            ("sound.human_voice_pitch_pct", ("voice pitch", "speech pitch"), "percent"),
+            (
+                "sound.human_voice_volume_pct",
+                ("voice volume", "human voice volume", "assistant voice volume"),
+                "percent",
+            ),
+        )
+        specs: list[Dict[str, object]] = []
+        for setting_path, aliases, spoken_unit in spec_entries:
+            base_spec = dict(runtime_specs.get(setting_path, {}) or {})
+            if not base_spec:
+                continue
+            base_spec["setting_path"] = setting_path
+            base_spec["aliases"] = tuple(str(alias).strip().lower() for alias in aliases if str(alias).strip())
+            base_spec["spoken_unit"] = str(spoken_unit or "").strip().lower()
+            specs.append(base_spec)
+        return tuple(specs)
+
+    def _execute_voice_setting_adjustment_command(
+        self,
+        command: str,
+    ) -> Optional[Tuple[str, str, str, Optional[Callable[[], None]]]]:
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not normalized:
+            return None
+
+        mode = "absolute"
+        if re.search(r"\b(?:increase|raise|turn up|up|higher|more|faster)\b", normalized):
+            mode = "increase"
+        elif re.search(r"\b(?:decrease|lower|reduce|turn down|down|less|slower)\b", normalized):
+            mode = "decrease"
+
+        sorted_specs = sorted(
+            self._voice_setting_runtime_specs(),
+            key=lambda spec: max((len(str(alias)) for alias in tuple(spec.get("aliases", ()) or ())), default=0),
+            reverse=True,
+        )
+        for spec in sorted_specs:
+            aliases = tuple(spec.get("aliases", ()) or ())
+            if not aliases:
+                continue
+            if not any(re.search(rf"\b{re.escape(str(alias))}\b", normalized) for alias in aliases):
+                continue
+
+            label = str(spec.get("label", "setting") or "setting")
+            value = self._extract_voice_number(normalized)
+            if value is None:
+                if mode in {"increase", "decrease"}:
+                    step_value = spec.get("step", 1)
+                    try:
+                        value = int(round(float(step_value)))
+                    except Exception:
+                        value = 1
+                else:
+                    return "", f"Tell me the value you want for {label.lower()}.", f"{label} value missing.", None
+
+            payload: Dict[str, object] = {
+                "setting_path": str(spec.get("setting_path", "") or "").strip(),
+                "mode": mode,
+            }
+            if mode == "absolute":
+                payload["value"] = value
+            else:
+                payload["delta"] = value
+
+            resolved, error_text = self._assistant_resolve_setting_change(payload)
+            if resolved is None:
+                spoken_error = str(error_text or f"I could not adjust {label.lower()} from voice right now.").strip()
+                return "", spoken_error, spoken_error, None
+
+            runtime_spec = self._assistant_setting_runtime_specs().get(str(resolved.get("setting_path") or ""), {})
+            widget = runtime_spec.get("widget")
+            spoken_value = str(resolved.get("display_value", resolved.get("value", "")) or "").strip()
+            spoken_unit = str(spec.get("spoken_unit", "") or "").strip().lower()
+            if spoken_unit:
+                spoken_value = f"{spoken_value} {spoken_unit}".strip()
+
+            if not bool(resolved.get("changed", True)):
+                return "", f"{label} is already {spoken_value}.", f"{label} already {spoken_value}.", None
+
+            deferred_action = None
+            if widget is not None and hasattr(widget, "setValue"):
+                target_value = resolved.get("value")
+                deferred_action = lambda widget=widget, target_value=target_value: widget.setValue(target_value)
+            return "acknowledged", f"Setting {label.lower()} to {spoken_value}.", f"{label} set to {spoken_value}.", deferred_action
+
+        return None
 
     def _assistant_resolve_setting_change(self, payload: Dict[str, object]) -> tuple[Optional[Dict[str, object]], str]:
         setting_path = str(payload.get("setting_path", "") or "").strip()
@@ -27349,14 +27527,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._open_voice_conversation_intake(
                 source="wake-word",
                 hold_s=16.0,
-                intake_phrase=self._voice_pick_phrase(
-                    "voice_wake_ack",
-                    (
-                        "Yes? I am listening.",
-                        "I am here. Ask your question.",
-                        "Yes. What do you want to know?",
-                    ),
-                ),
+                intake_phrase=self._voice_pick_phrase("voice_wake_ack", self._voice_wake_acknowledgement_variants()),
                 throttle_ack_s=1.5,
             )
             return
@@ -27369,6 +27540,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return
         command = self._normalize_stateful_voice_command_alias(command)
         if not command:
+            return
+
+        if self._voice_command_is_recent_wake_ack_echo(command):
+            self._log(f"Voice protocol: ignored likely wake acknowledgement echo -> {command}")
+            self._open_voice_conversation_intake(source="wake-ack-echo", hold_s=14.0, intake_phrase="")
             return
 
         if self._voice_command_should_ignore_low_confidence_noise(command):
@@ -27537,6 +27713,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 spoken_confirmation = f"Setting engagement speed to {target_value} percent."
                 handled_summary = f"Engagement speed set to {target_value} percent."
                 deferred_action = lambda value=target_value: self._slider_speed.setValue(value)
+
+        if not handled:
+            setting_adjustment = self._execute_voice_setting_adjustment_command(command)
+            if setting_adjustment is not None:
+                acknowledge_event, spoken_confirmation, handled_summary, deferred_action = setting_adjustment
+                handled = True
 
         # ── Extended: profile, model, settings, diagnostics, AI routing ─────────
         if not handled:
