@@ -867,24 +867,28 @@ class VoskCommandListener:
         current_threshold = max(120, int(getattr(self, "_noise_rms_threshold", 95)))
         if not chunk or rms < current_threshold:
             return
+        now = time.time()
+        prior_signature = dict(getattr(self, "_recent_signature", {}) or {})
+        merged_signature: dict[str, object] = {
+            "rms": int(rms),
+            "updated_at": now,
+        }
+        prior_frequency_hz = float(prior_signature.get("frequency_hz", 0.0) or 0.0)
+        if prior_frequency_hz > 0.0:
+            merged_signature["frequency_hz"] = round(prior_frequency_hz, 1)
         try:
             zero_crossings = int(audioop.cross(chunk, 2))
             sample_count = max(1, len(chunk) // 2)
             freq_hz = float(zero_crossings) * 16000.0 / (2.0 * float(sample_count))
-            if freq_hz < 60.0 or freq_hz > 420.0:
-                return
-            now = time.time()
             prev_freq = float(self._recent_signature.get("frequency_hz", 0.0) or 0.0)
             prev_at = float(self._recent_signature.get("updated_at", 0.0) or 0.0)
-            if prev_freq > 0.0 and (now - prev_at) < 1.4:
-                freq_hz = (prev_freq * 0.65) + (freq_hz * 0.35)
-            self._recent_signature = {
-                "frequency_hz": round(freq_hz, 1),
-                "rms": int(rms),
-                "updated_at": now,
-            }
+            if 60.0 <= freq_hz <= 420.0:
+                if prev_freq > 0.0 and (now - prev_at) < 1.4:
+                    freq_hz = (prev_freq * 0.65) + (freq_hz * 0.35)
+                merged_signature["frequency_hz"] = round(freq_hz, 1)
         except Exception:
-            return
+            pass
+        self._recent_signature = merged_signature
 
     def _emit_transcript(
         self,
@@ -943,17 +947,28 @@ class VoskCommandListener:
         partial_time = time.time()
         if float(getattr(self, "_active_speech_started_s", 0.0) or 0.0) <= 0.0:
             self._active_speech_started_s = partial_time
+        wake_detected = self._partial_contains_wake(cleaned)
+        command_window_until = float(getattr(self, "_command_window_until_s", 0.0) or 0.0)
+        listen_window_until = float(getattr(self, "_listen_window_until_s", 0.0) or 0.0)
+        explicit_listen_window_active = partial_time <= max(command_window_until, listen_window_until)
         if self._recent_output_input_block_active(now=partial_time):
-            self._on_log(f"[VOICE-DIAG] self-echo-partial-window-suppressed text='{cleaned}'")
-            return
+            if not (wake_detected or explicit_listen_window_active):
+                self._on_log(f"[VOICE-DIAG] self-echo-partial-window-suppressed text='{cleaned}'")
+                return
+            if wake_detected:
+                self._on_log(f"[VOICE-DIAG] self-echo-partial-window-barge-in-allowed text='{cleaned}'")
+            else:
+                self._on_log(f"[VOICE-DIAG] self-echo-partial-window-listen-allowed text='{cleaned}'")
         if self._matches_recent_output_echo(cleaned, partial=True):
-            self._on_log(f"[VOICE-DIAG] self-echo-partial-suppressed text='{cleaned}'")
-            return
+            if not wake_detected:
+                self._on_log(f"[VOICE-DIAG] self-echo-partial-suppressed text='{cleaned}'")
+                return
+            self._on_log(f"[VOICE-DIAG] self-echo-partial-barge-in-allowed text='{cleaned}'")
         self._last_partial_text = cleaned
         self._last_partial_updated_s = partial_time
         self._note_live_hearing_activity(now=partial_time, source=source)
         self._emit_transcript("partial", cleaned, source=source)
-        if self._partial_contains_wake(cleaned):
+        if wake_detected:
             self._emit_partial_wake_ack(cleaned)
 
     def _release_live_hearing_status_if_due(self, *, now: Optional[float] = None, source: str = "stt") -> None:
@@ -1605,6 +1620,13 @@ class VoskCommandListener:
             "open tab",
             "load profile",
             "switch profile",
+            "change profile",
+            "change the profile to",
+            "set profile to",
+            "set the profile to",
+            "update profile to",
+            "apply profile",
+            "activate profile",
             "current profile",
             "active profile",
             "what profile is active",
@@ -1938,6 +1960,7 @@ class VoskCommandListener:
                 "ellion",
                 "elian",
                 "alion",
+                "eliot",
                 "elliot",
             ])
         return list(dict.fromkeys(alias for alias in aliases if alias))
@@ -2162,6 +2185,7 @@ class VoskCommandListener:
             (r"\belyon\b", "elion"),
             (r"\bellion\b", "elion"),
             (r"\belian\b", "elion"),
+            (r"\beliot\b", "elion"),
             (r"\belliot\b", "elion"),
             (r"\bsports? and\b", "smart sentry"),
             (r"\bsport sentry\b", "smart sentry"),
@@ -2245,7 +2269,12 @@ class VoskCommandListener:
         if corrected in short_form_map:
             return short_form_map[corrected]
 
-        profile_match = re.search(r"\b(?:load|switch(?:\s+to)?|use)\b\s+(.+?)\s+profile\b", corrected)
+        profile_match = re.search(
+            r"\b(?:change|set|update|switch(?:\s+to)?|use|load|apply|activate)\b\s+(?:the\s+)?(?:coordinated\s+|master\s+)?profile\b(?:\s+(?:to|as))?\s+(.+)$",
+            corrected,
+        )
+        if not profile_match:
+            profile_match = re.search(r"\b(?:load|switch(?:\s+to)?|use)\b\s+(.+?)\s+profile\b", corrected)
         if profile_match:
             profile_name = re.sub(r"\s+", " ", str(profile_match.group(1) or "").strip())
             if profile_name:
@@ -2395,6 +2424,51 @@ class VoskCommandListener:
         tokens = [tok for tok in re.findall(r"[a-z0-9]+", str(sanitized or "").lower()) if tok]
         if not tokens:
             return True
+        actionable_verbs = {
+            "connect",
+            "disconnect",
+            "enable",
+            "disable",
+            "resume",
+            "pause",
+            "start",
+            "stop",
+            "open",
+            "close",
+            "run",
+            "set",
+            "switch",
+            "change",
+            "load",
+            "use",
+            "restart",
+            "shutdown",
+            "quit",
+            "exit",
+            "cancel",
+        }
+        actionable_targets = {
+            "smart",
+            "sentry",
+            "board",
+            "boards",
+            "camera",
+            "tracking",
+            "guard",
+            "voice",
+            "profile",
+            "model",
+            "face",
+            "recognition",
+            "shortcuts",
+            "pir",
+            "sensor",
+            "sensors",
+            "app",
+        }
+        token_set = set(tokens)
+        if len(tokens) >= 3 and (token_set & actionable_verbs) and (token_set & actionable_targets):
+            return False
         filler_words = {"up", "to", "keep", "he", "has", "uh", "um", "ah", "oh"}
         if all(token in filler_words for token in tokens):
             return True
@@ -2407,6 +2481,8 @@ class VoskCommandListener:
         try:
             conf = float(confidence)
         except Exception:
+            return False
+        if len(tokens) >= 5 and conf >= 0.20:
             return False
         known_fragments = set(self._command_grammar_fragments())
         if conf < 0.35 and len(tokens) <= 2 and str(sanitized or "") not in known_fragments:

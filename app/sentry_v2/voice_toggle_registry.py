@@ -71,7 +71,7 @@ VOICE_TOGGLE_SPECS: tuple[dict[str, object], ...] = (
         "control_attr": "_chk_face_enabled",
         "enable_command": "enable face recognition",
         "disable_command": "disable face recognition",
-        "aliases": ("face recognition", "face id"),
+        "aliases": ("face recognition", "face detection", "face id"),
         "enable_verbs": START_ENABLE_VERBS,
         "disable_verbs": START_DISABLE_VERBS,
     },

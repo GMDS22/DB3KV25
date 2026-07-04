@@ -3862,6 +3862,9 @@ class SentryV2TabWidget(QWidget):
         self._voice_heard_partial_text: str = ""
         self._voice_heard_final_text: str = ""
         self._voice_heard_status_text: str = "idle"
+        self._voice_runtime_recovery_token: int = 0
+        self._voice_runtime_recovery_attempts: int = 0
+        self._voice_runtime_recovery_max_attempts: int = 4
         self._last_runtime_diag_line: str = ""
         self._last_runtime_diag_log_s: float = 0.0
         self._last_voice_signature: Dict[str, object] = {}
@@ -12169,6 +12172,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._clear_voice_connect_confirmation()
         self._start_voice_interaction_window(reason="connect-confirmed", hold_s=12.0)
         enable_requested = bool(getattr(self, "_deferred_enable_sentry_after_connect", False))
+        if enable_requested:
+            self._voice_protocol_hold_paused = False
+            self._voice_interaction_engine_paused = False
         current_enabled = bool(hasattr(self, "_chk_enable") and bool(self._chk_enable.isChecked()))
 
         if self._host_controls_hardware():
@@ -12573,10 +12579,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 return "acknowledged"
             self._run_voice_action_after_confirmation(
                 "Sure. Closing the app now.",
-                lambda: self.begin_graceful_shutdown(on_complete=self.close),
+                self._request_full_application_close,
                 interrupt=False,
                 action_label="close-app",
-                wait_for_speech_completion=True,
+                run_action_immediately=True,
             )
             return "acknowledged"
 
@@ -12632,7 +12638,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 lambda: self._restart_application(),
                 interrupt=False,
                 action_label="restart-app",
-                wait_for_speech_completion=True,
+                run_action_immediately=True,
             )
             return "acknowledged"
 
@@ -14273,6 +14279,131 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 detail_lines.append(f"{mark} {name}: {val}")
         return "\n".join(detail_lines) if detail_lines else fallback
 
+    @staticmethod
+    def _voice_spell_com_port(text: str) -> str:
+        raw = str(text or "")
+        if not raw:
+            return ""
+
+        def _replace(match: re.Match[str]) -> str:
+            suffix = str(match.group(1) or "").strip()
+            if not suffix:
+                return "C O M"
+            return "C O M " + " ".join(ch for ch in suffix)
+
+        return re.sub(r"\bCOM\s*([0-9]{1,3})\b", _replace, raw, flags=re.IGNORECASE)
+
+    def _voice_connection_failure_response(self, err: str, details: object) -> str:
+        detail_map: dict[str, tuple[bool, str]] = {}
+        if isinstance(details, dict):
+            for name, pair in details.items():
+                try:
+                    ok, value = pair
+                except Exception:
+                    continue
+                detail_map[str(name or "").strip()] = (bool(ok), str(value or "").strip())
+
+        context = dict(getattr(self, "_connection_attempt_context", {}) or {})
+        preferred_debug = str(context.get("preferred_debug_port", "") or "").strip()
+        preferred_esp32 = str(context.get("preferred_esp32_port", "") or "").strip()
+        udp_host = str(context.get("udp_host", "") or "").strip()
+        udp_port = int(context.get("udp_port", 0) or 0)
+
+        visible_ports = []
+        for item in list(context.get("visible_ports", []) or []):
+            try:
+                port_name = SentryV2Comm._normalize_serial_port_name(str(item[0] or ""))
+            except Exception:
+                port_name = ""
+            if port_name:
+                visible_ports.append(port_name)
+        visible_ports_text = ""
+        if visible_ports:
+            spoken_ports = ", ".join(self._voice_spell_com_port(port) for port in visible_ports)
+            visible_ports_text = f" Visible ports are {spoken_ports}."
+
+        debug_failure = False
+        esp32_wifi_failure = False
+        esp32_serial_failure = False
+
+        for name, (link_ok, value) in detail_map.items():
+            if link_ok:
+                continue
+            lower_name = name.lower()
+            lower_value = value.lower()
+            if "debug board" in lower_name:
+                debug_failure = True
+            if "wifi" in lower_name and "esp32" in lower_name:
+                esp32_wifi_failure = True
+            if "esp32" in lower_name and "wifi" not in lower_name:
+                esp32_serial_failure = True
+            if "no com port specified" in lower_value:
+                if "debug board" in lower_name:
+                    debug_failure = True
+                if "esp32" in lower_name and "wifi" not in lower_name:
+                    esp32_serial_failure = True
+            if "not found in any available com port" in lower_value:
+                if "debug board" in lower_name:
+                    debug_failure = True
+                if "esp32" in lower_name and "wifi" not in lower_name:
+                    esp32_serial_failure = True
+            if "host unreachable" in lower_value or "unreachable" in lower_value:
+                if "esp32" in lower_name and "wifi" in lower_name:
+                    esp32_wifi_failure = True
+
+        err_text = str(err or "").strip()
+        err_lower = err_text.lower()
+        if not detail_map:
+            if "debug board" in err_lower and (
+                "not found in any available com port" in err_lower or "no com port specified" in err_lower
+            ):
+                debug_failure = True
+            if "esp32" in err_lower and "wifi" in err_lower and (
+                "host unreachable" in err_lower or "unreachable" in err_lower
+            ):
+                esp32_wifi_failure = True
+            if "esp32" in err_lower and "wifi" not in err_lower and (
+                "not found in any available com port" in err_lower or "no com port specified" in err_lower
+            ):
+                esp32_serial_failure = True
+
+        reasons: list[str] = []
+        if debug_failure:
+            reason = "Debug Board was not found on any C O M port"
+            if preferred_debug:
+                reason += f" (configured {self._voice_spell_com_port(preferred_debug)})"
+            reason += "."
+            reason += visible_ports_text
+            reasons.append(reason.strip())
+
+        if esp32_serial_failure:
+            reason = "ESP32 USB I O was not found on any C O M port"
+            if preferred_esp32:
+                reason += f" (configured {self._voice_spell_com_port(preferred_esp32)})"
+            reason += "."
+            reason += visible_ports_text
+            reasons.append(reason.strip())
+
+        if esp32_wifi_failure:
+            if udp_host and udp_port > 0:
+                reasons.append(
+                    f"ESP32 WiFi is unavailable at {udp_host}:{udp_port}. Check power and WiFi link."
+                )
+            elif udp_host:
+                reasons.append(f"ESP32 WiFi is unavailable at {udp_host}. Check power and WiFi link.")
+            else:
+                reasons.append("ESP32 WiFi is unavailable. Check power and WiFi link.")
+
+        if reasons:
+            return " ".join(reasons)
+
+        if err_text:
+            return (
+                "I could not connect the boards. "
+                f"Reason: {self._voice_spell_com_port(err_text)}."
+            )
+        return "I could not connect the boards because one or more hardware links are unavailable."
+
     def _on_connection_operation_finished(
         self,
         operation: str,
@@ -14400,10 +14531,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             if bool(getattr(self, "_voice_protocol_connect_via_voice_active", False)):
                 self._voice_protocol_connect_via_voice_active = False
                 self._start_voice_interaction_window(reason="connect-failed", hold_s=14.0)
-                response = (
-                    "I could not connect the boards. Say connect the smart sentry boards to the C O M port to retry, "
-                    "or tell me another task."
-                )
+                response = self._voice_connection_failure_response(err, details)
                 self._speak_human_phrase(response, interrupt=False)
                 self._schedule_voice_next_action_prompt(
                     delay_s=max(4.0, self._estimate_human_phrase_duration_s(response) + 1.2)
@@ -14661,6 +14789,24 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return
 
         self._log("Restarting application to apply saved settings")
+        app = QApplication.instance()
+        if app is not None:
+            QTimer.singleShot(0, app.quit)
+
+    def _request_full_application_close(self) -> None:
+        window = self.window()
+        if window is not None and window is not self and hasattr(window, "close"):
+            try:
+                window.close()
+                return
+            except Exception:
+                pass
+        if self.isWindow():
+            try:
+                self.close()
+                return
+            except Exception:
+                pass
         app = QApplication.instance()
         if app is not None:
             QTimer.singleShot(0, app.quit)
@@ -15235,7 +15381,22 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             QTimer.singleShot(delay, _safe_cam_open_retry)
         else:
             self._startup_retry_count = -1
-            self._set_camera_status(f"Failed to open: {source_text}", "error")
+            normalized_source = str(source_text or "").strip() or "camera source"
+            display_source = self._voice_spell_com_port(normalized_source)
+            if re.fullmatch(r"[0-9]+", normalized_source):
+                message = f"Camera index {normalized_source} is unavailable or already in use"
+                voice_message = f"Camera source {normalized_source} is not available right now."
+            elif re.search(r"^rtsp://|^http://|^https://", normalized_source, flags=re.IGNORECASE):
+                message = f"Camera stream is unavailable: {normalized_source}"
+                voice_message = "Camera stream is unavailable right now. Check camera power and network."
+            else:
+                message = f"Camera source is unavailable: {normalized_source}"
+                voice_message = f"Camera source {display_source} is not available right now."
+
+            self._set_camera_status(message, "error")
+            self._log(f"Camera unavailable: {normalized_source}")
+            if self._voice_interaction_window_active():
+                self._speak_after_operator_quiet(voice_message, interrupt=False)
 
     def _on_url_open_error(self, msg: str) -> None:
         """Called on Qt main thread when the background URL resolve/open failed."""
@@ -20712,8 +20873,24 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._voice_phrase_last_by_key = memory
         return selected
 
-    def _assistant_prompt_is_conversational(self, task_kind: str, prompt: str = "") -> bool:
+    def _assistant_prompt_is_conversational(
+        self,
+        task_kind: str,
+        prompt: str = "",
+        intent_metadata: Optional[Dict[str, object]] = None,
+    ) -> bool:
         if str(task_kind or "prompt").strip().lower() != "prompt":
+            return False
+        intent_data = dict(intent_metadata or {})
+        conversation_mode = str(intent_data.get("conversation_mode", "") or "").strip().lower()
+        if conversation_mode in {"general_conversation", "scene_conversation", "conversation"}:
+            return True
+        if conversation_mode in {"task_or_command", "analysis", "recommendations", "operator_task"}:
+            return False
+        routing_source = str(intent_data.get("routing_source", "") or "").strip().lower()
+        if routing_source in {"service_general_conversation", "service_scene_query", "service_default_conversation"}:
+            return True
+        if routing_source in {"service_operator_prompt"}:
             return False
         normalized = re.sub(r"\s+", " ", str(prompt or "").strip().lower())
         if not normalized:
@@ -20770,7 +20947,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 return f"I am still finishing {active_phrase}. I queued your live analysis. It is number {queue_pos} in line."
             return "Received. I started a live runtime analysis in the background."
 
-        if self._assistant_prompt_is_conversational(normalized_kind, prompt_text):
+        if normalized_kind == "prompt":
             if was_busy:
                 return "One moment. I will answer after the current reply."
             return ""
@@ -21689,6 +21866,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
     def _arm_enable_sentry_after_connect(self, reason: str = "") -> None:
         self._deferred_enable_sentry_after_connect = True
         self._deferred_enable_sentry_reason = str(reason or "").strip()
+        # "Run Smart Sentry" means resume tracking after connect unless the
+        # operator explicitly issues a pause command.
+        self._voice_protocol_hold_paused = False
+        self._voice_interaction_engine_paused = False
 
     def _clear_enable_sentry_after_connect(self) -> None:
         self._deferred_enable_sentry_after_connect = False
@@ -22955,7 +23136,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                         and bool(getattr(self.config.ai_assistant, "allow_action_execution", True))
                         and self._assistant_mode_allows_action_execution()
                     )
-        prompt_is_conversational = self._assistant_prompt_is_conversational(task_kind, prompt_text)
+        reply_intent = dict(getattr(reply, "intent", {}) or {})
+        prompt_is_conversational = self._assistant_prompt_is_conversational(
+            task_kind,
+            prompt_text,
+            reply_intent,
+        )
         conversational = bool(self.config.ai_assistant.mode == "conversational_voice")
         rendered = self._assistant_format_response(
             self._render_ai_reply(
@@ -22967,17 +23153,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             conversational=conversational,
         )
         spoken_result = self._assistant_spoken_reply(reply, task_kind=task_kind, action_notes=action_notes)
-        
-        # CRITICAL FIX: Check if task explicitly marked for speaking (e.g., dequeued conversational prompt)
-        should_speak_from_task = bool(completed_task.get("should_speak", False))
-        
-        # CRITICAL FIX: Determine if we SHOULD speak BEFORE recording the event.
-        # This ensures speak_requested in the conversation log matches actual behavior.
-        should_speak_response = should_speak_from_task or self._assistant_should_auto_speak(task_kind, prompt_text)
-        if task_kind == "prompt" and self._voice_interaction_window_active() and prompt_is_conversational:
-            # CRITICAL: Force conversational prompts to be spoken during voice windows.
-            # This fixes the "who are you" silent response issue.
-            should_speak_response = True
+
+        # Single policy owner: the helper decides whether the reply should be spoken.
+        should_speak_response = self._assistant_should_auto_speak(task_kind, prompt_text, reply_intent)
         
         self._append_ai_output(rendered, speak=should_speak_response, task_kind=task_kind)
         if spoken_result:
@@ -26857,20 +27035,36 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         pattern = r"\\b" + re.escape(cue) + r"\\b"
         return bool(re.search(pattern, prompt))
 
-    def _assistant_should_auto_speak(self, task_kind: str, prompt_text: str) -> bool:
+    def _assistant_should_auto_speak(
+        self,
+        task_kind: str,
+        prompt_text: str,
+        intent_metadata: Optional[Dict[str, object]] = None,
+    ) -> bool:
         normalized_kind = str(task_kind or "").strip().lower() or "prompt"
         voice_window_active = self._voice_interaction_window_active()
+        intent_data = dict(intent_metadata or {})
+        conversation_mode = str(intent_data.get("conversation_mode", "") or "").strip().lower()
+        routing_source = str(intent_data.get("routing_source", "") or "").strip().lower()
+        routed_as_conversation = conversation_mode in {"general_conversation", "scene_conversation", "conversation"} or routing_source in {
+            "service_general_conversation",
+            "service_scene_query",
+            "service_default_conversation",
+        }
 
-        # CRITICAL FIX: During active wake/follow-up windows, conversational prompt answers 
-        # MUST ALWAYS be spoken. This fixes "who are you" and other conversational questions
-        # that were being silenced by the cue-name requirement.
+        # During active wake/follow-up windows, conversational prompt answers
+        # must be spoken even when cue-name gating is enabled.
         if normalized_kind == "prompt" and voice_window_active:
-            if self._assistant_prompt_is_conversational(normalized_kind, prompt_text):
+            if routed_as_conversation:
+                return True
+            if self._assistant_prompt_is_conversational(normalized_kind, prompt_text, intent_data):
                 return True
 
         if not bool(getattr(self.config.ai_assistant, "auto_speak_responses", False)):
             return False
         if str(getattr(self.config.ai_assistant, "mode", "") or "").strip().lower() == "conversational_voice":
+            return True
+        if normalized_kind == "prompt" and routed_as_conversation:
             return True
         if normalized_kind in {"analysis", "recommendations"} and voice_window_active:
             return True
@@ -27027,6 +27221,48 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return
         self._append_voice_runtime_diag_log(text)
         self._log(f"[VOICE] {text}")
+
+    def _schedule_voice_runtime_recovery(self, *, reason: str, delay_s: float) -> None:
+        if self._closing:
+            return
+        if self._voice_runtime_recovery_attempts >= int(self._voice_runtime_recovery_max_attempts):
+            self._log(
+                "[VOICE] mic recovery suppressed "
+                f"(max attempts reached: {self._voice_runtime_recovery_attempts}/{self._voice_runtime_recovery_max_attempts})"
+            )
+            return
+        delay_ms = int(max(250.0, float(delay_s) * 1000.0))
+        self._voice_runtime_recovery_token += 1
+        recovery_token = int(self._voice_runtime_recovery_token)
+        self._log(
+            f"[VOICE] scheduling mic recovery in {delay_ms}ms "
+            f"(attempt {self._voice_runtime_recovery_attempts + 1}/{self._voice_runtime_recovery_max_attempts}, reason={reason})"
+        )
+
+        def _attempt_recovery(_token: int = recovery_token, _reason: str = str(reason or "mic_error")) -> None:
+            if self._closing:
+                return
+            if int(_token) != int(getattr(self, "_voice_runtime_recovery_token", 0) or 0):
+                return
+            if self._voice_runtime_recovery_attempts >= int(self._voice_runtime_recovery_max_attempts):
+                return
+            self._voice_runtime_recovery_attempts += 1
+            self._log(
+                "[VOICE] attempting mic recovery "
+                f"({self._voice_runtime_recovery_attempts}/{self._voice_runtime_recovery_max_attempts}, reason={_reason})"
+            )
+            self._voice_heard_status_text = "recovering"
+            self._update_runtime_diagnostics(reason=f"voice-recover:{_reason}", force=True)
+            self._init_voice_runtime()
+
+        QTimer.singleShot(delay_ms, _attempt_recovery)
+
+    def _reset_voice_runtime_recovery(self, *, reason: str) -> None:
+        if self._voice_runtime_recovery_attempts <= 0:
+            return
+        self._voice_runtime_recovery_attempts = 0
+        self._voice_runtime_recovery_token += 1
+        self._log(f"[VOICE] mic recovery cleared (reason={reason})")
 
     def _speak_dynamic_or_local(self, text: str) -> bool:
         phrase = str(text or "").strip()
@@ -27325,7 +27561,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return
 
         self._speak_after_operator_quiet(
-            "Verification required. Please face the camera and repeat your command.",
+            "Verification required. Please face the camera and repeat your command once more.",
             interrupt=False,
         )
         self._open_voice_conversation_intake(source="verification-face", hold_s=12.0, intake_phrase="")
@@ -27335,6 +27571,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if not pending:
             return False
 
+        pending_started_s = float(getattr(self, "_voice_operator_pending_started_s", 0.0) or 0.0)
+        if pending_started_s > 0.0 and (time.time() - pending_started_s) > 35.0:
+            self._voice_operator_reset_pending_verification()
+            return False
+
         if self._voice_operator_verification_lockout_active():
             remaining = int(max(1, round(self._voice_operator_verification_lockout_until_s - time.time())))
             self._speak_after_operator_quiet(
@@ -27342,6 +27583,28 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 interrupt=False,
             )
             return True
+
+        pin_fallback_enabled = bool(
+            self._voice_operator_pin_configured()
+            and bool(getattr(self.config.sound, "voice_operator_allow_pin_fallback", True))
+        )
+        normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
+        if not pin_fallback_enabled:
+            if normalized and (normalized == pending or normalized.endswith(pending) or pending in normalized):
+                self._voice_operator_start_verified_session()
+                self._voice_operator_finalize_verified_pending_command()
+                return True
+            if normalized and self._voice_control_request_requires_operator(normalized):
+                self._voice_operator_pending_command = normalized
+                self._voice_operator_pending_started_s = time.time()
+                self._speak_after_operator_quiet(
+                    "Verification required. Please face the camera and repeat that command once more.",
+                    interrupt=False,
+                )
+                self._open_voice_conversation_intake(source="verification-face", hold_s=12.0, intake_phrase="")
+                return True
+            self._voice_operator_reset_pending_verification()
+            return False
 
         candidate = self._extract_voice_operator_pin_candidate(command)
         if not candidate:
@@ -27677,6 +27940,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                     timestamp=timestamp,
                     metadata=transcript_meta,
                 )
+                state = str(self._voice_heard_status_text or "").strip().lower()
+                if state in {"mic_error", "error"}:
+                    attempts = int(getattr(self, "_voice_runtime_recovery_attempts", 0) or 0)
+                    delay_s = min(8.0, 1.5 + (attempts * 1.5))
+                    self._schedule_voice_runtime_recovery(reason=state, delay_s=delay_s)
+                elif state in {"listening", "hearing", "processing"}:
+                    self._reset_voice_runtime_recovery(reason=state)
         elif kind in {"partial", "wake_partial", "final"}:
             self._voice_heard_status_text = "listening"
             if text:
@@ -27804,6 +28074,93 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 return True
         return False
 
+    def _normalize_voice_profile_lookup_text(self, text: str) -> str:
+        normalized = re.sub(r"[^a-z0-9\s]+", " ", str(text or "").strip().lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        if not normalized:
+            return ""
+        number_words = {
+            "zero": "0",
+            "one": "1",
+            "two": "2",
+            "three": "3",
+            "four": "4",
+            "five": "5",
+            "six": "6",
+            "seven": "7",
+            "eight": "8",
+            "nine": "9",
+            "ten": "10",
+        }
+        parts = [number_words.get(token, token) for token in normalized.split()]
+        normalized = re.sub(r"\s+", " ", " ".join(parts)).strip()
+        return normalized
+
+    def _extract_voice_master_profile_request(self, command: str) -> str:
+        normalized = self._normalize_explicit_voice_command(command)
+        if not normalized:
+            return ""
+
+        patterns = (
+            r"\b(?:change|set|update|switch(?:\s+to)?|use|load|apply|activate)\b\s+(?:the\s+)?(?:coordinated\s+|master\s+)?profile\b(?:\s+(?:to|as))?\s+(.+)$",
+            r"\b(?:load|switch(?:\s+to)?|use)\b\s+(.+?)\s+profile\b$",
+            r"^profile\s+(.+)$",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, normalized)
+            if not match:
+                continue
+            candidate = re.sub(r"\s+", " ", str(match.group(1) or "").strip())
+            candidate = re.sub(r"\b(?:please|now|right now|for now)\b", " ", candidate)
+            candidate = re.sub(r"\s+", " ", candidate).strip(" ,.:;!?")
+            if candidate:
+                return candidate
+        return ""
+
+    def _resolve_voice_master_profile_index(self, requested_name: str) -> int:
+        if not hasattr(self, "_combo_master_profile"):
+            return -1
+        combo = self._combo_master_profile
+        requested_norm = self._normalize_voice_profile_lookup_text(requested_name)
+        if not requested_norm:
+            return -1
+
+        # Pass 1: exact normalized label match.
+        for index in range(combo.count()):
+            label = str(combo.itemText(index) or "")
+            if self._normalize_voice_profile_lookup_text(label) == requested_norm:
+                return index
+
+        # Pass 2: containment in either direction.
+        for index in range(combo.count()):
+            label_norm = self._normalize_voice_profile_lookup_text(str(combo.itemText(index) or ""))
+            if not label_norm:
+                continue
+            if requested_norm in label_norm or label_norm in requested_norm:
+                return index
+
+        # Pass 3: token-overlap fallback for near matches (e.g. "speed four" vs "speed 4").
+        requested_tokens = {tok for tok in requested_norm.split(" ") if tok}
+        if not requested_tokens:
+            return -1
+        best_index = -1
+        best_score = 0.0
+        for index in range(combo.count()):
+            label_norm = self._normalize_voice_profile_lookup_text(str(combo.itemText(index) or ""))
+            label_tokens = {tok for tok in label_norm.split(" ") if tok}
+            if not label_tokens:
+                continue
+            overlap = len(requested_tokens & label_tokens)
+            if overlap <= 0:
+                continue
+            score = overlap / float(max(len(requested_tokens), len(label_tokens)))
+            if score > best_score:
+                best_score = score
+                best_index = index
+        if best_score >= 0.55:
+            return best_index
+        return -1
+
     def _voice_command_requests_connect_and_enable(self, command: str) -> bool:
         normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
         if not normalized:
@@ -27850,6 +28207,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             (
                 "run the smart sentry",
                 "run smart sentry",
+                "run the smart sentry app",
+                "run smart sentry app",
                 "run the sentry",
                 "run sentry",
                 "activate the smart sentry",
@@ -28559,21 +28918,35 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                             handled = True
                             acknowledge_event = ""
 
-            # Profile switch: "load profile <name>" / "switch to <name> profile"
-            _profile_match = re.search(r"(?:load|switch to|use)\s+(.+?)\s+profile", cmd)
-            if not handled and _profile_match:
-                profile_name = _profile_match.group(1).strip().title()
-                if hasattr(self, "_combo_master_profile"):
-                    for i in range(self._combo_master_profile.count()):
-                        if self._combo_master_profile.itemText(i).lower() == profile_name.lower():
-                            self._combo_master_profile.setCurrentIndex(i)
-                            if hasattr(self, "_load_master_preset"):
-                                self._load_master_preset()
-                            handled = True
-                            acknowledge_event = "acknowledged"
-                            spoken_confirmation = f"Loaded {profile_name} profile."
-                            handled_summary = f"Profile {profile_name} loaded."
-                            break
+            # Profile switch: support broad phrasing like
+            # "change the profile to <name>" / "set profile to <name>" /
+            # "switch to <name> profile" / "load profile <name>".
+            requested_profile = self._extract_voice_master_profile_request(cmd)
+            if not handled and requested_profile:
+                selected_index = self._resolve_voice_master_profile_index(requested_profile)
+                if selected_index >= 0 and hasattr(self, "_combo_master_profile"):
+                    resolved_label = str(self._combo_master_profile.itemText(selected_index) or requested_profile).strip()
+                    self._combo_master_profile.setCurrentIndex(selected_index)
+                    if hasattr(self, "_load_master_preset"):
+                        self._load_master_preset()
+                    handled = True
+                    acknowledge_event = "acknowledged"
+                    spoken_confirmation = f"Loaded {resolved_label} profile."
+                    handled_summary = f"Profile {resolved_label} loaded."
+                elif hasattr(self, "_combo_master_profile") and self._combo_master_profile.count() > 0:
+                    sample_labels: list[str] = []
+                    for i in range(min(3, self._combo_master_profile.count())):
+                        label = str(self._combo_master_profile.itemText(i) or "").strip()
+                        if label:
+                            sample_labels.append(label)
+                    hint_text = ", ".join(sample_labels)
+                    if hint_text:
+                        spoken_confirmation = f"I could not find a matching profile for {requested_profile}. Try one of these: {hint_text}."
+                    else:
+                        spoken_confirmation = f"I could not find a matching profile for {requested_profile}."
+                    handled = True
+                    acknowledge_event = ""
+                    handled_summary = f"Profile not found: {requested_profile}."
 
             # Detection model: "use <size> model" / "switch yolo <size>"
             _model_match = re.search(r"(?:use|switch\s+(?:to\s+)?|load\s+)(?:yolo\s+)?(nano|small|medium|large|xlarge|tiny|\bn\b|\bs\b|\bm\b|\bl\b|\bx\b)", cmd)

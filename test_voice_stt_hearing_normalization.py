@@ -67,12 +67,34 @@ def test_phrase_alias_corrections_fix_recognition_token_drift() -> None:
     assert listener._apply_phrase_alias_corrections("switch prophile") == "switch profile"
 
 
+def test_wake_alias_and_face_detection_phrase_are_normalized() -> None:
+    listener, _commands, _transcripts = _make_listener()
+
+    assert listener._normalize_command_text("eliot") == "elion"
+    assert listener._normalize_command_text("eliot enable face detection") == "enable face recognition"
+
+
+def test_profile_change_phrasing_is_normalized() -> None:
+    listener, _commands, _transcripts = _make_listener()
+
+    assert (
+        listener._normalize_command_text("elion change the profile to smart sentry speed 4")
+        == "load profile smart sentry speed 4"
+    )
+    assert (
+        listener._normalize_command_text("elion set profile to smart sentry speed 4")
+        == "load profile smart sentry speed 4"
+    )
+
+
 def main() -> None:
     test_token_level_drift_recovers_connect_enable_command()
     test_token_level_drift_recovers_camera_status_and_diagnostics()
     test_token_level_drift_recovers_guarding_and_tracking_commands()
     test_windows_phrase_drift_recovers_run_smart_sentry_command()
     test_phrase_alias_corrections_fix_recognition_token_drift()
+    test_wake_alias_and_face_detection_phrase_are_normalized()
+    test_profile_change_phrasing_is_normalized()
     print("voice STT hearing normalization checks passed")
 
 
