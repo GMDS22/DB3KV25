@@ -28,12 +28,13 @@ SHAPE_PROFILE_ALIASES = {
 }
 
 SHAPE_FILTER_PROFILES = {
-    "rat": {"min_aspect_ratio": 0.85, "max_aspect_ratio": 4.6},
+    "rat": {"min_aspect_ratio": 1.15, "max_aspect_ratio": 3.2},
     "car": {"min_aspect_ratio": 1.15, "max_aspect_ratio": 4.8},
     "cat": {"min_aspect_ratio": 0.65, "max_aspect_ratio": 3.2},
     "dog": {"min_aspect_ratio": 0.65, "max_aspect_ratio": 3.6},
     "person": {"min_aspect_ratio": 0.20, "max_aspect_ratio": 1.05},
     "bird": {"min_aspect_ratio": 0.45, "max_aspect_ratio": 2.8},
+    "cat_dog_rat": {"min_aspect_ratio": 0.60, "max_aspect_ratio": 3.8},
 }
 
 

@@ -383,21 +383,19 @@ def normalize_auto_trigger_engagement(engagement: "EngagementConfig") -> List[st
 
 
 def normalize_target_filter_tracking(filter_cfg: "TargetFilterConfig") -> List[str]:
-    """Clamp semantic confirmation gates so moving-camera reacquire remains possible."""
+    """Validate semantic confirmation gates. Aggressive clamping disabled to allow strict confirmation profiles."""
     adjustments: List[str] = []
-
-    frames = int(getattr(filter_cfg, "semantic_min_confirm_frames", 1) or 1)
-    if frames > 1:
-        setattr(filter_cfg, "semantic_min_confirm_frames", 1)
-        adjustments.append(f"semantic_min_confirm_frames={frames}->1")
-
-    sem_conf = float(getattr(filter_cfg, "semantic_min_confirm_confidence", 0.0) or 0.0)
-    conf_floor = float(getattr(filter_cfg, "min_confidence", 0.5) or 0.5)
-    conf_cap = max(conf_floor, 0.52)
-    if sem_conf > conf_cap:
-        setattr(filter_cfg, "semantic_min_confirm_confidence", conf_cap)
-        adjustments.append(f"semantic_min_confirm_confidence={sem_conf:.2f}->{conf_cap:.2f}")
-
+    
+    # DISABLED aggressive clamping that was preventing strict confirmation thresholds
+    # Modern profiles (cat_dog_rat, sniper_*) require 3-6 frames and 0.6+ confidence
+    # Moving-camera reacquire is handled by scene_memory and loss_recovery, not by lowering gates
+    # 
+    # Old logic that clamped frames to 1 and confidence to 0.52:
+    # frames = int(getattr(filter_cfg, "semantic_min_confirm_frames", 1) or 1)
+    # if frames > 1: setattr(filter_cfg, "semantic_min_confirm_frames", 1)
+    # conf_cap = max(conf_floor, 0.52)
+    # if sem_conf > conf_cap: setattr(filter_cfg, "semantic_min_confirm_confidence", conf_cap)
+    
     return adjustments
 
 

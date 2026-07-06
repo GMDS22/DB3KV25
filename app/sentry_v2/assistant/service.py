@@ -1289,6 +1289,9 @@ class LocalAssistantService:
             "question": "",
             "suggestions": [],
             "payload": {},
+            "conversation_mode": "general_conversation",
+            "routing_source": "service_default_conversation",
+            "routing_owner": "assistant.service",
         }
 
     def _general_conversation_anchor(self) -> str:
@@ -1567,6 +1570,13 @@ class LocalAssistantService:
             )
 
     def answer_operator_prompt(self, prompt_text: str, snapshot: Dict[str, Any], *, model: str, include_logs: bool = True) -> AssistantReply:
+        def _with_routing(intent: Dict[str, Any] | None, *, mode: str, source: str) -> Dict[str, Any]:
+            merged = dict(intent or self._default_conversation_intent())
+            merged["conversation_mode"] = str(mode or "general_conversation").strip().lower() or "general_conversation"
+            merged["routing_source"] = str(source or "service_default_conversation").strip().lower() or "service_default_conversation"
+            merged["routing_owner"] = "assistant.service"
+            return merged
+
         parsed_actions = self._parse_actions(prompt_text)
         profile_reply = self._profile_protocol_reply(prompt_text)
 
@@ -1589,21 +1599,33 @@ class LocalAssistantService:
                         return AssistantReply(
                             text=cleaned, source="ollama", model=model,
                             raw_response=reply_text, prompt_used=conversation_prompt,
-                            intent=self._default_conversation_intent(),
+                            intent=_with_routing(
+                                self._default_conversation_intent(),
+                                mode="scene_conversation",
+                                source="service_scene_query",
+                            ),
                             memory_context=self._memory_context(),
                         )
                 except Exception as exc:
                     return AssistantReply(
                         text=anchor, source="deterministic", model=model,
                         raw_response="scene_query_fallback", prompt_used=conversation_prompt,
-                        intent=self._default_conversation_intent(),
+                        intent=_with_routing(
+                            self._default_conversation_intent(),
+                            mode="scene_conversation",
+                            source="service_scene_query",
+                        ),
                         memory_context=self._memory_context(),
                         error=str(exc),
                     )
             return AssistantReply(
                 text=anchor, source="deterministic", model=model,
                 raw_response="scene_query_fallback", prompt_used="scene_query_fallback",
-                intent=self._default_conversation_intent(),
+                intent=_with_routing(
+                    self._default_conversation_intent(),
+                    mode="scene_conversation",
+                    source="service_scene_query",
+                ),
                 memory_context=self._memory_context(),
             )
         conversational_reply = self._conversational_protocol_reply(prompt_text)
@@ -1630,7 +1652,11 @@ class LocalAssistantService:
                             model=model,
                             raw_response=reply_text,
                             prompt_used=prompt,
-                            intent=self._default_conversation_intent(),
+                            intent=_with_routing(
+                                self._default_conversation_intent(),
+                                mode="general_conversation",
+                                source="service_general_conversation",
+                            ),
                             memory_context=self._memory_context(),
                         )
                 except Exception as exc:
@@ -1640,7 +1666,11 @@ class LocalAssistantService:
                         model=model,
                         raw_response="conversation_fallback",
                         prompt_used=prompt,
-                        intent=self._default_conversation_intent(),
+                        intent=_with_routing(
+                            self._default_conversation_intent(),
+                            mode="general_conversation",
+                            source="service_general_conversation",
+                        ),
                         memory_context=self._memory_context(),
                         error=str(exc),
                     )
@@ -1650,12 +1680,17 @@ class LocalAssistantService:
                 model=model,
                 raw_response="conversation_fallback",
                 prompt_used="conversation_fallback",
-                intent=self._default_conversation_intent(),
+                intent=_with_routing(
+                    self._default_conversation_intent(),
+                    mode="general_conversation",
+                    source="service_general_conversation",
+                ),
                 memory_context=self._memory_context(),
             )
         findings, recommendations, summary = self._analyzer.analyze(snapshot)
         self._remember_command(prompt_text)
         intent = self._parse_intent(prompt_text, snapshot, model=model, fallback_actions=parsed_actions)
+        intent = _with_routing(intent, mode="task_or_command", source="service_operator_prompt")
         actions = self._intent_to_actions(intent)
         if not actions:
             actions = parsed_actions

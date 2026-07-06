@@ -16,45 +16,8 @@ class _FakeConnectionTab:
         self._comm = SimpleNamespace(SERIAL_IO_LABEL=SentryV2Comm.SERIAL_IO_LABEL)
         self.config = SimpleNamespace(connection=SimpleNamespace(esp32_port="COM7", debug_port="COM8"))
 
-    def _list_serial_ports_normalized(self):
-        return [("COM3", "USB-SERIAL CH340"), ("COM4", "CP210 USB to UART")]
-
-    def _resolve_serial_port(self, target: str, preferred_port: str = "") -> str:
-        return ""
-
-    def _wifi_credentials_candidates_for_mode(self, mode: int):
-        return [("SMART-SENTRY-V2.3", "db3000pass")]
-
-    def _windows_wifi_current_ssid(self) -> str:
-        return "OfficeWiFi"
-
-    def _windows_wifi_network_available(self, ssid: str) -> bool:
-        return ssid == "SMART-SENTRY-V2.3"
-
-    def _normalize_ssid(self, ssid: str) -> str:
-        return SentryV2TabWidget._normalize_ssid(self, ssid)
-
-    def _ssid_matches_expected(self, candidate_ssid: str, expected_ssids):
-        return SentryV2TabWidget._ssid_matches_expected(self, candidate_ssid, expected_ssids)
-
-    def _connection_detail_map(self, details):
-        return SentryV2TabWidget._connection_detail_map(self, details)
-
-    def _summarize_visible_com_ports(self, ports, limit: int = 6) -> str:
-        return SentryV2TabWidget._summarize_visible_com_ports(self, ports, limit=limit)
-
-    def _connection_serial_port_note(self, target: str, label: str, configured_port: str, detail_value: str, *, visible_ports=None) -> str:
-        return SentryV2TabWidget._connection_serial_port_note(
-            self,
-            target,
-            label,
-            configured_port,
-            detail_value,
-            visible_ports=visible_ports,
-        )
-
-    def _connection_wifi_link_note(self, mode: int) -> str:
-        return SentryV2TabWidget._connection_wifi_link_note(self, mode)
+    def _voice_spell_com_port(self, text: str) -> str:
+        return SentryV2TabWidget._voice_spell_com_port(text)
 
 
 class _FakeButton:
@@ -145,22 +108,20 @@ class _VoiceConnectResultTab(_FakeConnectionTab):
     def _voice_normalize_connection_phrase(self, text: str) -> str:
         return SentryV2TabWidget._voice_normalize_connection_phrase(self, text)
 
-    def _connection_success_notes(self, mode: int, details, *, current_enabled: bool):
-        return SentryV2TabWidget._connection_success_notes(self, mode, details, current_enabled=current_enabled)
+    def _voice_spell_com_port(self, text: str) -> str:
+        return SentryV2TabWidget._voice_spell_com_port(text)
 
-    def _connection_diagnostic_notes(self, mode: int, details, *, include_mode2_wifi_warning: bool = False):
-        return SentryV2TabWidget._connection_diagnostic_notes(
-            self,
-            mode,
-            details,
-            include_mode2_wifi_warning=include_mode2_wifi_warning,
-        )
+    def _voice_connection_failure_response(self, err: str, details) -> str:
+        return SentryV2TabWidget._voice_connection_failure_response(self, err, details)
 
     def _set_connection_status(self, text: str, state: str) -> None:
         self.status_updates.append((str(text), str(state)))
 
     def _log(self, message: str) -> None:
         self.logs.append(str(message))
+
+    def _update_runtime_diagnostics(self, *, reason: str, force: bool = False) -> None:
+        self.logs.append(f"diag:{reason}:{int(bool(force))}")
 
     def _sync_home_screen_visibility(self) -> None:
         self.home_sync_calls += 1
@@ -196,38 +157,61 @@ class _VoiceConnectResultTab(_FakeConnectionTab):
         self.prompt_delays.append(float(delay_s))
 
 
-def test_mode2_failure_reports_missing_debug_board_and_visible_wifi() -> None:
-    tab = _FakeConnectionTab()
+class _CameraFailureTab:
+    def __init__(self, *, voice_window_active: bool = True) -> None:
+        self._closing = False
+        self._camera_open_in_progress = True
+        self._startup_retry_count = 3
+        self._btn_cam = _FakeButton()
+        self._voice_window_active = bool(voice_window_active)
+        self.camera_status = []
+        self.logs = []
+        self.spoken = []
 
-    notes = SentryV2TabWidget._connection_diagnostic_notes(
+    def _has_local_source(self) -> bool:
+        return False
+
+    def _set_camera_status(self, text: str, level: str) -> None:
+        self.camera_status.append((str(text), str(level)))
+
+    def _log(self, message: str) -> None:
+        self.logs.append(str(message))
+
+    def _voice_interaction_window_active(self) -> bool:
+        return self._voice_window_active
+
+    def _speak_after_operator_quiet(self, phrase: str, *, interrupt: bool = False, minimum_quiet_s: float = 0.0) -> bool:
+        self.spoken.append((str(phrase), bool(interrupt), float(minimum_quiet_s)))
+        return True
+
+    def _voice_spell_com_port(self, text: str) -> str:
+        return SentryV2TabWidget._voice_spell_com_port(text)
+
+
+def test_voice_connection_failure_response_reports_missing_ports_and_wifi() -> None:
+    tab = _FakeConnectionTab()
+    tab._connection_attempt_context = {
+        "preferred_esp32_port": "COM7",
+        "preferred_debug_port": "COM8",
+        "visible_ports": [("COM3", "USB-SERIAL CH340"), ("COM4", "CP210 USB to UART")],
+        "udp_host": "192.168.4.1",
+        "udp_port": 9000,
+    }
+
+    phrase = SentryV2TabWidget._voice_connection_failure_response(
         tab,
-        SentryV2Comm.MODE_WIFI_DEBUG_USB,
+        "Debug board failed",
         {
             "Debug Board": (False, "No COM port specified"),
             "ESP32 WiFi": (False, "WiFi host unreachable"),
         },
     )
 
-    assert any("Debug Board was not found on any COM port" in note for note in notes)
-    assert any("ESP32 WiFi SMART-SENTRY-V2.3 is available" in note and "OfficeWiFi" in note for note in notes)
-
-
-def test_mode2_degraded_success_still_reports_visible_wifi_gap() -> None:
-    tab = _FakeConnectionTab()
-
-    notes = SentryV2TabWidget._connection_diagnostic_notes(
-        tab,
-        SentryV2Comm.MODE_WIFI_DEBUG_USB,
-        {
-            "Debug Board": (True, "COM4"),
-            "ESP32 WiFi": (False, "WiFi host unreachable"),
-        },
-        include_mode2_wifi_warning=True,
-    )
-
-    assert notes == [
-        "ESP32 WiFi SMART-SENTRY-V2.3 is available, but Windows is currently connected to OfficeWiFi instead."
-    ]
+    assert "Debug Board was not found on any C O M port" in phrase
+    assert "C O M 8" in phrase
+    assert "C O M 3" in phrase
+    assert "C O M 4" in phrase
+    assert "ESP32 WiFi is unavailable at 192.168.4.1:9000" in phrase
 
 
 def test_open_serial_reports_missing_port_inventory() -> None:
@@ -263,9 +247,10 @@ def test_voice_connect_failure_reports_missing_debug_board_inventory() -> None:
 
     assert tab.spoken
     spoken_text = tab.spoken[-1][0]
-    assert "Debug Board was not found on any COM port" in spoken_text
+    assert "Debug Board was not found on any C O M port" in spoken_text
     assert "C O M 3" in spoken_text
     assert "C O M 4" in spoken_text
+    assert "ESP32 WiFi is unavailable at 192.168.4.1:9000" in spoken_text
     assert any(state == "failed" for _label, state, _detail in tab.task_updates)
 
 
@@ -295,18 +280,41 @@ def test_voice_connect_success_reports_actual_debug_board_port() -> None:
 
     assert tab.spoken
     spoken_text = tab.spoken[-1][0]
-    assert "connected the Debug Board on C O M 4 instead of C O M 8" in spoken_text
-    assert "OfficeWiFi" in spoken_text
+    assert "Smart Sentry boards are connected on the C O M link" in spoken_text
     assert "Smart Sentry is enabled." in spoken_text
     assert tab._chk_enable.isChecked() is True
 
 
+def test_camera_open_failure_reports_unavailable_index_and_voice_feedback() -> None:
+    tab = _CameraFailureTab(voice_window_active=True)
+
+    SentryV2TabWidget._on_camera_open_failed(tab, "0")
+
+    assert tab.camera_status
+    assert tab.camera_status[-1][0] == "Camera index 0 is unavailable or already in use"
+    assert tab.camera_status[-1][1] == "error"
+    assert tab.spoken
+    assert "Camera source 0 is not available right now." in tab.spoken[-1][0]
+
+
+def test_camera_open_failure_reports_unavailable_stream() -> None:
+    tab = _CameraFailureTab(voice_window_active=False)
+
+    SentryV2TabWidget._on_camera_open_failed(tab, "rtsp://192.168.4.10/live")
+
+    assert tab.camera_status
+    assert tab.camera_status[-1][0] == "Camera stream is unavailable: rtsp://192.168.4.10/live"
+    assert tab.camera_status[-1][1] == "error"
+    assert not tab.spoken
+
+
 def main() -> None:
-    test_mode2_failure_reports_missing_debug_board_and_visible_wifi()
-    test_mode2_degraded_success_still_reports_visible_wifi_gap()
+    test_voice_connection_failure_response_reports_missing_ports_and_wifi()
     test_open_serial_reports_missing_port_inventory()
     test_voice_connect_failure_reports_missing_debug_board_inventory()
     test_voice_connect_success_reports_actual_debug_board_port()
+    test_camera_open_failure_reports_unavailable_index_and_voice_feedback()
+    test_camera_open_failure_reports_unavailable_stream()
     print("connection diagnostic checks passed")
 
 

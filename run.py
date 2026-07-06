@@ -148,6 +148,7 @@ def _run_main_with_retry() -> int:
 
 if __name__ == "__main__":
     
+    
     sys.excepthook = _log_unhandled_exception
     try:
         _NATIVE_CRASH_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)

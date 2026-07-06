@@ -212,6 +212,30 @@ def test_wake_barge_in_can_bypass_recent_output_echo_block() -> None:
     assert command == "who are you"
 
 
+def test_partial_wake_can_bypass_recent_output_echo_block() -> None:
+    listener, _commands, transcripts = _make_listener()
+    listener._recent_output_input_block_until_s = time.time() + 20.0
+
+    listener._publish_partial_transcript("elion who are you", source="windows")
+
+    assert listener._last_partial_text == "elion who are you"
+    assert any(
+        str(payload.get("kind") or "") == "partial"
+        and str(payload.get("text") or "") == "elion who are you"
+        for payload in transcripts
+    )
+
+
+def test_partial_non_wake_phrase_is_still_blocked_during_output_echo_window() -> None:
+    listener, _commands, transcripts = _make_listener()
+    listener._recent_output_input_block_until_s = time.time() + 20.0
+
+    listener._publish_partial_transcript("who are you", source="windows")
+
+    assert listener._last_partial_text == ""
+    assert not any(str(payload.get("kind") or "") == "partial" for payload in transcripts)
+
+
 def test_non_wake_phrase_still_blocked_during_output_echo_window() -> None:
     listener, _commands, _transcripts = _make_listener()
     listener._recent_output_input_block_until_s = time.time() + 20.0
@@ -338,6 +362,8 @@ def main() -> None:
     test_recognizer_gate_is_softer_than_full_noise_threshold()
     test_quieter_chunks_can_retrain_recognizer_gate()
     test_wake_barge_in_can_bypass_recent_output_echo_block()
+    test_partial_wake_can_bypass_recent_output_echo_block()
+    test_partial_non_wake_phrase_is_still_blocked_during_output_echo_window()
     test_non_wake_phrase_still_blocked_during_output_echo_window()
     test_followup_phrase_is_allowed_inside_active_listen_window()
     test_core_intent_recovery_handles_who_are_you_drift()

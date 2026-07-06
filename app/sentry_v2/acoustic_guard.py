@@ -27,11 +27,11 @@ class USBMicrophoneAnomalyDetector:
         *,
         sample_rate_hz: int = 16000,
         block_size: int = 1024,
-        warmup_seconds: float = 3.0,
-        baseline_adapt_rate: float = 0.035,
-        anomaly_threshold_db: float = 8.0,
-        anomaly_zscore_threshold: float = 2.8,
-        cooldown_s: float = 8.0,
+        warmup_seconds: float = 2.0,  # Reduced from 3.0 for faster adaptation
+        baseline_adapt_rate: float = 0.045,  # Increased from 0.035 for faster environment learning
+        anomaly_threshold_db: float = 7.5,  # Reduced from 8.0 for better detection of quieter speech
+        anomaly_zscore_threshold: float = 2.5,  # Reduced from 2.8 for more sensitive anomaly detection
+        cooldown_s: float = 6.0,  # Reduced from 8.0 to allow faster follow-up detection
         device_name: str = "",
         on_wake_word: Optional[Callable[[str], None]] = None,
         wake_word: str = "",

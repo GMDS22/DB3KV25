@@ -769,8 +769,8 @@ class VoskCommandListener:
         self._diag_quiet_log_interval_s: float = 8.0
         self._diag_audio_rms_min: int = 90
         self._diag_gain_log_interval_s: float = 12.0
-        self._input_gain_target_rms: int = 1450
-        self._input_gain_max: float = 6.5
+        self._input_gain_target_rms: int = 1200  # Lower target (was 1450) for earlier detection threshold
+        self._input_gain_max: float = 8.0  # Increased max gain (was 6.5) for quiet headsets
         self._recent_signature: dict[str, object] = {}
         self._recent_spoken_phrase_suppressions: list[dict[str, object]] = []
         self._recent_output_input_block_until_s: float = 0.0
@@ -786,9 +786,10 @@ class VoskCommandListener:
         self._active_speech_started_s: float = 0.0
         self._min_final_words: int = 1
         self._min_final_duration_s: float = 0.2
-        self._min_final_confidence: float = 0.45
-        self._noise_rms_threshold: int = 95
+        self._min_final_confidence: float = 0.35  # Reduced from 0.45 for better detection of quiet speech
+        self._noise_rms_threshold: int = 90  # Reduced from 95 for more sensitive detection
         self._adaptive_noise_threshold: bool = True
+        self._quiet_command_confidence_floor: float = 0.10  # Very permissive for known simple commands
         self._noise_baseline_samples: list[int] = []
         self._baseline_sample_count: int = 0
         self._dynamic_silence_threshold: float = 0.8
@@ -844,15 +845,16 @@ class VoskCommandListener:
         if len(self._noise_baseline_samples) > 100:
             self._noise_baseline_samples.pop(0)
         
-        # Update threshold every 50 samples
+        # Update threshold every 50 samples (more frequent adaptation)
         if self._baseline_sample_count % 50 == 0 and len(self._noise_baseline_samples) > 10:
             avg_noise = sum(self._noise_baseline_samples) / len(self._noise_baseline_samples)
-            # Set threshold to average + 20% margin
-            self._noise_rms_threshold = max(80, int(avg_noise * 1.2))
+            # Set threshold to average + 10% margin (was 20%, now more aggressive)
+            self._noise_rms_threshold = max(75, int(avg_noise * 1.10))
 
     def _recognizer_gate_rms(self) -> int:
-        threshold = max(55, int(getattr(self, "_noise_rms_threshold", 95) or 95))
-        return max(48, min(threshold, int(threshold * 0.72)))
+        threshold = max(55, int(getattr(self, "_noise_rms_threshold", 90) or 90))
+        # Lower gate for better detection of quiet speech: 60% of threshold instead of 72%
+        return max(38, min(threshold, int(threshold * 0.60)))
 
     def _should_process_recognizer_audio(self, rms: int) -> bool:
         try:
@@ -1058,7 +1060,7 @@ class VoskCommandListener:
         if confidence is not None:
             try:
                 c = float(confidence)
-                min_conf = float(getattr(self, "_min_final_confidence", 0.45) or 0.45)
+                min_conf = float(getattr(self, "_min_final_confidence", 0.35) or 0.35)  # Baseline: 0.35 (was 0.45)
                 # Inside an active command window the operator has already confirmed
                 # attention via wake word.  Relax the floor so that a follow-up
                 # utterance with high background noise can still pass to command
@@ -1067,9 +1069,9 @@ class VoskCommandListener:
                 in_window = current_time <= float(getattr(self, "_command_window_until_s", 0.0) or 0.0)
                 if in_window:
                     if duration_ok:
-                        min_conf = min(min_conf, 0.12)
+                        min_conf = min(min_conf, 0.08)  # Very permissive during window
                     else:
-                        min_conf = min(min_conf, 0.20)
+                        min_conf = min(min_conf, 0.15)  # Intermediate permissiveness
                 confidence_ok = c >= min_conf
             except Exception:
                 confidence_ok = True
@@ -2201,6 +2203,23 @@ class VoskCommandListener:
             (r"\brun\s+(?:the\s+)?smarts?\s+and\b", "run smart sentry"),
             (r"\brun\s+(?:the\s+)?smart\s+sent\s+(?:tree|three)\b", "run smart sentry"),
             (r"\brun\s+(?:the\s+)?smarts?\s+and\s+(?:tree|three|drink)\b", "run smart sentry"),
+            # Additional mishearing fixes for "run the smart sentry"
+            (r"\brun\s+smart\s+sentry\b", "run the smart sentry"),
+            (r"\brun\s+the\s+(?:smarts|smart)\b", "run the smart sentry"),
+            (r"\brun(?:s)?\s+(?:the\s+)?smart\b(?!\s+(?:phone|watch|home|light))", "run the smart sentry"),
+            (r"\brant\s+(?:the\s+)?smart\s+sentry\b", "run the smart sentry"),
+            (r"\bran\s+(?:the\s+)?smart\s+sentry\b", "run the smart sentry"),
+            (r"\brun\s+(?:the\s+)?smart\s+(?:sentry|century|centry)\b", "run the smart sentry"),
+            (r"\brun\s+(?:the\s+)?(?:smarts?|smart)\s+(?:and\s+)?(?:tree|three|drink)\b", "run the smart sentry"),
+            # "start" variations for "run"
+            (r"\bstart\s+(?:the\s+)?(?:smart\s+)?sentry\b", "run the smart sentry"),
+            (r"\bstart\s+(?:tracking|tracking system)\b", "run the smart sentry"),
+            # "enable" variations
+            (r"\benable\s+(?:the\s+)?(?:smart\s+)?sentry\b", "enable the smart sentry"),
+            (r"\benable\s+(?:tracking|autotracking|auto tracking)\b", "enable the smart sentry"),
+            # Additional filler and mishearing corrections
+            (r"\brun\s+a\s+smart\s+sentry\b", "run the smart sentry"),
+            (r"\bran\s+the\s+smart\s+sentry\b", "run the smart sentry"),
             (r"\bgo to the home\b", "go home"),
             (r"\bgo to home\b", "go home"),
             (r"\bgo to the rest\b", "go rest"),
@@ -2231,6 +2250,12 @@ class VoskCommandListener:
             (r"\bwho r you\b", "who are you"),
             (r"\bcancel that(?:\s+[a-z]+)?$", "cancel that"),
             (r"\byou do it\b", "do it"),
+            # Additional command variations
+            (r"\bwhat is your status\b", "status report"),
+            (r"\bhows the camera\b", "what do you see"),
+            (r"\bis camera open\b", "camera status"),
+            (r"\bstop the turret\b", "stop tracking"),
+            (r"\bpause the tracking\b", "pause tracking"),
         )
         for pattern, replacement in replacements:
             corrected = re.sub(pattern, replacement, corrected)
@@ -2275,8 +2300,19 @@ class VoskCommandListener:
         )
         if not profile_match:
             profile_match = re.search(r"\b(?:load|switch(?:\s+to)?|use)\b\s+(.+?)\s+profile\b", corrected)
+        if not profile_match:
+            profile_match = re.search(
+                r"\b(?:change|set|update|switch(?:\s+to)?|use|load|apply|activate)\b\s+(?:the\s+)?(?:coordinated\s+|master\s+)?(?:preset|mode)\b(?:\s+(?:to|as))?\s+(.+)$",
+                corrected,
+            )
+        if not profile_match:
+            profile_match = re.search(r"\b(?:load|switch(?:\s+to)?|use|apply|activate)\b\s+(.+?)\s+(?:preset|mode)\b", corrected)
+        if not profile_match:
+            profile_match = re.search(r"\b(?:use|load|switch(?:\s+to)?|activate|apply)\b\s+(speed\s+\d+(?:\s+[^,.;!?]+)?)$", corrected)
         if profile_match:
             profile_name = re.sub(r"\s+", " ", str(profile_match.group(1) or "").strip())
+            profile_name = re.sub(r"\b(?:profile|preset|mode)\b$", " ", profile_name)
+            profile_name = re.sub(r"\s+", " ", profile_name).strip(" ,.:;!?")
             if profile_name:
                 return f"load profile {profile_name}"
 
@@ -2339,6 +2375,7 @@ class VoskCommandListener:
             (r"\bconnect\b.*\bsmart\s+sentry\b.*\bboards?\b", "connect smart sentry boards"),
             (r"\bconnect\b.*\b(app|com|port|ports|serial)\b", "connect boards"),
             (r"\bconnect\b.*\bboards?\b", "connect boards"),
+            (r"\b(?:restart|relaunch|reload|reboot|reset)\b.*\b(?:app|application|program)\b", "restart the app"),
             (r"\bopen\b.*\b(camera|video)\b", "open camera"),
             (r"\bclose\b.*\b(camera|video)\b", "close camera"),
             (r"\b(?:close|quit|exit)\b.*\b(?:app|application|smart\s+sentry)\b", "close the app"),

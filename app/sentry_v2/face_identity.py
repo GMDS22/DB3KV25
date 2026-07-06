@@ -24,6 +24,13 @@ _YUNET_INPUT_SIZE = (320, 320)
 _YUNET_SCORE_THRESHOLD = 0.80
 _YUNET_NMS_THRESHOLD = 0.3
 _YUNET_TOP_K = 96
+_YUNET_MIN_ACCEPT_SCORE = 0.90
+_FACE_MIN_ASPECT_RATIO = 0.72
+_FACE_MAX_ASPECT_RATIO = 1.38
+_MAX_FACE_CENTER_Y_RATIO_IN_PERSON = 0.67
+_MAX_FACE_TOP_Y_RATIO_IN_PERSON = 0.74
+_MAX_FACE_WIDTH_RATIO_IN_PERSON = 0.82
+_MAX_FACE_HEIGHT_RATIO_IN_PERSON = 0.68
 _LEGACY_EMBEDDING_SIZE = 160
 _SFACE_MAX_DETECT_DIM = 640
 _SFACE_EMBEDDING_SIZE = 128
@@ -751,6 +758,8 @@ class FaceIdentityRuntime:
                 landmarks[:, 0] += float(x)
                 landmarks[:, 1] += float(y)
                 score = float(row[14]) if row.size >= 15 else 0.0
+                if not self._sface_candidate_is_plausible(bbox, landmarks, score=score, person_roi=roi):
+                    continue
                 entries.append(
                     _DetectedFaceEntry(
                         bbox=bbox,
@@ -759,6 +768,105 @@ class FaceIdentityRuntime:
                     )
                 )
         return self._dedupe_face_entries(entries)
+
+    def _sface_candidate_is_plausible(
+        self,
+        bbox: Tuple[int, int, int, int],
+        landmarks: Optional[np.ndarray],
+        *,
+        score: float,
+        person_roi: Optional[Tuple[int, int, int, int]] = None,
+    ) -> bool:
+        x, y, w, h = [int(v) for v in bbox]
+        if w <= 0 or h <= 0:
+            return False
+        if float(score) < float(_YUNET_MIN_ACCEPT_SCORE):
+            return False
+        aspect_ratio = float(w) / float(max(1, h))
+        if aspect_ratio < float(_FACE_MIN_ASPECT_RATIO) or aspect_ratio > float(_FACE_MAX_ASPECT_RATIO):
+            return False
+        if not self._sface_landmarks_are_plausible(bbox, landmarks):
+            return False
+        if person_roi is not None and not self._face_bbox_fits_person_roi(bbox, person_roi):
+            return False
+        return True
+
+    @staticmethod
+    def _sface_landmarks_are_plausible(
+        bbox: Tuple[int, int, int, int],
+        landmarks: Optional[np.ndarray],
+    ) -> bool:
+        if landmarks is None:
+            return False
+        points = np.asarray(landmarks, dtype=np.float32).reshape(-1, 2)
+        if points.shape != (5, 2):
+            return False
+        x, y, w, h = [float(v) for v in bbox]
+        margin_x = w * 0.18
+        margin_y = h * 0.18
+        min_x = x - margin_x
+        max_x = x + w + margin_x
+        min_y = y - margin_y
+        max_y = y + h + margin_y
+        if np.any(points[:, 0] < min_x) or np.any(points[:, 0] > max_x):
+            return False
+        if np.any(points[:, 1] < min_y) or np.any(points[:, 1] > max_y):
+            return False
+
+        left_eye, right_eye, nose, left_mouth, right_mouth = points
+        if left_eye[0] >= right_eye[0] or left_mouth[0] >= right_mouth[0]:
+            return False
+
+        eye_y = float((left_eye[1] + right_eye[1]) * 0.5)
+        mouth_y = float((left_mouth[1] + right_mouth[1]) * 0.5)
+        if not (eye_y < float(nose[1]) < mouth_y):
+            return False
+
+        eye_distance = float(right_eye[0] - left_eye[0])
+        mouth_distance = float(right_mouth[0] - left_mouth[0])
+        if eye_distance < (w * 0.16) or eye_distance > (w * 0.78):
+            return False
+        if mouth_distance < (w * 0.14) or mouth_distance > (w * 0.92):
+            return False
+
+        nose_offset_left = float(nose[0] - left_eye[0])
+        nose_offset_right = float(right_eye[0] - nose[0])
+        if nose_offset_left < (w * 0.08) or nose_offset_right < (w * 0.08):
+            return False
+        if abs(float(left_eye[1] - right_eye[1])) > (h * 0.22):
+            return False
+        if abs(float(left_mouth[1] - right_mouth[1])) > (h * 0.28):
+            return False
+
+        nose_y_ratio = float((nose[1] - y) / max(1.0, h))
+        if nose_y_ratio < 0.24 or nose_y_ratio > 0.72:
+            return False
+        return True
+
+    @staticmethod
+    def _face_bbox_fits_person_roi(
+        bbox: Tuple[int, int, int, int],
+        person_roi: Tuple[int, int, int, int],
+    ) -> bool:
+        face_x, face_y, face_w, face_h = [float(v) for v in bbox]
+        person_x, person_y, person_w, person_h = [float(v) for v in person_roi]
+        if person_w <= 0.0 or person_h <= 0.0:
+            return False
+
+        top_ratio = (face_y - person_y) / person_h
+        center_y_ratio = ((face_y + (face_h * 0.5)) - person_y) / person_h
+        width_ratio = face_w / person_w
+        height_ratio = face_h / person_h
+
+        if top_ratio < -0.08 or top_ratio > float(_MAX_FACE_TOP_Y_RATIO_IN_PERSON):
+            return False
+        if center_y_ratio > float(_MAX_FACE_CENTER_Y_RATIO_IN_PERSON):
+            return False
+        if width_ratio > float(_MAX_FACE_WIDTH_RATIO_IN_PERSON):
+            return False
+        if height_ratio > float(_MAX_FACE_HEIGHT_RATIO_IN_PERSON):
+            return False
+        return True
 
     def _detect_face_entries_legacy(
         self,

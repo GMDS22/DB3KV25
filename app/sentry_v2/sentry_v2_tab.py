@@ -1536,67 +1536,88 @@ TARGET_FILTER_PRESETS = {
         },
     },
     "dog_focus": {
-        "label": "Dog Focus",
-        "description": "Class-locked dog tracking with medium target-size constraints.",
+        "label": "Dog Focus — High Accuracy",
+        "description": "Dog-ONLY class lock with STRICT semantic confirmation (4 frames/0.60 confidence). Rejects cats, rats, birds, and other objects. Shape filter validates dog aspect ratio (0.65-3.6). Use this when you need precision dog-only tracking.",
         "tooltip_key": "preset_filter_dog_focus",
         "settings": {
             "allowed_classes": ["dog", "dogs"],
-            "min_confidence": 0.40,
+            "class_priority": {"dog": 1.0},
+            "min_confidence": 0.50,
             "min_size_ratio": 0.0003,
             "max_size_ratio": 0.10,
             "shape_filter_enabled": True,
             "shape_profile_name": "dog",
-            "semantic_min_confirm_frames": 2,
-            "semantic_min_confirm_confidence": 0.48,
+            "semantic_min_confirm_frames": 4,
+            "semantic_min_confirm_confidence": 0.60,
             "semantic_confirm_ttl_s": 0.8,
         },
     },
     "cat_focus": {
-        "label": "Cat Focus",
-        "description": "Class-locked cat tracking with tighter small-target size constraints.",
+        "label": "Cat Focus — High Accuracy",
+        "description": "Cat-ONLY class lock with STRICT semantic confirmation (4 frames/0.60 confidence). Rejects dogs, rats, birds, and other objects. Shape filter validates cat aspect ratio (0.65-3.2). Use this when you need precision cat-only tracking.",
         "tooltip_key": "preset_filter_cat_focus",
         "settings": {
             "allowed_classes": ["cat", "cats"],
-            "min_confidence": 0.34,
+            "class_priority": {"cat": 1.0},
+            "min_confidence": 0.46,
             "min_size_ratio": 0.00015,
             "max_size_ratio": 0.06,
             "shape_filter_enabled": True,
             "shape_profile_name": "cat",
-            "semantic_min_confirm_frames": 2,
-            "semantic_min_confirm_confidence": 0.42,
+            "semantic_min_confirm_frames": 4,
+            "semantic_min_confirm_confidence": 0.62,
             "semantic_confirm_ttl_s": 0.8,
         },
     },
     "bird_focus": {
-        "label": "Bird Focus",
-        "description": "Class-locked bird tracking with shape and confirmation safety.",
+        "label": "Bird Focus — High Accuracy",
+        "description": "Bird-ONLY class lock with STRICT semantic confirmation (3 frames/0.60 confidence). Rejects cats, dogs, rats, and other objects. Shape filter validates bird aspect ratio (0.45-2.8). Use this for precision bird detection and tracking.",
         "tooltip_key": "preset_filter_bird_focus",
         "settings": {
             "allowed_classes": ["bird", "birds"],
-            "min_confidence": 0.34,
+            "class_priority": {"bird": 1.0},
+            "min_confidence": 0.50,
             "min_size_ratio": 0.00008,
             "max_size_ratio": 0.05,
             "shape_filter_enabled": True,
             "shape_profile_name": "bird",
-            "semantic_min_confirm_frames": 2,
-            "semantic_min_confirm_confidence": 0.42,
+            "semantic_min_confirm_frames": 3,
+            "semantic_min_confirm_confidence": 0.60,
             "semantic_confirm_ttl_s": 0.8,
         },
     },
     "rat_like_motion": {
-        "label": "Rat-Like Motion",
-        "description": "Rat class-focused tiny-target filter tuned for the ratdogcat animal model.",
+        "label": "Rat — High Accuracy",
+        "description": "Rat-ONLY class lock with AGGRESSIVE semantic confirmation (6 frames/0.72 confidence). Rejects cats, dogs, birds, and other objects. Shape filter validates rat aspect ratio (1.15-3.2). Designed for precision rat detection with near-zero false positives.",
         "tooltip_key": "preset_filter_rat_like_motion",
         "settings": {
             "allowed_classes": ["rat"],
-            "min_confidence": 0.18,
+            "class_priority": {"rat": 1.0},
+            "min_confidence": 0.32,
             "min_size_ratio": 0.00005,
             "max_size_ratio": 0.04,
             "shape_filter_enabled": True,
             "shape_profile_name": "rat",
-            "semantic_min_confirm_frames": 3,
+            "semantic_min_confirm_frames": 6,
             "semantic_min_confirm_confidence": 0.72,
             "semantic_confirm_ttl_s": 0.8,
+        },
+    },
+    "cat_dog_rat": {
+        "label": "Cat/Dog/Rat Multi-Class Precision",
+        "description": "Combined filter for cat/dog/rat targets with AGGRESSIVE confirmation gates to prevent false positives. Requires 6+ frames (0.2s consensus) and 0.65+ confidence. Shape profile validates aspect ratios for all three species.",
+        "tooltip_key": "preset_filter_cat_dog_rat",
+        "settings": {
+            "allowed_classes": ["cat", "dog", "rat"],
+            "class_priority": {"rat": 1.35, "cat": 1.15, "dog": 1.0},
+            "min_confidence": 0.46,
+            "min_size_ratio": 0.0001,
+            "max_size_ratio": 0.08,
+            "shape_filter_enabled": True,
+            "shape_profile_name": "cat_dog_rat",
+            "semantic_min_confirm_frames": 6,
+            "semantic_min_confirm_confidence": 0.65,
+            "semantic_confirm_ttl_s": 0.85,
         },
     },
     "person_focus_closest": {
@@ -1649,30 +1670,37 @@ TARGET_FILTER_PRESETS = {
         },
     },
     "sniper_small_rodent": {
-        "label": "Sniper Small Rodent",
-        "description": "Class-locked sniper filter for rat/small-rodent style detections.",
+        "label": "Sniper Rat — Maximum Accuracy",
+        "description": "Rat-ONLY sniper filter with MAXIMUM confirmation (6 frames/0.70 confidence minimum). Only detects rat class, rejects all other objects. Designed for zero-tolerance false positives in high-precision scenarios.",
         "tooltip_key": "preset_filter_sniper_small_rodent",
         "settings": {
-            "allowed_classes": ["rat", "mouse"],
-            "min_confidence": 0.30,
+            "allowed_classes": ["rat"],
+            "class_priority": {"rat": 1.0},
+            "min_confidence": 0.50,
             "min_size_ratio": 0.00005,
             "max_size_ratio": 0.04,
             "shape_filter_enabled": True,
             "shape_profile_name": "rat",
-            "semantic_min_confirm_frames": 3,
-            "semantic_min_confirm_confidence": 0.68,
+            "semantic_min_confirm_frames": 6,
+            "semantic_min_confirm_confidence": 0.70,
             "semantic_confirm_ttl_s": 0.8,
         },
     },
     "sniper_medium_pet": {
-        "label": "Sniper Medium Cat/Dog",
-        "description": "Class-locked sniper filter for medium cat/dog targets.",
+        "label": "Sniper Cat/Dog — High Accuracy",
+        "description": "Cat/Dog-ONLY sniper filter with STRICT confirmation (5 frames/0.65 confidence). Only detects cat or dog class, rejects rats, birds, and other objects. Strong class separation for precision pet tracking.",
         "tooltip_key": "preset_filter_sniper_medium_pet",
         "settings": {
             "allowed_classes": ["cat", "cats", "dog", "dogs"],
-            "min_confidence": 0.44,
+            "class_priority": {"dog": 1.0, "cat": 0.95},
+            "min_confidence": 0.52,
             "min_size_ratio": 0.0002,
             "max_size_ratio": 0.10,
+            "shape_filter_enabled": True,
+            "shape_profile_name": "cat_dog_rat",
+            "semantic_min_confirm_frames": 5,
+            "semantic_min_confirm_confidence": 0.65,
+            "semantic_confirm_ttl_s": 0.8,
         },
     },
     "sniper_large_person": {
@@ -3842,6 +3870,7 @@ class SentryV2TabWidget(QWidget):
         self._voice_interaction_engine_paused: bool = False
         self._voice_protocol_hold_paused: bool = False
         self._voice_system_reporting_suspended: bool = False
+        self._voice_system_reporting_pause_until: float = 0.0  # Grace period: keep pause active until this timestamp
         self._voice_operator_last_activity_s: float = 0.0
         self._voice_wake_ack_last_s: float = 0.0
         self._voice_protocol_scenario: str = "idle"
@@ -11456,9 +11485,24 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(4)
 
+        # Header with title and control buttons
+        header_layout = QHBoxLayout()
+        
         title = QLabel("Speech To Text")
         title.setProperty("themeRole", "statusSectionTitle")
-        layout.addWidget(title)
+        header_layout.addWidget(title)
+        
+        header_layout.addStretch(1)
+        
+        self._btn_voice_listening_toggle = QPushButton("Stop Listening")
+        self._btn_voice_listening_toggle.setMaximumWidth(120)
+        self._btn_voice_listening_toggle.setCheckable(True)
+        self._btn_voice_listening_toggle.setChecked(True)  # Default: listening enabled
+        self._btn_voice_listening_toggle.clicked.connect(self._on_voice_listening_toggle)
+        self._voice_listening_enabled = True  # Track listening state
+        header_layout.addWidget(self._btn_voice_listening_toggle)
+        
+        layout.addLayout(header_layout)
 
         subtitle = QLabel("Shows the current partial and final transcript from the active microphone.")
         subtitle.setWordWrap(True)
@@ -12093,6 +12137,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._voice_protocol_awaiting_next_action = False
             self._voice_interaction_active_until_s = 0.0
             self._set_voice_protocol_scenario("idle")
+            # CRITICAL: Resume reporting when voice activity ends
+            if bool(getattr(self, "_voice_system_reporting_suspended", False)):
+                self._voice_system_reporting_suspended = False
+                self._log("[VOICE RESUME] Reporting resumed after voice protocol pause")
             if not self._assistant_busy and not self._human_voice_busy():
                 self._on_ai_state_update("idle")
             self._log("Voice protocol: explicit pause remains active after conversation timeout")
@@ -12102,6 +12150,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._voice_interaction_active_until_s = 0.0
             self._voice_interaction_engine_paused = False
             self._set_voice_protocol_scenario("idle")
+            # CRITICAL: Resume reporting when voice activity ends
+            if bool(getattr(self, "_voice_system_reporting_suspended", False)):
+                self._voice_system_reporting_suspended = False
+                self._log("[VOICE RESUME] Reporting resumed - autotracking active")
             if not self._assistant_busy and not self._human_voice_busy():
                 self._on_ai_state_update("idle")
             self._log("Voice protocol: listening window closed and autotracking stayed active")
@@ -12109,14 +12161,28 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._voice_protocol_awaiting_next_action = False
         self._voice_interaction_active_until_s = 0.0
         self._set_voice_protocol_scenario("idle")
+        # CRITICAL: Resume reporting when voice activity ends
+        if bool(getattr(self, "_voice_system_reporting_suspended", False)):
+            self._voice_system_reporting_suspended = False
+            self._log("[VOICE RESUME] Reporting resumed after listening window closed")
         if not self._assistant_busy and not self._human_voice_busy():
             self._on_ai_state_update("idle")
+        guarding_active = self._autotracking_runtime_active_for_voice()
         if bool(getattr(self.config.sound, "human_voice_enabled", False)) and self._human_voice_supported():
-            self._speak_after_operator_quiet(
-                "Guarding continues. Say the wake word when you need me again.",
-                interrupt=False,
-            )
-        self._log("Voice protocol: next-action timeout closed with guarding still active")
+            if guarding_active:
+                self._speak_after_operator_quiet(
+                    "Guarding continues. Say the wake word when you need me again.",
+                    interrupt=False,
+                )
+            else:
+                self._speak_after_operator_quiet(
+                    "Listening window closed. Smart Sentry is not actively guarding right now.",
+                    interrupt=False,
+                )
+        self._log(
+            "Voice protocol: next-action timeout closed "
+            + ("with guarding still active" if guarding_active else "with guarding inactive")
+        )
 
     def _announce_startup_voice_intro(self) -> None:
         if bool(getattr(self, "_startup_voice_intro_announced", False)):
@@ -12258,7 +12324,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._toggle_connection,
             interrupt=False,
             action_label="connect Smart Sentry boards",
-            run_action_immediately=True,
+            wait_for_speech_completion=True,
         )
         self._log("Voice protocol: executing direct board connect request")
         return "acknowledged"
@@ -12315,7 +12381,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._toggle_connection,
             interrupt=False,
             action_label="disconnect Smart Sentry boards",
-            run_action_immediately=True,
+            wait_for_speech_completion=True,
         )
         self._log("Voice protocol: executing direct board disconnect request")
         return "acknowledged"
@@ -12572,17 +12638,22 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             "stop smart sentry app",
             "stop the app",
             "stop app",
+            "close it",
+            "close this app",
+            "close this",
+            "quit it",
+            "exit it",
         )
         if any(token in cmd for token in _close_app_tokens):
             if bool(getattr(self, "_shutdown_in_progress", False)) or bool(getattr(self, "_cleanup_started", False)):
-                self._speak_after_operator_quiet("The app is already closing.", interrupt=False)
+                self._speak_after_operator_quiet("Shutdown is already in progress.", interrupt=False)
                 return "acknowledged"
             self._run_voice_action_after_confirmation(
                 "Sure. Closing the app now.",
                 self._request_full_application_close,
                 interrupt=False,
                 action_label="close-app",
-                run_action_immediately=True,
+                wait_for_speech_completion=True,
             )
             return "acknowledged"
 
@@ -12620,7 +12691,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         )
         if any(token in cmd for token in _restart_app_tokens):
             if bool(getattr(self, "_shutdown_in_progress", False)) or bool(getattr(self, "_cleanup_started", False)):
-                self._speak_after_operator_quiet("The app is already restarting.", interrupt=False)
+                self._speak_after_operator_quiet("Shutdown is already in progress.", interrupt=False)
                 return "acknowledged"
             # Generate a non-repeating response using the voice phrase picker
             response = self._voice_pick_phrase(
@@ -12638,7 +12709,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 lambda: self._restart_application(),
                 interrupt=False,
                 action_label="restart-app",
-                run_action_immediately=True,
+                wait_for_speech_completion=True,
             )
             return "acknowledged"
 
@@ -14795,15 +14866,15 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _request_full_application_close(self) -> None:
         window = self.window()
-        if window is not None and window is not self and hasattr(window, "close"):
+        if window is not None and window is not self and hasattr(window, "begin_graceful_shutdown"):
             try:
-                window.close()
+                window.begin_graceful_shutdown(on_complete=window.close)
                 return
             except Exception:
                 pass
         if self.isWindow():
             try:
-                self.close()
+                self.begin_graceful_shutdown(on_complete=self.close)
                 return
             except Exception:
                 pass
@@ -15467,6 +15538,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
     def _has_local_source(self) -> bool:
         return self._cap is not None or self._test_media_image_frame is not None or self._url_stream_active
+
+    def _autotracking_runtime_active_for_voice(self) -> bool:
+        enabled = bool(hasattr(self, "_chk_enable") and bool(self._chk_enable.isChecked()))
+        if not enabled:
+            return False
+        if not self._has_local_source():
+            return False
+        return bool(self._host_controls_hardware() or self._comm.is_connected())
 
     def _close_camera(self, *, log_close: bool = True) -> None:
         self._cam_timer.stop()
@@ -22050,8 +22129,22 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "close smart sentry app",
                 "quit the smart sentry app",
                 "exit the smart sentry app",
+                "restart smart sentry",
+                "restart the smart sentry",
+                "restart app",
+                "restart the app",
                 "restart the smart sentry app",
                 "restart smart sentry app",
+                "relaunch smart sentry",
+                "relaunch the smart sentry",
+                "reload smart sentry",
+                "reload the smart sentry",
+                "reload app",
+                "reload the app",
+                "reboot smart sentry",
+                "reboot the smart sentry",
+                "reboot app",
+                "reboot the app",
                 "relaunch the smart sentry app",
                 "relaunch smart sentry app",
             ),
@@ -23463,9 +23556,18 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             else:
                 parts.append(f"Smart Sentry is engaging a {active_class} target in {engage_phase} phase.")
         elif state_name == "GUARDING":
-            parts.append(
-                f"Smart Sentry is guarding with {visible_targets} visible target{'s' if visible_targets != 1 else ''} and {qualified_targets} qualified target{'s' if qualified_targets != 1 else ''}."
-            )
+            if self._autotracking_runtime_active_for_voice():
+                parts.append(
+                    f"Smart Sentry is guarding with {visible_targets} visible target{'s' if visible_targets != 1 else ''} and {qualified_targets} qualified target{'s' if qualified_targets != 1 else ''}."
+                )
+            else:
+                status_parts: List[str] = []
+                if not self._has_local_source():
+                    status_parts.append("camera is closed")
+                if not bool(self._host_controls_hardware() or self._comm.is_connected()):
+                    status_parts.append("board link is disconnected")
+                reason_text = " and ".join(status_parts) if status_parts else "runtime prerequisites are not ready"
+                parts.append(f"Smart Sentry is not actively guarding right now because {reason_text}.")
         elif state_name == "RETURNING":
             parts.append("Smart Sentry is returning to the guard position.")
         elif state_name == "PAUSED":
@@ -26969,6 +27071,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
     def _maybe_speak_runtime_notice(self, phrase: str, *, cooldown_s: float, state_attr: str, interrupt: bool = False) -> bool:
         if not phrase:
             return False
+        # CRITICAL: Pause all voice reporting when user is speaking OR during grace period
+        now = time.time()
+        pause_until = float(getattr(self, "_voice_system_reporting_pause_until", 0.0) or 0.0)
+        if bool(getattr(self, "_voice_system_reporting_suspended", False)) or now < pause_until:
+            return False
         if not bool(getattr(self.config.sound, "human_voice_enabled", False)):
             return False
         if not self._human_voice_supported():
@@ -26986,13 +27093,18 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         return False
 
     def _maybe_speak_fire_status(self, *, key: str, phrase: str, blocked: bool = False) -> bool:
+        # CRITICAL: Pause all voice reporting when user is speaking OR during grace period  
         now = time.time()
+        pause_until = float(getattr(self, "_voice_system_reporting_pause_until", 0.0) or 0.0)
+        if bool(getattr(self, "_voice_system_reporting_suspended", False)) or now < pause_until:
+            return False
+        now_inner = time.time()
         state_key_attr = "_last_fire_voice_blocked_key" if blocked else "_last_fire_voice_key"
         state_time_attr = "_last_fire_voice_blocked_s" if blocked else "_last_fire_voice_alert_s"
         cooldown_s = 5.5 if blocked else 3.0
         last_key = str(getattr(self, state_key_attr, "") or "")
         last_time = float(getattr(self, state_time_attr, 0.0) or 0.0)
-        if key == last_key and (now - last_time) < cooldown_s:
+        if key == last_key and (now_inner - last_time) < cooldown_s:
             return False
         if not self._speak_human_phrase(phrase, interrupt=False):
             return False
@@ -27102,6 +27214,41 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._init_voice_runtime()
         friendly_name = selected_device or "default system microphone"
         self._queue_setting_change_announcement("Voice input device", friendly_name)
+
+    def _on_voice_listening_toggle(self, checked: bool) -> None:
+        """Handle speech-to-text listening toggle button."""
+        btn = getattr(self, "_btn_voice_listening_toggle", None)
+        if btn is None:
+            return
+        
+        self._voice_listening_enabled = bool(checked)
+        
+        try:
+            voice_runtime = getattr(self, "_voice_runtime", None)
+            if voice_runtime is None:
+                self._log("[VOICE CONTROL] Voice runtime not initialized")
+                return
+            
+            if checked:
+                # Resume listening
+                voice_runtime.start()
+                btn.setText("Stop Listening")
+                btn.setStyleSheet("")
+                self._log("[VOICE CONTROL] Speech-to-text listening started")
+                self._queue_setting_change_announcement("Speech recognition", "listening enabled")
+            else:
+                # Stop listening
+                voice_runtime.stop()
+                btn.setText("Start Listening")
+                btn.setStyleSheet("background-color: #e8e8e8; color: #666;")
+                self._log("[VOICE CONTROL] Speech-to-text listening stopped")
+                self._queue_setting_change_announcement("Speech recognition", "listening disabled")
+                # Clear the transcript display when stopping
+                self._txt_voice_heard.setPlainText("Status: idle (listening disabled)\nPartial: --\nFinal: --")
+        except Exception as e:
+            self._log(f"[VOICE CONTROL ERROR] Failed to toggle listening: {e}")
+            btn.setChecked(not checked)  # Revert button state on error
+            self._speak_after_operator_quiet(f"Error toggling speech recognition: {e}", interrupt=False)
 
     def _refresh_voice_input_device_dropdown(self, select_name: str = "") -> None:
         combo = getattr(self, "_combo_voice_input_device", None)
@@ -27954,6 +28101,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._clear_voice_next_action_prompt()
                 self._stop_human_speech()
                 self._on_ai_state_update("listening")
+                # CRITICAL: Immediately suspend all system reporting when user voice is detected
+                # This allows the user to hear themselves and voice commands to be recognized clearly
+                # without competing with system TTS output or detection reporting
+                if not bool(getattr(self, "_voice_system_reporting_suspended", False)):
+                    self._voice_system_reporting_suspended = True
+                    # Set grace period: keep pause active for 2.5s after voice stops to allow command processing
+                    self._voice_system_reporting_pause_until = time.time() + 2.5
+                    self._log(f"[VOICE PAUSE] Suspended reporting during voice activity")
             if kind == "final":
                 confidence_value = payload.get("confidence", None)
                 try:
@@ -27997,6 +28152,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._voice_heard_partial_text = text
         self._refresh_voice_hearing_panel()
 
+    def _on_voice_transcript_event(self, payload: object) -> None:
+        """Backward-compatible alias for older test and runtime hooks."""
+        self._on_voice_transcript_received(payload)
+
     def _extract_voice_number(self, text: str) -> Optional[int]:
         cleaned = str(text or "").lower()
         numbers = re.findall(r"\d+", cleaned)
@@ -28034,8 +28193,31 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if not normalized:
             return ""
         cue = self._assistant_cue_name()
+        if cue:
+            cue_aliases = (
+                cue,
+                "e lion",
+                "a lion",
+                "on lion",
+                "alien",
+                "elian",
+                "elyan",
+                "elyon",
+                "elliot",
+                "eliot",
+            )
+            for alias in cue_aliases:
+                token = re.sub(r"\s+", " ", str(alias or "").strip().lower())
+                if not token:
+                    continue
+                normalized = re.sub(rf"^\s*{re.escape(token)}\b", cue, normalized)
         if cue and normalized.startswith(f"{cue} "):
             normalized = normalized[len(cue) :].strip()
+        normalized = re.sub(
+            r"^(?:i(?:\s+am)?\s+)?(?:listening|listen|analysis|analyzing|analyst|assistant|is)\s+",
+            "",
+            normalized,
+        ).strip()
         polite_prefix_patterns = (
             r"^(?:hey|hi|hello)\s+",
             r"^(?:please|okay|ok|well|now|just)\s+",
@@ -28074,6 +28256,39 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 return True
         return False
 
+    def _apply_fuzzy_command_corrections(self, command: str) -> str:
+        """Apply fuzzy matching corrections for commonly misheared short command words.
+        
+        Catches mishearings like "rant" → "run", "stat" → "start", "sop" → "stop".
+        Uses Levenshtein-like character difference detection for short words.
+        """
+        corrected = str(command or "").strip().lower()
+        if not corrected:
+            return ""
+        
+        # Fuzzy corrections for short command words (common mishearings)
+        # Format: (mishearing_pattern, intended_word, minimum_context)
+        fuzzy_replacements = (
+            (r"\brant\b", "run", "smart|sentry|tracking"),  # "rant" → "run"
+            (r"\brans\b", "run", "smart|sentry|tracking"),  # "rans" → "run"
+            (r"\brant(?:ing|s)?\b", "run", "smart|sentry|tracking"),
+            (r"\bstat(?:e)?\b", "start", "tracking|sentry"),  # "stat" → "start"
+            (r"\bsop\b", "stop", "tracking|sentry"),  # "sop" → "stop"
+            (r"\bsops\b", "stop", "tracking|sentry"),
+            (r"\bpaus\b", "pause", "tracking|sentry"),  # "paus" → "pause"
+            (r"\benbl\b", "enable", "sentry|tracking"),  # "enbl" → "enable"
+            (r"\bdisbl\b", "disable", "sentry|tracking"),  # "disbl" → "disable"
+            (r"\bresum\b", "resume", "tracking|sentry"),  # "resum" → "resume"
+        )
+        
+        for mishearing_pattern, intended_word, context_pattern in fuzzy_replacements:
+            # Only apply if the context words are present
+            if re.search(context_pattern, corrected):
+                corrected = re.sub(mishearing_pattern, intended_word, corrected)
+        
+        corrected = re.sub(r"\s+", " ", corrected).strip()
+        return corrected
+
     def _normalize_voice_profile_lookup_text(self, text: str) -> str:
         normalized = re.sub(r"[^a-z0-9\s]+", " ", str(text or "").strip().lower())
         normalized = re.sub(r"\s+", " ", normalized).strip()
@@ -28102,8 +28317,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return ""
 
         patterns = (
-            r"\b(?:change|set|update|switch(?:\s+to)?|use|load|apply|activate)\b\s+(?:the\s+)?(?:coordinated\s+|master\s+)?profile\b(?:\s+(?:to|as))?\s+(.+)$",
-            r"\b(?:load|switch(?:\s+to)?|use)\b\s+(.+?)\s+profile\b$",
+            r"\b(?:change|set|update|switch(?:\s+to)?|use|load|apply|activate)\b\s+(?:the\s+)?(?:coordinated\s+|master\s+)?(?:profile|preset|mode)\b(?:\s+(?:to|as))?\s+(.+)$",
+            r"\b(?:load|switch(?:\s+to)?|use|apply|activate)\b\s+(.+?)\s+(?:profile|preset|mode)\b$",
+            r"\b(?:use|load|switch(?:\s+to)?|activate|apply)\b\s+(speed\s+\d+(?:\s+[^,.;!?]+)?)$",
             r"^profile\s+(.+)$",
         )
         for pattern in patterns:
@@ -28112,41 +28328,48 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 continue
             candidate = re.sub(r"\s+", " ", str(match.group(1) or "").strip())
             candidate = re.sub(r"\b(?:please|now|right now|for now)\b", " ", candidate)
+            candidate = re.sub(r"\b(?:profile|preset|mode)\b$", " ", candidate)
             candidate = re.sub(r"\s+", " ", candidate).strip(" ,.:;!?")
             if candidate:
                 return candidate
         return ""
 
-    def _resolve_voice_master_profile_index(self, requested_name: str) -> int:
-        if not hasattr(self, "_combo_master_profile"):
-            return -1
-        combo = self._combo_master_profile
+    def _resolve_voice_master_profile_name(self, requested_name: str) -> str:
+        profiles = self._get_master_profiles()
+        if not profiles:
+            return ""
         requested_norm = self._normalize_voice_profile_lookup_text(requested_name)
         if not requested_norm:
-            return -1
+            return ""
+
+        candidates: list[tuple[str, str]] = []
+        for key, preset in profiles.items():
+            label = str(preset.get("label", key) or key).strip()
+            candidates.append((str(key), label))
 
         # Pass 1: exact normalized label match.
-        for index in range(combo.count()):
-            label = str(combo.itemText(index) or "")
+        for profile_name, label in candidates:
             if self._normalize_voice_profile_lookup_text(label) == requested_norm:
-                return index
+                return profile_name
+            if self._normalize_voice_profile_lookup_text(profile_name) == requested_norm:
+                return profile_name
 
         # Pass 2: containment in either direction.
-        for index in range(combo.count()):
-            label_norm = self._normalize_voice_profile_lookup_text(str(combo.itemText(index) or ""))
+        for profile_name, label in candidates:
+            label_norm = self._normalize_voice_profile_lookup_text(label)
             if not label_norm:
                 continue
             if requested_norm in label_norm or label_norm in requested_norm:
-                return index
+                return profile_name
 
         # Pass 3: token-overlap fallback for near matches (e.g. "speed four" vs "speed 4").
         requested_tokens = {tok for tok in requested_norm.split(" ") if tok}
         if not requested_tokens:
-            return -1
-        best_index = -1
+            return ""
+        best_name = ""
         best_score = 0.0
-        for index in range(combo.count()):
-            label_norm = self._normalize_voice_profile_lookup_text(str(combo.itemText(index) or ""))
+        for profile_name, label in candidates:
+            label_norm = self._normalize_voice_profile_lookup_text(label)
             label_tokens = {tok for tok in label_norm.split(" ") if tok}
             if not label_tokens:
                 continue
@@ -28156,10 +28379,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             score = overlap / float(max(len(requested_tokens), len(label_tokens)))
             if score > best_score:
                 best_score = score
-                best_index = index
+                best_name = profile_name
         if best_score >= 0.55:
-            return best_index
-        return -1
+            return best_name
+        return ""
 
     def _voice_command_requests_connect_and_enable(self, command: str) -> bool:
         normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
@@ -28275,6 +28498,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         command = str(text or "").strip().lower()
         if not command:
             return
+        
+        # Guard: suppress command processing while system is actively speaking/reporting
+        # to prevent command collision and maintain voice interaction coherence
+        if self._human_voice_busy():
+            self._log(f"[VOICE CMD] Deferred during active speech output: {command}")
+            return
+        
         self._note_operator_voice_activity()
         self._record_runtime_conversation_event(
             "operator",
@@ -28283,6 +28513,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             channel="voice",
             metadata={"normalized": True},
         )
+        # Apply fuzzy corrections for commonly misheared short command words
+        command = self._apply_fuzzy_command_corrections(command)
         self._log(f"[VOICE CMD] {command}")
 
         cue = self._assistant_cue_name()
@@ -28387,8 +28619,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "enable the smart sentry",
                 "enable the sentry",
                 "start smart sentry",
+                "start the smart sentry",
                 "start the sentry",
                 "start sentry",
+                "run smart sentry",
+                "run the smart sentry",
+                "run sentry",
+                "run the sentry",
+                "run tracking",
                 "resume smart sentry",
                 "resume tracking",
                 "resume guarding mode",
@@ -28404,6 +28642,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "go live",
                 "go active",
                 "go online",
+                "turn on sentry",
+                "turn on tracking",
+                "turn on smart sentry",
             ),
         ):
             already_enabled = bool(hasattr(self, "_chk_enable") and bool(self._chk_enable.isChecked()))
@@ -28428,6 +28669,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             command,
             (
                 "stop tracking",
+                "stop the tracking",
                 "disable sentry",
                 "disable tracking",
                 "disable smart sentry",
@@ -28435,18 +28677,24 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 "disable the sentry",
                 "disable sentry tracking",
                 "pause smart sentry",
+                "pause the smart sentry",
                 "pause tracking",
                 "pause guarding mode",
                 "pause sentry",
                 "pause the sentry",
                 "stop smart sentry",
+                "stop the smart sentry",
                 "stop the sentry",
                 "stop sentry",
                 "stand down",
                 "stand by",
                 "hold tracking",
+                "hold the tracking",
                 "suspend tracking",
                 "suspend sentry",
+                "turn off sentry",
+                "turn off tracking",
+                "turn off smart sentry",
             ),
         ):
             already_disabled = not bool(hasattr(self, "_chk_enable") and bool(self._chk_enable.isChecked()))
@@ -28923,22 +29171,21 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             # "switch to <name> profile" / "load profile <name>".
             requested_profile = self._extract_voice_master_profile_request(cmd)
             if not handled and requested_profile:
-                selected_index = self._resolve_voice_master_profile_index(requested_profile)
-                if selected_index >= 0 and hasattr(self, "_combo_master_profile"):
-                    resolved_label = str(self._combo_master_profile.itemText(selected_index) or requested_profile).strip()
-                    self._combo_master_profile.setCurrentIndex(selected_index)
-                    if hasattr(self, "_load_master_preset"):
-                        self._load_master_preset()
+                resolved_profile = self._resolve_voice_master_profile_name(requested_profile)
+                all_profiles = self._get_master_profiles()
+                if resolved_profile and resolved_profile in all_profiles:
+                    resolved_label = str(all_profiles[resolved_profile].get("label", requested_profile) or requested_profile).strip()
+                    self._apply_master_profile(resolved_profile)
                     handled = True
                     acknowledge_event = "acknowledged"
                     spoken_confirmation = f"Loaded {resolved_label} profile."
                     handled_summary = f"Profile {resolved_label} loaded."
-                elif hasattr(self, "_combo_master_profile") and self._combo_master_profile.count() > 0:
-                    sample_labels: list[str] = []
-                    for i in range(min(3, self._combo_master_profile.count())):
-                        label = str(self._combo_master_profile.itemText(i) or "").strip()
-                        if label:
-                            sample_labels.append(label)
+                elif all_profiles:
+                    sample_labels = [
+                        str(preset.get("label", name) or name).strip()
+                        for name, preset in list(all_profiles.items())[:3]
+                        if str(preset.get("label", name) or name).strip()
+                    ]
                     hint_text = ", ".join(sample_labels)
                     if hint_text:
                         spoken_confirmation = f"I could not find a matching profile for {requested_profile}. Try one of these: {hint_text}."
@@ -29225,10 +29472,16 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return
         if not hasattr(self, "_chk_enable") or not bool(self._chk_enable.isChecked()):
             return
+        if not self._autotracking_runtime_active_for_voice():
+            return
         engine = getattr(self, "engine", None)
         if engine is None or getattr(engine, "state", SentryV2State.PAUSED) == SentryV2State.PAUSED:
             return
-        if bool(getattr(self, "_voice_system_reporting_suspended", False)):
+        # CRITICAL: Check both the pause flag AND grace period (pause_until timestamp)
+        # Pause will remain active for 2.5s after voice stops to allow command processing
+        now = time.time()
+        pause_until = float(getattr(self, "_voice_system_reporting_pause_until", 0.0) or 0.0)
+        if bool(getattr(self, "_voice_system_reporting_suspended", False)) or now < pause_until:
             return
         if self._voice_interaction_window_active() or str(getattr(self, "_voice_protocol_scenario", "") or "").strip().lower() == "conversation":
             return

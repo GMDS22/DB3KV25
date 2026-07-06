@@ -437,6 +437,16 @@ class SentryV2Engine:
         qualified, diagnostics = self._filter.filter_with_diagnostics(detections, now)
         self.last_filter_diagnostics = diagnostics
         self.last_qualified = qualified
+        
+        # Diagnostic logging: show YOLO detections before and after filtering
+        if self._log_autotracking and detections:
+            for det in detections:
+                decision = next((d for d in diagnostics if int(d.track_id) == int(det.track_id)), None)
+                status = "PASS" if decision and decision.passed else "REJECT"
+                reason = decision.reason if decision else "no_decision"
+                self._autotrack_logger.log_note(
+                    f"YOLO: class={det.class_name} conf={det.confidence:.2f} size={det.area_ratio:.5f} {status} ({reason})"
+                )
 
         # 2. Score
         scored = self._scorer.score(qualified, now)
