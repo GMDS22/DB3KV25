@@ -39,7 +39,14 @@
     "trigger_output_active_low": false,
     "trigger_servo_rest_deg": 0,
     "trigger_servo_fire_deg": 45,
-    "trigger_servo_speed_dps": 360
+    "trigger_servo_speed_dps": 360,
+    "motion_policy_mode": "require_recent_motion",
+    "motion_recent_window_s": 1.0,
+    "motion_recent_distance_px": 14.0,
+    "motion_average_velocity_px_s": 12.0,
+    "motion_confidence_min": 0.45,
+    "motion_stationary_timeout_s": 1.5,
+    "motion_suppression_cooldown_s": 1.2
   },
   "guard": {
     "guard_pan": 90.0,

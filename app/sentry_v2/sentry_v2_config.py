@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Tuple
 # Increment _CURRENT_SCHEMA_VERSION whenever a field is added, removed, or
 # renamed in SentryV2Config (or any sub-config that would break existing saves).
 # Bump this constant AND add a migration branch in SentryV2Config.from_dict().
-_CURRENT_SCHEMA_VERSION: int = 1
+_CURRENT_SCHEMA_VERSION: int = 2
 
 _log = logging.getLogger(__name__)
 
@@ -301,6 +301,17 @@ class EngagementConfig:
     stationary_release_hold_s: float = 8.0
     stationary_release_suppress_s: float = 10.0
     stationary_release_motion_px: float = 36.0
+    # Motion policy lifecycle for planner/fire qualification.
+    # allow_stationary: stationary targets may still qualify for engagement.
+    # require_recent_motion: target must show recent movement to stay engageable.
+    # tracking_only: target stays tracked but never becomes engageable.
+    motion_policy_mode: str = "require_recent_motion"
+    motion_recent_window_s: float = 1.0
+    motion_recent_distance_px: float = 14.0
+    motion_average_velocity_px_s: float = 12.0
+    motion_confidence_min: float = 0.45
+    motion_stationary_timeout_s: float = 1.5
+    motion_suppression_cooldown_s: float = 1.2
 
     # Internal sentinel — set by __post_init__ so that re-constructing an
     # EngagementConfig from an already-normalised dict (e.g. from_dict) does
@@ -947,6 +958,11 @@ class SentryV2Config:
                 "Defaults applied for any new fields.",
                 raw_version,
                 _CURRENT_SCHEMA_VERSION,
+            )
+        if raw_version < 2:
+            _log.info(
+                "Motion-policy defaults are now enabled for all engagement profiles; "
+                "older configs will be migrated to the new policy architecture on save()."
             )
         # Always write back the current schema version so the file is migrated
         # on the next save(), regardless of what version was on disk.

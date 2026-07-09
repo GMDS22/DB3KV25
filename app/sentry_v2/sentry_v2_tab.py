@@ -140,6 +140,8 @@ from .sentry_v2_config import (
 from .target_filter import DetectedObject
 from .assistant import AssistantAction, AssistantReply, LocalAssistantService, OllamaClient
 from .voice_runtime import VoiceRuntimeController, KokoroTTS
+from .mission_archive import MissionArchiveWriter, SnapshotCaptureService
+from .mission_review import MissionBrowserWindow, MissionRepository
 
 
 MANUAL_TRIGGER_SERVO_LATCH_MS = 160
@@ -1785,6 +1787,88 @@ def _normalize_engagement_precision_limits(settings: dict, raw_settings: Optiona
 
     return resolved
 
+
+def _motion_policy_bundle(
+    mode: str,
+    *,
+    recent_window_s: float,
+    recent_distance_px: float,
+    average_velocity_px_s: float,
+    confidence_min: float,
+    stationary_timeout_s: float,
+    suppression_cooldown_s: float,
+) -> dict:
+    return {
+        "motion_policy_mode": mode,
+        "motion_recent_window_s": float(recent_window_s),
+        "motion_recent_distance_px": float(recent_distance_px),
+        "motion_average_velocity_px_s": float(average_velocity_px_s),
+        "motion_confidence_min": float(confidence_min),
+        "motion_stationary_timeout_s": float(stationary_timeout_s),
+        "motion_suppression_cooldown_s": float(suppression_cooldown_s),
+    }
+
+
+_MOTION_POLICY_DEFAULTS = {
+    "allow_stationary": _motion_policy_bundle(
+        "allow_stationary",
+        recent_window_s=1.75,
+        recent_distance_px=18.0,
+        average_velocity_px_s=8.0,
+        confidence_min=0.35,
+        stationary_timeout_s=6.0,
+        suppression_cooldown_s=1.5,
+    ),
+    "require_recent_motion": _motion_policy_bundle(
+        "require_recent_motion",
+        recent_window_s=1.0,
+        recent_distance_px=14.0,
+        average_velocity_px_s=12.0,
+        confidence_min=0.45,
+        stationary_timeout_s=1.5,
+        suppression_cooldown_s=1.2,
+    ),
+    "tracking_only": _motion_policy_bundle(
+        "tracking_only",
+        recent_window_s=0.75,
+        recent_distance_px=10.0,
+        average_velocity_px_s=8.0,
+        confidence_min=0.30,
+        stationary_timeout_s=0.5,
+        suppression_cooldown_s=0.6,
+    ),
+}
+
+
+def _infer_motion_policy_mode(profile_key: str, *, label: str = "", filter_settings: Optional[dict] = None) -> str:
+    normalized = f"{profile_key} {label}".strip().lower()
+    allowed_classes = set()
+    if isinstance(filter_settings, dict):
+        normalized = f"{normalized} {str(filter_settings.get('shape_profile_name', '') or '').lower()}"
+        allowed_classes = {str(name).strip().lower() for name in list(filter_settings.get("allowed_classes", []) or [])}
+
+    if any(token in normalized for token in ("training", "demo_track", "track only", "observer")):
+        return "tracking_only"
+    if "rat" in normalized or "rat" in allowed_classes:
+        return "require_recent_motion"
+    if any(token in normalized for token in ("cat", "dog", "small movers", "pet", "animal")):
+        return "require_recent_motion"
+    if "person" in normalized or "human" in normalized or "person" in allowed_classes:
+        return "allow_stationary"
+    return "require_recent_motion"
+
+
+def _resolve_motion_policy_settings(profile_key: str, *, label: str = "", filter_settings: Optional[dict] = None) -> dict:
+    mode = _infer_motion_policy_mode(profile_key, label=label, filter_settings=filter_settings)
+    return dict(_MOTION_POLICY_DEFAULTS[mode])
+
+
+def _merge_motion_policy_settings(base_settings: dict, profile_key: str, *, label: str = "", filter_settings: Optional[dict] = None) -> dict:
+    merged = dict(base_settings or {})
+    for key, value in _resolve_motion_policy_settings(profile_key, label=label, filter_settings=filter_settings).items():
+        merged.setdefault(key, value)
+    return merged
+
 MASTER_PROFILE_PRESETS = {
     # ── Per-detection-mode person profiles (modes 0–10) ────────────────────────
     "person_motion_diff": {
@@ -2683,6 +2767,23 @@ ENGAGEMENT_PRESETS = {
         },
     },
 }
+
+
+for _engagement_profile_name, _engagement_profile in ENGAGEMENT_PRESETS.items():
+    _engagement_profile["settings"] = _merge_motion_policy_settings(
+        _engagement_profile.get("settings", {}),
+        _engagement_profile_name,
+        label=str(_engagement_profile.get("label", "") or ""),
+    )
+for _master_profile_name, _master_profile in MASTER_PROFILE_PRESETS.items():
+    _master_profile.setdefault(
+        "motion_policy",
+        _resolve_motion_policy_settings(
+            _master_profile_name,
+            label=str(_master_profile.get("label", "") or ""),
+            filter_settings=dict(TARGET_FILTER_PRESETS.get(str(_master_profile.get("filter", "") or ""), {}).get("settings", {}) or {}),
+        ),
+    )
 
 _ENGAGEMENT_PRESET_ADVANCED_OVERRIDES = {
     "demo_track": {
@@ -3726,6 +3827,15 @@ class SentryV2TabWidget(QWidget):
         self.engine.on_fire(self._on_engine_fire)
         self.engine.on_move(self._on_engine_move)
         self.engine.on_state_change(self._on_engine_state_change)
+        self.engine.set_pir_trace_callback(self._on_engine_pir_trace)
+        self._mission_archive_writer = MissionArchiveWriter()
+        self._mission_archive_writer.start()
+        self._snapshot_capture_service = SnapshotCaptureService(
+            base_dir=self._mission_archive_writer.base_dir,
+            frame_provider=self._mission_archive_frame_provider,
+        )
+        self._snapshot_capture_service.start()
+        self.engine.set_mission_event_publisher(self._on_engine_mission_event)
         self._pan_tilt_motion_enabled: bool = True
         self.engine.set_motion_enabled(self._pan_tilt_motion_enabled)
 
@@ -3918,6 +4028,8 @@ class SentryV2TabWidget(QWidget):
         self._pir_last_event_sensor: Optional[int] = None
         self._pir_last_event_time_s: float = 0.0
         self._pir_event_count: int = 0
+        self._pir_trace_log_path: Path = RUNTIME_ROOT_PATH / "logs" / "pir_trace" / f"pir_trace_{time.strftime('%Y%m%d_%H%M%S')}.jsonl"
+        self._pir_trace_log_path.parent.mkdir(parents=True, exist_ok=True)
         self._last_camera_source_text: str = str(self.config.connection.camera_source or "").strip() or "0"
         self._last_camera_width: int = int(self.config.connection.camera_width)
         self._last_camera_height: int = int(self.config.connection.camera_height)
@@ -4788,6 +4900,24 @@ class SentryV2TabWidget(QWidget):
         self._quiet_save_timer.stop()
         try:
             self.engine.stop()
+        except Exception:
+            pass
+        try:
+            self.engine.set_mission_event_publisher(None)
+        except Exception:
+            pass
+        try:
+            self._mission_archive_end_if_active(reason="tab_cleanup")
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "_snapshot_capture_service") and self._snapshot_capture_service is not None:
+                self._snapshot_capture_service.stop()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, "_mission_archive_writer") and self._mission_archive_writer is not None:
+                self._mission_archive_writer.stop()
         except Exception:
             pass
         self._stop_fire_burst(send_release=False)
@@ -10896,6 +11026,15 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._btn_open_runtime_snapshot_folder.clicked.connect(self._open_runtime_snapshot_folder)
         self._apply_tooltip(self._btn_open_runtime_snapshot_folder, "open_runtime_snapshot_folder")
         quick_lay.addWidget(self._btn_open_runtime_snapshot_folder, 0, 4)
+
+        self._btn_open_mission_review = QPushButton("Mission Review")
+        self._btn_open_mission_review.setMinimumHeight(34)
+        self._set_button_role(self._btn_open_mission_review, "primary")
+        self._btn_open_mission_review.setToolTip(
+            "Open the Mission Browser and review historical missions using only Mission Archive data."
+        )
+        self._btn_open_mission_review.clicked.connect(self._open_mission_review_browser)
+        quick_lay.addWidget(self._btn_open_mission_review, 1, 0)
         self._register_responsive_button_grid(quick_lay)
         self._reflow_responsive_button_grid(quick_lay)
 
@@ -13442,6 +13581,122 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if move_note:
             self._log(f"{move_note} -> pan {float(pan):.1f} tilt {float(tilt):.1f}")
 
+    def _mission_archive_frame_provider(self) -> Optional[np.ndarray]:
+        frame = getattr(self, "_last_raw_frame", None)
+        if isinstance(frame, np.ndarray) and frame.size > 0:
+            return frame.copy()
+        display = getattr(self, "_last_display_frame", None)
+        if isinstance(display, np.ndarray) and display.size > 0:
+            return display.copy()
+        return None
+
+    def _mission_archive_config_snapshot(self) -> Dict[str, object]:
+        snapshot = dict(self.config.to_dict())
+        snapshot["runtime"] = {
+            "detection_mode_index": int(getattr(self.config.detection_mode, "detection_mode", 0) or 0),
+            "yolo_model_name": str(getattr(self.config.detection_mode, "yolo_model_name", "") or ""),
+            "active_master_profile": str(getattr(self, "_active_master_profile_name", "") or ""),
+            "camera_source_kind": str(getattr(self, "_local_source_kind", "") or ""),
+            "camera_source_label": str(getattr(self, "_local_source_label", "") or ""),
+        }
+        return snapshot
+
+    def _mission_archive_start_if_needed(self, *, reason: str) -> str:
+        mission_id = self._mission_archive_writer.active_mission_id()
+        if mission_id:
+            return mission_id
+        mission_id = self._mission_archive_writer.start_mission(
+            metadata={
+                "source": "sentry_v2_tab",
+                "reason": str(reason or "engine_transition"),
+            },
+            config_snapshot=self._mission_archive_config_snapshot(),
+            start_reason=str(reason or "engine_transition"),
+        )
+        return mission_id
+
+    def _mission_archive_end_if_active(self, *, reason: str) -> None:
+        if not self._mission_archive_writer.active_mission_id():
+            return
+        self._mission_archive_writer.end_mission(
+            reason=str(reason or "engine_paused"),
+            config_snapshot=self._mission_archive_config_snapshot(),
+        )
+
+    def _publish_mission_runtime_config_snapshot(self, *, reason: str) -> None:
+        if not self._mission_archive_writer.active_mission_id():
+            return
+        self._mission_archive_writer.publish_event(
+            event_type="runtime_config_snapshot",
+            source="sentry_v2_tab",
+            severity="info",
+            data={
+                "reason": str(reason or "runtime_update"),
+                "state": str(getattr(self.engine.state, "name", "PAUSED") if self.engine is not None else "PAUSED"),
+                "active_profile": str(getattr(self, "_active_master_profile_name", "") or ""),
+                "detection_mode": int(getattr(self.config.detection_mode, "detection_mode", 0) or 0),
+                "yolo_model_name": str(getattr(self.config.detection_mode, "yolo_model_name", "") or ""),
+            },
+            config_snapshot=self._mission_archive_config_snapshot(),
+            ensure_mission=False,
+        )
+
+    def _on_engine_mission_event(self, event_type: str, payload: Dict[str, object]) -> None:
+        event_name = str(event_type or "").strip() or "engine_event"
+        data = dict(payload or {})
+
+        if event_name == "engine_state_transition":
+            from_state = str(data.get("from_state", "") or "")
+            to_state = str(data.get("to_state", "") or "")
+            if from_state == "PAUSED" and to_state != "PAUSED":
+                self._mission_archive_start_if_needed(reason="engine_started")
+
+        mission_id = self._mission_archive_writer.active_mission_id()
+        if not mission_id:
+            if event_name != "engine_state_transition":
+                mission_id = self._mission_archive_start_if_needed(reason="implicit_engine_event")
+            else:
+                mission_id = self._mission_archive_writer.active_mission_id()
+
+        media_refs: List[str] = []
+        should_capture = event_name in {"engagement_telemetry", "planner_selection"}
+        if should_capture and mission_id:
+            bbox_tuple: Optional[Tuple[int, int, int, int]] = None
+            bbox_obj = data.get("bbox")
+            if isinstance(bbox_obj, list) and len(bbox_obj) == 4:
+                try:
+                    bbox_tuple = (int(bbox_obj[0]), int(bbox_obj[1]), int(bbox_obj[2]), int(bbox_obj[3]))
+                except Exception:
+                    bbox_tuple = None
+
+            media = self._snapshot_capture_service.request_capture(
+                mission_id=mission_id,
+                event_type=event_name,
+                track_id=int(data.get("tracker_id", -1) or -1),
+                bbox=bbox_tuple,
+                timestamp=float(data.get("timestamp", time.time()) or time.time()),
+            )
+            if media is not None:
+                rel_path = str(media.get("rel_path") or "").strip()
+                if rel_path:
+                    media_refs.append(rel_path)
+
+        self._mission_archive_writer.publish_event(
+            event_type=event_name,
+            source="sentry_v2_engine",
+            severity="info",
+            data=data,
+            media_refs=media_refs,
+            occurred_at=float(data.get("timestamp", time.time()) or time.time()),
+            ensure_mission=(event_name != "engine_state_transition"),
+        )
+
+        if event_name == "engine_state_transition":
+            from_state = str(data.get("from_state", "") or "")
+            to_state = str(data.get("to_state", "") or "")
+            if to_state == "PAUSED" and from_state != "PAUSED":
+                self._mission_archive_end_if_active(reason="engine_paused")
+
     def _on_engine_state_change(self, old: SentryV2State, new: SentryV2State) -> None:
         self._lbl_state.setText(f"State: {new.name}")
         self._log(f"State: {old.name} -> {new.name}")
@@ -13474,43 +13729,90 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._maybe_speak_autotracking_status_report(force_state_report=True)
 
     def _log_tracking_pipeline_diagnostics(self, detections: List[DetectedObject], now: float) -> None:
-        person_visible = [det for det in detections if str(getattr(det, "class_name", "")).strip().lower() == "person"]
-        diagnostics = list(getattr(self.engine, "last_filter_diagnostics", []) or [])
-        person_decisions = [
-            decision for decision in diagnostics
-            if str(getattr(decision, "class_name", "")).strip().lower() == "person"
+        configured_classes = [
+            str(item).strip().lower()
+            for item in list(getattr(self.config.target_filter, "allowed_classes", []) or [])
+            if str(item).strip()
         ]
-        person_qualified = [decision for decision in person_decisions if bool(getattr(decision, "passed", False))]
+        active_classes: List[str] = []
+        for name in configured_classes:
+            if name not in active_classes:
+                active_classes.append(name)
+        if not active_classes:
+            for det in detections:
+                cls = str(getattr(det, "class_name", "")).strip().lower()
+                if cls and cls not in active_classes:
+                    active_classes.append(cls)
+
+        diagnostics = list(getattr(self.engine, "last_filter_diagnostics", []) or [])
+
+        def _class_selected(class_name: str) -> bool:
+            if not active_classes:
+                return True
+            return class_name in active_classes
+
+        visible_filtered = [
+            det
+            for det in detections
+            if _class_selected(str(getattr(det, "class_name", "")).strip().lower())
+        ]
+        decisions_filtered = [
+            decision
+            for decision in diagnostics
+            if _class_selected(str(getattr(decision, "class_name", "")).strip().lower())
+        ]
+        qualified_filtered = [decision for decision in decisions_filtered if bool(getattr(decision, "passed", False))]
+
         active_order = getattr(self.engine, "active_order", None)
         active_det = getattr(getattr(active_order, "target", None), "det", None)
-        engaged_person = bool(active_det is not None and str(getattr(active_det, "class_name", "")).strip().lower() == "person")
+        active_class = str(getattr(active_det, "class_name", "")).strip().lower() if active_det is not None else ""
+        engaged_target = bool(active_det is not None and _class_selected(active_class))
 
-        if engaged_person:
+        if engaged_target:
             stage = "engaged"
-        elif person_qualified:
+        elif qualified_filtered:
             stage = "qualified"
-        elif person_visible:
+        elif visible_filtered:
             stage = "visible_filtered"
         else:
             stage = "idle"
 
-        lead_visible = max(person_visible, key=lambda det: float(getattr(det, "confidence", 0.0)), default=None)
-        lead_decision = max(person_decisions, key=lambda decision: float(getattr(decision, "confidence", 0.0)), default=None)
+        lead_visible = max(visible_filtered, key=lambda det: float(getattr(det, "confidence", 0.0)), default=None)
+        lead_decision = max(decisions_filtered, key=lambda decision: float(getattr(decision, "confidence", 0.0)), default=None)
         lead_track_id = int(getattr(lead_decision, "track_id", getattr(lead_visible, "track_id", -1)))
         lead_conf = float(getattr(lead_decision, "confidence", getattr(lead_visible, "confidence", 0.0)) or 0.0)
         lead_reason = str(getattr(lead_decision, "reason", "")) if lead_decision is not None else ""
         lead_detail = str(getattr(lead_decision, "detail", "")) if lead_decision is not None else ""
         lead_hits = int(getattr(lead_decision, "confirm_hits", 0) or 0) if lead_decision is not None else 0
         lead_required = int(getattr(lead_decision, "confirm_required", 1) or 1) if lead_decision is not None else 1
-        engaged_track_id = int(getattr(active_det, "track_id", -1) or -1) if engaged_person else -1
+        engaged_track_id = int(getattr(active_det, "track_id", -1) or -1) if engaged_target else -1
+
+        visible_counts: Dict[str, int] = {name: 0 for name in active_classes}
+        qualified_counts: Dict[str, int] = {name: 0 for name in active_classes}
+        engaged_counts: Dict[str, int] = {name: 0 for name in active_classes}
+
+        for det in visible_filtered:
+            cls = str(getattr(det, "class_name", "")).strip().lower()
+            visible_counts[cls] = visible_counts.get(cls, 0) + 1
+        for decision in qualified_filtered:
+            cls = str(getattr(decision, "class_name", "")).strip().lower()
+            qualified_counts[cls] = qualified_counts.get(cls, 0) + 1
+        if engaged_target and active_class:
+            engaged_counts[active_class] = engaged_counts.get(active_class, 0) + 1
+
+        classes_text = ",".join(active_classes) if active_classes else "any"
+        visible_text = ",".join(f"{name}:{visible_counts.get(name, 0)}" for name in active_classes) if active_classes else str(len(visible_filtered))
+        qualified_text = ",".join(f"{name}:{qualified_counts.get(name, 0)}" for name in active_classes) if active_classes else str(len(qualified_filtered))
+        engaged_text = ",".join(f"{name}:{engaged_counts.get(name, 0)}" for name in active_classes) if active_classes else str(1 if engaged_target else 0)
 
         state_name = str(getattr(self.engine.state, "name", self.engine.state))
         diag_key = "|".join([
             stage,
             state_name,
-            str(len(person_visible)),
-            str(len(person_qualified)),
-            str(1 if engaged_person else 0),
+            classes_text,
+            visible_text,
+            qualified_text,
+            engaged_text,
             str(lead_track_id),
             lead_reason,
             lead_detail,
@@ -13523,15 +13825,19 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._tracking_diag_last_log_s = now
 
         if stage == "idle":
-            self._log(f"[TRACKDBG] person pipeline: visible=0 qualified=0 engaged=0 state={state_name}")
+            self._log(
+                f"[TRACKDBG] profile pipeline: classes={classes_text} visible={visible_text} "
+                f"qualified={qualified_text} engaged={engaged_text} state={state_name}"
+            )
             return
 
         message = (
-            f"[TRACKDBG] person pipeline: visible={len(person_visible)} qualified={len(person_qualified)} "
-            f"engaged={1 if engaged_person else 0} state={state_name}"
+            f"[TRACKDBG] profile pipeline: classes={classes_text} visible={visible_text} "
+            f"qualified={qualified_text} engaged={engaged_text} state={state_name}"
         )
         if lead_track_id >= 0:
-            message += f" lead_track={lead_track_id} conf={lead_conf:.2f}"
+            lead_class = str(getattr(lead_decision, "class_name", getattr(lead_visible, "class_name", "")) or "")
+            message += f" lead_track={lead_track_id} lead_class={lead_class} conf={lead_conf:.2f}"
         if stage == "visible_filtered" and lead_reason:
             message += f" reason={lead_reason}"
             if lead_detail:
@@ -13539,7 +13845,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         elif stage == "qualified" and lead_decision is not None:
             message += f" reason=qualified ({lead_hits}/{max(1, lead_required)})"
         elif stage == "engaged" and engaged_track_id >= 0:
-            message += f" active_track={engaged_track_id}"
+            message += f" active_track={engaged_track_id} active_class={active_class}"
         self._log(message)
 
     def _emit_comm_pir_event(self, sensor_id: int, timestamp: float) -> None:
@@ -13549,10 +13855,39 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             if not self._closing:
                 self._report_runtime_warning("PIR signal emit failed", exc)
 
+    def _append_pir_trace(self, record: Dict[str, object]) -> None:
+        payload: Dict[str, object] = dict(record or {})
+        payload.setdefault("timestamp", float(time.time()))
+        payload.setdefault("runtime_version", str(SMART_SENTRY_RELEASE_VERSION))
+        payload.setdefault("state", self.engine.get_state_name() if self.engine is not None else "")
+        try:
+            with self._pir_trace_log_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        except Exception as exc:
+            if not self._closing:
+                self._report_runtime_warning("PIR trace write failed", exc)
+
+    def _on_engine_pir_trace(self, payload: Dict[str, object]) -> None:
+        record = dict(payload or {})
+        record.setdefault("source", "engine")
+        self._append_pir_trace(record)
+
     def _emit_comm_transport_log(self, message: str) -> None:
         text = str(message or "").strip()
         if not text:
             return
+        upper = text.upper()
+        if "PIR" in upper:
+            self._append_pir_trace(
+                {
+                    "source": "transport",
+                    "action": "transport_pir_log",
+                    "raw_message": text,
+                    "function": "_emit_comm_transport_log",
+                    "filename": __file__,
+                    "line": 13603,
+                }
+            )
         try:
             self._log_requested.emit(text)
         except Exception as exc:
@@ -13638,6 +13973,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             pass
 
     def _on_comm_pir_event_received(self, sensor_id: int, timestamp: float) -> None:
+        receipt_time = float(time.time())
+        latency_s = max(0.0, receipt_time - float(timestamp))
+        pre_stats = self.engine.get_engagement_stats() if self.engine is not None else {}
+        queue_before = int(pre_stats.get("pir_queue_length", 0) or 0)
+        state_before = str(pre_stats.get("state", "") or "")
+        planner_before = str(pre_stats.get("engage_phase", "") or "")
         self._pir_last_event_sensor = int(sensor_id)
         self._pir_last_event_time_s = float(timestamp)
         self._pir_event_count += 1
@@ -13647,7 +13988,66 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             and engine_state != SentryV2State.PAUSED
             and bool(getattr(self.config.pir_guard, "pir_enabled", False))
         )
+        self._append_pir_trace(
+            {
+                "source": "tab",
+                "action": "pir_event_received_in_tab",
+                "sensor_id": int(sensor_id),
+                "sensor_timestamp": float(timestamp),
+                "receipt_timestamp": receipt_time,
+                "transport_latency_s": float(latency_s),
+                "queue_before": queue_before,
+                "state_before": state_before,
+                "planner_before": planner_before,
+                "pir_allowed_to_trigger_search": bool(pir_runtime_active),
+                "function": "_on_comm_pir_event_received",
+                "filename": __file__,
+                "line": 13692,
+            }
+        )
         self.engine.on_pir_sensor_fired(int(sensor_id), float(timestamp))
+        post_stats = self.engine.get_engagement_stats() if self.engine is not None else {}
+        queue_after = int(post_stats.get("pir_queue_length", 0) or 0)
+        state_after = str(post_stats.get("state", "") or "")
+        planner_after = str(post_stats.get("engage_phase", "") or "")
+        pir_note_after = str(post_stats.get("pir_note", "") or "")
+        decision = "accepted"
+        reason = "runtime_active"
+        if not pir_runtime_active:
+            if engine_state == SentryV2State.PAUSED:
+                decision = "ignored"
+                reason = "paused"
+            elif not bool(getattr(self.config.pir_guard, "pir_enabled", False)):
+                decision = "ignored"
+                reason = "pir_disabled"
+            else:
+                decision = "queued"
+                reason = "state_gate"
+        elif state_before == "ENGAGING":
+            decision = "queued"
+            reason = "engaging_state"
+        elif queue_after > 0 and state_after == state_before:
+            decision = "queued"
+            reason = "awaiting_cue_or_active_processing"
+        self._append_pir_trace(
+            {
+                "source": "tab",
+                "action": "pir_event_post_engine",
+                "sensor_id": int(sensor_id),
+                "queue_before": queue_before,
+                "queue_after": queue_after,
+                "state_before": state_before,
+                "state_after": state_after,
+                "planner_before": planner_before,
+                "planner_after": planner_after,
+                "decision": decision,
+                "reason": reason,
+                "pir_note": pir_note_after,
+                "function": "_on_comm_pir_event_received",
+                "filename": __file__,
+                "line": 13701,
+            }
+        )
         if pir_runtime_active:
             self._sound_engine.note_pir_event(sensor_id)
         if hasattr(self, "_lbl_pir_status"):
@@ -18233,6 +18633,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._sync_legacy_settings_copy()
             self._save_prompted_target_library()
             self._save_face_identity_library()
+            self._publish_mission_runtime_config_snapshot(reason="settings_saved")
             self._log(f"Settings saved: {self.config.config_path}")
         except Exception as e:
             self._log(f"Save error: {e}")
@@ -19420,6 +19821,18 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 self._log(f"Opened runtime export folder: {self._portable_path_string(folder_path)}")
         except Exception as exc:
             self._log(f"Open export folder failed: {exc}")
+
+    def _open_mission_review_browser(self) -> None:
+        try:
+            if getattr(self, "_mission_browser_window", None) is None:
+                repo = MissionRepository(archive_root=self._mission_archive_writer.base_dir)
+                self._mission_browser_window = MissionBrowserWindow(repo=repo)
+                self._mission_browser_window.setAttribute(Qt.WA_DeleteOnClose, True)
+            self._mission_browser_window.show()
+            self._mission_browser_window.raise_()
+            self._mission_browser_window.activateWindow()
+        except Exception as exc:
+            self._log(f"Mission review open failed: {exc}")
 
     def _export_serial_log(self) -> None:
         try:
@@ -25108,6 +25521,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._apply_servo_time_preset(preset["servo"])
             self._apply_guard_settings(dict(preset.get("guard", {}) or {}))
             self._apply_face_recognition_profile_settings(dict(preset.get("face_recognition", {}) or {}))
+            motion_policy = dict(preset.get("motion_policy", {}) or {})
+            if motion_policy:
+                for key, value in motion_policy.items():
+                    setattr(self.config.engagement, key, value)
             self._active_master_profile_name = preset_name
             self._set_master_profile_label(preset_name)
             self._set_custom_master_profile_edit_target(
@@ -25365,11 +25782,17 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             "use_ml_model": bool(payload["threat"].get("use_ml_model", False)),
             "ml_model_path": str(payload["threat"].get("ml_model_path", "") or ""),
         }
+        engagement_settings = _merge_motion_policy_settings(
+            dict(payload["engagement"]),
+            slug,
+            label=display_name,
+            filter_settings=dict(payload.get("filter", {}) or {}),
+        )
         ENGAGEMENT_PRESETS[engagement_key] = {
             "label": f"Custom Engage: {display_name}",
             "description": "User-saved engagement snapshot.",
             "tooltip_key": "",
-            "settings": dict(payload["engagement"]),
+            "settings": engagement_settings,
         }
         BUS_SERVO_TIME_PRESETS[servo_key] = {
             "label": f"Custom Servo: {display_name}",
@@ -25389,6 +25812,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             "servo": servo_key,
             "guard": dict(payload.get("guard", {})),
             "face_recognition": dict(payload.get("face_recognition", {}) or {}),
+            "motion_policy": _resolve_motion_policy_settings(
+                slug,
+                label=display_name,
+                filter_settings=dict(payload.get("filter", {}) or {}),
+            ),
         }
         return master_key
 
@@ -25535,7 +25963,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                     "detection": detection,
                     "filter": filter_settings,
                     "threat": threat,
-                    "engagement": engagement,
+                    "engagement": _merge_motion_policy_settings(
+                        engagement,
+                        str(slug),
+                        label=display_name,
+                        filter_settings=filter_settings,
+                    ),
                     "servo_move_time_ms": int(servo_move_time_ms),
                     "guard": dict(entry.get("guard", {}) or {}),
                     "face_recognition": dict(entry.get("face_recognition", {}) or {}),
@@ -26046,6 +26479,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self.overlay.update_config(self.config)
             self._sync_detector_params()
             self._sync_acoustic_guard_runtime()
+            self._publish_mission_runtime_config_snapshot(reason="runtime_apply")
         finally:
             self._runtime_apply_in_progress = False
 

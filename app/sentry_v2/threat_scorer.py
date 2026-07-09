@@ -47,6 +47,21 @@ class TrackedTarget:
     history_samples: int = 0
     heading_stability: float = 0.0
 
+
+@dataclass
+class MotionHistorySnapshot:
+    """Recent motion metrics derived from the scorer's track history."""
+    track_id: int
+    window_s: float
+    sample_count: int
+    recent_motion_distance_px: float
+    average_velocity_px_s: float
+    motion_confidence: float
+    stationary_duration_s: float
+    last_motion_seen_s: float
+    first_seen_s: float
+    recent_motion_detected: bool
+
     @property
     def id(self) -> int:
         """Compatibility alias for older call sites that still expect target.id."""
@@ -117,6 +132,81 @@ class ThreatScorer:
         targets.sort(key=lambda t: t.threat_score, reverse=True)
         self._prune_stale(now, max_age=5.0)
         return targets
+
+    def get_motion_history_snapshot(
+        self,
+        det: DetectedObject,
+        timestamp: Optional[float] = None,
+        *,
+        window_s: float = 1.25,
+    ) -> MotionHistorySnapshot:
+        """Return recent motion metrics for a detection using scorer history."""
+        now = timestamp or time.time()
+        tid = int(det.track_id)
+        history = list(self._history.get(tid, []) or [])
+        first_seen = float(self._first_seen.get(tid, now))
+        if not history:
+            return MotionHistorySnapshot(
+                track_id=tid,
+                window_s=float(window_s),
+                sample_count=0,
+                recent_motion_distance_px=0.0,
+                average_velocity_px_s=0.0,
+                motion_confidence=0.0,
+                stationary_duration_s=max(0.0, now - first_seen),
+                last_motion_seen_s=first_seen,
+                first_seen_s=first_seen,
+                recent_motion_detected=False,
+            )
+
+        window = self._recent_motion_window(history, max_span_s=max(0.10, float(window_s)))
+        frame_w = max(1.0, float(getattr(det, "frame_width", 640) or 640))
+        frame_h = max(1.0, float(getattr(det, "frame_height", 480) or 480))
+        segment_distances_px: List[float] = []
+        segment_speeds_px_s: List[float] = []
+        last_motion_seen = first_seen
+        motion_threshold_px_s = max(1.5, min(frame_w, frame_h) * 0.01)
+
+        for (t0, x0, y0), (t1, x1, y1) in zip(window, window[1:]):
+            dt = max(0.001, float(t1 - t0))
+            dx_px = (float(x1) - float(x0)) * frame_w
+            dy_px = (float(y1) - float(y0)) * frame_h
+            distance_px = math.hypot(dx_px, dy_px)
+            speed_px_s = distance_px / dt
+            segment_distances_px.append(distance_px)
+            segment_speeds_px_s.append(speed_px_s)
+            if speed_px_s >= motion_threshold_px_s:
+                last_motion_seen = float(t1)
+
+        recent_motion_distance_px = float(sum(segment_distances_px))
+        window_dt = max(0.001, float(window[-1][0] - window[0][0]))
+        average_velocity_px_s = recent_motion_distance_px / window_dt
+
+        bbox_diag_px = math.hypot(float(det.bbox[2]), float(det.bbox[3]))
+        distance_scale = max(10.0, bbox_diag_px * 0.22)
+        velocity_scale = max(6.0, bbox_diag_px * 0.10)
+        distance_score = max(0.0, min(1.0, recent_motion_distance_px / distance_scale))
+        velocity_score = max(0.0, min(1.0, average_velocity_px_s / velocity_scale))
+        sample_score = max(0.0, min(1.0, max(0, len(window) - 1) / 4.0))
+        motion_confidence = max(0.0, min(1.0, (0.45 * distance_score) + (0.40 * velocity_score) + (0.15 * sample_score)))
+        stationary_duration_s = max(0.0, now - float(last_motion_seen))
+
+        return MotionHistorySnapshot(
+            track_id=tid,
+            window_s=float(window_s),
+            sample_count=int(max(0, len(window) - 1)),
+            recent_motion_distance_px=recent_motion_distance_px,
+            average_velocity_px_s=average_velocity_px_s,
+            motion_confidence=motion_confidence,
+            stationary_duration_s=stationary_duration_s,
+            last_motion_seen_s=float(last_motion_seen),
+            first_seen_s=float(first_seen),
+            recent_motion_detected=bool(
+                recent_motion_distance_px >= distance_scale * 0.35
+                or average_velocity_px_s >= velocity_scale * 0.35
+                or motion_confidence >= 0.45
+            ),
+        )
 
     def update_config(
         self,

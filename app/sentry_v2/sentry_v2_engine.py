@@ -18,18 +18,27 @@ from __future__ import annotations
 
 import random
 import time
+import inspect
 from enum import Enum, auto
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .sentry_v2_config import SentryV2Config
 from .sentry_v2_no_fire_masks import find_blocking_mask
-from .target_filter import DetectedObject, FilterDecision, TargetFilter
+from .target_filter import (
+    DetectedObject,
+    FilterDecision,
+    SHAPE_FILTER_PROFILES,
+    SHAPE_PROFILE_ALIASES,
+    TargetFilter,
+)
 from .threat_scorer import ThreatScorer, TrackedTarget
 from .engagement_planner import EngagementPlanner, EngagementOrder
 from .ml_training_logger import MLTrainingLogger
 from .sentry_v2_pir_manager import SentryV2PIRManager
 from .precision_tuning_logger import PrecisionTuningLogger
 from .autotracking_logger import AutotrackingLogger
+from .engagement_telemetry_logger import EngagementTelemetryLogger
+from .forensic_validation_logger import ForensicValidationLogger
 from .scene_memory import SceneMemory
 
 
@@ -76,6 +85,16 @@ class SentryV2Engine:
         self._planner = EngagementPlanner(config.engagement, config.guard, config.no_fire_masks)
         self._pir_manager = SentryV2PIRManager(config.pir_guard)
         self._scene_memory = SceneMemory()
+        self._engagement_telemetry = EngagementTelemetryLogger()
+        self._forensic_logger = ForensicValidationLogger()
+        self._forensic_overlay_entries: List[Dict[str, Any]] = []
+        self._forensic_track_state: Dict[int, Dict[str, float]] = {}
+        self._motion_policy_state: Dict[int, Dict[str, Any]] = {}
+        self._last_motion_policy_snapshots: Dict[int, Dict[str, Any]] = {}
+        self._last_motion_policy_engageable_ids: List[int] = []
+        self._frame_number: int = 0
+        self._last_update_timestamp: float = 0.0
+        self._last_fire_gate_trace: Dict[str, Any] = {}
 
         # Turret state (tracked by main app, seeded from guard config)
         self.current_pan: float = config.guard.guard_pan
@@ -221,7 +240,10 @@ class SentryV2Engine:
         self._cb_fire: Optional[Callable[[int], None]] = None
         self._cb_move: Optional[Callable[[float, float], None]] = None
         self._cb_state: Optional[Callable[[SentryV2State, SentryV2State], None]] = None
+        self._cb_pir_trace: Optional[Callable[[Dict[str, Any]], None]] = None
+        self._cb_mission_event: Optional[Callable[[str, Dict[str, Any]], None]] = None
         self._motion_enabled: bool = True
+        self._pir_manager.set_trace_callback(self._on_pir_manager_trace)
 
     # ------------------------------------------------------------------ #
     # Callback registration
@@ -233,8 +255,60 @@ class SentryV2Engine:
     def on_move(self, cb: Callable[[float, float], None]) -> None:
         self._cb_move = cb
 
+    def set_pir_trace_callback(self, cb: Optional[Callable[[Dict[str, Any]], None]]) -> None:
+        """Register optional PIR diagnostics callback (non-functional tracing only)."""
+        self._cb_pir_trace = cb
+
+    def _emit_pir_trace(self, action: str, **fields: Any) -> None:
+        callback = self._cb_pir_trace
+        if callback is None:
+            return
+        frame = inspect.currentframe()
+        caller = frame.f_back if frame is not None else None
+        payload: Dict[str, Any] = {
+            "component": "engine",
+            "action": str(action),
+            "timestamp": float(time.time()),
+            "engine_state": str(self.state.name),
+            "planner_state": self._current_planner_state(),
+            "pir_state": self._current_pir_state(),
+            "function": caller.f_code.co_name if caller is not None else "",
+            "filename": __file__,
+            "line": int(caller.f_lineno) if caller is not None else 0,
+        }
+        payload.update(fields)
+        try:
+            callback(payload)
+        except Exception:
+            pass
+
+    def _on_pir_manager_trace(self, payload: Dict[str, Any]) -> None:
+        merged = dict(payload or {})
+        merged.setdefault("engine_state", str(self.state.name))
+        merged.setdefault("planner_state", self._current_planner_state())
+        merged.setdefault("pir_state", self._current_pir_state())
+        callback = self._cb_pir_trace
+        if callback is None:
+            return
+        try:
+            callback(merged)
+        except Exception:
+            pass
+
     def on_state_change(self, cb: Callable[[SentryV2State, SentryV2State], None]) -> None:
         self._cb_state = cb
+
+    def set_mission_event_publisher(self, cb: Optional[Callable[[str, Dict[str, Any]], None]]) -> None:
+        self._cb_mission_event = cb
+
+    def _publish_mission_event(self, event_type: str, payload: Dict[str, Any]) -> None:
+        callback = self._cb_mission_event
+        if callback is None:
+            return
+        try:
+            callback(str(event_type), dict(payload or {}))
+        except Exception as exc:
+            self._report_runtime_warning("Mission archive publish failed", exc)
 
     def _report_runtime_warning(self, context: str, exc: Exception) -> None:
         print(f"[SENTRY_V2_ENGINE] {context}: {exc}", flush=True)
@@ -338,6 +412,7 @@ class SentryV2Engine:
         self._last_fire_veto_reason = ""
         self._last_fire_veto_time = 0.0
         self._return_start = 0.0
+        self._last_fire_gate_trace = {}
         self._reset_loss_recovery_state()
         self._pir_cue_mode = False
         self._pir_cue_sensor_id = -1
@@ -421,6 +496,8 @@ class SentryV2Engine:
     ) -> None:
         """Call once per camera frame with current detections."""
         now = timestamp or time.time()
+        self._frame_number += 1
+        self._last_update_timestamp = now
 
         # Increment frame counter for logging
         if self._log_autotracking:
@@ -450,7 +527,11 @@ class SentryV2Engine:
 
         # 2. Score
         scored = self._scorer.score(qualified, now)
+        engageable_targets, motion_snapshots = self._apply_motion_policy_to_targets(scored, now)
         self.last_targets = scored
+        self._last_motion_policy_snapshots = {int(item.get("track_id", -1)): dict(item) for item in motion_snapshots}
+        self._last_motion_policy_engageable_ids = [int(target.det.track_id) for target in engageable_targets]
+        self._emit_forensic_detection_records(detections, diagnostics, scored, now)
 
         # 2b. Record detections in scene memory for class-prior tracking.
         for _t in scored:
@@ -491,6 +572,397 @@ class SentryV2Engine:
         elif self.state == SentryV2State.RETURNING:
             self._update_returning(now)
 
+    def _forensic_motion_threshold(self) -> float:
+        configured = float(getattr(self.cfg.detection_mode, "motion_gate_threshold", 1.0) or 1.0)
+        return float(max(0.05, configured))
+
+    def _update_forensic_track_state(self, detections: List[DetectedObject], now: float) -> Dict[int, Dict[str, float]]:
+        motion_map: Dict[int, Dict[str, float]] = {}
+        threshold = self._forensic_motion_threshold()
+        for det in detections:
+            track_id = int(det.track_id)
+            cx = float(det.norm_cx)
+            cy = float(det.norm_cy)
+            state = self._forensic_track_state.get(track_id)
+            if state is None:
+                state = {
+                    "first_seen": now,
+                    "last_seen": now,
+                    "last_cx": cx,
+                    "last_cy": cy,
+                    "vx": 0.0,
+                    "vy": 0.0,
+                    "speed": 0.0,
+                }
+            else:
+                dt = max(1e-6, now - float(state.get("last_seen", now)))
+                vx = (cx - float(state.get("last_cx", cx))) / dt
+                vy = (cy - float(state.get("last_cy", cy))) / dt
+                state["vx"] = float(vx)
+                state["vy"] = float(vy)
+                state["speed"] = float((vx * vx + vy * vy) ** 0.5)
+                state["last_seen"] = now
+                state["last_cx"] = cx
+                state["last_cy"] = cy
+            self._forensic_track_state[track_id] = state
+            speed = float(state.get("speed", 0.0) or 0.0)
+            age = max(0.0, now - float(state.get("first_seen", now)))
+            motion_map[track_id] = {
+                "detection_age_s": float(age),
+                "vx": float(state.get("vx", 0.0) or 0.0),
+                "vy": float(state.get("vy", 0.0) or 0.0),
+                "speed": speed,
+                "moving": bool(speed >= threshold),
+                "stationary": bool(speed < threshold),
+            }
+
+        stale_ids = [
+            tid
+            for tid, track_state in self._forensic_track_state.items()
+            if (now - float(track_state.get("last_seen", now))) > 8.0
+        ]
+        for tid in stale_ids:
+            self._forensic_track_state.pop(int(tid), None)
+
+        return motion_map
+
+    def _format_forensic_stage_records(
+        self,
+        det: DetectedObject,
+        decision: Optional[FilterDecision],
+        target: Optional[TrackedTarget],
+        motion_state: Dict[str, float],
+    ) -> List[Dict[str, Any]]:
+        stages = self._build_filter_stage_records(det, decision, target)
+        speed = float(motion_state.get("speed", 0.0) or 0.0)
+        threshold = self._forensic_motion_threshold()
+        policy_state = dict(self._motion_policy_state.get(int(getattr(det, "track_id", -1) or -1), {}) or {})
+        stages.append(
+            {
+                "stage": "motion_filter",
+                "inputs": {
+                    "motion_score": speed,
+                    "vx": float(motion_state.get("vx", 0.0) or 0.0),
+                    "vy": float(motion_state.get("vy", 0.0) or 0.0),
+                    "motion_policy_state": str(policy_state.get("state", "TRACKING") or "TRACKING"),
+                    "recent_motion_distance_px": float(policy_state.get("recent_motion_distance_px", 0.0) or 0.0),
+                    "average_velocity_px_s": float(policy_state.get("average_velocity_px_s", 0.0) or 0.0),
+                    "motion_confidence": float(policy_state.get("motion_confidence", 0.0) or 0.0),
+                    "stationary_duration_s": float(policy_state.get("stationary_duration_s", 0.0) or 0.0),
+                },
+                "threshold": {
+                    "moving_threshold": threshold,
+                    "configured_motion_gate_threshold": float(
+                        getattr(self.cfg.detection_mode, "motion_gate_threshold", threshold) or threshold
+                    ),
+                    "motion_recent_distance_px": float(getattr(self.cfg.engagement, "motion_recent_distance_px", 18.0) or 18.0),
+                    "motion_average_velocity_px_s": float(getattr(self.cfg.engagement, "motion_average_velocity_px_s", 10.0) or 10.0),
+                    "motion_confidence_min": float(getattr(self.cfg.engagement, "motion_confidence_min", 0.35) or 0.35),
+                    "motion_stationary_timeout_s": float(getattr(self.cfg.engagement, "motion_stationary_timeout_s", 4.0) or 4.0),
+                },
+                "pass": bool(policy_state.get("motion_allowed", True)),
+                "reason": str(policy_state.get("suppression_reason", "motion policy evaluated") or "motion policy evaluated"),
+            }
+        )
+        stages.append(
+            {
+                "stage": "hold_time",
+                "inputs": {
+                    "trigger_hold_start": float(getattr(self, "_trigger_hold_start", 0.0) or 0.0),
+                    "trigger_gate_active": bool(getattr(self, "_trigger_gate_active", False)),
+                },
+                "threshold": {
+                    "required_hold_s": float(getattr(self.cfg.engagement, "fire_trigger_hold_time", 0.0) or 0.0),
+                },
+                "pass": bool(target is not None),
+                "reason": "evaluated during fire authorization path",
+            }
+        )
+        stages.append(
+            {
+                "stage": "target_centering",
+                "inputs": {
+                    "last_err_pan_deg": float(getattr(self, "_last_err_pan_deg", 0.0) or 0.0),
+                    "last_err_tilt_deg": float(getattr(self, "_last_err_tilt_deg", 0.0) or 0.0),
+                },
+                "threshold": {
+                    "pan_tolerance": float(getattr(self.cfg.engagement, "fire_trigger_enter_pan_tolerance", 0.0) or 0.0),
+                    "tilt_tolerance": float(getattr(self.cfg.engagement, "fire_trigger_enter_tilt_tolerance", 0.0) or 0.0),
+                },
+                "pass": bool(target is not None),
+                "reason": "evaluated during engage/fire phases",
+            }
+        )
+        stages.append(
+            {
+                "stage": "planner_qualification",
+                "inputs": {
+                    "threat_score": float(getattr(target, "threat_score", 0.0) or 0.0) if target is not None else 0.0,
+                },
+                "threshold": {
+                    "min_threat_score": float(getattr(self.cfg.engagement, "min_threat_score", 0.0) or 0.0),
+                },
+                "pass": bool(target is not None and float(getattr(target, "threat_score", 0.0) or 0.0) >= float(getattr(self.cfg.engagement, "min_threat_score", 0.0) or 0.0)),
+                "reason": "target included in scored candidate set" if target is not None else "target not scored/qualified",
+            }
+        )
+        stages.append(
+            {
+                "stage": "safety_gates",
+                "inputs": self._current_safety_state(time.time()),
+                "threshold": {
+                    "auto_trigger_enabled": bool(getattr(self.cfg.engagement, "auto_trigger_enabled", False)),
+                },
+                "pass": bool(target is not None),
+                "reason": "evaluated per fire attempt",
+            }
+        )
+        stages.append(
+            {
+                "stage": "fire_authorization",
+                "inputs": {
+                    "state": str(self.state.name),
+                    "engage_phase": str(getattr(self, "_engage_phase", "") or ""),
+                },
+                "threshold": {
+                    "fire_requires_lock": bool(getattr(self.cfg.engagement, "fire_requires_lock", False)),
+                },
+                "pass": bool(target is not None),
+                "reason": "evaluated inside engagement update path",
+            }
+        )
+        return stages
+
+    def _emit_forensic_detection_records(
+        self,
+        detections: List[DetectedObject],
+        diagnostics: List[FilterDecision],
+        scored: List[TrackedTarget],
+        now: float,
+    ) -> None:
+        decision_by_track: Dict[int, FilterDecision] = {
+            int(dec.track_id): dec for dec in diagnostics
+        }
+        target_by_track: Dict[int, TrackedTarget] = {
+            int(target.det.track_id): target for target in scored
+        }
+        threshold = float(getattr(self.cfg.engagement, "min_threat_score", 0.0) or 0.0)
+        selected_track_ids = {
+            int(order.target.det.track_id)
+            for order in list(getattr(self, "_queue", []) or [])
+        }
+        active_track_id = int(getattr(getattr(self, "active_order", None), "target", None).det.track_id) if getattr(self, "active_order", None) is not None else -1
+        motion_map = self._update_forensic_track_state(detections, now)
+        overlay_entries: List[Dict[str, Any]] = []
+
+        for det in detections:
+            track_id = int(det.track_id)
+            decision = decision_by_track.get(track_id)
+            target = target_by_track.get(track_id)
+            policy_state = dict(self._motion_policy_state.get(track_id, {}) or {})
+            motion_state = motion_map.get(track_id, {
+                "detection_age_s": 0.0,
+                "vx": 0.0,
+                "vy": 0.0,
+                "speed": 0.0,
+                "moving": False,
+                "stationary": True,
+            })
+            shape_info = self._shape_profile_telemetry(det)
+            inside_zone = bool(
+                self.cfg.target_filter.engagement_zone[0] <= det.norm_cx <= self.cfg.target_filter.engagement_zone[2]
+                and self.cfg.target_filter.engagement_zone[1] <= det.norm_cy <= self.cfg.target_filter.engagement_zone[3]
+            )
+            semantic_hits = int(getattr(decision, "confirm_hits", 0) or 0) if decision is not None else 0
+            semantic_required = int(getattr(decision, "confirm_required", 1) or 1) if decision is not None else 1
+
+            if track_id == active_track_id or track_id in selected_track_ids:
+                qualification_status = "qualified"
+                rejection_reason = ""
+            elif decision is not None and not bool(decision.passed):
+                qualification_status = "rejected"
+                rejection_reason = str(decision.reason)
+            elif target is not None and float(getattr(target, "threat_score", 0.0) or 0.0) < threshold:
+                qualification_status = "candidate"
+                rejection_reason = "below_threat_threshold"
+            elif policy_state and str(policy_state.get("state", "TRACKING") or "TRACKING") == "TRACK_ONLY":
+                qualification_status = "track_only"
+                rejection_reason = str(policy_state.get("suppression_reason", "motion policy suppressed") or "motion policy suppressed")
+            elif target is not None:
+                qualification_status = "candidate"
+                rejection_reason = ""
+            else:
+                qualification_status = "ignored"
+                rejection_reason = "not_scored"
+
+            stages = self._format_forensic_stage_records(det, decision, target, motion_state)
+            record: Dict[str, Any] = {
+                "event_type": "detection_evaluation",
+                "frame_number": int(self._frame_number),
+                "timestamp": float(now),
+                "state": str(self.state.name),
+                "planner_state": self._current_planner_state(),
+                "pir_state": self._current_pir_state(),
+                "tracker_id": track_id,
+                "yolo_class": str(det.class_name),
+                "yolo_confidence": float(det.confidence),
+                "bbox": [int(det.bbox[0]), int(det.bbox[1]), int(det.bbox[2]), int(det.bbox[3])],
+                "detection_age_s": float(motion_state.get("detection_age_s", 0.0) or 0.0),
+                "motion_score": float(motion_state.get("speed", 0.0) or 0.0),
+                "motion_policy_state": str(policy_state.get("state", "TRACKING") or "TRACKING"),
+                "motion_policy": {
+                    "state": str(policy_state.get("state", "TRACKING") or "TRACKING"),
+                    "previous_state": str(policy_state.get("previous_state", "") or ""),
+                    "suppression_reason": str(policy_state.get("suppression_reason", "") or ""),
+                    "suppression_timestamp": float(policy_state.get("suppression_timestamp", 0.0) or 0.0),
+                    "suppression_expiry": float(policy_state.get("suppression_expiry", 0.0) or 0.0),
+                    "next_eligible_evaluation_time": float(policy_state.get("next_eligible_evaluation_time", 0.0) or 0.0),
+                    "recent_motion_distance_px": float(policy_state.get("recent_motion_distance_px", 0.0) or 0.0),
+                    "average_velocity_px_s": float(policy_state.get("average_velocity_px_s", 0.0) or 0.0),
+                    "motion_confidence": float(policy_state.get("motion_confidence", 0.0) or 0.0),
+                    "stationary_duration_s": float(policy_state.get("stationary_duration_s", 0.0) or 0.0),
+                    "motion_window_s": float(policy_state.get("motion_window_s", self._motion_policy_window_s()) or self._motion_policy_window_s()),
+                    "motion_allowed": bool(policy_state.get("motion_allowed", True)),
+                    "profile_mode": str(policy_state.get("profile_mode", self._motion_policy_mode()) or self._motion_policy_mode()),
+                    "history": list(policy_state.get("history", []) or []),
+                },
+                "shape_score": float(shape_info.get("shape_score", 0.0) or 0.0),
+                "semantic_confirmation": {
+                    "count": semantic_hits,
+                    "required": semantic_required,
+                },
+                "threat_score": float(getattr(target, "threat_score", 0.0) or 0.0) if target is not None else 0.0,
+                "target_velocity": {
+                    "vx": float(motion_state.get("vx", 0.0) or 0.0),
+                    "vy": float(motion_state.get("vy", 0.0) or 0.0),
+                    "speed": float(motion_state.get("speed", 0.0) or 0.0),
+                },
+                "is_moving": bool(motion_state.get("moving", False)),
+                "is_stationary": bool(motion_state.get("stationary", True)),
+                "inside_engagement_zone": bool(inside_zone),
+                "qualification_status": str(qualification_status),
+                "rejection_reason": str(rejection_reason),
+                "filter_stages": stages,
+            }
+            self._forensic_logger.append(record)
+            self._publish_mission_event("forensic_detection_evaluation", record)
+            overlay_entries.append(
+                {
+                    "track_id": track_id,
+                    "class_name": str(det.class_name),
+                    "confidence": float(det.confidence),
+                    "bbox": [int(det.bbox[0]), int(det.bbox[1]), int(det.bbox[2]), int(det.bbox[3])],
+                    "motion_score": float(motion_state.get("speed", 0.0) or 0.0),
+                    "motion_policy_state": str(policy_state.get("state", "TRACKING") or "TRACKING"),
+                    "motion_policy_reason": str(policy_state.get("suppression_reason", "") or ""),
+                    "shape_score": float(shape_info.get("shape_score", 0.0) or 0.0),
+                    "threat_score": float(getattr(target, "threat_score", 0.0) or 0.0) if target is not None else 0.0,
+                    "status": str(qualification_status),
+                    "rejection_reason": str(rejection_reason),
+                    "planner_state": str(getattr(self, "_engage_phase", "") or ""),
+                }
+            )
+        self._forensic_overlay_entries = overlay_entries
+
+    def get_forensic_overlay_entries(self) -> List[Dict[str, Any]]:
+        return list(self._forensic_overlay_entries)
+
+    def _log_planner_selection_event(
+        self,
+        *,
+        now: float,
+        context: str,
+        input_targets: List[TrackedTarget],
+        queue: List[EngagementOrder],
+    ) -> None:
+        ranking = sorted(
+            [
+                {
+                    "track_id": int(t.det.track_id),
+                    "class_name": str(t.det.class_name),
+                    "threat_score": float(t.threat_score),
+                    "selected": bool(any(int(o.target.det.track_id) == int(t.det.track_id) for o in queue)),
+                }
+                for t in input_targets
+            ],
+            key=lambda item: float(item.get("threat_score", 0.0)),
+            reverse=True,
+        )
+
+        selection_chain: List[Dict[str, Any]] = []
+        for rank_item in ranking:
+            tid = int(rank_item["track_id"])
+            queue_match = next((o for o in queue if int(o.target.det.track_id) == tid), None)
+            decision = self._find_filter_decision_for_track(tid)
+            if queue_match is not None:
+                reason = f"selected rank={int(queue_match.rank)}"
+            elif decision is not None and not bool(decision.passed):
+                reason = f"rejected filter={decision.reason}"
+            elif float(rank_item["threat_score"]) < float(getattr(self.cfg.engagement, "min_threat_score", 0.0) or 0.0):
+                reason = "below planner threat threshold"
+            else:
+                reason = "not selected by queue constraints or slew optimization"
+            selection_chain.append(
+                {
+                    "track_id": tid,
+                    "class_name": str(rank_item["class_name"]),
+                    "threat_score": float(rank_item["threat_score"]),
+                    "selected": bool(queue_match is not None),
+                    "selection_reason": reason,
+                }
+            )
+
+        selected_ids = [int(order.target.det.track_id) for order in queue]
+        first_selected_threat = float(queue[0].target.threat_score) if queue else 0.0
+        highest_candidate_threat = float(ranking[0]["threat_score"]) if ranking else 0.0
+        higher_candidate_exists = bool(highest_candidate_threat > first_selected_threat + 1e-9)
+
+        self._forensic_logger.append(
+            {
+                "event_type": "planner_selection",
+                "frame_number": int(self._frame_number),
+                "timestamp": float(now),
+                "context": str(context),
+                "selected_track_ids": selected_ids,
+                "selected_order": [
+                    {
+                        "track_id": int(order.target.det.track_id),
+                        "class_name": str(order.target.det.class_name),
+                        "threat_score": float(order.target.threat_score),
+                        "rank": int(order.rank),
+                        "planned_pan": float(order.pan),
+                        "planned_tilt": float(order.tilt),
+                    }
+                    for order in queue
+                ],
+                "ranking": selection_chain,
+                "higher_scored_candidate_than_first_selected": bool(higher_candidate_exists),
+                "planner_state": self._current_planner_state(),
+            }
+        )
+        self._publish_mission_event(
+            "planner_selection",
+            {
+                "frame_number": int(self._frame_number),
+                "timestamp": float(now),
+                "context": str(context),
+                "selected_track_ids": selected_ids,
+                "selected_order": [
+                    {
+                        "track_id": int(order.target.det.track_id),
+                        "class_name": str(order.target.det.class_name),
+                        "threat_score": float(order.target.threat_score),
+                        "rank": int(order.rank),
+                        "planned_pan": float(order.pan),
+                        "planned_tilt": float(order.tilt),
+                    }
+                    for order in queue
+                ],
+                "ranking": selection_chain,
+                "planner_state": self._current_planner_state(),
+            },
+        )
+
     # ------------------------------------------------------------------ #
     # PIR event interface (called by comm when sensor data arrives)
     # ------------------------------------------------------------------ #
@@ -498,23 +970,51 @@ class SentryV2Engine:
     def on_pir_sensor_fired(self, sensor_id: int, timestamp: Optional[float] = None) -> None:
         """Called when a PIR sensor event is received from ESP32."""
         now = timestamp or time.time()
+        queue_before = int(self._pir_manager.peek_queue_count())
+        self._emit_pir_trace(
+            "pir_event_received",
+            sensor_id=int(sensor_id),
+            event_timestamp=float(now),
+            queue_before=queue_before,
+            pir_can_trigger_search=bool(self.state != SentryV2State.PAUSED and self.cfg.pir_guard.pir_enabled),
+        )
 
         # Ignore stale/pre-enable PIR hits. Queuing them while PAUSED causes the
         # first enable cycle to consume old events and lunge toward a sensor cue
         # that the operator did not request.
         if self.state == SentryV2State.PAUSED or not self.cfg.pir_guard.pir_enabled:
+            reason = "paused" if self.state == SentryV2State.PAUSED else "pir_disabled"
+            self._emit_pir_trace("pir_event_blocked", sensor_id=int(sensor_id), reason=reason)
             return
 
         self._pir_manager.on_pir_event(sensor_id, now)
+        queue_after_enqueue = int(self._pir_manager.peek_queue_count())
+        self._emit_pir_trace(
+            "pir_event_processed_by_manager",
+            sensor_id=int(sensor_id),
+            queue_before=queue_before,
+            queue_after=queue_after_enqueue,
+        )
 
         # PIR is a blind-spot cueing input, not a higher-priority override than a
         # camera-confirmed active engagement. Queue the PIR event immediately, but
         # only convert it into motion outside live ENGAGING tracking.
         if self.state == SentryV2State.ENGAGING:
+            self._emit_pir_trace(
+                "pir_event_deferred_engaging",
+                sensor_id=int(sensor_id),
+                reason="engaging_state_blocks_immediate_cue",
+                queue_length=int(self._pir_manager.peek_queue_count()),
+            )
             return
 
         cue = self._pir_manager.get_next_cue(now)
         if cue is None:
+            self._emit_pir_trace(
+                "pir_event_no_cue_available",
+                sensor_id=int(sensor_id),
+                queue_length=int(self._pir_manager.peek_queue_count()),
+            )
             return
 
         if self.state == SentryV2State.RETURNING:
@@ -538,6 +1038,13 @@ class SentryV2Engine:
         self._set_pir_note(
             f"PIR cue S{int(cue.sensor_id) + 1} -> pan {float(cue.cue_pan):.1f} tilt {float(cue.cue_tilt):.1f}",
             when=now,
+        )
+        self._emit_pir_trace(
+            "pir_cue_started",
+            sensor_id=int(cue.sensor_id),
+            cue_pan=float(cue.cue_pan),
+            cue_tilt=float(cue.cue_tilt),
+            queue_length=int(self._pir_manager.peek_queue_count()),
         )
         self._move_turret(self._pir_cue_pan, self._pir_cue_tilt)
 
@@ -851,7 +1358,8 @@ class SentryV2Engine:
         If scoreable threats exist above threshold, plan engagement.
         Also handles PIR sensor cues for blind-spot detection.
         """
-        targets_for_engagement = self._apply_stationary_release_protocol(targets, now)
+        motion_policy_ids = set(int(track_id) for track_id in list(getattr(self, "_last_motion_policy_engageable_ids", []) or []))
+        targets_for_engagement = [target for target in self._apply_stationary_release_protocol(targets, now) if int(target.det.track_id) in motion_policy_ids]
 
         # Check for threats first — engagement always takes priority
         if targets_for_engagement:
@@ -865,6 +1373,12 @@ class SentryV2Engine:
                 )
                 queue = self._planner.plan(targets_for_engagement, self.current_pan, self.current_tilt)
                 if queue:
+                    self._log_planner_selection_event(
+                        now=now,
+                        context="guarding_primary",
+                        input_targets=list(targets_for_engagement),
+                        queue=list(queue),
+                    )
                     # Log engagement promotion for primary target
                     if self._log_autotracking and queue:
                         first_target = queue[0].target
@@ -910,6 +1424,13 @@ class SentryV2Engine:
                 self._set_pir_note(
                     f"PIR cue S{int(cue.sensor_id) + 1} -> pan {float(cue.cue_pan):.1f} tilt {float(cue.cue_tilt):.1f}",
                     when=now,
+                )
+                self._emit_pir_trace(
+                    "pir_cue_started_from_guarding",
+                    sensor_id=int(cue.sensor_id),
+                    cue_pan=float(cue.cue_pan),
+                    cue_tilt=float(cue.cue_tilt),
+                    queue_length=int(self._pir_manager.peek_queue_count()),
                 )
                 self._move_turret(self._pir_cue_pan, self._pir_cue_tilt)
                 return
@@ -1063,6 +1584,12 @@ class SentryV2Engine:
             if now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown:
                 queue = self._planner.plan(targets, self.current_pan, self.current_tilt)
                 if queue:
+                    self._log_planner_selection_event(
+                        now=now,
+                        context="pir_confirmation",
+                        input_targets=list(targets),
+                        queue=list(queue),
+                    )
                     self._queue = queue
                     self.last_queue = queue
                     self._queue_index = 0
@@ -1073,6 +1600,12 @@ class SentryV2Engine:
                     self.active_order = first
                     self._remember_active_target(first.target.det)
                     self._start_order_engagement(first, now)
+                    self._emit_pir_trace(
+                        "pir_consumed_target_confirmed_engage",
+                        sensor_id=active_sensor_id,
+                        action_taken="target_acquisition_engage",
+                        queue_length=int(self._pir_manager.peek_queue_count()),
+                    )
             return
         
         # No target confirmed at cue point
@@ -1089,6 +1622,13 @@ class SentryV2Engine:
             active_sensor_id = int(getattr(self, "_pir_cue_sensor_id", -1))
             sensor_text = f" S{active_sensor_id + 1}" if active_sensor_id >= 0 else ""
             self._set_pir_note(f"PIR search start{sensor_text} ({total_steps} points)", when=now)
+            self._emit_pir_trace(
+                "pir_search_started_no_detect",
+                sensor_id=active_sensor_id,
+                total_steps=int(total_steps),
+                action_taken="scan",
+                queue_length=int(self._pir_manager.peek_queue_count()),
+            )
             next_point = self._pir_manager.get_next_scan_point()
             if next_point is not None:
                 # Apply organic jitter on the very first scan move too
@@ -1104,9 +1644,23 @@ class SentryV2Engine:
                 self._pir_scan_awaiting_settle = True
                 self._pir_settle_start = now
             else:
+                self._emit_pir_trace(
+                    "pir_search_no_points",
+                    sensor_id=active_sensor_id,
+                    action_taken="no_action_return_home",
+                    reason="scan_grid_empty",
+                    queue_length=int(self._pir_manager.peek_queue_count()),
+                )
                 self._finish_pir_no_target()
         else:
             # No search enabled, finish this cue and fall back to guard/patrol.
+            self._emit_pir_trace(
+                "pir_no_detect_scan_disabled",
+                sensor_id=int(getattr(self, "_pir_cue_sensor_id", -1)),
+                action_taken="no_action_return_home",
+                reason="scan_on_no_detect_disabled",
+                queue_length=int(self._pir_manager.peek_queue_count()),
+            )
             self._finish_pir_no_target()
 
     def _update_pir_scan(self, targets: List[TrackedTarget], now: float) -> None:
@@ -1123,6 +1677,12 @@ class SentryV2Engine:
             if now - self._last_engage_time >= self.cfg.engagement.cycle_cooldown:
                 queue = self._planner.plan(targets, self.current_pan, self.current_tilt)
                 if queue:
+                    self._log_planner_selection_event(
+                        now=now,
+                        context="pir_scan",
+                        input_targets=list(targets),
+                        queue=list(queue),
+                    )
                     self._queue = queue
                     self.last_queue = queue
                     self._queue_index = 0
@@ -1133,6 +1693,12 @@ class SentryV2Engine:
                     self.active_order = first
                     self._remember_active_target(first.target.det)
                     self._start_order_engagement(first, now)
+                    self._emit_pir_trace(
+                        "pir_scan_consumed_target_confirmed_engage",
+                        sensor_id=active_sensor_id,
+                        action_taken="target_acquisition_engage",
+                        queue_length=int(self._pir_manager.peek_queue_count()),
+                    )
             return
         
         # Wait for servo settle before moving to next scan point
@@ -1160,11 +1726,27 @@ class SentryV2Engine:
                 f"PIR search step{sensor_text} {step_index}/{total_steps} -> pan {scan_pan:.1f} tilt {scan_tilt:.1f}",
                 when=now,
             )
+            self._emit_pir_trace(
+                "pir_scan_step",
+                sensor_id=active_sensor_id,
+                step_index=int(step_index),
+                total_steps=int(total_steps),
+                scan_pan=float(scan_pan),
+                scan_tilt=float(scan_tilt),
+                queue_length=int(self._pir_manager.peek_queue_count()),
+            )
             self._pir_scan_awaiting_settle = True
             self._pir_settle_start = now
         else:
             # Search complete with no target. Explicitly return home so a static
             # guard configuration cannot remain parked at the final hunt point.
+            self._emit_pir_trace(
+                "pir_scan_exhausted_no_target",
+                sensor_id=int(getattr(self, "_pir_cue_sensor_id", -1)),
+                action_taken="no_action_return_home",
+                reason="scan_exhausted",
+                queue_length=int(self._pir_manager.peek_queue_count()),
+            )
             self._finish_pir_no_target()
 
     def _pir_scan_settle_time(self) -> float:
@@ -1335,32 +1917,225 @@ class SentryV2Engine:
             # CRITICAL AUTO-TRIGGER LOGIC - DO NOT DISABLE WITHOUT USER APPROVAL
             # This is the primary auto-fire mechanism that MUST work when auto_trigger_enabled=True
             # =================================================================================
-            if (
-                self.cfg.engagement.auto_trigger_enabled
-                and (settle_met or early_lock)
-                and self._ready_to_fire()
-                and target is not None
-                and self._trigger_should_fire(target, lock_pan, lock_tilt, now)
-            ):
+            primary_auto_enabled = bool(self.cfg.engagement.auto_trigger_enabled)
+            primary_settle_or_lock = bool(settle_met or early_lock)
+            primary_ready = bool(self._ready_to_fire())
+            primary_has_target = bool(target is not None)
+            primary_gate_pass = False
+            if primary_auto_enabled and primary_settle_or_lock and primary_ready and primary_has_target:
+                primary_gate_pass = bool(self._trigger_should_fire(target, lock_pan, lock_tilt, now))
+
+            if primary_auto_enabled and primary_settle_or_lock and primary_ready and primary_has_target and primary_gate_pass:
                 self._begin_fire(order, now)
                 return
+
+            if primary_has_target:
+                if not primary_auto_enabled:
+                    primary_reason = "auto_trigger_disabled"
+                    primary_stages = [
+                        {
+                            "stage": "auto_trigger_enabled",
+                            "inputs": {"auto_trigger_enabled": False},
+                            "threshold": {"required": True},
+                            "pass": False,
+                            "reason": "planner veto",
+                        }
+                    ]
+                elif not primary_settle_or_lock:
+                    primary_reason = "target_not_centered"
+                    primary_stages = [
+                        {
+                            "stage": "precision_settle_or_lock",
+                            "inputs": {
+                                "settle_met": bool(settle_met),
+                                "early_lock": bool(early_lock),
+                                "elapsed": float(elapsed),
+                            },
+                            "threshold": {
+                                "precision_settle_time": float(settle),
+                                "aim_lock_required_frames": int(self.cfg.engagement.aim_lock_required_frames),
+                            },
+                            "pass": False,
+                            "reason": "target not centered",
+                        }
+                    ]
+                elif not primary_ready:
+                    primary_reason = "target_not_centered"
+                    primary_stages = [
+                        {
+                            "stage": "aim_lock_ready",
+                            "inputs": {
+                                "aim_lock_frames": int(self._aim_lock_frames),
+                                "fire_requires_lock": bool(self.cfg.engagement.fire_requires_lock),
+                            },
+                            "threshold": {
+                                "aim_lock_required_frames": int(self.cfg.engagement.aim_lock_required_frames),
+                            },
+                            "pass": False,
+                            "reason": "target not centered",
+                        }
+                    ]
+                else:
+                    primary_reason = str((self._last_fire_gate_trace or {}).get("reason", "unknown rejection path") or "unknown rejection path")
+                    primary_stages = list((self._last_fire_gate_trace or {}).get("stages", []) or [])
+
+                self._emit_engagement_telemetry(
+                    now=now,
+                    order=order,
+                    target=target,
+                    attempt_type="primary",
+                    firing_approved=False,
+                    firing_rejected_reason=primary_reason,
+                    stages=primary_stages,
+                )
+            elif primary_auto_enabled and primary_settle_or_lock and primary_ready:
+                self._emit_engagement_telemetry(
+                    now=now,
+                    order=order,
+                    target=None,
+                    attempt_type="primary",
+                    firing_approved=False,
+                    firing_rejected_reason="tracker_lost",
+                    stages=[
+                        {
+                            "stage": "tracker_presence",
+                            "inputs": {"target_present": False},
+                            "threshold": {"required": True},
+                            "pass": False,
+                            "reason": "tracker lost",
+                        }
+                    ],
+                )
 
             # =================================================================================
             # BACKUP AUTO-TRIGGER LOGIC - DO NOT DISABLE WITHOUT USER APPROVAL  
             # Fallback firing mechanism for timeout scenarios
             # =================================================================================
+            backup_auto_enabled = bool(self.cfg.engagement.auto_trigger_enabled)
+            backup_refractory_clear = bool(now >= self._trigger_refractory_until)
+            backup_timeout_met = bool(elapsed >= float(self.cfg.engagement.aim_lock_timeout))
+            backup_has_target = bool(target is not None)
+            backup_ready = bool(self._ready_to_fire())
+            backup_target_ok = bool(target is not None and self._target_meets_fire_requirements(target, now=now))
+            backup_aim_lock = bool(self._has_aim_lock(lock_pan, lock_tilt))
+            backup_mask_clear = bool(self._current_no_fire_mask() is None)
+
             if (
-                self.cfg.engagement.auto_trigger_enabled
-                and now >= self._trigger_refractory_until
-                and elapsed >= float(self.cfg.engagement.aim_lock_timeout)
-                and target is not None
-                and self._ready_to_fire()
-                and self._target_meets_fire_requirements(target, now=now)
-                and self._has_aim_lock(lock_pan, lock_tilt)
-                and self._current_no_fire_mask() is None
+                backup_auto_enabled
+                and backup_refractory_clear
+                and backup_timeout_met
+                and backup_has_target
+                and backup_ready
+                and backup_target_ok
+                and backup_aim_lock
+                and backup_mask_clear
             ):
                 self._begin_fire(order, now)
                 return
+
+            if backup_has_target and backup_timeout_met:
+                backup_stages = [
+                    {
+                        "stage": "auto_trigger_enabled",
+                        "inputs": {"auto_trigger_enabled": bool(backup_auto_enabled)},
+                        "threshold": {"required": True},
+                        "pass": bool(backup_auto_enabled),
+                        "reason": "auto-trigger enabled" if backup_auto_enabled else "planner veto",
+                    },
+                    {
+                        "stage": "refractory_period",
+                        "inputs": {"now": float(now)},
+                        "threshold": {"refractory_until": float(self._trigger_refractory_until)},
+                        "pass": bool(backup_refractory_clear),
+                        "reason": "refractory period satisfied" if backup_refractory_clear else "refractory period",
+                    },
+                    {
+                        "stage": "aim_lock_timeout",
+                        "inputs": {"elapsed": float(elapsed)},
+                        "threshold": {"aim_lock_timeout": float(self.cfg.engagement.aim_lock_timeout)},
+                        "pass": bool(backup_timeout_met),
+                        "reason": "timeout satisfied" if backup_timeout_met else "hold-time requirement not satisfied",
+                    },
+                    {
+                        "stage": "aim_lock_ready",
+                        "inputs": {"aim_lock_frames": int(self._aim_lock_frames)},
+                        "threshold": {"aim_lock_required_frames": int(self.cfg.engagement.aim_lock_required_frames)},
+                        "pass": bool(backup_ready),
+                        "reason": "aim lock ready" if backup_ready else "target not centered",
+                    },
+                    {
+                        "stage": "target_fire_requirements",
+                        "inputs": {
+                            "confidence": float(getattr(getattr(target, "det", None), "confidence", 0.0) or 0.0) if target is not None else 0.0,
+                            "persistence": float(getattr(target, "persistence", 0.0) or 0.0) if target is not None else 0.0,
+                        },
+                        "threshold": {
+                            "min_confidence": float(self.cfg.engagement.fire_trigger_min_confidence),
+                            "min_persistence": float(self.cfg.engagement.fire_trigger_min_persistence),
+                        },
+                        "pass": bool(backup_target_ok),
+                        "reason": "requirements satisfied" if backup_target_ok else "confidence below threshold",
+                    },
+                    {
+                        "stage": "center_lock",
+                        "inputs": {"lock_pan": float(lock_pan), "lock_tilt": float(lock_tilt)},
+                        "threshold": {
+                            "aim_lock_pan_tolerance": float(self.cfg.engagement.aim_lock_pan_tolerance),
+                            "aim_lock_tilt_tolerance": float(self.cfg.engagement.aim_lock_tilt_tolerance),
+                        },
+                        "pass": bool(backup_aim_lock),
+                        "reason": "target centered" if backup_aim_lock else "target not centered",
+                    },
+                    {
+                        "stage": "no_fire_mask",
+                        "inputs": {"active_mask": str(self._last_no_fire_mask_name or "")},
+                        "threshold": {"requires_clear_mask": True},
+                        "pass": bool(backup_mask_clear),
+                        "reason": "mask clear" if backup_mask_clear else "mask block",
+                    },
+                ]
+                if backup_auto_enabled and backup_refractory_clear and backup_timeout_met and backup_has_target and backup_ready and backup_target_ok and backup_aim_lock and backup_mask_clear:
+                    backup_reason = "approved"
+                elif not backup_auto_enabled:
+                    backup_reason = "auto_trigger_disabled"
+                elif not backup_refractory_clear:
+                    backup_reason = "refractory_period"
+                elif not backup_ready or not backup_aim_lock:
+                    backup_reason = "target_not_centered"
+                elif not backup_target_ok:
+                    backup_reason = "target_quality_below_threshold"
+                elif not backup_mask_clear:
+                    backup_reason = "mask_block"
+                else:
+                    backup_reason = "unknown rejection path"
+
+                self._emit_engagement_telemetry(
+                    now=now,
+                    order=order,
+                    target=target,
+                    attempt_type="backup",
+                    firing_approved=False,
+                    firing_rejected_reason=backup_reason,
+                    stages=backup_stages,
+                )
+            elif backup_auto_enabled and backup_timeout_met and not backup_has_target:
+                self._emit_engagement_telemetry(
+                    now=now,
+                    order=order,
+                    target=None,
+                    attempt_type="backup",
+                    firing_approved=False,
+                    firing_rejected_reason="tracker_lost",
+                    stages=[
+                        {
+                            "stage": "tracker_presence",
+                            "inputs": {"target_present": False},
+                            "threshold": {"required": True},
+                            "pass": False,
+                            "reason": "tracker lost",
+                        }
+                    ],
+                )
 
             if corr_pan != 0.0 or corr_tilt != 0.0:
                 self._move_turret(self.current_pan + corr_pan, self.current_tilt + corr_tilt)
@@ -1755,6 +2530,668 @@ class SentryV2Engine:
         self._last_fire_veto_reason = str(reason or "")
         self._last_fire_veto_time = float(now)
 
+    def _normalized_rejection_reason(self, reason: str) -> str:
+        reason_key = str(reason or "").strip().lower()
+        mapping = {
+            "class_rejected": "class not allowed",
+            "low_confidence": "confidence below threshold",
+            "shape_rejected": "shape mismatch",
+            "semantic_confirm_pending": "semantic confirmation failed",
+            "tracker_lost": "tracker lost",
+            "target_not_centered": "target not centered",
+            "refractory_period": "refractory period",
+            "planner_veto": "planner veto",
+            "safety_lock": "safety lock",
+            "no_fire_mask_block": "mask block",
+            "pir_requirement_not_satisfied": "PIR requirement not satisfied",
+            "person_fire_authorization_failed": "safety lock",
+            "target_quality_below_threshold": "confidence below threshold",
+            "hold_time_not_met": "hold-time requirement not satisfied",
+            "auto_trigger_disabled": "planner veto",
+            "prompted_auto_fire_disabled": "planner veto",
+            "mask_block": "mask block",
+        }
+        if reason_key in mapping:
+            return mapping[reason_key]
+        return reason_key or "unknown rejection path"
+
+    def _shape_profile_telemetry(self, det: DetectedObject) -> Dict[str, Any]:
+        profile_name = str(getattr(self.cfg.target_filter, "shape_profile_name", "") or "").strip().lower()
+        if not profile_name:
+            profile_name = str(getattr(det, "class_name", "") or "").strip().lower()
+        profile_name = SHAPE_PROFILE_ALIASES.get(profile_name, profile_name)
+        profile = SHAPE_FILTER_PROFILES.get(profile_name)
+
+        width = max(1.0, float(det.bbox[2]))
+        height = max(1.0, float(det.bbox[3]))
+        aspect_ratio = width / height
+        score = 1.0
+        passed = True
+        reason = "shape profile accepted"
+        min_aspect_ratio = 0.0
+        max_aspect_ratio = 0.0
+
+        if profile:
+            min_aspect_ratio = float(profile.get("min_aspect_ratio", 0.0) or 0.0)
+            max_aspect_ratio = float(profile.get("max_aspect_ratio", 0.0) or 0.0)
+            if min_aspect_ratio > 0.0 and aspect_ratio < min_aspect_ratio:
+                passed = False
+                score = max(0.0, aspect_ratio / max(min_aspect_ratio, 1e-6))
+                reason = "shape mismatch"
+            elif max_aspect_ratio > 0.0 and aspect_ratio > max_aspect_ratio:
+                passed = False
+                score = max(0.0, max_aspect_ratio / max(aspect_ratio, 1e-6))
+                reason = "shape mismatch"
+        else:
+            reason = "shape profile unavailable; check skipped"
+
+        return {
+            "shape_profile_used": profile_name,
+            "shape_score": float(round(score, 6)),
+            "aspect_ratio": float(round(aspect_ratio, 6)),
+            "min_aspect_ratio": float(min_aspect_ratio),
+            "max_aspect_ratio": float(max_aspect_ratio),
+            "shape_passed": bool(passed),
+            "shape_reason": reason,
+        }
+
+    def _find_filter_decision_for_track(self, track_id: int) -> Optional[FilterDecision]:
+        for decision in self.last_filter_diagnostics:
+            if int(getattr(decision, "track_id", -1) or -1) == int(track_id):
+                return decision
+        return None
+
+    def _build_filter_stage_records(
+        self,
+        det: DetectedObject,
+        decision: Optional[FilterDecision],
+        target: Optional[TrackedTarget],
+    ) -> List[Dict[str, Any]]:
+        allowed_classes = [str(item) for item in list(getattr(self.cfg.target_filter, "allowed_classes", []) or [])]
+        class_allowed = (not allowed_classes) or (str(det.class_name) in allowed_classes)
+        confidence_threshold = float(getattr(self.cfg.target_filter, "min_confidence", 0.0) or 0.0)
+        conf_pass = float(det.confidence) >= confidence_threshold
+        min_size_ratio = float(getattr(self.cfg.target_filter, "min_size_ratio", 0.0) or 0.0)
+        max_size_ratio = float(getattr(self.cfg.target_filter, "max_size_ratio", 0.0) or 0.0)
+        area_ratio = float(det.area_ratio)
+        min_size_pass = area_ratio >= min_size_ratio
+        max_size_pass = (max_size_ratio <= 0.0) or (area_ratio <= max_size_ratio)
+        zone = list(getattr(self.cfg.target_filter, "engagement_zone", [0.0, 0.0, 1.0, 1.0]) or [0.0, 0.0, 1.0, 1.0])
+        zone_pass = bool(zone[0] <= det.norm_cx <= zone[2] and zone[1] <= det.norm_cy <= zone[3])
+        semantic_required = max(1, int(getattr(self.cfg.target_filter, "semantic_min_confirm_frames", 1) or 1))
+        semantic_hits = int(getattr(decision, "confirm_hits", 0) or 0) if decision is not None else 0
+        semantic_pass = semantic_required <= 1 or semantic_hits >= semantic_required
+        shape_info = self._shape_profile_telemetry(det)
+
+        stages: List[Dict[str, Any]] = [
+            {
+                "stage": "class_whitelist",
+                "inputs": {"class_name": str(det.class_name)},
+                "threshold": {"allowed_classes": allowed_classes},
+                "pass": bool(class_allowed),
+                "reason": "class accepted" if class_allowed else "class not allowed",
+            },
+            {
+                "stage": "confidence_threshold",
+                "inputs": {"confidence": float(det.confidence)},
+                "threshold": {"min_confidence": confidence_threshold},
+                "pass": bool(conf_pass),
+                "reason": "confidence accepted" if conf_pass else "confidence below threshold",
+            },
+            {
+                "stage": "size_min",
+                "inputs": {"area_ratio": area_ratio},
+                "threshold": {"min_size_ratio": min_size_ratio},
+                "pass": bool(min_size_pass),
+                "reason": "size accepted" if min_size_pass else "size too small",
+            },
+            {
+                "stage": "size_max",
+                "inputs": {"area_ratio": area_ratio},
+                "threshold": {"max_size_ratio": max_size_ratio},
+                "pass": bool(max_size_pass),
+                "reason": "size accepted" if max_size_pass else "size too large",
+            },
+            {
+                "stage": "engagement_zone",
+                "inputs": {"norm_center": [float(det.norm_cx), float(det.norm_cy)]},
+                "threshold": {"zone": zone},
+                "pass": bool(zone_pass),
+                "reason": "inside zone" if zone_pass else "outside zone",
+            },
+            {
+                "stage": "shape_profile",
+                "inputs": {
+                    "aspect_ratio": float(shape_info["aspect_ratio"]),
+                    "shape_profile": str(shape_info["shape_profile_used"]),
+                },
+                "threshold": {
+                    "min_aspect_ratio": float(shape_info["min_aspect_ratio"]),
+                    "max_aspect_ratio": float(shape_info["max_aspect_ratio"]),
+                },
+                "pass": bool(shape_info["shape_passed"]),
+                "reason": str(shape_info["shape_reason"]),
+            },
+            {
+                "stage": "semantic_confirmation",
+                "inputs": {
+                    "confirm_hits": semantic_hits,
+                    "decision_reason": str(getattr(decision, "reason", "") or ""),
+                    "decision_detail": str(getattr(decision, "detail", "") or ""),
+                },
+                "threshold": {
+                    "semantic_min_confirm_frames": semantic_required,
+                    "semantic_min_confirm_confidence": float(
+                        getattr(self.cfg.target_filter, "semantic_min_confirm_confidence", 0.0) or 0.0
+                    ),
+                },
+                "pass": bool(semantic_pass),
+                "reason": "semantic confirmation passed" if semantic_pass else "semantic confirmation failed",
+            },
+        ]
+
+        if target is not None:
+            min_threat = float(getattr(self.cfg.engagement, "min_threat_score", 0.0) or 0.0)
+            threat_score = float(getattr(target, "threat_score", 0.0) or 0.0)
+            threat_pass = threat_score >= min_threat
+            stages.append(
+                {
+                    "stage": "threat_threshold",
+                    "inputs": {"threat_score": threat_score},
+                    "threshold": {"min_threat_score": min_threat},
+                    "pass": bool(threat_pass),
+                    "reason": "planner candidate accepted" if threat_pass else "planner veto",
+                }
+            )
+
+        return stages
+
+    def _build_gate_stage_records(self, stages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        gate_stages: List[Dict[str, Any]] = []
+        for stage in stages:
+            gate_stages.append(
+                {
+                    "stage": str(stage.get("stage", "")),
+                    "inputs": dict(stage.get("inputs", {}) or {}),
+                    "threshold": dict(stage.get("threshold", {}) or {}),
+                    "pass": bool(stage.get("pass", False)),
+                    "reason": str(stage.get("reason", "") or ""),
+                }
+            )
+        return gate_stages
+
+    def _current_planner_state(self) -> Dict[str, Any]:
+        return {
+            "engage_phase": str(getattr(self, "_engage_phase", "") or ""),
+            "queue_index": int(getattr(self, "_queue_index", 0) or 0),
+            "queue_length": int(len(getattr(self, "_queue", []) or [])),
+            "loss_recovery_phase": str(getattr(self, "_loss_recovery_phase", "") or ""),
+            "reacquire_note": str(getattr(self, "_last_reacquire_note", "") or ""),
+        }
+
+    def _current_pir_state(self) -> Dict[str, Any]:
+        return {
+            "pir_enabled": bool(getattr(self.cfg.pir_guard, "pir_enabled", False)),
+            "pir_cue_mode": bool(getattr(self, "_pir_cue_mode", False)),
+            "pir_scan_mode": bool(getattr(self, "_pir_scan_mode", False)),
+            "pir_sensor_id": int(getattr(self, "_pir_cue_sensor_id", -1) or -1),
+            "pir_queue_length": int(self._pir_manager.peek_queue_count()),
+            "pir_status": str(self._pir_manager.get_status_text()),
+        }
+
+    def _current_safety_state(self, now: float) -> Dict[str, Any]:
+        return {
+            "auto_trigger_enabled": bool(getattr(self.cfg.engagement, "auto_trigger_enabled", False)),
+            "fire_refractory_until": float(getattr(self, "_trigger_refractory_until", 0.0) or 0.0),
+            "fire_refractory_active": bool(now < float(getattr(self, "_trigger_refractory_until", 0.0) or 0.0)),
+            "no_fire_mask": str(getattr(self, "_last_no_fire_mask_name", "") or ""),
+            "fire_veto_reason": str(getattr(self, "_last_fire_veto_reason", "") or ""),
+            "trigger_gate_active": bool(getattr(self, "_trigger_gate_active", False)),
+            "trigger_hold_start": float(getattr(self, "_trigger_hold_start", 0.0) or 0.0),
+        }
+
+    def _motion_policy_mode(self) -> str:
+        return str(getattr(self.cfg.engagement, "motion_policy_mode", "allow_stationary") or "allow_stationary").strip().lower()
+
+    def _motion_policy_window_s(self) -> float:
+        return max(0.20, float(getattr(self.cfg.engagement, "motion_recent_window_s", 1.25) or 1.25))
+
+    def _motion_policy_entry(self, track_id: int) -> Dict[str, Any]:
+        return self._motion_policy_state.setdefault(
+            int(track_id),
+            {
+                "track_id": int(track_id),
+                "state": "TRACKING",
+                "previous_state": "",
+                "suppression_reason": "",
+                "suppression_timestamp": 0.0,
+                "suppression_expiry": 0.0,
+                "next_eligible_evaluation_time": 0.0,
+                "recent_motion_distance_px": 0.0,
+                "average_velocity_px_s": 0.0,
+                "motion_confidence": 0.0,
+                "stationary_duration_s": 0.0,
+                "motion_window_s": self._motion_policy_window_s(),
+                "last_evaluated": 0.0,
+                "history": [],
+                "last_motion_detected": False,
+                "motion_samples": 0,
+            },
+        )
+
+    def _record_motion_policy_transition(
+        self,
+        track_id: int,
+        new_state: str,
+        now: float,
+        reason: str,
+    ) -> Dict[str, Any]:
+        entry = self._motion_policy_entry(track_id)
+        new_state = str(new_state or "TRACKING")
+        previous_state = str(entry.get("state", "TRACKING") or "TRACKING")
+        if previous_state != new_state:
+            history = list(entry.get("history", []) or [])
+            history.append(
+                {
+                    "timestamp": float(now),
+                    "from": previous_state,
+                    "to": new_state,
+                    "reason": str(reason or ""),
+                }
+            )
+            entry["history"] = history[-20:]
+            entry["previous_state"] = previous_state
+            entry["state"] = new_state
+            self._publish_mission_event(
+                "motion_policy_transition",
+                {
+                    "timestamp": float(now),
+                    "frame_number": int(self._frame_number),
+                    "track_id": int(track_id),
+                    "from_state": str(previous_state),
+                    "to_state": str(new_state),
+                    "reason": str(reason or ""),
+                },
+            )
+        else:
+            entry["state"] = new_state
+        entry["last_evaluated"] = float(now)
+        return entry
+
+    def _evaluate_motion_policy(self, target: TrackedTarget, now: float) -> Dict[str, Any]:
+        det = target.det
+        track_id = int(det.track_id)
+        entry = self._motion_policy_entry(track_id)
+        mode = self._motion_policy_mode()
+        motion_snapshot = self._scorer.get_motion_history_snapshot(det, now, window_s=self._motion_policy_window_s())
+        engage_mode_allowed = bool(getattr(self.cfg.engagement, "motion_allow_stationary_engagement", True))
+        recent_distance_px = float(motion_snapshot.recent_motion_distance_px)
+        average_velocity_px_s = float(motion_snapshot.average_velocity_px_s)
+        motion_confidence = float(motion_snapshot.motion_confidence)
+        stationary_duration_s = float(motion_snapshot.stationary_duration_s)
+
+        recent_distance_threshold_px = max(0.0, float(getattr(self.cfg.engagement, "motion_recent_distance_px", 18.0) or 18.0))
+        average_velocity_threshold_px_s = max(0.0, float(getattr(self.cfg.engagement, "motion_average_velocity_px_s", 10.0) or 10.0))
+        motion_confidence_min = max(0.0, float(getattr(self.cfg.engagement, "motion_confidence_min", 0.35) or 0.35))
+        stationary_timeout_s = max(0.0, float(getattr(self.cfg.engagement, "motion_stationary_timeout_s", 4.0) or 4.0))
+        suppression_cooldown_s = max(0.0, float(getattr(self.cfg.engagement, "motion_suppression_cooldown_s", 1.5) or 1.5))
+
+        recent_motion_ok = bool(
+            recent_distance_px >= recent_distance_threshold_px
+            or average_velocity_px_s >= average_velocity_threshold_px_s
+            or motion_confidence >= motion_confidence_min
+        )
+
+        suppression_reason = str(entry.get("suppression_reason", "") or "")
+        suppression_timestamp = float(entry.get("suppression_timestamp", 0.0) or 0.0)
+        suppression_expiry = float(entry.get("suppression_expiry", 0.0) or 0.0)
+        next_eval = float(entry.get("next_eligible_evaluation_time", 0.0) or 0.0)
+        current_state = str(entry.get("state", "TRACKING") or "TRACKING")
+
+        if current_state == "TRACK_ONLY" and mode != "allow_stationary" and now < next_eval and not recent_motion_ok:
+            entry.update(
+                {
+                    "track_id": track_id,
+                    "motion_window_s": float(self._motion_policy_window_s()),
+                    "recent_motion_distance_px": recent_distance_px,
+                    "average_velocity_px_s": average_velocity_px_s,
+                    "motion_confidence": motion_confidence,
+                    "stationary_duration_s": stationary_duration_s,
+                    "recent_motion_detected": bool(motion_snapshot.recent_motion_detected),
+                    "motion_samples": int(motion_snapshot.sample_count),
+                    "suppression_reason": str(suppression_reason or "recent motion below threshold"),
+                    "suppression_timestamp": float(suppression_timestamp or now),
+                    "suppression_expiry": float(suppression_expiry or next_eval),
+                    "next_eligible_evaluation_time": float(next_eval),
+                    "profile_mode": mode,
+                    "motion_allowed": False,
+                    "motion_context": {
+                        "track_id": track_id,
+                        "recent_motion_distance_px": recent_distance_px,
+                        "average_velocity_px_s": average_velocity_px_s,
+                        "motion_confidence": motion_confidence,
+                        "stationary_duration_s": stationary_duration_s,
+                        "recent_motion_detected": bool(motion_snapshot.recent_motion_detected),
+                    },
+                }
+            )
+            return entry
+
+        if mode == "tracking_only":
+            new_state = "TRACK_ONLY"
+            suppression_reason = "profile tracking_only"
+            if suppression_timestamp <= 0.0:
+                suppression_timestamp = float(now)
+            if suppression_expiry <= 0.0:
+                suppression_expiry = float(now + suppression_cooldown_s)
+            next_eval = max(next_eval, suppression_expiry)
+        elif mode == "require_recent_motion":
+            if recent_motion_ok:
+                new_state = "ENGAGEABLE"
+                suppression_reason = ""
+                suppression_timestamp = 0.0
+                suppression_expiry = 0.0
+                next_eval = float(now)
+            else:
+                if stationary_duration_s >= stationary_timeout_s:
+                    new_state = "TRACK_ONLY"
+                    suppression_reason = "recent motion timeout"
+                else:
+                    new_state = "TRACKING"
+                    suppression_reason = "recent motion below threshold"
+                if suppression_timestamp <= 0.0:
+                    suppression_timestamp = float(now)
+                if suppression_expiry <= 0.0:
+                    suppression_expiry = float(now + suppression_cooldown_s)
+                next_eval = max(next_eval, suppression_expiry)
+        else:
+            new_state = "ENGAGEABLE" if engage_mode_allowed else "TRACK_ONLY"
+            if not engage_mode_allowed:
+                suppression_reason = "profile stationary disallows engagement"
+                if suppression_timestamp <= 0.0:
+                    suppression_timestamp = float(now)
+                if suppression_expiry <= 0.0:
+                    suppression_expiry = float(now + suppression_cooldown_s)
+                next_eval = max(next_eval, suppression_expiry)
+            else:
+                suppression_reason = ""
+                suppression_timestamp = 0.0
+                suppression_expiry = 0.0
+                next_eval = float(now)
+
+        if current_state in {"ENGAGING", "FIRE_AUTHORIZATION", "FIRED", "POST_ENGAGEMENT"}:
+            new_state = current_state
+
+        entry = self._record_motion_policy_transition(
+            track_id,
+            new_state,
+            now,
+            suppression_reason or ("recent motion confirmed" if new_state == "ENGAGEABLE" else ""),
+        )
+        entry.update(
+            {
+                "track_id": track_id,
+                "motion_window_s": float(self._motion_policy_window_s()),
+                "recent_motion_distance_px": recent_distance_px,
+                "average_velocity_px_s": average_velocity_px_s,
+                "motion_confidence": motion_confidence,
+                "stationary_duration_s": stationary_duration_s,
+                "recent_motion_detected": bool(motion_snapshot.recent_motion_detected),
+                "motion_samples": int(motion_snapshot.sample_count),
+                "suppression_reason": str(suppression_reason or ""),
+                "suppression_timestamp": float(suppression_timestamp),
+                "suppression_expiry": float(suppression_expiry),
+                "next_eligible_evaluation_time": float(next_eval),
+                "profile_mode": mode,
+                "motion_allowed": bool(new_state == "ENGAGEABLE"),
+                "motion_context": {
+                    "track_id": track_id,
+                    "recent_motion_distance_px": recent_distance_px,
+                    "average_velocity_px_s": average_velocity_px_s,
+                    "motion_confidence": motion_confidence,
+                    "stationary_duration_s": stationary_duration_s,
+                    "recent_motion_detected": bool(motion_snapshot.recent_motion_detected),
+                },
+            }
+        )
+        return entry
+
+    def _apply_motion_policy_to_targets(
+        self,
+        targets: List[TrackedTarget],
+        now: float,
+    ) -> Tuple[List[TrackedTarget], List[Dict[str, Any]]]:
+        engageable: List[TrackedTarget] = []
+        snapshots: List[Dict[str, Any]] = []
+        active_track_ids = {int(t.det.track_id) for t in targets}
+        suppression_cooldown_s = max(0.0, float(getattr(self.cfg.engagement, "motion_suppression_cooldown_s", 1.5) or 1.5))
+
+        for target in targets:
+            entry = self._evaluate_motion_policy(target, now)
+            snapshots.append(dict(entry))
+            if str(entry.get("state", "TRACKING") or "TRACKING") == "ENGAGEABLE":
+                engageable.append(target)
+            elif str(entry.get("state", "TRACKING") or "TRACKING") == "TRACK_ONLY" and float(entry.get("next_eligible_evaluation_time", 0.0) or 0.0) <= 0.0:
+                entry["next_eligible_evaluation_time"] = float(now + suppression_cooldown_s)
+
+        stale_track_ids = [
+            track_id
+            for track_id in list(self._motion_policy_state.keys())
+            if track_id not in active_track_ids
+            and (now - float(self._motion_policy_state.get(track_id, {}).get("last_evaluated", now) or now)) > max(0.5, float(self.cfg.engagement.target_loss_timeout))
+        ]
+        for track_id in stale_track_ids:
+            entry = self._motion_policy_state.get(track_id)
+            if entry is None:
+                continue
+            current_state = str(entry.get("state", "TRACKING") or "TRACKING")
+            if current_state not in {"LOST", "EXPIRED"}:
+                lost_state = self._record_motion_policy_transition(track_id, "LOST", now, "target not visible")
+                lost_state["suppression_reason"] = "target not visible"
+                lost_state["suppression_timestamp"] = float(now)
+                lost_state["suppression_expiry"] = float(now + max(0.5, float(self.cfg.engagement.target_loss_timeout)))
+                lost_state["next_eligible_evaluation_time"] = float(lost_state["suppression_expiry"])
+                lost_state["state"] = "EXPIRED" if (now - float(lost_state.get("suppression_timestamp", now))) > float(self.cfg.engagement.target_loss_timeout) else "LOST"
+
+        return engageable, snapshots
+
+    def _emit_engagement_telemetry(
+        self,
+        *,
+        now: float,
+        order: Optional[EngagementOrder],
+        target: Optional[TrackedTarget],
+        attempt_type: str,
+        firing_approved: bool,
+        firing_rejected_reason: str,
+        stages: List[Dict[str, Any]],
+    ) -> None:
+        tracked_target = target
+        if tracked_target is None and order is not None:
+            tracked_target = order.target
+
+        det: Optional[DetectedObject] = tracked_target.det if tracked_target is not None else None
+        decision = None
+        if det is not None:
+            decision = self._find_filter_decision_for_track(int(getattr(det, "track_id", -1) or -1))
+
+        if det is not None:
+            shape_info = self._shape_profile_telemetry(det)
+            yolo_class = str(getattr(det, "class_name", "") or "")
+            yolo_confidence = float(getattr(det, "confidence", 0.0) or 0.0)
+            bbox = tuple(int(v) for v in getattr(det, "bbox", (0, 0, 0, 0)))
+            tracker_id = int(getattr(det, "track_id", -1) or -1)
+            motion_policy_state = dict(self._motion_policy_state.get(tracker_id, {}) or {})
+            semantic_hits = int(getattr(decision, "confirm_hits", 0) or 0) if decision is not None else 0
+            semantic_required = int(getattr(decision, "confirm_required", 1) or 1) if decision is not None else 1
+            filter_stages = self._build_filter_stage_records(det, decision, tracked_target)
+            motion_score = float(getattr(tracked_target, "speed", 0.0) or 0.0) if tracked_target is not None else 0.0
+            threat_score = float(getattr(tracked_target, "threat_score", 0.0) or 0.0) if tracked_target is not None else 0.0
+        else:
+            shape_info = {
+                "shape_profile_used": "",
+                "shape_score": 0.0,
+            }
+            yolo_class = ""
+            yolo_confidence = 0.0
+            bbox = (0, 0, 0, 0)
+            tracker_id = -1
+            semantic_hits = 0
+            semantic_required = 1
+            filter_stages = []
+            motion_score = 0.0
+            threat_score = 0.0
+            motion_policy_state = {}
+
+        combined_stages = list(filter_stages) + self._build_gate_stage_records(stages)
+        rejection_reason = str(firing_rejected_reason or "").strip()
+        if not firing_approved:
+            rejection_reason = self._normalized_rejection_reason(rejection_reason)
+
+        record: Dict[str, Any] = {
+            "timestamp": float(now),
+            "timestamp_local": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
+            "frame_number": int(self._frame_number),
+            "attempt_type": str(attempt_type),
+            "tracker_id": tracker_id,
+            "yolo_class": yolo_class,
+            "yolo_confidence": yolo_confidence,
+            "bbox": {
+                "x": int(bbox[0]),
+                "y": int(bbox[1]),
+                "w": int(bbox[2]),
+                "h": int(bbox[3]),
+                "area_ratio": float((int(bbox[2]) * int(bbox[3])) / max(1, self.cfg.guard.frame_width * self.cfg.guard.frame_height)),
+            },
+            "motion_score": motion_score,
+            "motion_policy_state": str(motion_policy_state.get("state", "TRACKING") or "TRACKING"),
+            "motion_policy": {
+                "state": str(motion_policy_state.get("state", "TRACKING") or "TRACKING"),
+                "previous_state": str(motion_policy_state.get("previous_state", "") or ""),
+                "suppression_reason": str(motion_policy_state.get("suppression_reason", "") or ""),
+                "suppression_timestamp": float(motion_policy_state.get("suppression_timestamp", 0.0) or 0.0),
+                "suppression_expiry": float(motion_policy_state.get("suppression_expiry", 0.0) or 0.0),
+                "next_eligible_evaluation_time": float(motion_policy_state.get("next_eligible_evaluation_time", 0.0) or 0.0),
+                "recent_motion_distance_px": float(motion_policy_state.get("recent_motion_distance_px", 0.0) or 0.0),
+                "average_velocity_px_s": float(motion_policy_state.get("average_velocity_px_s", 0.0) or 0.0),
+                "motion_confidence": float(motion_policy_state.get("motion_confidence", 0.0) or 0.0),
+                "stationary_duration_s": float(motion_policy_state.get("stationary_duration_s", 0.0) or 0.0),
+                "motion_window_s": float(motion_policy_state.get("motion_window_s", self._motion_policy_window_s()) or self._motion_policy_window_s()),
+                "motion_allowed": bool(motion_policy_state.get("motion_allowed", True)),
+                "profile_mode": str(motion_policy_state.get("profile_mode", self._motion_policy_mode()) or self._motion_policy_mode()),
+                "history": list(motion_policy_state.get("history", []) or []),
+            },
+            "shape_profile_used": str(shape_info.get("shape_profile_used", "") or ""),
+            "shape_score": float(shape_info.get("shape_score", 0.0) or 0.0),
+            "semantic_confirmation": {
+                "count": semantic_hits,
+                "required": semantic_required,
+            },
+            "threat_score": threat_score,
+            "planner_state": self._current_planner_state(),
+            "pir_state": self._current_pir_state(),
+            "sentry_state": str(getattr(self.state, "name", self.state)),
+            "safety_state": self._current_safety_state(now),
+            "firing": {
+                "approved": bool(firing_approved),
+                "rejected_reason": "" if firing_approved else rejection_reason,
+            },
+            "qualification_stages": combined_stages,
+        }
+
+        try:
+            self._engagement_telemetry.append(record)
+        except Exception as exc:
+            self._report_runtime_warning("Engagement telemetry append failed", exc)
+
+        bbox_data = record.get("bbox", {})
+        self._publish_mission_event(
+            "engagement_telemetry",
+            {
+                "timestamp": float(now),
+                "frame_number": int(self._frame_number),
+                "attempt_type": str(attempt_type),
+                "tracker_id": int(tracker_id),
+                "firing_approved": bool(firing_approved),
+                "firing_rejected_reason": str(rejection_reason),
+                "yolo_class": str(yolo_class),
+                "yolo_confidence": float(yolo_confidence),
+                "bbox": [
+                    int(bbox_data.get("x", 0) or 0),
+                    int(bbox_data.get("y", 0) or 0),
+                    int(bbox_data.get("w", 0) or 0),
+                    int(bbox_data.get("h", 0) or 0),
+                ],
+                "threat_score": float(threat_score),
+                "motion_score": float(motion_score),
+                "motion_policy_state": str(motion_policy_state.get("state", "TRACKING") or "TRACKING"),
+                "qualification_stages": list(combined_stages),
+            },
+        )
+
+        try:
+            frame = inspect.currentframe()
+            caller = frame.f_back if frame is not None else None
+            motion_threshold = self._forensic_motion_threshold()
+            stationary = bool(float(motion_score) < float(motion_threshold))
+            allowed_classes = [str(c) for c in list(getattr(self.cfg.target_filter, "allowed_classes", []) or [])]
+            class_allowed = (not allowed_classes) or (str(yolo_class) in allowed_classes)
+            self._forensic_logger.append(
+                {
+                    "event_type": "engagement_attempt",
+                    "frame_number": int(self._frame_number),
+                    "attempt_type": str(attempt_type),
+                    "tracker_id": int(tracker_id),
+                    "yolo_class": str(yolo_class),
+                    "class_allowed": bool(class_allowed),
+                    "allowed_classes": allowed_classes,
+                    "firing_approved": bool(firing_approved),
+                    "firing_rejected_reason": str(rejection_reason),
+                    "threat_score": float(threat_score),
+                    "motion_score": float(motion_score),
+                    "motion_policy_state": str(motion_policy_state.get("state", "TRACKING") or "TRACKING"),
+                    "motion_policy": {
+                        "state": str(motion_policy_state.get("state", "TRACKING") or "TRACKING"),
+                        "previous_state": str(motion_policy_state.get("previous_state", "") or ""),
+                        "suppression_reason": str(motion_policy_state.get("suppression_reason", "") or ""),
+                        "suppression_timestamp": float(motion_policy_state.get("suppression_timestamp", 0.0) or 0.0),
+                        "suppression_expiry": float(motion_policy_state.get("suppression_expiry", 0.0) or 0.0),
+                        "next_eligible_evaluation_time": float(motion_policy_state.get("next_eligible_evaluation_time", 0.0) or 0.0),
+                        "recent_motion_distance_px": float(motion_policy_state.get("recent_motion_distance_px", 0.0) or 0.0),
+                        "average_velocity_px_s": float(motion_policy_state.get("average_velocity_px_s", 0.0) or 0.0),
+                        "motion_confidence": float(motion_policy_state.get("motion_confidence", 0.0) or 0.0),
+                        "stationary_duration_s": float(motion_policy_state.get("stationary_duration_s", 0.0) or 0.0),
+                        "motion_window_s": float(motion_policy_state.get("motion_window_s", self._motion_policy_window_s()) or self._motion_policy_window_s()),
+                        "motion_allowed": bool(motion_policy_state.get("motion_allowed", True)),
+                        "profile_mode": str(motion_policy_state.get("profile_mode", self._motion_policy_mode()) or self._motion_policy_mode()),
+                        "history": list(motion_policy_state.get("history", []) or []),
+                    },
+                    "stationary_analysis": {
+                        "is_stationary": bool(stationary),
+                        "moving_threshold": float(motion_threshold),
+                        "motion_filter_enabled": False,
+                        "stationary_targeting_allowed_by_design": True,
+                        "approving_function": caller.f_code.co_name if caller is not None else "",
+                        "approving_filename": __file__,
+                        "approving_line": int(caller.f_lineno) if caller is not None else 0,
+                    },
+                    "wrong_class_analysis": {
+                        "outside_configured_classes": bool(not class_allowed),
+                        "semantic_confirmation": {
+                            "count": int(semantic_hits),
+                            "required": int(semantic_required),
+                        },
+                        "planner_state": self._current_planner_state(),
+                        "decision_chain": combined_stages,
+                    },
+                    "planner_state": self._current_planner_state(),
+                    "pir_state": self._current_pir_state(),
+                    "safety_state": self._current_safety_state(now),
+                }
+            )
+        except Exception as exc:
+            self._report_runtime_warning("Forensic engagement append failed", exc)
+
     def _prune_track_identity_cache(self, now: float) -> None:
         max_age = max(5.0, self._person_identity_fire_authorization_window_s() * 3.0)
         stale_track_ids = [
@@ -1973,6 +3410,7 @@ class SentryV2Engine:
         """Start engagement with a coarse acquire move before precision."""
         self._reset_precision_state()
         self._remember_active_target(order.target.det, target=order.target, timestamp=now)
+        self._record_motion_policy_transition(int(order.target.det.track_id), "ENGAGING", now, "planner selected target")
         # Seed aim anchors to the new order's planned position so that
         # loss recovery (if triggered immediately) searches near the
         # correct target, not the previous engagement's last aim point.
@@ -2091,7 +3529,18 @@ class SentryV2Engine:
         if not self._person_target_is_fire_authorized(order.target, now):
             self._trigger_gate_active = False
             self._trigger_hold_start = 0.0
+            self._emit_engagement_telemetry(
+                now=now,
+                order=order,
+                target=order.target,
+                attempt_type="final",
+                firing_approved=False,
+                firing_rejected_reason="person_fire_authorization_failed",
+                stages=list((self._last_fire_gate_trace or {}).get("stages", []) or []),
+            )
             return
+
+        self._record_motion_policy_transition(int(order.target.det.track_id), "FIRE_AUTHORIZATION", now, "final fire gate entered")
 
         blocked_mask = self._current_no_fire_mask()
         prompted_auto_fire_allowed = True
@@ -2130,21 +3579,69 @@ class SentryV2Engine:
             and blocked_mask is None
             and prompted_auto_fire_allowed
         )
+
+        final_stages: List[Dict[str, Any]] = [
+            {
+                "stage": "auto_trigger_enabled",
+                "inputs": {"auto_trigger_enabled": bool(self.cfg.engagement.auto_trigger_enabled)},
+                "threshold": {"required": True},
+                "pass": bool(self.cfg.engagement.auto_trigger_enabled),
+                "reason": "auto-trigger enabled" if bool(self.cfg.engagement.auto_trigger_enabled) else "planner veto",
+            },
+            {
+                "stage": "no_fire_mask",
+                "inputs": {"active_mask": str(getattr(blocked_mask, "name", "") if blocked_mask is not None else "")},
+                "threshold": {"requires_clear_mask": True},
+                "pass": bool(blocked_mask is None),
+                "reason": "mask clear" if blocked_mask is None else "mask block",
+            },
+            {
+                "stage": "prompted_auto_fire_policy",
+                "inputs": {"source": str(getattr(order.target.det, "source", "") or "")},
+                "threshold": {"prompted_allow_auto_fire": bool(getattr(self.cfg, "prompted_allow_auto_fire", False))},
+                "pass": bool(prompted_auto_fire_allowed),
+                "reason": "prompted policy satisfied" if prompted_auto_fire_allowed else "planner veto",
+            },
+        ]
+
+        if fired:
+            final_reason = "approved"
+        elif not bool(self.cfg.engagement.auto_trigger_enabled):
+            final_reason = "auto_trigger_disabled"
+        elif blocked_mask is not None:
+            final_reason = "mask_block"
+        elif not prompted_auto_fire_allowed:
+            final_reason = "prompted_auto_fire_disabled"
+        else:
+            final_reason = "unknown rejection path"
+
+        self._emit_engagement_telemetry(
+            now=now,
+            order=order,
+            target=order.target,
+            attempt_type="final",
+            firing_approved=bool(fired),
+            firing_rejected_reason=final_reason,
+            stages=list((self._last_fire_gate_trace or {}).get("stages", []) or []) + final_stages,
+        )
+
         if fired:
             burst = self.cfg.engagement.burst_count
             if self._cb_fire:
                 self._cb_fire(burst)
                 self._note_stationary_release_fire(order.target.det, now)
-                self.engagement_log.append({
-            "track_id": order.target.det.track_id,
-            "class": order.target.det.class_name,
-            "threat": round(order.target.threat_score, 2),
-            "pan": round(order.pan, 1),
-            "tilt": round(order.tilt, 1),
-            "time": now,
-            "fired": fired,
-            "blocked_by_mask": str(blocked_mask.name) if blocked_mask is not None else "",
-        })
+            self._record_motion_policy_transition(int(order.target.det.track_id), "FIRED", now, "fire callback executed")
+            self._record_motion_policy_transition(int(order.target.det.track_id), "POST_ENGAGEMENT", now, "post-fire cooldown")
+            self.engagement_log.append({
+                "track_id": order.target.det.track_id,
+                "class": order.target.det.class_name,
+                "threat": round(order.target.threat_score, 2),
+                "pan": round(order.pan, 1),
+                "tilt": round(order.tilt, 1),
+                "time": now,
+                "fired": fired,
+                "blocked_by_mask": str(blocked_mask.name) if blocked_mask is not None else "",
+            })
         # Keep log bounded
         if len(self.engagement_log) > 100:
             self.engagement_log = self.engagement_log[-100:]
@@ -2332,6 +3829,13 @@ class SentryV2Engine:
         gp, gt = self._planner.get_return_position()
         sensor_text = f" S{active_sensor_id + 1}" if active_sensor_id >= 0 else ""
         self._set_pir_note(f"PIR no target{sensor_text} -> return home {gp:.1f}/{gt:.1f}")
+        self._emit_pir_trace(
+            "pir_no_target_return_home",
+            sensor_id=active_sensor_id,
+            return_pan=float(gp),
+            return_tilt=float(gt),
+            queue_length=int(self._pir_manager.peek_queue_count()),
+        )
         self._move_turret(gp, gt)
         self._patrol_initialized = False
         self._patrol_last_update = 0.0
@@ -2925,23 +4429,150 @@ class SentryV2Engine:
           5. Hold time requirement met
         """
         eng = self.cfg.engagement
+        stage_trace: List[Dict[str, Any]] = []
+
+        def _push_stage(name: str, inputs: Dict[str, Any], threshold: Dict[str, Any], passed: bool, reason: str) -> None:
+            stage_trace.append(
+                {
+                    "stage": str(name),
+                    "inputs": dict(inputs),
+                    "threshold": dict(threshold),
+                    "pass": bool(passed),
+                    "reason": str(reason),
+                }
+            )
         
         # Refractory check: prevent rapid re-firing
         if now < self._trigger_refractory_until:
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
+            _push_stage(
+                "refractory_period",
+                {"now": float(now)},
+                {"refractory_until": float(self._trigger_refractory_until)},
+                False,
+                "refractory period",
+            )
+            self._last_fire_gate_trace = {
+                "approved": False,
+                "reason": "refractory_period",
+                "stages": stage_trace,
+            }
             return False
+        _push_stage(
+            "refractory_period",
+            {"now": float(now)},
+            {"refractory_until": float(self._trigger_refractory_until)},
+            True,
+            "refractory period satisfied",
+        )
 
         # No-fire mask check: safety-critical
         if self._current_no_fire_mask() is not None:
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
+            _push_stage(
+                "no_fire_mask",
+                {"active_mask": str(self._last_no_fire_mask_name or "")},
+                {"requires_clear_mask": True},
+                False,
+                "mask block",
+            )
+            self._last_fire_gate_trace = {
+                "approved": False,
+                "reason": "no_fire_mask_block",
+                "stages": stage_trace,
+            }
             return False
+        _push_stage(
+            "no_fire_mask",
+            {"active_mask": ""},
+            {"requires_clear_mask": True},
+            True,
+            "mask clear",
+        )
 
         if not self._person_target_is_fire_authorized(target, now):
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
+            _push_stage(
+                "person_fire_authorization",
+                {
+                    "class_name": str(getattr(target.det, "class_name", "") or ""),
+                    "fire_veto_reason": str(self._last_fire_veto_reason or ""),
+                },
+                {"authorization_required": True},
+                False,
+                "safety lock",
+            )
+            self._last_fire_gate_trace = {
+                "approved": False,
+                "reason": "person_fire_authorization_failed",
+                "stages": stage_trace,
+            }
             return False
+        _push_stage(
+            "person_fire_authorization",
+            {
+                "class_name": str(getattr(target.det, "class_name", "") or ""),
+                "fire_veto_reason": str(self._last_fire_veto_reason or ""),
+            },
+            {"authorization_required": True},
+            True,
+            "authorization accepted",
+        )
+
+        policy_state = self._motion_policy_state.get(int(getattr(target.det, "track_id", -1) or -1), {})
+        policy_mode = self._motion_policy_mode()
+        policy_lifecycle = str(policy_state.get("state", "TRACKING") or "TRACKING")
+        policy_motion_allowed = bool(policy_state.get("motion_allowed", True))
+        if policy_mode != "allow_stationary" and not policy_motion_allowed:
+            self._trigger_hold_start = 0.0
+            self._trigger_gate_active = False
+            self._set_fire_veto_reason(
+                str(policy_state.get("suppression_reason", "motion policy suppressed") or "motion policy suppressed"),
+                now,
+            )
+            _push_stage(
+                "motion_policy",
+                {
+                    "state": policy_lifecycle,
+                    "suppression_reason": str(policy_state.get("suppression_reason", "") or ""),
+                    "recent_motion_distance_px": float(policy_state.get("recent_motion_distance_px", 0.0) or 0.0),
+                    "average_velocity_px_s": float(policy_state.get("average_velocity_px_s", 0.0) or 0.0),
+                    "motion_confidence": float(policy_state.get("motion_confidence", 0.0) or 0.0),
+                    "stationary_duration_s": float(policy_state.get("stationary_duration_s", 0.0) or 0.0),
+                },
+                {
+                    "motion_policy_mode": policy_mode,
+                    "motion_stationary_timeout_s": float(getattr(self.cfg.engagement, "motion_stationary_timeout_s", 4.0) or 4.0),
+                },
+                False,
+                "motion policy rejected target",
+            )
+            self._last_fire_gate_trace = {
+                "approved": False,
+                "reason": "motion_policy_block",
+                "stages": stage_trace,
+            }
+            return False
+        _push_stage(
+            "motion_policy",
+            {
+                "state": policy_lifecycle,
+                "suppression_reason": str(policy_state.get("suppression_reason", "") or ""),
+                "recent_motion_distance_px": float(policy_state.get("recent_motion_distance_px", 0.0) or 0.0),
+                "average_velocity_px_s": float(policy_state.get("average_velocity_px_s", 0.0) or 0.0),
+                "motion_confidence": float(policy_state.get("motion_confidence", 0.0) or 0.0),
+                "stationary_duration_s": float(policy_state.get("stationary_duration_s", 0.0) or 0.0),
+            },
+            {
+                "motion_policy_mode": policy_mode,
+                "motion_stationary_timeout_s": float(getattr(self.cfg.engagement, "motion_stationary_timeout_s", 4.0) or 4.0),
+            },
+            True,
+            "motion policy accepted",
+        )
 
         # Centering check: use hysteresis (wider exit than enter)
         enter_pan = float(eng.fire_trigger_enter_pan_tolerance)
@@ -2952,27 +4583,93 @@ class SentryV2Engine:
         gate_tilt = exit_tilt if self._trigger_gate_active else enter_tilt
 
         centered = abs(lock_pan) <= gate_pan and abs(lock_tilt) <= gate_tilt
+        _push_stage(
+            "centering",
+            {
+                "lock_pan": float(lock_pan),
+                "lock_tilt": float(lock_tilt),
+                "gate_pan": float(gate_pan),
+                "gate_tilt": float(gate_tilt),
+            },
+            {
+                "enter_pan": float(enter_pan),
+                "enter_tilt": float(enter_tilt),
+                "exit_pan": float(exit_pan),
+                "exit_tilt": float(exit_tilt),
+            },
+            bool(centered),
+            "target centered" if centered else "target not centered",
+        )
         
         # Target quality check: simplified - only confidence and persistence
         trustworthy = (
             float(target.det.confidence) >= float(eng.fire_trigger_min_confidence)
             and float(target.persistence) >= float(eng.fire_trigger_min_persistence)
         )
+        _push_stage(
+            "target_quality",
+            {
+                "confidence": float(target.det.confidence),
+                "persistence": float(target.persistence),
+            },
+            {
+                "min_confidence": float(eng.fire_trigger_min_confidence),
+                "min_persistence": float(eng.fire_trigger_min_persistence),
+            },
+            bool(trustworthy),
+            "quality accepted" if trustworthy else "confidence below threshold",
+        )
 
         if not (centered and trustworthy):
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
+            self._last_fire_gate_trace = {
+                "approved": False,
+                "reason": "target_not_centered" if not centered else "target_quality_below_threshold",
+                "stages": stage_trace,
+            }
             return False
 
         # Hold time accumulation
         if self._trigger_hold_start <= 0.0:
             self._trigger_hold_start = now
             self._trigger_gate_active = True
+            _push_stage(
+                "hold_time",
+                {
+                    "hold_start": float(self._trigger_hold_start),
+                    "hold_elapsed": 0.0,
+                },
+                {"required_hold_time_s": float(eng.fire_trigger_hold_time)},
+                False,
+                "hold-time requirement not satisfied",
+            )
+            self._last_fire_gate_trace = {
+                "approved": False,
+                "reason": "hold_time_not_met",
+                "stages": stage_trace,
+            }
             return False
 
         self._trigger_gate_active = True
         hold_elapsed = now - self._trigger_hold_start
-        return hold_elapsed >= float(eng.fire_trigger_hold_time)
+        hold_pass = hold_elapsed >= float(eng.fire_trigger_hold_time)
+        _push_stage(
+            "hold_time",
+            {
+                "hold_start": float(self._trigger_hold_start),
+                "hold_elapsed": float(hold_elapsed),
+            },
+            {"required_hold_time_s": float(eng.fire_trigger_hold_time)},
+            bool(hold_pass),
+            "hold-time requirement satisfied" if hold_pass else "hold-time requirement not satisfied",
+        )
+        self._last_fire_gate_trace = {
+            "approved": bool(hold_pass),
+            "reason": "approved" if hold_pass else "hold_time_not_met",
+            "stages": stage_trace,
+        }
+        return hold_pass
 
     def _compute_visual_servo_correction(
         self,
@@ -3345,6 +5042,15 @@ class SentryV2Engine:
         self.state = new
         if self._cb_state:
             self._cb_state(old, new)
+        self._publish_mission_event(
+            "engine_state_transition",
+            {
+                "timestamp": float(time.time()),
+                "frame_number": int(self._frame_number),
+                "from_state": str(old.name),
+                "to_state": str(new.name),
+            },
+        )
 
     # ------------------------------------------------------------------ #
     # External queries
@@ -3354,6 +5060,8 @@ class SentryV2Engine:
         return self.state.name
 
     def get_engagement_stats(self) -> Dict:
+        active_track_id = int(getattr(getattr(self, "active_order", None), "target", None).det.track_id) if getattr(self, "active_order", None) is not None else -1
+        active_motion_policy = dict(self._motion_policy_state.get(active_track_id, {}) or {}) if active_track_id >= 0 else {}
         return {
             "state": self.state.name,
             "engage_phase": str(getattr(self, "_engage_phase", "")),
@@ -3386,7 +5094,24 @@ class SentryV2Engine:
             "no_fire_mask": self._last_no_fire_mask_name,
             "fire_veto_reason": self._last_fire_veto_reason,
             "fire_veto_recent": bool(self._last_fire_veto_time and (time.time() - self._last_fire_veto_time) <= 3.0),
+            "motion_policy": {
+                "mode": self._motion_policy_mode(),
+                "active_track_id": active_track_id,
+                "active_state": str(active_motion_policy.get("state", "") or ""),
+                "suppression_reason": str(active_motion_policy.get("suppression_reason", "") or ""),
+                "suppression_expiry": float(active_motion_policy.get("suppression_expiry", 0.0) or 0.0),
+                "next_eligible_evaluation_time": float(active_motion_policy.get("next_eligible_evaluation_time", 0.0) or 0.0),
+                "recent_motion_distance_px": float(active_motion_policy.get("recent_motion_distance_px", 0.0) or 0.0),
+                "average_velocity_px_s": float(active_motion_policy.get("average_velocity_px_s", 0.0) or 0.0),
+                "motion_confidence": float(active_motion_policy.get("motion_confidence", 0.0) or 0.0),
+                "stationary_duration_s": float(active_motion_policy.get("stationary_duration_s", 0.0) or 0.0),
+                "history": list(active_motion_policy.get("history", []) or []),
+            },
+            "engagement_telemetry_log": str(self._engagement_telemetry.log_path),
+            "engagement_telemetry_run_id": str(self._engagement_telemetry.run_id),
+            "frame_number": int(self._frame_number),
             "motion_enabled": bool(self._motion_enabled),
+            "motion_policy_state_count": int(len(self._motion_policy_state)),
             "filter_rejections": [
                 {
                     "track_id": int(decision.track_id),

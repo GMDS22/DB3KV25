@@ -135,6 +135,7 @@ class SentryV2Overlay:
             self._draw_engagement_zone(frame, engine, w, h)
 
         display_targets = self._get_display_targets(engine) if include_target_boxes else []
+        self._draw_forensic_object_debug(frame, engine)
         primary = display_targets[0] if display_targets else None
         self._draw_detection_size_tag(frame, primary)
         if primary is not None:
@@ -148,6 +149,49 @@ class SentryV2Overlay:
         self._draw_fire_feedback(frame, w, h)
 
         return frame
+
+    def _draw_forensic_object_debug(self, frame: np.ndarray, engine: SentryV2Engine) -> None:
+        entries = list(engine.get_forensic_overlay_entries()) if hasattr(engine, "get_forensic_overlay_entries") else []
+        if not entries:
+            return
+        planner_state = str(getattr(engine, "_engage_phase", "") or "")
+        for entry in entries:
+            bbox = list(entry.get("bbox", [0, 0, 0, 0]) or [0, 0, 0, 0])
+            if len(bbox) != 4:
+                continue
+            bx, by, bw, bh = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+            status = str(entry.get("status", "ignored") or "ignored").lower()
+            if status == "qualified":
+                color = _COL_GREEN
+            elif status == "candidate":
+                color = _COL_YELLOW
+            elif status == "rejected":
+                color = _COL_RED
+            else:
+                color = _COL_GRAY
+
+            if bw > 1 and bh > 1:
+                cv2.rectangle(frame, (bx, by), (bx + bw, by + bh), color, 1, cv2.LINE_AA)
+
+            tracker_id = int(entry.get("track_id", -1) or -1)
+            class_name = str(entry.get("class_name", "") or "")
+            conf = float(entry.get("confidence", 0.0) or 0.0)
+            motion = float(entry.get("motion_score", 0.0) or 0.0)
+            shape = float(entry.get("shape_score", 0.0) or 0.0)
+            threat = float(entry.get("threat_score", 0.0) or 0.0)
+            reject_reason = str(entry.get("rejection_reason", "") or "")
+
+            label = (
+                f"ID{tracker_id} {class_name} c={conf:.2f} m={motion:.2f} "
+                f"sh={shape:.2f} th={threat:.2f} {status.upper()}"
+            )
+            if reject_reason:
+                label += f" r={reject_reason}"
+            if planner_state:
+                label += f" p={planner_state}"
+
+            label_y = max(12, by - 6)
+            self._put_text(frame, label, (max(2, bx), label_y), _FS_TINY, color)
 
     def _draw_detection_size_tag(self, frame: np.ndarray, target: Optional[TrackedTarget]) -> None:
         """Draw a pixel size tag for the current primary target only."""

@@ -138,7 +138,14 @@
         "stationary_release_min_fire_cycles": 3,
         "stationary_release_hold_s": 5.0,
         "stationary_release_suppress_s": 10.0,
-        "stationary_release_motion_px": 36.0
+        "stationary_release_motion_px": 36.0,
+        "motion_policy_mode": "allow_stationary",
+        "motion_recent_window_s": 1.75,
+        "motion_recent_distance_px": 18.0,
+        "motion_average_velocity_px_s": 8.0,
+        "motion_confidence_min": 0.35,
+        "motion_stationary_timeout_s": 6.0,
+        "motion_suppression_cooldown_s": 1.5
       },
       "servo_move_time_ms": 22,
       "guard": {}
@@ -277,7 +284,14 @@
         "stationary_release_min_fire_cycles": 3,
         "stationary_release_hold_s": 5.0,
         "stationary_release_suppress_s": 10.0,
-        "stationary_release_motion_px": 36.0
+        "stationary_release_motion_px": 36.0,
+        "motion_policy_mode": "allow_stationary",
+        "motion_recent_window_s": 1.75,
+        "motion_recent_distance_px": 18.0,
+        "motion_average_velocity_px_s": 8.0,
+        "motion_confidence_min": 0.35,
+        "motion_stationary_timeout_s": 6.0,
+        "motion_suppression_cooldown_s": 1.5
       },
       "face_recognition": {
         "enabled": true,
@@ -434,7 +448,14 @@
         "stationary_release_min_fire_cycles": 3,
         "stationary_release_hold_s": 5.0,
         "stationary_release_suppress_s": 10.0,
-        "stationary_release_motion_px": 36.0
+        "stationary_release_motion_px": 36.0,
+        "motion_policy_mode": "allow_stationary",
+        "motion_recent_window_s": 1.75,
+        "motion_recent_distance_px": 18.0,
+        "motion_average_velocity_px_s": 8.0,
+        "motion_confidence_min": 0.35,
+        "motion_stationary_timeout_s": 6.0,
+        "motion_suppression_cooldown_s": 1.5
       },
       "servo_move_time_ms": 18,
       "guard": {
@@ -665,7 +686,14 @@
         "stationary_release_min_fire_cycles": 3,
         "stationary_release_hold_s": 5.0,
         "stationary_release_suppress_s": 10.0,
-        "stationary_release_motion_px": 36.0
+        "stationary_release_motion_px": 36.0,
+        "motion_policy_mode": "allow_stationary",
+        "motion_recent_window_s": 1.75,
+        "motion_recent_distance_px": 18.0,
+        "motion_average_velocity_px_s": 8.0,
+        "motion_confidence_min": 0.35,
+        "motion_stationary_timeout_s": 6.0,
+        "motion_suppression_cooldown_s": 1.5
       },
       "face_recognition": {
         "enabled": true,
@@ -822,7 +850,14 @@
         "stationary_release_min_fire_cycles": 3,
         "stationary_release_hold_s": 5.0,
         "stationary_release_suppress_s": 10.0,
-        "stationary_release_motion_px": 36.0
+        "stationary_release_motion_px": 36.0,
+        "motion_policy_mode": "allow_stationary",
+        "motion_recent_window_s": 1.75,
+        "motion_recent_distance_px": 18.0,
+        "motion_average_velocity_px_s": 8.0,
+        "motion_confidence_min": 0.35,
+        "motion_stationary_timeout_s": 6.0,
+        "motion_suppression_cooldown_s": 1.5
       },
       "face_recognition": {
         "enabled": true,
@@ -979,7 +1014,14 @@
         "stationary_release_min_fire_cycles": 3,
         "stationary_release_hold_s": 5.0,
         "stationary_release_suppress_s": 10.0,
-        "stationary_release_motion_px": 36.0
+        "stationary_release_motion_px": 36.0,
+        "motion_policy_mode": "allow_stationary",
+        "motion_recent_window_s": 1.75,
+        "motion_recent_distance_px": 18.0,
+        "motion_average_velocity_px_s": 8.0,
+        "motion_confidence_min": 0.35,
+        "motion_stationary_timeout_s": 6.0,
+        "motion_suppression_cooldown_s": 1.5
       },
       "face_recognition": {
         "enabled": true,
@@ -1149,7 +1191,14 @@
         "stationary_release_min_fire_cycles": 3,
         "stationary_release_hold_s": 5.0,
         "stationary_release_suppress_s": 10.0,
-        "stationary_release_motion_px": 36.0
+        "stationary_release_motion_px": 36.0,
+        "motion_policy_mode": "require_recent_motion",
+        "motion_recent_window_s": 1.0,
+        "motion_recent_distance_px": 14.0,
+        "motion_average_velocity_px_s": 12.0,
+        "motion_confidence_min": 0.45,
+        "motion_stationary_timeout_s": 1.5,
+        "motion_suppression_cooldown_s": 1.2
       },
       "face_recognition": {
         "enabled": true,
@@ -1306,7 +1355,14 @@
         "stationary_release_min_fire_cycles": 3,
         "stationary_release_hold_s": 5.0,
         "stationary_release_suppress_s": 10.0,
-        "stationary_release_motion_px": 36.0
+        "stationary_release_motion_px": 36.0,
+        "motion_policy_mode": "require_recent_motion",
+        "motion_recent_window_s": 1.0,
+        "motion_recent_distance_px": 14.0,
+        "motion_average_velocity_px_s": 12.0,
+        "motion_confidence_min": 0.45,
+        "motion_stationary_timeout_s": 1.5,
+        "motion_suppression_cooldown_s": 1.2
       },
       "servo_move_time_ms": 16,
       "guard": {}
@@ -1448,7 +1504,14 @@
         "stationary_release_min_fire_cycles": 3,
         "stationary_release_hold_s": 5.0,
         "stationary_release_suppress_s": 10.0,
-        "stationary_release_motion_px": 36.0
+        "stationary_release_motion_px": 36.0,
+        "motion_policy_mode": "require_recent_motion",
+        "motion_recent_window_s": 1.0,
+        "motion_recent_distance_px": 14.0,
+        "motion_average_velocity_px_s": 12.0,
+        "motion_confidence_min": 0.45,
+        "motion_stationary_timeout_s": 1.5,
+        "motion_suppression_cooldown_s": 1.2
       },
       "servo_move_time_ms": 16,
       "guard": {}

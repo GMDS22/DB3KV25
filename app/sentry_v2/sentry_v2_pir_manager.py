@@ -7,7 +7,8 @@ Manages PIR sensor state, debouncing, and cue generation for blind-spot detectio
 from __future__ import annotations
 
 import time
-from typing import List, Optional, Tuple
+import inspect
+from typing import Callable, Dict, List, Optional, Tuple
 
 from .sentry_v2_config import PIRGuardConfig, PIRSensorConfig
 
@@ -27,6 +28,7 @@ class SentryV2PIRManager:
     
     def __init__(self, config: PIRGuardConfig):
         self.cfg = config
+        self._trace_callback: Optional[Callable[[Dict[str, object]], None]] = None
         
         # Debounce tracking per sensor: {sensor_id: last_fire_time}
         self._last_fire_time: dict = {}
@@ -46,6 +48,32 @@ class SentryV2PIRManager:
         self._scan_index: int = 0
         self._scan_point_visited: set = set()  # Track visited points during scan
         self._scan_reference_point: Optional[Tuple[float, float]] = None
+
+    def set_trace_callback(self, callback: Optional[Callable[[Dict[str, object]], None]]) -> None:
+        """Register an optional diagnostics callback for PIR queue/state tracing."""
+        self._trace_callback = callback
+
+    def _trace(self, action: str, **fields: object) -> None:
+        callback = self._trace_callback
+        if callback is None:
+            return
+        frame = inspect.currentframe()
+        caller = frame.f_back if frame is not None else None
+        payload: Dict[str, object] = {
+            "component": "pir_manager",
+            "action": str(action),
+            "timestamp": float(time.time()),
+            "function": caller.f_code.co_name if caller is not None else "",
+            "filename": __file__,
+            "line": int(caller.f_lineno) if caller is not None else 0,
+            "queue_length": int(len(self._cue_queue)),
+            "active_cue": bool(self._active_cue is not None),
+        }
+        payload.update(fields)
+        try:
+            callback(payload)
+        except Exception:
+            pass
 
     def _search_style(self, override: Optional[str] = None) -> str:
         style = str(override or getattr(self.cfg, "search_style", "hunting") or "hunting").strip().lower()
@@ -190,6 +218,7 @@ class SentryV2PIRManager:
     def update_config(self, config: PIRGuardConfig) -> None:
         """Hot-reload configuration."""
         self.cfg = config
+        queue_before = int(len(self._cue_queue))
         # Clear internal state on config change
         self._last_fire_time.clear()
         self._cue_queue.clear()
@@ -198,17 +227,23 @@ class SentryV2PIRManager:
         self._scan_reference_point = None
         self._last_accepted_event_time = 0.0
         self._last_accepted_sensor_id = None
+        self._trace("config_update_reset", queue_before=queue_before, queue_after=int(len(self._cue_queue)))
         
     def on_pir_event(self, sensor_id: int, timestamp: float) -> None:
         """Called when a PIR sensor fires. Handles debouncing and queueing."""
+        queue_before = int(len(self._cue_queue))
+        self._trace("event_received", sensor_id=int(sensor_id), event_timestamp=float(timestamp), queue_before=queue_before)
         if not self.cfg.pir_enabled:
+            self._trace("event_ignored_disabled", sensor_id=int(sensor_id), queue_before=queue_before)
             return
         
         if sensor_id < 0 or sensor_id >= len(self.cfg.sensors):
+            self._trace("event_ignored_invalid_sensor", sensor_id=int(sensor_id), queue_before=queue_before)
             return
         
         sensor = self.cfg.sensors[sensor_id]
         if not sensor.enabled:
+            self._trace("event_ignored_sensor_disabled", sensor_id=int(sensor_id), queue_before=queue_before)
             return
         
         # Check debounce
@@ -217,6 +252,15 @@ class SentryV2PIRManager:
         debounce_s = sensor.debounce_ms / 1000.0
         
         if now - last_fire < debounce_s:
+            self._trace(
+                "event_ignored_debounce",
+                sensor_id=int(sensor_id),
+                event_timestamp=float(now),
+                last_fire_timestamp=float(last_fire),
+                debounce_s=float(debounce_s),
+                delta_s=float(now - last_fire),
+                queue_before=queue_before,
+            )
             return  # Still in debounce period
 
         configured_cross_lockout_s = max(0.0, float(getattr(self.cfg, "cross_sensor_lockout_ms", 0) or 0) / 1000.0)
@@ -228,6 +272,14 @@ class SentryV2PIRManager:
             and int(self._last_accepted_sensor_id) != int(sensor_id)
             and (now - self._last_accepted_event_time) < cross_lockout_s
         ):
+            self._trace(
+                "event_ignored_cross_sensor_lockout",
+                sensor_id=int(sensor_id),
+                previous_sensor_id=int(self._last_accepted_sensor_id),
+                cross_lockout_s=float(cross_lockout_s),
+                delta_s=float(now - self._last_accepted_event_time),
+                queue_before=queue_before,
+            )
             return
         
         self._last_fire_time[sensor_id] = now
@@ -242,6 +294,15 @@ class SentryV2PIRManager:
             timestamp=now,
         )
         self._cue_queue.append(event)
+        self._trace(
+            "event_enqueued",
+            sensor_id=int(sensor_id),
+            cue_pan=float(sensor.cue_pan),
+            cue_tilt=float(sensor.cue_tilt),
+            event_timestamp=float(now),
+            queue_before=queue_before,
+            queue_after=int(len(self._cue_queue)),
+        )
     
     def has_pending_cue(self) -> bool:
         """Check if there's a queued or active cue waiting to be processed."""
@@ -253,32 +314,69 @@ class SentryV2PIRManager:
         Returns None if no cues available or if active cue is still being pursued.
         """
         if not self.cfg.pir_enabled:
+            self._trace("get_next_cue_disabled", now=float(now))
             return None
         
         # If there's an active cue, check if it has timed out
         if self._active_cue is not None:
             if now - self._active_cue_start < self.cfg.confirmation_timeout:
+                self._trace(
+                    "active_cue_still_pending",
+                    now=float(now),
+                    active_sensor_id=int(self._active_cue.sensor_id),
+                    active_age_s=float(now - self._active_cue_start),
+                    confirmation_timeout_s=float(self.cfg.confirmation_timeout),
+                )
                 return None  # Still pursuing current cue
             else:
+                self._trace(
+                    "active_cue_confirmation_timeout",
+                    now=float(now),
+                    active_sensor_id=int(self._active_cue.sensor_id),
+                    active_age_s=float(now - self._active_cue_start),
+                    confirmation_timeout_s=float(self.cfg.confirmation_timeout),
+                )
                 self._active_cue = None  # Timeout reached, clear it
         
         # Discard stale events before popping (data_timeout_ms guard)
         timeout_s = self.cfg.data_timeout_ms / 1000.0
         while self._cue_queue:
             if now - self._cue_queue[0].timestamp > timeout_s:
+                expired = self._cue_queue[0]
                 self._cue_queue.pop(0)  # too old, discard
+                self._trace(
+                    "queued_event_expired",
+                    now=float(now),
+                    sensor_id=int(expired.sensor_id),
+                    event_timestamp=float(expired.timestamp),
+                    age_s=float(now - expired.timestamp),
+                    timeout_s=float(timeout_s),
+                    queue_after=int(len(self._cue_queue)),
+                )
             else:
                 break
 
         # Try to get next from queue
         if self._cue_queue:
+            queue_before = int(len(self._cue_queue))
             cue = self._cue_queue.pop(0)
             self._active_cue = cue
             self._active_cue_start = now
             self._scan_active = False  # Reset scan state
             self._scan_index = 0
+            self._trace(
+                "event_dequeued_to_active",
+                now=float(now),
+                sensor_id=int(cue.sensor_id),
+                cue_pan=float(cue.cue_pan),
+                cue_tilt=float(cue.cue_tilt),
+                event_timestamp=float(cue.timestamp),
+                queue_before=queue_before,
+                queue_after=int(len(self._cue_queue)),
+            )
             return cue
 
+        self._trace("queue_empty_no_cue", now=float(now))
         return None
     
     def generate_scan_grid(
@@ -414,10 +512,18 @@ class SentryV2PIRManager:
         other sensors are preserved so the hunt protocol can continue
         investigating remaining zones.
         """
+        queue_before = int(len(self._cue_queue))
+        active_sensor_id = int(self._active_cue.sensor_id) if self._active_cue is not None else -1
         self._active_cue = None
         self._scan_active = False
         self._scan_reference_point = None
         # _cue_queue intentionally NOT cleared here
+        self._trace(
+            "active_cue_completed",
+            active_sensor_id=active_sensor_id,
+            queue_before=queue_before,
+            queue_after=int(len(self._cue_queue)),
+        )
 
     def cancel_active_cue(self) -> None:
         """Cancel the active cue and clear the entire queue (full stop).
@@ -426,10 +532,18 @@ class SentryV2PIRManager:
         reload, or feature disabled).  Do NOT call this on target-found
         — use complete_active_cue() instead to preserve queued events.
         """
+        queue_before = int(len(self._cue_queue))
+        active_sensor_id = int(self._active_cue.sensor_id) if self._active_cue is not None else -1
         self._active_cue = None
         self._scan_active = False
         self._cue_queue.clear()
         self._scan_reference_point = None
+        self._trace(
+            "active_cue_cancelled_and_queue_cleared",
+            active_sensor_id=active_sensor_id,
+            queue_before=queue_before,
+            queue_after=int(len(self._cue_queue)),
+        )
 
     def peek_queue_count(self) -> int:
         """Return number of events waiting in queue (excludes active cue)."""
