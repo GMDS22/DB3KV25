@@ -13105,13 +13105,21 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             if bool(getattr(self, "_shutdown_in_progress", False)) or bool(getattr(self, "_cleanup_started", False)):
                 self._speak_after_operator_quiet("Shutdown is already in progress.", interrupt=False)
                 return "acknowledged"
-            self._run_voice_action_after_confirmation(
-                "Sure. Closing the app now.",
-                self._request_full_application_close,
-                interrupt=False,
-                action_label="close-app",
-                wait_for_speech_completion=True,
-            )
+            close_callback = getattr(self, "_request_full_application_close", None)
+            if not callable(close_callback):
+                close_callback = getattr(self, "begin_graceful_shutdown", None)
+            if not callable(close_callback):
+                close_callback = getattr(self, "close", None)
+            if callable(close_callback):
+                self._run_voice_action_after_confirmation(
+                    "Sure. Closing the app now.",
+                    close_callback,
+                    interrupt=False,
+                    action_label="close-app",
+                    wait_for_speech_completion=True,
+                )
+            else:
+                self._speak_after_operator_quiet("Close is unavailable in the current context.", interrupt=False)
             return "acknowledged"
 
         _restart_app_tokens = (
@@ -13150,24 +13158,30 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             if bool(getattr(self, "_shutdown_in_progress", False)) or bool(getattr(self, "_cleanup_started", False)):
                 self._speak_after_operator_quiet("Shutdown is already in progress.", interrupt=False)
                 return "acknowledged"
-            # Generate a non-repeating response using the voice phrase picker
-            response = self._voice_pick_phrase(
-                "restart_app",
-                (
-                    "Restarting Smart Sentry now.",
-                    "Relaunching the application.",
-                    "Initiating application restart.",
-                    "Restarting the system now.",
-                    "Reloading Smart Sentry.",
+            restart_callback = getattr(self, "_restart_application", None)
+            if not callable(restart_callback):
+                restart_callback = getattr(self, "restart", None)
+            if callable(restart_callback):
+                # Generate a non-repeating response using the voice phrase picker
+                response = self._voice_pick_phrase(
+                    "restart_app",
+                    (
+                        "Restarting Smart Sentry now.",
+                        "Relaunching the application.",
+                        "Initiating application restart.",
+                        "Restarting the system now.",
+                        "Reloading Smart Sentry.",
+                    )
                 )
-            )
-            self._run_voice_action_after_confirmation(
-                response,
-                lambda: self._restart_application(),
-                interrupt=False,
-                action_label="restart-app",
-                wait_for_speech_completion=True,
-            )
+                self._run_voice_action_after_confirmation(
+                    response,
+                    restart_callback,
+                    interrupt=False,
+                    action_label="restart-app",
+                    wait_for_speech_completion=True,
+                )
+            else:
+                self._speak_after_operator_quiet("Restart is unavailable in the current context.", interrupt=False)
             return "acknowledged"
 
         cancel_all_tokens = (
