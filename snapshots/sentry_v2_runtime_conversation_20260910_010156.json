@@ -1,0 +1,878 @@
+{
+  "generated_at_local": "2026-09-10 01:01:56",
+  "generated_at_epoch_s": 1788973316.479295,
+  "entry_count": 43,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 35,
+    "operator": 5
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 35,
+    "spoken_confirmation": 1,
+    "voice_transcript_partial": 4,
+    "voice_transcript_final": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 41
+  },
+  "voice_transcript_summary": {
+    "partial_count": 4,
+    "final_count": 1,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "smart sentry is ready",
+  "latest_operator_request": "smart sentry is ready",
+  "latest_assistant_message": "Smart Sentry is ready.",
+  "analysis_hints": [],
+  "recent_turns": [
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1788973159.438167,
+      "timestamp_local": "2026-09-10 00:59:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973159.438167,
+        "source": "vosk",
+        "rms": 131,
+        "updated_at": 1788973159.438167
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1788973159.5159416,
+      "timestamp_local": "2026-09-10 00:59:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart century is ready",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973159.5159416,
+        "source": "vosk",
+        "rms": 131,
+        "updated_at": 1788973159.438167
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1788973159.6856296,
+      "timestamp_local": "2026-09-10 00:59:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973159.6856296,
+        "source": "vosk",
+        "rms": 131,
+        "updated_at": 1788973159.438167
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1788973160.2683597,
+      "timestamp_local": "2026-09-10 00:59:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973160.2683597,
+        "source": "vosk",
+        "rms": 131,
+        "updated_at": 1788973159.438167
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1788973160.43671,
+      "timestamp_local": "2026-09-10 00:59:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973160.43671,
+        "source": "vosk",
+        "rms": 131,
+        "updated_at": 1788973159.438167
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1788973160.6907635,
+      "timestamp_local": "2026-09-10 00:59:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973160.6907635,
+        "source": "vosk",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1788973160.9361212,
+      "timestamp_local": "2026-09-10 00:59:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973160.9361212,
+        "source": "vosk",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1788973161.2939446,
+      "timestamp_local": "2026-09-10 00:59:21",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "smart sentry is ready",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1788973161.2939446,
+        "source": "final",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1788973161.4329686,
+      "timestamp_local": "2026-09-10 00:59:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973161.4329686,
+        "source": "vosk",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1788973161.4334762,
+      "timestamp_local": "2026-09-10 00:59:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973161.4334762,
+        "source": "vosk",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1788973162.1894941,
+      "timestamp_local": "2026-09-10 00:59:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973162.1894941,
+        "source": "vosk",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1788973162.4362037,
+      "timestamp_local": "2026-09-10 00:59:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973162.4362037,
+        "source": "vosk",
+        "rms": 397,
+        "updated_at": 1788973162.4362037
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1788973113.7169535,
+      "timestamp_local": "2026-09-10 00:58:33",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1788973113.7184637,
+      "timestamp_local": "2026-09-10 00:58:33",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1788973117.4317813,
+      "timestamp_local": "2026-09-10 00:58:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973117.4317813,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1788973120.4359078,
+      "timestamp_local": "2026-09-10 00:58:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973120.4359078,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1788973121.4353135,
+      "timestamp_local": "2026-09-10 00:58:41",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973121.4353135,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1788973154.505235,
+      "timestamp_local": "2026-09-10 00:59:14",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Smart Sentry is ready.",
+      "metadata": {
+        "interrupt": true,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1788973131.6850698,
+      "timestamp_local": "2026-09-10 00:58:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973131.6850698,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1788973132.1865747,
+      "timestamp_local": "2026-09-10 00:58:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973132.1865747,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1788973134.185345,
+      "timestamp_local": "2026-09-10 00:58:54",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973134.185345,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1788973134.6861782,
+      "timestamp_local": "2026-09-10 00:58:54",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973134.6861782,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1788973145.935361,
+      "timestamp_local": "2026-09-10 00:59:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973145.935361,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1788973146.6851683,
+      "timestamp_local": "2026-09-10 00:59:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973146.6851683,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1788973147.6861672,
+      "timestamp_local": "2026-09-10 00:59:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973147.6861672,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1788973148.1856596,
+      "timestamp_local": "2026-09-10 00:59:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973148.1856596,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1788973148.935573,
+      "timestamp_local": "2026-09-10 00:59:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973148.935573,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1788973149.435263,
+      "timestamp_local": "2026-09-10 00:59:09",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973149.435263,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1788973150.1867585,
+      "timestamp_local": "2026-09-10 00:59:10",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973150.1867585,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1788973150.6857915,
+      "timestamp_local": "2026-09-10 00:59:10",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973150.6857915,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1788973152.186639,
+      "timestamp_local": "2026-09-10 00:59:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973152.186639,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1788973152.9354463,
+      "timestamp_local": "2026-09-10 00:59:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973152.9354463,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1788973153.6859546,
+      "timestamp_local": "2026-09-10 00:59:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973153.6859546,
+        "source": "vosk",
+        "rms": 137,
+        "updated_at": 1788973153.6859546
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1788973154.1853487,
+      "timestamp_local": "2026-09-10 00:59:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973154.1853487,
+        "source": "vosk",
+        "rms": 137,
+        "updated_at": 1788973153.6859546
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1788973154.6871068,
+      "timestamp_local": "2026-09-10 00:59:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973154.6871068,
+        "source": "vosk",
+        "rms": 137,
+        "updated_at": 1788973153.6859546
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1788973155.6854546,
+      "timestamp_local": "2026-09-10 00:59:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973155.6854546,
+        "source": "vosk",
+        "rms": 137,
+        "updated_at": 1788973153.6859546
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1788973156.685384,
+      "timestamp_local": "2026-09-10 00:59:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973156.685384,
+        "source": "vosk",
+        "rms": 499,
+        "updated_at": 1788973156.685384
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1788973157.273618,
+      "timestamp_local": "2026-09-10 00:59:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973157.273618,
+        "source": "vosk",
+        "rms": 321,
+        "updated_at": 1788973157.1858444
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1788973157.435564,
+      "timestamp_local": "2026-09-10 00:59:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973157.435564,
+        "source": "vosk",
+        "rms": 417,
+        "updated_at": 1788973157.435564
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1788973157.4778972,
+      "timestamp_local": "2026-09-10 00:59:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart century",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973157.4778972,
+        "source": "vosk",
+        "rms": 417,
+        "updated_at": 1788973157.435564
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1788973157.6860383,
+      "timestamp_local": "2026-09-10 00:59:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973157.6860383,
+        "source": "vosk",
+        "rms": 368,
+        "updated_at": 1788973157.6860383
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1788973157.7105138,
+      "timestamp_local": "2026-09-10 00:59:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart century is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973157.7105138,
+        "source": "vosk",
+        "rms": 368,
+        "updated_at": 1788973157.6860383
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1788973158.2768636,
+      "timestamp_local": "2026-09-10 00:59:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973158.2768636,
+        "source": "vosk",
+        "rms": 368,
+        "updated_at": 1788973157.6860383
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1788973159.438167,
+      "timestamp_local": "2026-09-10 00:59:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973159.438167,
+        "source": "vosk",
+        "rms": 131,
+        "updated_at": 1788973159.438167
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1788973159.5159416,
+      "timestamp_local": "2026-09-10 00:59:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "smart century is ready",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973159.5159416,
+        "source": "vosk",
+        "rms": 131,
+        "updated_at": 1788973159.438167
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1788973159.6856296,
+      "timestamp_local": "2026-09-10 00:59:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973159.6856296,
+        "source": "vosk",
+        "rms": 131,
+        "updated_at": 1788973159.438167
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1788973160.2683597,
+      "timestamp_local": "2026-09-10 00:59:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973160.2683597,
+        "source": "vosk",
+        "rms": 131,
+        "updated_at": 1788973159.438167
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1788973160.43671,
+      "timestamp_local": "2026-09-10 00:59:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973160.43671,
+        "source": "vosk",
+        "rms": 131,
+        "updated_at": 1788973159.438167
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1788973160.6907635,
+      "timestamp_local": "2026-09-10 00:59:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973160.6907635,
+        "source": "vosk",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1788973160.9361212,
+      "timestamp_local": "2026-09-10 00:59:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973160.9361212,
+        "source": "vosk",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1788973161.2939446,
+      "timestamp_local": "2026-09-10 00:59:21",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "smart sentry is ready",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1788973161.2939446,
+        "source": "final",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1788973161.4329686,
+      "timestamp_local": "2026-09-10 00:59:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973161.4329686,
+        "source": "vosk",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1788973161.4334762,
+      "timestamp_local": "2026-09-10 00:59:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973161.4334762,
+        "source": "vosk",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1788973162.1894941,
+      "timestamp_local": "2026-09-10 00:59:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973162.1894941,
+        "source": "vosk",
+        "rms": 158,
+        "updated_at": 1788973160.6907635
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1788973162.4362037,
+      "timestamp_local": "2026-09-10 00:59:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973162.4362037,
+        "source": "vosk",
+        "rms": 397,
+        "updated_at": 1788973162.4362037
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260910_010156.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260910_010156.md"
+  }
+}

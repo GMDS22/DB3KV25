@@ -21,10 +21,10 @@ FACE_EMBEDDING_BACKEND_LEGACY = "legacy_dct"
 FACE_EMBEDDING_BACKEND_SFACE = "opencv_sface"
 
 _YUNET_INPUT_SIZE = (320, 320)
-_YUNET_SCORE_THRESHOLD = 0.80
+_YUNET_SCORE_THRESHOLD = 0.65
 _YUNET_NMS_THRESHOLD = 0.3
 _YUNET_TOP_K = 96
-_YUNET_MIN_ACCEPT_SCORE = 0.90
+_YUNET_MIN_ACCEPT_SCORE = _YUNET_SCORE_THRESHOLD
 _FACE_MIN_ASPECT_RATIO = 0.72
 _FACE_MAX_ASPECT_RATIO = 1.38
 _MAX_FACE_CENTER_Y_RATIO_IN_PERSON = 0.67
@@ -130,6 +130,17 @@ class FaceIdentityLibrary:
         for item in items:
             if not isinstance(item, dict):
                 continue
+            embeddings = list(item.get("embeddings", []) or [])
+            backend = str(item.get("embedding_backend", FACE_EMBEDDING_BACKEND_LEGACY) or FACE_EMBEDDING_BACKEND_LEGACY).strip().lower()
+            if backend == FACE_EMBEDDING_BACKEND_SFACE:
+                embedding_sizes = {
+                    int(np.asarray(raw, dtype=np.float32).flatten().size)
+                    for raw in embeddings
+                    if raw is not None
+                }
+                if embedding_sizes and embedding_sizes.issubset({_LEGACY_EMBEDDING_SIZE}):
+                    item = dict(item)
+                    item["embedding_backend"] = FACE_EMBEDDING_BACKEND_LEGACY
             profiles.append(FaceIdentityProfile(**item))
         return cls(profiles)
 
@@ -218,7 +229,7 @@ class FaceIdentityRuntime:
         preferred_backend: str = FACE_EMBEDDING_BACKEND_SFACE,
         detector_model_path: Optional[str] = None,
         recognizer_model_path: Optional[str] = None,
-        allow_legacy_fallback: bool = True,
+        allow_legacy_fallback: bool = False,
     ):
         self.library = library
         cascade_path = self._resolve_cascade_path()
@@ -631,11 +642,10 @@ class FaceIdentityRuntime:
 
     def _score_to_confidence(self, score: float, backend: str) -> float:
         if backend == FACE_EMBEDDING_BACKEND_SFACE:
-            clamped = max(0.0, min(1.0, float(score)))
-            baseline = float(_SFACE_RECOMMENDED_COSINE_THRESHOLD)
-            if clamped <= baseline:
-                return 0.82 * (clamped / max(1e-6, baseline))
-            return 0.82 + ((clamped - baseline) * (0.18 / max(1e-6, 1.0 - baseline)))
+            # OpenCV SFace uses cosine similarity; do not remap the raw similarity to a
+            # synthetic confidence that makes edge-case impostors look like strong matches.
+            # A similarity of 0.36 should stay a weak match, not become ~0.82 confidence.
+            return max(0.0, min(1.0, float(score)))
         return (float(score) + 1.0) * 0.5
 
     def _embedding_from_bbox(self, frame: np.ndarray, bbox: Tuple[int, int, int, int]) -> Optional[np.ndarray]:
@@ -741,6 +751,10 @@ class FaceIdentityRuntime:
                 resized_w = max(1, int(round(float(sub.shape[1]) * scale)))
                 resized_h = max(1, int(round(float(sub.shape[0]) * scale)))
                 detect_frame = cv2.resize(sub, (resized_w, resized_h), interpolation=cv2.INTER_AREA)
+            # The detector sees the resized ROI. Apply the configured minimum
+            # in that coordinate space; the returned box is checked again in
+            # original pixels below.
+            detect_min_size = max(16, int(round(float(min_size) * scale)))
             try:
                 self._face_detector.setInputSize((int(detect_frame.shape[1]), int(detect_frame.shape[0])))
                 _retval, faces = self._face_detector.detect(detect_frame)
@@ -751,7 +765,7 @@ class FaceIdentityRuntime:
             inverse_scale = 1.0 / scale if scale > 0.0 else 1.0
             for row in np.asarray(faces, dtype=np.float32):
                 fx, fy, fw, fh = row[:4] * inverse_scale
-                if fw < min_size or fh < min_size:
+                if fw < detect_min_size or fh < detect_min_size:
                     continue
                 bbox = (x + int(round(fx)), y + int(round(fy)), int(round(fw)), int(round(fh)))
                 landmarks = (row[4:14].reshape(5, 2).astype(np.float32) * inverse_scale)

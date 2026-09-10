@@ -16,6 +16,9 @@ from .sentry_v2_config import TargetFilterConfig
 
 
 NON_SEMANTIC_CLASSES = {"motion", "foreground", "color", "moving_object"}
+SEMANTIC_IDENTITY_CLASSES = {"cat", "cats", "dog", "dogs", "rat", "rats"}
+MIN_SEMANTIC_IDENTITY_CONFIRM_FRAMES = 3
+MAX_SEMANTIC_IDENTITY_AREA_RATIO = 0.08
 
 # Normalized-coordinate distance threshold for detecting same-class re-ID jumps.
 # If a track_id's detection center moves more than this between frames, the
@@ -28,13 +31,13 @@ SHAPE_PROFILE_ALIASES = {
 }
 
 SHAPE_FILTER_PROFILES = {
-    "rat": {"min_aspect_ratio": 1.15, "max_aspect_ratio": 3.2},
+    "rat": {"min_aspect_ratio": 0.45, "max_aspect_ratio": 4.6},
     "car": {"min_aspect_ratio": 1.15, "max_aspect_ratio": 4.8},
     "cat": {"min_aspect_ratio": 0.65, "max_aspect_ratio": 3.2},
     "dog": {"min_aspect_ratio": 0.65, "max_aspect_ratio": 3.6},
     "person": {"min_aspect_ratio": 0.20, "max_aspect_ratio": 1.05},
     "bird": {"min_aspect_ratio": 0.45, "max_aspect_ratio": 2.8},
-    "cat_dog_rat": {"min_aspect_ratio": 0.60, "max_aspect_ratio": 3.8},
+    "cat_dog_rat": {"min_aspect_ratio": 0.45, "max_aspect_ratio": 3.8},
 }
 
 
@@ -183,6 +186,13 @@ class TargetFilter:
         # 3. Size
         if not is_prompted:
             area = det.area_ratio
+            if (
+                det.class_name in SEMANTIC_IDENTITY_CLASSES
+                and area > MAX_SEMANTIC_IDENTITY_AREA_RATIO
+            ):
+                return False, "semantic_box_too_large", (
+                    f"{area:.4f}>{MAX_SEMANTIC_IDENTITY_AREA_RATIO:.4f}"
+                )
             if area < self.cfg.min_size_ratio:
                 return False, "size_too_small", f"{area:.4f}<{self.cfg.min_size_ratio:.4f}"
             if self.cfg.max_size_ratio > 0 and area > self.cfg.max_size_ratio:
@@ -226,6 +236,8 @@ class TargetFilter:
             return True, "qualified", "non_semantic_or_prompted", 1, 1
 
         required_frames = max(1, int(getattr(self.cfg, "semantic_min_confirm_frames", 1) or 1))
+        if str(det.class_name or "").strip().lower() in SEMANTIC_IDENTITY_CLASSES:
+            required_frames = max(required_frames, MIN_SEMANTIC_IDENTITY_CONFIRM_FRAMES)
         if required_frames <= 1:
             return True, "qualified", "semantic_confirm_disabled", 1, 1
 

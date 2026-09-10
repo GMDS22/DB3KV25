@@ -1,0 +1,3168 @@
+{
+  "generated_at_local": "2026-09-08 00:52:50",
+  "generated_at_epoch_s": 1788799970.7893684,
+  "entry_count": 184,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 101,
+    "operator": 80
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 101,
+    "spoken_confirmation": 1,
+    "voice_transcript_partial": 78,
+    "voice_transcript_final": 2
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 182
+  },
+  "voice_transcript_summary": {
+    "partial_count": 78,
+    "final_count": 2,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "mike was almost requests your flop i don t know it s a nice single got those places to inflate the for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation renovation games a high powered great security camera to go down at the same time his accomplice a smart centuries right",
+  "latest_operator_request": "mike was almost requests your flop i don t know it s a nice single got those places to inflate the for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation renovation games a high powered great security camera to go down at the same time his accomplice a smart centuries right",
+  "latest_assistant_message": "Smart Sentry is ready.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 173,
+      "timestamp_epoch_s": 1788799530.8643742,
+      "timestamp_local": "2026-09-08 00:45:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799530.8643742,
+        "source": "vosk",
+        "rms": 1176,
+        "updated_at": 1788799530.8201692
+      }
+    },
+    {
+      "id": 174,
+      "timestamp_epoch_s": 1788799531.0700467,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799531.0700467,
+        "source": "vosk",
+        "rms": 1176,
+        "updated_at": 1788799530.8201692
+      }
+    },
+    {
+      "id": 175,
+      "timestamp_epoch_s": 1788799531.1316164,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799531.1316164,
+        "source": "vosk",
+        "rms": 1176,
+        "updated_at": 1788799530.8201692
+      }
+    },
+    {
+      "id": 176,
+      "timestamp_epoch_s": 1788799531.3189514,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799531.3189514,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 177,
+      "timestamp_epoch_s": 1788799531.3322196,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked on security",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799531.3322196,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 178,
+      "timestamp_epoch_s": 1788799531.5701418,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799531.5701418,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 179,
+      "timestamp_epoch_s": 1788799531.5934727,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked on a security guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799531.5934727,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 180,
+      "timestamp_epoch_s": 1788799531.8203468,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799531.8203468,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 181,
+      "timestamp_epoch_s": 1788799531.869191,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked on security guards don't",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799531.869191,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 182,
+      "timestamp_epoch_s": 1788799532.0701509,
+      "timestamp_local": "2026-09-08 00:45:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799532.0701509,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 183,
+      "timestamp_epoch_s": 1788799532.1147745,
+      "timestamp_local": "2026-09-08 00:45:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked on a security guard step forward",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799532.1147745,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 184,
+      "timestamp_epoch_s": 1788799532.5724213,
+      "timestamp_local": "2026-09-08 00:45:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799532.5724213,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1788799483.054508,
+      "timestamp_local": "2026-09-08 00:44:43",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1788799483.0565073,
+      "timestamp_local": "2026-09-08 00:44:43",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1788799487.4855406,
+      "timestamp_local": "2026-09-08 00:44:47",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799487.4855406,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1788799489.3171864,
+      "timestamp_local": "2026-09-08 00:44:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799489.3171864,
+        "source": "vosk",
+        "rms": 429,
+        "updated_at": 1788799489.3171864
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1788799489.817753,
+      "timestamp_local": "2026-09-08 00:44:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799489.817753,
+        "source": "vosk",
+        "rms": 429,
+        "updated_at": 1788799489.3171864
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1788799490.0676365,
+      "timestamp_local": "2026-09-08 00:44:50",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799490.0676365,
+        "source": "vosk",
+        "rms": 313,
+        "updated_at": 1788799490.0676365
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1788799525.9078407,
+      "timestamp_local": "2026-09-08 00:45:25",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Smart Sentry is ready.",
+      "metadata": {
+        "interrupt": true,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1788799502.0692668,
+      "timestamp_local": "2026-09-08 00:45:02",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799502.0692668,
+        "source": "vosk",
+        "rms": 1181,
+        "updated_at": 1788799501.569105
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1788799502.8191376,
+      "timestamp_local": "2026-09-08 00:45:02",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799502.8191376,
+        "source": "vosk",
+        "rms": 920,
+        "updated_at": 1788799502.8191376
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1788799504.3531735,
+      "timestamp_local": "2026-09-08 00:45:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "for us",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799504.3531735,
+        "source": "vosk",
+        "rms": 803,
+        "updated_at": 1788799504.3190382
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1788799504.5693386,
+      "timestamp_local": "2026-09-08 00:45:04",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799504.5693386,
+        "source": "vosk",
+        "rms": 803,
+        "updated_at": 1788799504.3190382
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1788799504.5891638,
+      "timestamp_local": "2026-09-08 00:45:04",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "first",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799504.5891638,
+        "source": "vosk",
+        "rms": 803,
+        "updated_at": 1788799504.3190382
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1788799505.0690863,
+      "timestamp_local": "2026-09-08 00:45:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799505.0690863,
+        "source": "vosk",
+        "rms": 803,
+        "updated_at": 1788799504.3190382
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1788799505.3198464,
+      "timestamp_local": "2026-09-08 00:45:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799505.3198464,
+        "source": "vosk",
+        "rms": 803,
+        "updated_at": 1788799504.3190382
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1788799505.5690684,
+      "timestamp_local": "2026-09-08 00:45:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799505.5690684,
+        "source": "vosk",
+        "rms": 803,
+        "updated_at": 1788799504.3190382
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1788799505.9082217,
+      "timestamp_local": "2026-09-08 00:45:05",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "for us",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1788799505.9082217,
+        "source": "final",
+        "rms": 803,
+        "updated_at": 1788799504.3190382
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1788799505.9533272,
+      "timestamp_local": "2026-09-08 00:45:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799505.9533272,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1788799505.9533272
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1788799506.6725705,
+      "timestamp_local": "2026-09-08 00:45:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "went wrong",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799506.6725705,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1788799505.9533272
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1788799506.819445,
+      "timestamp_local": "2026-09-08 00:45:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799506.819445,
+        "source": "vosk",
+        "rms": 908,
+        "updated_at": 1788799506.819445
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1788799506.8550608,
+      "timestamp_local": "2026-09-08 00:45:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "mike ross",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799506.8550608,
+        "source": "vosk",
+        "rms": 908,
+        "updated_at": 1788799506.819445
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1788799507.0690534,
+      "timestamp_local": "2026-09-08 00:45:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799507.0690534,
+        "source": "vosk",
+        "rms": 813,
+        "updated_at": 1788799507.0690534
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1788799507.1807985,
+      "timestamp_local": "2026-09-08 00:45:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "mike ross how",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799507.1807985,
+        "source": "vosk",
+        "rms": 813,
+        "updated_at": 1788799507.0690534
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1788799507.317983,
+      "timestamp_local": "2026-09-08 00:45:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799507.317983,
+        "source": "vosk",
+        "rms": 1166,
+        "updated_at": 1788799507.317983
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1788799507.4016447,
+      "timestamp_local": "2026-09-08 00:45:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799507.4016447,
+        "source": "vosk",
+        "rms": 1166,
+        "updated_at": 1788799507.317983
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1788799507.5693178,
+      "timestamp_local": "2026-09-08 00:45:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799507.5693178,
+        "source": "vosk",
+        "rms": 1198,
+        "updated_at": 1788799507.5693178
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1788799507.6658072,
+      "timestamp_local": "2026-09-08 00:45:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost requests your",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799507.6658072,
+        "source": "vosk",
+        "rms": 1198,
+        "updated_at": 1788799507.5693178
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1788799507.8192449,
+      "timestamp_local": "2026-09-08 00:45:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799507.8192449,
+        "source": "vosk",
+        "rms": 1198,
+        "updated_at": 1788799507.5693178
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1788799507.874681,
+      "timestamp_local": "2026-09-08 00:45:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799507.874681,
+        "source": "vosk",
+        "rms": 1198,
+        "updated_at": 1788799507.5693178
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1788799508.0694375,
+      "timestamp_local": "2026-09-08 00:45:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799508.0694375,
+        "source": "vosk",
+        "rms": 1198,
+        "updated_at": 1788799507.5693178
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1788799508.1049006,
+      "timestamp_local": "2026-09-08 00:45:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost requests your flock",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799508.1049006,
+        "source": "vosk",
+        "rms": 1198,
+        "updated_at": 1788799507.5693178
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1788799508.319439,
+      "timestamp_local": "2026-09-08 00:45:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799508.319439,
+        "source": "vosk",
+        "rms": 917,
+        "updated_at": 1788799508.319439
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1788799508.3800325,
+      "timestamp_local": "2026-09-08 00:45:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost requests your flock of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799508.3800325,
+        "source": "vosk",
+        "rms": 917,
+        "updated_at": 1788799508.319439
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1788799508.5702631,
+      "timestamp_local": "2026-09-08 00:45:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799508.5702631,
+        "source": "vosk",
+        "rms": 917,
+        "updated_at": 1788799508.319439
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1788799508.6278818,
+      "timestamp_local": "2026-09-08 00:45:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost requests your flock of your",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799508.6278818,
+        "source": "vosk",
+        "rms": 917,
+        "updated_at": 1788799508.319439
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1788799509.0692677,
+      "timestamp_local": "2026-09-08 00:45:09",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799509.0692677,
+        "source": "vosk",
+        "rms": 917,
+        "updated_at": 1788799508.319439
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1788799509.136283,
+      "timestamp_local": "2026-09-08 00:45:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799509.136283,
+        "source": "vosk",
+        "rms": 917,
+        "updated_at": 1788799508.319439
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1788799509.3194113,
+      "timestamp_local": "2026-09-08 00:45:09",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799509.3194113,
+        "source": "vosk",
+        "rms": 1028,
+        "updated_at": 1788799509.3194113
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1788799509.5692751,
+      "timestamp_local": "2026-09-08 00:45:09",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799509.5692751,
+        "source": "vosk",
+        "rms": 1028,
+        "updated_at": 1788799509.3194113
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1788799509.694161,
+      "timestamp_local": "2026-09-08 00:45:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799509.694161,
+        "source": "vosk",
+        "rms": 1028,
+        "updated_at": 1788799509.3194113
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1788799509.819761,
+      "timestamp_local": "2026-09-08 00:45:09",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799509.819761,
+        "source": "vosk",
+        "rms": 922,
+        "updated_at": 1788799509.819761
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1788799510.0696182,
+      "timestamp_local": "2026-09-08 00:45:10",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799510.0696182,
+        "source": "vosk",
+        "rms": 922,
+        "updated_at": 1788799509.819761
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1788799510.1831279,
+      "timestamp_local": "2026-09-08 00:45:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know enough signatory",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799510.1831279,
+        "source": "vosk",
+        "rms": 922,
+        "updated_at": 1788799509.819761
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1788799510.3191552,
+      "timestamp_local": "2026-09-08 00:45:10",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799510.3191552,
+        "source": "vosk",
+        "rms": 1010,
+        "updated_at": 1788799510.3191552
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1788799510.4518018,
+      "timestamp_local": "2026-09-08 00:45:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice thought but",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799510.4518018,
+        "source": "vosk",
+        "rms": 1010,
+        "updated_at": 1788799510.3191552
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1788799510.5693307,
+      "timestamp_local": "2026-09-08 00:45:10",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799510.5693307,
+        "source": "vosk",
+        "rms": 1010,
+        "updated_at": 1788799510.3191552
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1788799511.0698917,
+      "timestamp_local": "2026-09-08 00:45:11",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799511.0698917,
+        "source": "vosk",
+        "rms": 784,
+        "updated_at": 1788799511.0698917
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1788799511.3192852,
+      "timestamp_local": "2026-09-08 00:45:11",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799511.3192852,
+        "source": "vosk",
+        "rms": 774,
+        "updated_at": 1788799511.3192852
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1788799511.3850574,
+      "timestamp_local": "2026-09-08 00:45:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799511.3850574,
+        "source": "vosk",
+        "rms": 774,
+        "updated_at": 1788799511.3192852
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1788799511.5699668,
+      "timestamp_local": "2026-09-08 00:45:11",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799511.5699668,
+        "source": "vosk",
+        "rms": 774,
+        "updated_at": 1788799511.3192852
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1788799511.6134288,
+      "timestamp_local": "2026-09-08 00:45:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice single type of place a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799511.6134288,
+        "source": "vosk",
+        "rms": 774,
+        "updated_at": 1788799511.3192852
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1788799511.8193524,
+      "timestamp_local": "2026-09-08 00:45:11",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799511.8193524,
+        "source": "vosk",
+        "rms": 774,
+        "updated_at": 1788799511.3192852
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1788799511.8968592,
+      "timestamp_local": "2026-09-08 00:45:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799511.8968592,
+        "source": "vosk",
+        "rms": 774,
+        "updated_at": 1788799511.3192852
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1788799512.0691361,
+      "timestamp_local": "2026-09-08 00:45:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799512.0691361,
+        "source": "vosk",
+        "rms": 769,
+        "updated_at": 1788799512.0691361
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1788799512.1615903,
+      "timestamp_local": "2026-09-08 00:45:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799512.1615903,
+        "source": "vosk",
+        "rms": 769,
+        "updated_at": 1788799512.0691361
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1788799512.318962,
+      "timestamp_local": "2026-09-08 00:45:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799512.318962,
+        "source": "vosk",
+        "rms": 769,
+        "updated_at": 1788799512.0691361
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1788799512.4009516,
+      "timestamp_local": "2026-09-08 00:45:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places to inflate",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799512.4009516,
+        "source": "vosk",
+        "rms": 769,
+        "updated_at": 1788799512.0691361
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1788799512.5693197,
+      "timestamp_local": "2026-09-08 00:45:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799512.5693197,
+        "source": "vosk",
+        "rms": 769,
+        "updated_at": 1788799512.0691361
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1788799512.619721,
+      "timestamp_local": "2026-09-08 00:45:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799512.619721,
+        "source": "vosk",
+        "rms": 769,
+        "updated_at": 1788799512.0691361
+      }
+    },
+    {
+      "id": 59,
+      "timestamp_epoch_s": 1788799512.8191156,
+      "timestamp_local": "2026-09-08 00:45:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799512.8191156,
+        "source": "vosk",
+        "rms": 875,
+        "updated_at": 1788799512.8191156
+      }
+    },
+    {
+      "id": 60,
+      "timestamp_epoch_s": 1788799512.8763466,
+      "timestamp_local": "2026-09-08 00:45:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799512.8763466,
+        "source": "vosk",
+        "rms": 875,
+        "updated_at": 1788799512.8191156
+      }
+    },
+    {
+      "id": 61,
+      "timestamp_epoch_s": 1788799513.0692148,
+      "timestamp_local": "2026-09-08 00:45:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799513.0692148,
+        "source": "vosk",
+        "rms": 875,
+        "updated_at": 1788799512.8191156
+      }
+    },
+    {
+      "id": 62,
+      "timestamp_epoch_s": 1788799513.141686,
+      "timestamp_local": "2026-09-08 00:45:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for patients",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799513.141686,
+        "source": "vosk",
+        "rms": 875,
+        "updated_at": 1788799512.8191156
+      }
+    },
+    {
+      "id": 63,
+      "timestamp_epoch_s": 1788799513.3192732,
+      "timestamp_local": "2026-09-08 00:45:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799513.3192732,
+        "source": "vosk",
+        "rms": 875,
+        "updated_at": 1788799512.8191156
+      }
+    },
+    {
+      "id": 64,
+      "timestamp_epoch_s": 1788799513.3942177,
+      "timestamp_local": "2026-09-08 00:45:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799513.3942177,
+        "source": "vosk",
+        "rms": 875,
+        "updated_at": 1788799512.8191156
+      }
+    },
+    {
+      "id": 65,
+      "timestamp_epoch_s": 1788799513.569412,
+      "timestamp_local": "2026-09-08 00:45:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799513.569412,
+        "source": "vosk",
+        "rms": 740,
+        "updated_at": 1788799513.569412
+      }
+    },
+    {
+      "id": 66,
+      "timestamp_epoch_s": 1788799514.069491,
+      "timestamp_local": "2026-09-08 00:45:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799514.069491,
+        "source": "vosk",
+        "rms": 740,
+        "updated_at": 1788799513.569412
+      }
+    },
+    {
+      "id": 67,
+      "timestamp_epoch_s": 1788799514.1739814,
+      "timestamp_local": "2026-09-08 00:45:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799514.1739814,
+        "source": "vosk",
+        "rms": 740,
+        "updated_at": 1788799513.569412
+      }
+    },
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1788799514.3192024,
+      "timestamp_local": "2026-09-08 00:45:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799514.3192024,
+        "source": "vosk",
+        "rms": 740,
+        "updated_at": 1788799513.569412
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1788799514.3954291,
+      "timestamp_local": "2026-09-08 00:45:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for patients to control",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799514.3954291,
+        "source": "vosk",
+        "rms": 740,
+        "updated_at": 1788799513.569412
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1788799514.569164,
+      "timestamp_local": "2026-09-08 00:45:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799514.569164,
+        "source": "vosk",
+        "rms": 740,
+        "updated_at": 1788799513.569412
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1788799514.6345768,
+      "timestamp_local": "2026-09-08 00:45:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799514.6345768,
+        "source": "vosk",
+        "rms": 740,
+        "updated_at": 1788799513.569412
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1788799515.0690134,
+      "timestamp_local": "2026-09-08 00:45:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799515.0690134,
+        "source": "vosk",
+        "rms": 740,
+        "updated_at": 1788799513.569412
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1788799515.3192954,
+      "timestamp_local": "2026-09-08 00:45:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799515.3192954,
+        "source": "vosk",
+        "rms": 1074,
+        "updated_at": 1788799515.3192954
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1788799515.3691278,
+      "timestamp_local": "2026-09-08 00:45:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken four hundred",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799515.3691278,
+        "source": "vosk",
+        "rms": 1074,
+        "updated_at": 1788799515.3192954
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1788799515.5696774,
+      "timestamp_local": "2026-09-08 00:45:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799515.5696774,
+        "source": "vosk",
+        "rms": 1074,
+        "updated_at": 1788799515.3192954
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1788799515.6326058,
+      "timestamp_local": "2026-09-08 00:45:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799515.6326058,
+        "source": "vosk",
+        "rms": 1074,
+        "updated_at": 1788799515.3192954
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1788799515.8195205,
+      "timestamp_local": "2026-09-08 00:45:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799515.8195205,
+        "source": "vosk",
+        "rms": 1074,
+        "updated_at": 1788799515.3192954
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1788799515.8579078,
+      "timestamp_local": "2026-09-08 00:45:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799515.8579078,
+        "source": "vosk",
+        "rms": 1074,
+        "updated_at": 1788799515.3192954
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1788799516.069498,
+      "timestamp_local": "2026-09-08 00:45:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799516.069498,
+        "source": "vosk",
+        "rms": 1074,
+        "updated_at": 1788799515.3192954
+      }
+    },
+    {
+      "id": 80,
+      "timestamp_epoch_s": 1788799516.3190243,
+      "timestamp_local": "2026-09-08 00:45:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799516.3190243,
+        "source": "vosk",
+        "rms": 1074,
+        "updated_at": 1788799515.3192954
+      }
+    },
+    {
+      "id": 81,
+      "timestamp_epoch_s": 1788799516.5690832,
+      "timestamp_local": "2026-09-08 00:45:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799516.5690832,
+        "source": "vosk",
+        "rms": 872,
+        "updated_at": 1788799516.5690832
+      }
+    },
+    {
+      "id": 82,
+      "timestamp_epoch_s": 1788799516.6132698,
+      "timestamp_local": "2026-09-08 00:45:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and if",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799516.6132698,
+        "source": "vosk",
+        "rms": 872,
+        "updated_at": 1788799516.5690832
+      }
+    },
+    {
+      "id": 83,
+      "timestamp_epoch_s": 1788799516.8192601,
+      "timestamp_local": "2026-09-08 00:45:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799516.8192601,
+        "source": "vosk",
+        "rms": 796,
+        "updated_at": 1788799516.8192601
+      }
+    },
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1788799516.8620758,
+      "timestamp_local": "2026-09-08 00:45:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799516.8620758,
+        "source": "vosk",
+        "rms": 796,
+        "updated_at": 1788799516.8192601
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1788799517.0692863,
+      "timestamp_local": "2026-09-08 00:45:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799517.0692863,
+        "source": "vosk",
+        "rms": 796,
+        "updated_at": 1788799516.8192601
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1788799517.09452,
+      "timestamp_local": "2026-09-08 00:45:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799517.09452,
+        "source": "vosk",
+        "rms": 796,
+        "updated_at": 1788799516.8192601
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1788799517.3196685,
+      "timestamp_local": "2026-09-08 00:45:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799517.3196685,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799517.3196685
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1788799517.3462694,
+      "timestamp_local": "2026-09-08 00:45:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six hours",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799517.3462694,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799517.3196685
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1788799517.820013,
+      "timestamp_local": "2026-09-08 00:45:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799517.820013,
+        "source": "vosk",
+        "rms": 1049,
+        "updated_at": 1788799517.820013
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1788799517.8611279,
+      "timestamp_local": "2026-09-08 00:45:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799517.8611279,
+        "source": "vosk",
+        "rms": 1049,
+        "updated_at": 1788799517.820013
+      }
+    },
+    {
+      "id": 91,
+      "timestamp_epoch_s": 1788799518.0690422,
+      "timestamp_local": "2026-09-08 00:45:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799518.0690422,
+        "source": "vosk",
+        "rms": 1010,
+        "updated_at": 1788799518.0690422
+      }
+    },
+    {
+      "id": 92,
+      "timestamp_epoch_s": 1788799518.0919054,
+      "timestamp_local": "2026-09-08 00:45:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799518.0919054,
+        "source": "vosk",
+        "rms": 1010,
+        "updated_at": 1788799518.0690422
+      }
+    },
+    {
+      "id": 93,
+      "timestamp_epoch_s": 1788799518.5691078,
+      "timestamp_local": "2026-09-08 00:45:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799518.5691078,
+        "source": "vosk",
+        "rms": 1010,
+        "updated_at": 1788799518.0690422
+      }
+    },
+    {
+      "id": 94,
+      "timestamp_epoch_s": 1788799518.819041,
+      "timestamp_local": "2026-09-08 00:45:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799518.819041,
+        "source": "vosk",
+        "rms": 1010,
+        "updated_at": 1788799518.0690422
+      }
+    },
+    {
+      "id": 95,
+      "timestamp_epoch_s": 1788799518.8852308,
+      "timestamp_local": "2026-09-08 00:45:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers about",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799518.8852308,
+        "source": "vosk",
+        "rms": 1010,
+        "updated_at": 1788799518.0690422
+      }
+    },
+    {
+      "id": 96,
+      "timestamp_epoch_s": 1788799519.0695288,
+      "timestamp_local": "2026-09-08 00:45:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799519.0695288,
+        "source": "vosk",
+        "rms": 1109,
+        "updated_at": 1788799519.0695288
+      }
+    },
+    {
+      "id": 97,
+      "timestamp_epoch_s": 1788799519.1545274,
+      "timestamp_local": "2026-09-08 00:45:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799519.1545274,
+        "source": "vosk",
+        "rms": 1109,
+        "updated_at": 1788799519.0695288
+      }
+    },
+    {
+      "id": 98,
+      "timestamp_epoch_s": 1788799519.319378,
+      "timestamp_local": "2026-09-08 00:45:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799519.319378,
+        "source": "vosk",
+        "rms": 840,
+        "updated_at": 1788799519.319378
+      }
+    },
+    {
+      "id": 99,
+      "timestamp_epoch_s": 1788799519.3808558,
+      "timestamp_local": "2026-09-08 00:45:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799519.3808558,
+        "source": "vosk",
+        "rms": 840,
+        "updated_at": 1788799519.319378
+      }
+    },
+    {
+      "id": 100,
+      "timestamp_epoch_s": 1788799519.569057,
+      "timestamp_local": "2026-09-08 00:45:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799519.569057,
+        "source": "vosk",
+        "rms": 840,
+        "updated_at": 1788799519.319378
+      }
+    },
+    {
+      "id": 101,
+      "timestamp_epoch_s": 1788799519.6084204,
+      "timestamp_local": "2026-09-08 00:45:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799519.6084204,
+        "source": "vosk",
+        "rms": 840,
+        "updated_at": 1788799519.319378
+      }
+    },
+    {
+      "id": 102,
+      "timestamp_epoch_s": 1788799519.819014,
+      "timestamp_local": "2026-09-08 00:45:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799519.819014,
+        "source": "vosk",
+        "rms": 840,
+        "updated_at": 1788799519.319378
+      }
+    },
+    {
+      "id": 103,
+      "timestamp_epoch_s": 1788799519.862118,
+      "timestamp_local": "2026-09-08 00:45:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799519.862118,
+        "source": "vosk",
+        "rms": 840,
+        "updated_at": 1788799519.319378
+      }
+    },
+    {
+      "id": 104,
+      "timestamp_epoch_s": 1788799520.0691879,
+      "timestamp_local": "2026-09-08 00:45:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799520.0691879,
+        "source": "vosk",
+        "rms": 853,
+        "updated_at": 1788799520.0691879
+      }
+    },
+    {
+      "id": 105,
+      "timestamp_epoch_s": 1788799520.1793988,
+      "timestamp_local": "2026-09-08 00:45:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799520.1793988,
+        "source": "vosk",
+        "rms": 853,
+        "updated_at": 1788799520.0691879
+      }
+    },
+    {
+      "id": 106,
+      "timestamp_epoch_s": 1788799520.319144,
+      "timestamp_local": "2026-09-08 00:45:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799520.319144,
+        "source": "vosk",
+        "rms": 853,
+        "updated_at": 1788799520.0691879
+      }
+    },
+    {
+      "id": 107,
+      "timestamp_epoch_s": 1788799520.3681803,
+      "timestamp_local": "2026-09-08 00:45:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the really",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799520.3681803,
+        "source": "vosk",
+        "rms": 853,
+        "updated_at": 1788799520.0691879
+      }
+    },
+    {
+      "id": 108,
+      "timestamp_epoch_s": 1788799520.569936,
+      "timestamp_local": "2026-09-08 00:45:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799520.569936,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799520.569936
+      }
+    },
+    {
+      "id": 109,
+      "timestamp_epoch_s": 1788799520.6276968,
+      "timestamp_local": "2026-09-08 00:45:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799520.6276968,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799520.569936
+      }
+    },
+    {
+      "id": 110,
+      "timestamp_epoch_s": 1788799520.819017,
+      "timestamp_local": "2026-09-08 00:45:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799520.819017,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1788799520.819017
+      }
+    },
+    {
+      "id": 111,
+      "timestamp_epoch_s": 1788799520.8728125,
+      "timestamp_local": "2026-09-08 00:45:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799520.8728125,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1788799520.819017
+      }
+    },
+    {
+      "id": 112,
+      "timestamp_epoch_s": 1788799521.0707333,
+      "timestamp_local": "2026-09-08 00:45:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799521.0707333,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1788799520.819017
+      }
+    },
+    {
+      "id": 113,
+      "timestamp_epoch_s": 1788799521.1689997,
+      "timestamp_local": "2026-09-08 00:45:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the back to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799521.1689997,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1788799520.819017
+      }
+    },
+    {
+      "id": 114,
+      "timestamp_epoch_s": 1788799521.3201685,
+      "timestamp_local": "2026-09-08 00:45:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799521.3201685,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1788799520.819017
+      }
+    },
+    {
+      "id": 115,
+      "timestamp_epoch_s": 1788799521.376124,
+      "timestamp_local": "2026-09-08 00:45:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799521.376124,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1788799520.819017
+      }
+    },
+    {
+      "id": 116,
+      "timestamp_epoch_s": 1788799521.5690022,
+      "timestamp_local": "2026-09-08 00:45:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799521.5690022,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1788799520.819017
+      }
+    },
+    {
+      "id": 117,
+      "timestamp_epoch_s": 1788799521.6410089,
+      "timestamp_local": "2026-09-08 00:45:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as an individual",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799521.6410089,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1788799520.819017
+      }
+    },
+    {
+      "id": 118,
+      "timestamp_epoch_s": 1788799522.070055,
+      "timestamp_local": "2026-09-08 00:45:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799522.070055,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1788799520.819017
+      }
+    },
+    {
+      "id": 119,
+      "timestamp_epoch_s": 1788799522.3199027,
+      "timestamp_local": "2026-09-08 00:45:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799522.3199027,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1788799520.819017
+      }
+    },
+    {
+      "id": 120,
+      "timestamp_epoch_s": 1788799522.3693101,
+      "timestamp_local": "2026-09-08 00:45:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799522.3693101,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1788799520.819017
+      }
+    },
+    {
+      "id": 121,
+      "timestamp_epoch_s": 1788799522.5698886,
+      "timestamp_local": "2026-09-08 00:45:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799522.5698886,
+        "source": "vosk",
+        "rms": 869,
+        "updated_at": 1788799522.5698886
+      }
+    },
+    {
+      "id": 122,
+      "timestamp_epoch_s": 1788799522.6099086,
+      "timestamp_local": "2026-09-08 00:45:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as an individual",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799522.6099086,
+        "source": "vosk",
+        "rms": 869,
+        "updated_at": 1788799522.5698886
+      }
+    },
+    {
+      "id": 123,
+      "timestamp_epoch_s": 1788799522.8206987,
+      "timestamp_local": "2026-09-08 00:45:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799522.8206987,
+        "source": "vosk",
+        "rms": 785,
+        "updated_at": 1788799522.8206987
+      }
+    },
+    {
+      "id": 124,
+      "timestamp_epoch_s": 1788799522.879273,
+      "timestamp_local": "2026-09-08 00:45:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799522.879273,
+        "source": "vosk",
+        "rms": 785,
+        "updated_at": 1788799522.8206987
+      }
+    },
+    {
+      "id": 125,
+      "timestamp_epoch_s": 1788799523.0701213,
+      "timestamp_local": "2026-09-08 00:45:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799523.0701213,
+        "source": "vosk",
+        "rms": 785,
+        "updated_at": 1788799522.8206987
+      }
+    },
+    {
+      "id": 126,
+      "timestamp_epoch_s": 1788799523.1038518,
+      "timestamp_local": "2026-09-08 00:45:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games are high",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799523.1038518,
+        "source": "vosk",
+        "rms": 785,
+        "updated_at": 1788799522.8206987
+      }
+    },
+    {
+      "id": 127,
+      "timestamp_epoch_s": 1788799523.3199441,
+      "timestamp_local": "2026-09-08 00:45:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799523.3199441,
+        "source": "vosk",
+        "rms": 785,
+        "updated_at": 1788799522.8206987
+      }
+    },
+    {
+      "id": 128,
+      "timestamp_epoch_s": 1788799523.3414676,
+      "timestamp_local": "2026-09-08 00:45:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799523.3414676,
+        "source": "vosk",
+        "rms": 785,
+        "updated_at": 1788799522.8206987
+      }
+    },
+    {
+      "id": 129,
+      "timestamp_epoch_s": 1788799523.5700347,
+      "timestamp_local": "2026-09-08 00:45:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799523.5700347,
+        "source": "vosk",
+        "rms": 785,
+        "updated_at": 1788799522.8206987
+      }
+    },
+    {
+      "id": 130,
+      "timestamp_epoch_s": 1788799523.6026685,
+      "timestamp_local": "2026-09-08 00:45:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered explosives",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799523.6026685,
+        "source": "vosk",
+        "rms": 785,
+        "updated_at": 1788799522.8206987
+      }
+    },
+    {
+      "id": 131,
+      "timestamp_epoch_s": 1788799523.819982,
+      "timestamp_local": "2026-09-08 00:45:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799523.819982,
+        "source": "vosk",
+        "rms": 785,
+        "updated_at": 1788799522.8206987
+      }
+    },
+    {
+      "id": 132,
+      "timestamp_epoch_s": 1788799523.8668587,
+      "timestamp_local": "2026-09-08 00:45:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered group",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799523.8668587,
+        "source": "vosk",
+        "rms": 785,
+        "updated_at": 1788799522.8206987
+      }
+    },
+    {
+      "id": 133,
+      "timestamp_epoch_s": 1788799524.0699244,
+      "timestamp_local": "2026-09-08 00:45:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799524.0699244,
+        "source": "vosk",
+        "rms": 925,
+        "updated_at": 1788799524.0699244
+      }
+    },
+    {
+      "id": 134,
+      "timestamp_epoch_s": 1788799524.1349459,
+      "timestamp_local": "2026-09-08 00:45:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799524.1349459,
+        "source": "vosk",
+        "rms": 925,
+        "updated_at": 1788799524.0699244
+      }
+    },
+    {
+      "id": 135,
+      "timestamp_epoch_s": 1788799524.3192518,
+      "timestamp_local": "2026-09-08 00:45:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799524.3192518,
+        "source": "vosk",
+        "rms": 730,
+        "updated_at": 1788799524.3192518
+      }
+    },
+    {
+      "id": 136,
+      "timestamp_epoch_s": 1788799524.383202,
+      "timestamp_local": "2026-09-08 00:45:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered in grad school",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799524.383202,
+        "source": "vosk",
+        "rms": 730,
+        "updated_at": 1788799524.3192518
+      }
+    },
+    {
+      "id": 137,
+      "timestamp_epoch_s": 1788799524.5697565,
+      "timestamp_local": "2026-09-08 00:45:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799524.5697565,
+        "source": "vosk",
+        "rms": 730,
+        "updated_at": 1788799524.3192518
+      }
+    },
+    {
+      "id": 138,
+      "timestamp_epoch_s": 1788799524.6057198,
+      "timestamp_local": "2026-09-08 00:45:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered group be skewed",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799524.6057198,
+        "source": "vosk",
+        "rms": 730,
+        "updated_at": 1788799524.3192518
+      }
+    },
+    {
+      "id": 139,
+      "timestamp_epoch_s": 1788799524.8194716,
+      "timestamp_local": "2026-09-08 00:45:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799524.8194716,
+        "source": "vosk",
+        "rms": 730,
+        "updated_at": 1788799524.3192518
+      }
+    },
+    {
+      "id": 140,
+      "timestamp_epoch_s": 1788799524.8706276,
+      "timestamp_local": "2026-09-08 00:45:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799524.8706276,
+        "source": "vosk",
+        "rms": 730,
+        "updated_at": 1788799524.3192518
+      }
+    },
+    {
+      "id": 141,
+      "timestamp_epoch_s": 1788799525.3189924,
+      "timestamp_local": "2026-09-08 00:45:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799525.3189924,
+        "source": "vosk",
+        "rms": 730,
+        "updated_at": 1788799524.3192518
+      }
+    },
+    {
+      "id": 142,
+      "timestamp_epoch_s": 1788799525.389056,
+      "timestamp_local": "2026-09-08 00:45:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge there was",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799525.389056,
+        "source": "vosk",
+        "rms": 730,
+        "updated_at": 1788799524.3192518
+      }
+    },
+    {
+      "id": 143,
+      "timestamp_epoch_s": 1788799525.5690906,
+      "timestamp_local": "2026-09-08 00:45:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799525.5690906,
+        "source": "vosk",
+        "rms": 730,
+        "updated_at": 1788799524.3192518
+      }
+    },
+    {
+      "id": 144,
+      "timestamp_epoch_s": 1788799525.629193,
+      "timestamp_local": "2026-09-08 00:45:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge families think",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799525.629193,
+        "source": "vosk",
+        "rms": 730,
+        "updated_at": 1788799524.3192518
+      }
+    },
+    {
+      "id": 145,
+      "timestamp_epoch_s": 1788799525.820141,
+      "timestamp_local": "2026-09-08 00:45:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799525.820141,
+        "source": "vosk",
+        "rms": 770,
+        "updated_at": 1788799525.820141
+      }
+    },
+    {
+      "id": 146,
+      "timestamp_epoch_s": 1788799525.8925886,
+      "timestamp_local": "2026-09-08 00:45:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge families to go",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799525.8925886,
+        "source": "vosk",
+        "rms": 770,
+        "updated_at": 1788799525.820141
+      }
+    },
+    {
+      "id": 147,
+      "timestamp_epoch_s": 1788799526.0709794,
+      "timestamp_local": "2026-09-08 00:45:26",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799526.0709794,
+        "source": "vosk",
+        "rms": 770,
+        "updated_at": 1788799525.820141
+      }
+    },
+    {
+      "id": 148,
+      "timestamp_epoch_s": 1788799526.2434096,
+      "timestamp_local": "2026-09-08 00:45:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge families to go down in",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799526.2434096,
+        "source": "vosk",
+        "rms": 770,
+        "updated_at": 1788799525.820141
+      }
+    },
+    {
+      "id": 149,
+      "timestamp_epoch_s": 1788799526.5698814,
+      "timestamp_local": "2026-09-08 00:45:26",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799526.5698814,
+        "source": "vosk",
+        "rms": 791,
+        "updated_at": 1788799526.5698814
+      }
+    },
+    {
+      "id": 150,
+      "timestamp_epoch_s": 1788799526.645754,
+      "timestamp_local": "2026-09-08 00:45:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge families to go down",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799526.645754,
+        "source": "vosk",
+        "rms": 791,
+        "updated_at": 1788799526.5698814
+      }
+    },
+    {
+      "id": 151,
+      "timestamp_epoch_s": 1788799526.8208013,
+      "timestamp_local": "2026-09-08 00:45:26",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799526.8208013,
+        "source": "vosk",
+        "rms": 1019,
+        "updated_at": 1788799526.8208013
+      }
+    },
+    {
+      "id": 152,
+      "timestamp_epoch_s": 1788799527.0700011,
+      "timestamp_local": "2026-09-08 00:45:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799527.0700011,
+        "source": "vosk",
+        "rms": 850,
+        "updated_at": 1788799527.0700011
+      }
+    },
+    {
+      "id": 153,
+      "timestamp_epoch_s": 1788799527.111359,
+      "timestamp_local": "2026-09-08 00:45:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge families to go down at the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799527.111359,
+        "source": "vosk",
+        "rms": 850,
+        "updated_at": 1788799527.0700011
+      }
+    },
+    {
+      "id": 154,
+      "timestamp_epoch_s": 1788799527.5698917,
+      "timestamp_local": "2026-09-08 00:45:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799527.5698917,
+        "source": "vosk",
+        "rms": 955,
+        "updated_at": 1788799527.5698917
+      }
+    },
+    {
+      "id": 155,
+      "timestamp_epoch_s": 1788799527.6152658,
+      "timestamp_local": "2026-09-08 00:45:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge families to go down at the same time",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799527.6152658,
+        "source": "vosk",
+        "rms": 955,
+        "updated_at": 1788799527.5698917
+      }
+    },
+    {
+      "id": 156,
+      "timestamp_epoch_s": 1788799527.8199644,
+      "timestamp_local": "2026-09-08 00:45:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799527.8199644,
+        "source": "vosk",
+        "rms": 862,
+        "updated_at": 1788799527.8199644
+      }
+    },
+    {
+      "id": 157,
+      "timestamp_epoch_s": 1788799528.0775588,
+      "timestamp_local": "2026-09-08 00:45:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799528.0775588,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1788799528.0775588
+      }
+    },
+    {
+      "id": 158,
+      "timestamp_epoch_s": 1788799528.1391325,
+      "timestamp_local": "2026-09-08 00:45:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge families to go down at the same time as a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799528.1391325,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1788799528.0775588
+      }
+    },
+    {
+      "id": 159,
+      "timestamp_epoch_s": 1788799528.3213224,
+      "timestamp_local": "2026-09-08 00:45:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799528.3213224,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1788799528.3213224
+      }
+    },
+    {
+      "id": 160,
+      "timestamp_epoch_s": 1788799528.3714948,
+      "timestamp_local": "2026-09-08 00:45:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge families to go down at the same type of his accomplices",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799528.3714948,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1788799528.3213224
+      }
+    },
+    {
+      "id": 161,
+      "timestamp_epoch_s": 1788799528.596363,
+      "timestamp_local": "2026-09-08 00:45:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799528.596363,
+        "source": "vosk",
+        "rms": 946,
+        "updated_at": 1788799528.5953631
+      }
+    },
+    {
+      "id": 162,
+      "timestamp_epoch_s": 1788799528.6531355,
+      "timestamp_local": "2026-09-08 00:45:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge families to go down at the same type of his accomplice a smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799528.6531355,
+        "source": "vosk",
+        "rms": 946,
+        "updated_at": 1788799528.5953631
+      }
+    },
+    {
+      "id": 163,
+      "timestamp_epoch_s": 1788799528.8203003,
+      "timestamp_local": "2026-09-08 00:45:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799528.8203003,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1788799528.8203003
+      }
+    },
+    {
+      "id": 164,
+      "timestamp_epoch_s": 1788799529.0792663,
+      "timestamp_local": "2026-09-08 00:45:29",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799529.0792663,
+        "source": "vosk",
+        "rms": 869,
+        "updated_at": 1788799529.0792663
+      }
+    },
+    {
+      "id": 165,
+      "timestamp_epoch_s": 1788799529.1327922,
+      "timestamp_local": "2026-09-08 00:45:29",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "which was almost required to flop i don't know if it's a nice think look at those places in straight sets for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation and games a high powered a great big huge families to go down at the same type of his accomplice a smart century",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799529.1327922,
+        "source": "vosk",
+        "rms": 869,
+        "updated_at": 1788799529.0792663
+      }
+    },
+    {
+      "id": 166,
+      "timestamp_epoch_s": 1788799529.3215353,
+      "timestamp_local": "2026-09-08 00:45:29",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799529.3215353,
+        "source": "vosk",
+        "rms": 869,
+        "updated_at": 1788799529.0792663
+      }
+    },
+    {
+      "id": 167,
+      "timestamp_epoch_s": 1788799529.8890748,
+      "timestamp_local": "2026-09-08 00:45:29",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "mike was almost requests your flop i don t know it s a nice single got those places to inflate the for pictures taken to take longer to the hospital and thirty six our powers on this day the reason to watch the bank disguised as motivation renovation games a high powered great security camera to go down at the same time his accomplice a smart centuries right",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1788799529.8890748,
+        "source": "final",
+        "rms": 869,
+        "updated_at": 1788799529.0792663
+      }
+    },
+    {
+      "id": 168,
+      "timestamp_epoch_s": 1788799530.4531882,
+      "timestamp_local": "2026-09-08 00:45:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799530.4531882,
+        "source": "vosk",
+        "rms": 869,
+        "updated_at": 1788799529.0792663
+      }
+    },
+    {
+      "id": 169,
+      "timestamp_epoch_s": 1788799530.4541922,
+      "timestamp_local": "2026-09-08 00:45:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799530.4541922,
+        "source": "vosk",
+        "rms": 869,
+        "updated_at": 1788799529.0792663
+      }
+    },
+    {
+      "id": 170,
+      "timestamp_epoch_s": 1788799530.4984434,
+      "timestamp_local": "2026-09-08 00:45:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "backdoor",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799530.4984434,
+        "source": "vosk",
+        "rms": 869,
+        "updated_at": 1788799529.0792663
+      }
+    },
+    {
+      "id": 171,
+      "timestamp_epoch_s": 1788799530.5614722,
+      "timestamp_local": "2026-09-08 00:45:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799530.5614722,
+        "source": "vosk",
+        "rms": 869,
+        "updated_at": 1788799529.0792663
+      }
+    },
+    {
+      "id": 172,
+      "timestamp_epoch_s": 1788799530.8201692,
+      "timestamp_local": "2026-09-08 00:45:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799530.8201692,
+        "source": "vosk",
+        "rms": 1176,
+        "updated_at": 1788799530.8201692
+      }
+    },
+    {
+      "id": 173,
+      "timestamp_epoch_s": 1788799530.8643742,
+      "timestamp_local": "2026-09-08 00:45:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799530.8643742,
+        "source": "vosk",
+        "rms": 1176,
+        "updated_at": 1788799530.8201692
+      }
+    },
+    {
+      "id": 174,
+      "timestamp_epoch_s": 1788799531.0700467,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799531.0700467,
+        "source": "vosk",
+        "rms": 1176,
+        "updated_at": 1788799530.8201692
+      }
+    },
+    {
+      "id": 175,
+      "timestamp_epoch_s": 1788799531.1316164,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799531.1316164,
+        "source": "vosk",
+        "rms": 1176,
+        "updated_at": 1788799530.8201692
+      }
+    },
+    {
+      "id": 176,
+      "timestamp_epoch_s": 1788799531.3189514,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799531.3189514,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 177,
+      "timestamp_epoch_s": 1788799531.3322196,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked on security",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799531.3322196,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 178,
+      "timestamp_epoch_s": 1788799531.5701418,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799531.5701418,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 179,
+      "timestamp_epoch_s": 1788799531.5934727,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked on a security guard",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799531.5934727,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 180,
+      "timestamp_epoch_s": 1788799531.8203468,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799531.8203468,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 181,
+      "timestamp_epoch_s": 1788799531.869191,
+      "timestamp_local": "2026-09-08 00:45:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked on security guards don't",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799531.869191,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 182,
+      "timestamp_epoch_s": 1788799532.0701509,
+      "timestamp_local": "2026-09-08 00:45:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799532.0701509,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 183,
+      "timestamp_epoch_s": 1788799532.1147745,
+      "timestamp_local": "2026-09-08 00:45:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "back door locked on a security guard step forward",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788799532.1147745,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    },
+    {
+      "id": 184,
+      "timestamp_epoch_s": 1788799532.5724213,
+      "timestamp_local": "2026-09-08 00:45:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788799532.5724213,
+        "source": "vosk",
+        "rms": 865,
+        "updated_at": 1788799531.3189514
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260908_005250.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260908_005250.md"
+  }
+}

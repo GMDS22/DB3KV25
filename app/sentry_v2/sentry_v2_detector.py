@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import os
 import time
+import threading
+from functools import wraps
 from typing import Dict, List, Optional, Tuple, Any
 
 import cv2
@@ -32,6 +34,19 @@ CLASS_ID_MOTION = -1
 CLASS_ID_FOREGROUND = -2
 CLASS_ID_COLOR = -3
 CLASS_ID_MOVING_OBJECT = -4
+
+
+def _profile_detector_stage(stage_name: str):
+    def decorate(method):
+        @wraps(method)
+        def wrapped(self, *args, **kwargs):
+            started = time.perf_counter()
+            try:
+                return method(self, *args, **kwargs)
+            finally:
+                self._record_profile_timing(stage_name, (time.perf_counter() - started) * 1000.0)
+        return wrapped
+    return decorate
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +88,7 @@ class SentryV2Detector:
     """Self-contained multi-mode detector for SMART SENTRY V3."""
 
     def __init__(self) -> None:
+        self._profile_local = threading.local()
         # Frame-diff state
         self._prev_frame: Optional[np.ndarray] = None
         # Resize acceleration is intentionally limited to pure motion-only modes.
@@ -119,6 +135,22 @@ class SentryV2Detector:
         self.color_fusion_overlap: int = 15
         self._motion_suppressed_until: float = 0.0
         self._last_color_gate_status: Dict[str, Any] = {}
+
+    def _record_profile_timing(self, stage_name: str, elapsed_ms: float) -> None:
+        timings = getattr(self._profile_local, "timings", None)
+        if timings is None:
+            timings = {}
+            self._profile_local.timings = timings
+        timings[stage_name] = float(timings.get(stage_name, 0.0)) + max(0.0, float(elapsed_ms))
+
+    def consume_profile_timings_ms(self) -> Dict[str, float]:
+        """Return component timings collected by the calling detector thread."""
+        timings = dict(getattr(self._profile_local, "timings", {}) or {})
+        self._profile_local.timings = {}
+        motion_ms = float(timings.get("frame_diff_ms", 0.0)) + float(timings.get("backsub_ms", 0.0))
+        if motion_ms:
+            timings["motion_detector_ms"] = motion_ms
+        return timings
 
     # ------------------------------------------------------------------ #
     #  YOLO management
@@ -256,6 +288,7 @@ class SentryV2Detector:
     #  Frame Difference  (mode 0)
     # ------------------------------------------------------------------ #
 
+    @_profile_detector_stage("frame_diff_ms")
     def _detect_frame_diff(self, frame: np.ndarray, *, allow_resize: bool = True) -> list:
         gray, scale = self._prepare_motion_frame(frame, allow_resize=allow_resize)
         if self._motion_detection_suppressed():
@@ -290,6 +323,7 @@ class SentryV2Detector:
     #  Background Subtraction  (mode 1)
     # ------------------------------------------------------------------ #
 
+    @_profile_detector_stage("backsub_ms")
     def _detect_backsub(self, frame: np.ndarray, *, allow_resize: bool = True) -> list:
         if self._back_sub is None:
             self._back_sub = cv2.createBackgroundSubtractorMOG2(
@@ -323,6 +357,7 @@ class SentryV2Detector:
     #  YOLO  (modes 2, 10)
     # ------------------------------------------------------------------ #
 
+    @_profile_detector_stage("yolo_ms")
     def _detect_yolo(self, frame: np.ndarray) -> list:
         if not self._yolo_loaded or self._yolo_model is None:
             return []
@@ -461,6 +496,7 @@ class SentryV2Detector:
             boxes.append((int(x), int(y), int(w), int(h), 0.85, CLASS_ID_COLOR))
         return boxes
 
+    @_profile_detector_stage("color_detector_ms")
     def _detect_color(self, frame: np.ndarray) -> list:
         k = self.color_blur | 1
         blurred = cv2.GaussianBlur(frame, (k, k), 0)

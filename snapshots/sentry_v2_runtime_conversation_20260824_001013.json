@@ -1,0 +1,3818 @@
+{
+  "generated_at_local": "2026-08-24 00:10:13",
+  "generated_at_epoch_s": 1787501413.198013,
+  "entry_count": 211,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 118,
+    "operator": 90
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 118,
+    "voice_transcript_partial": 85,
+    "voice_transcript_final": 5,
+    "spoken_confirmation": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 209
+  },
+  "voice_transcript_summary": {
+    "partial_count": 85,
+    "final_count": 5,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "we also like to give back to new gallup on able to establish a never ending anything of my life s or something don t some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn t know why joined by this morning we spotted something we d be his roof is really bad shape so here s the black marks",
+  "latest_operator_request": "we also like to give back to new gallup on able to establish a never ending anything of my life s or something don t some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn t know why joined by this morning we spotted something we d be his roof is really bad shape so here s the black marks",
+  "latest_assistant_message": "Smart Sentry is ready.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 200,
+      "timestamp_epoch_s": 1787500851.5543857,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500851.5543857,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500851.485372,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 201,
+      "timestamp_epoch_s": 1787500851.9682367,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500851.9682367,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500851.9682367,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 202,
+      "timestamp_epoch_s": 1787500851.9974902,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the got a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500851.9974902,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500851.9682367,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 203,
+      "timestamp_epoch_s": 1787500852.2190332,
+      "timestamp_local": "2026-08-24 00:00:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500852.2190332,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500852.2190332,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 204,
+      "timestamp_epoch_s": 1787500852.2732463,
+      "timestamp_local": "2026-08-24 00:00:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the gutters we gonna",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500852.2732463,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500852.2190332,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 205,
+      "timestamp_epoch_s": 1787500852.4681895,
+      "timestamp_local": "2026-08-24 00:00:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500852.4681895,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500852.4681895,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 206,
+      "timestamp_epoch_s": 1787500852.4916728,
+      "timestamp_local": "2026-08-24 00:00:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the gutters we gonna shock",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500852.4916728,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500852.4681895,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 207,
+      "timestamp_epoch_s": 1787500852.7175133,
+      "timestamp_local": "2026-08-24 00:00:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500852.7175133,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500852.7175133,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 208,
+      "timestamp_epoch_s": 1787500853.335608,
+      "timestamp_local": "2026-08-24 00:00:53",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500853.335608,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500853.335608,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 209,
+      "timestamp_epoch_s": 1787500853.3636656,
+      "timestamp_local": "2026-08-24 00:00:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the gutters we gonna shock he",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500853.3636656,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500853.335608,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 210,
+      "timestamp_epoch_s": 1787500853.5788527,
+      "timestamp_local": "2026-08-24 00:00:53",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500853.5788527,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500853.5788527,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 211,
+      "timestamp_epoch_s": 1787500853.646085,
+      "timestamp_local": "2026-08-24 00:00:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the gutters we gonna shock keep i",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500853.646085,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500853.5788527,
+        "frequency_hz": 304.0
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1787500809.5725951,
+      "timestamp_local": "2026-08-24 00:00:09",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1787500809.5741293,
+      "timestamp_local": "2026-08-24 00:00:09",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1787500811.4071367,
+      "timestamp_local": "2026-08-24 00:00:11",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500811.4071367,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1787500812.6563191,
+      "timestamp_local": "2026-08-24 00:00:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500812.6563191,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500812.6563191
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1787500814.6361127,
+      "timestamp_local": "2026-08-24 00:00:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "please",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500814.6361127,
+        "source": "vosk",
+        "rms": 754,
+        "updated_at": 1787500814.5390527,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1787500814.78731,
+      "timestamp_local": "2026-08-24 00:00:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500814.78731,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500814.78731,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1787500814.9179242,
+      "timestamp_local": "2026-08-24 00:00:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "please they",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500814.9179242,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500814.78731,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1787500815.0376227,
+      "timestamp_local": "2026-08-24 00:00:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500815.0376227,
+        "source": "vosk",
+        "rms": 1206,
+        "updated_at": 1787500815.0376227,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1787500815.287816,
+      "timestamp_local": "2026-08-24 00:00:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500815.287816,
+        "source": "vosk",
+        "rms": 608,
+        "updated_at": 1787500815.287816,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1787500815.4014823,
+      "timestamp_local": "2026-08-24 00:00:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "please the forklift",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500815.4014823,
+        "source": "vosk",
+        "rms": 608,
+        "updated_at": 1787500815.287816,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1787500815.5372152,
+      "timestamp_local": "2026-08-24 00:00:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500815.5372152,
+        "source": "vosk",
+        "rms": 409,
+        "updated_at": 1787500815.5372152,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1787500815.7874355,
+      "timestamp_local": "2026-08-24 00:00:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500815.7874355,
+        "source": "vosk",
+        "rms": 476,
+        "updated_at": 1787500815.7874355,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1787500816.4848804,
+      "timestamp_local": "2026-08-24 00:00:16",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "please the forklift",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1787500816.4848804,
+        "source": "final",
+        "rms": 476,
+        "updated_at": 1787500815.7874355,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1787500816.526758,
+      "timestamp_local": "2026-08-24 00:00:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500816.526758,
+        "source": "vosk",
+        "rms": 476,
+        "updated_at": 1787500815.7874355,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1787500816.526758,
+      "timestamp_local": "2026-08-24 00:00:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500816.526758,
+        "source": "vosk",
+        "rms": 199,
+        "updated_at": 1787500816.526758,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1787500820.263979,
+      "timestamp_local": "2026-08-24 00:00:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "oh okay",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500820.263979,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500820.1575685,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1787500820.408323,
+      "timestamp_local": "2026-08-24 00:00:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500820.408323,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500820.408323,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1787500820.634448,
+      "timestamp_local": "2026-08-24 00:00:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "battle of britain",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500820.634448,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500820.408323,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1787500820.711151,
+      "timestamp_local": "2026-08-24 00:00:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "battle of britain for it",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500820.711151,
+        "source": "vosk",
+        "rms": 294,
+        "updated_at": 1787500820.6590087,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1787500820.908372,
+      "timestamp_local": "2026-08-24 00:00:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500820.908372,
+        "source": "vosk",
+        "rms": 265,
+        "updated_at": 1787500820.908372,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1787500821.1580958,
+      "timestamp_local": "2026-08-24 00:00:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500821.1580958,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500821.1580958,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1787500821.4290283,
+      "timestamp_local": "2026-08-24 00:00:21",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "battle of britain for it",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1787500821.4290283,
+        "source": "final",
+        "rms": 1201,
+        "updated_at": 1787500821.1580958,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1787500821.5451295,
+      "timestamp_local": "2026-08-24 00:00:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500821.5451295,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500821.1580958,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1787500821.687022,
+      "timestamp_local": "2026-08-24 00:00:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "like",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500821.687022,
+        "source": "vosk",
+        "rms": 309,
+        "updated_at": 1787500821.6584942,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1787500821.908171,
+      "timestamp_local": "2026-08-24 00:00:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500821.908171,
+        "source": "vosk",
+        "rms": 445,
+        "updated_at": 1787500821.908171,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1787500822.1579516,
+      "timestamp_local": "2026-08-24 00:00:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500822.1579516,
+        "source": "vosk",
+        "rms": 355,
+        "updated_at": 1787500822.1579516,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1787500822.4074776,
+      "timestamp_local": "2026-08-24 00:00:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500822.4074776,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500822.4074776,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1787500822.6193037,
+      "timestamp_local": "2026-08-24 00:00:22",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "like",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1787500822.6193037,
+        "source": "final",
+        "rms": 1203,
+        "updated_at": 1787500822.4074776,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1787500822.706492,
+      "timestamp_local": "2026-08-24 00:00:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500822.706492,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500822.706492,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1787500822.956316,
+      "timestamp_local": "2026-08-24 00:00:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so my",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500822.956316,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500822.9070075,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1787500846.7802818,
+      "timestamp_local": "2026-08-24 00:00:46",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Smart Sentry is ready.",
+      "metadata": {
+        "interrupt": true,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1787500823.1571922,
+      "timestamp_local": "2026-08-24 00:00:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500823.1571922,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500823.1571922,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1787500823.4082274,
+      "timestamp_local": "2026-08-24 00:00:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500823.4082274,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500823.4082274,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1787500823.5036983,
+      "timestamp_local": "2026-08-24 00:00:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so my toys and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500823.5036983,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500823.4082274,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1787500823.658843,
+      "timestamp_local": "2026-08-24 00:00:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500823.658843,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500823.658843,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1787500823.754396,
+      "timestamp_local": "2026-08-24 00:00:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so my toys and me when i",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500823.754396,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500823.658843,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1787500823.9075487,
+      "timestamp_local": "2026-08-24 00:00:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500823.9075487,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500823.9075487,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1787500823.9969373,
+      "timestamp_local": "2026-08-24 00:00:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so my toys and me when i'm out and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500823.9969373,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500823.9075487,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1787500824.1578112,
+      "timestamp_local": "2026-08-24 00:00:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500824.1578112,
+        "source": "vosk",
+        "rms": 1204,
+        "updated_at": 1787500824.1578112,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1787500824.2362978,
+      "timestamp_local": "2026-08-24 00:00:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so my toys and me when i lived in",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500824.2362978,
+        "source": "vosk",
+        "rms": 1204,
+        "updated_at": 1787500824.1578112,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1787500824.4078138,
+      "timestamp_local": "2026-08-24 00:00:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500824.4078138,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500824.4078138,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1787500824.5056558,
+      "timestamp_local": "2026-08-24 00:00:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so my toys and me when i lived in san francisco",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500824.5056558,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500824.4078138,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1787500824.6574242,
+      "timestamp_local": "2026-08-24 00:00:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500824.6574242,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500824.6574242,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1787500824.7196333,
+      "timestamp_local": "2026-08-24 00:00:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so my toys and me when i'm out and and family",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500824.7196333,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500824.6574242,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1787500824.9087262,
+      "timestamp_local": "2026-08-24 00:00:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500824.9087262,
+        "source": "vosk",
+        "rms": 663,
+        "updated_at": 1787500824.9087262,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1787500824.9450214,
+      "timestamp_local": "2026-08-24 00:00:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so my toys and me when i'm out and and family business",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500824.9450214,
+        "source": "vosk",
+        "rms": 663,
+        "updated_at": 1787500824.9087262,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1787500825.1582868,
+      "timestamp_local": "2026-08-24 00:00:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500825.1582868,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500825.1582868,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1787500825.4080806,
+      "timestamp_local": "2026-08-24 00:00:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500825.4080806,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500825.4080806,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1787500825.657988,
+      "timestamp_local": "2026-08-24 00:00:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500825.657988,
+        "source": "vosk",
+        "rms": 243,
+        "updated_at": 1787500825.657988,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1787500826.0085213,
+      "timestamp_local": "2026-08-24 00:00:26",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "so my toys and me when i m out in and family business yeah",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1787500826.0085213,
+        "source": "final",
+        "rms": 243,
+        "updated_at": 1787500825.657988,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1787500826.1558087,
+      "timestamp_local": "2026-08-24 00:00:26",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500826.1558087,
+        "source": "vosk",
+        "rms": 243,
+        "updated_at": 1787500825.657988,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1787500826.1558087,
+      "timestamp_local": "2026-08-24 00:00:26",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500826.1558087,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500826.1558087,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1787500826.4629204,
+      "timestamp_local": "2026-08-24 00:00:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "rios",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500826.4629204,
+        "source": "vosk",
+        "rms": 1008,
+        "updated_at": 1787500826.4082665,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1787500826.6590643,
+      "timestamp_local": "2026-08-24 00:00:26",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500826.6590643,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500826.6590643,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1787500826.7176414,
+      "timestamp_local": "2026-08-24 00:00:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to be",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500826.7176414,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500826.6590643,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1787500826.9075391,
+      "timestamp_local": "2026-08-24 00:00:26",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500826.9075391,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500826.6590643,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1787500826.9412313,
+      "timestamp_local": "2026-08-24 00:00:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500826.9412313,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500826.6590643,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1787500827.1575415,
+      "timestamp_local": "2026-08-24 00:00:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500827.1575415,
+        "source": "vosk",
+        "rms": 986,
+        "updated_at": 1787500827.1575415,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 59,
+      "timestamp_epoch_s": 1787500827.1913524,
+      "timestamp_local": "2026-08-24 00:00:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500827.1913524,
+        "source": "vosk",
+        "rms": 986,
+        "updated_at": 1787500827.1575415,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 60,
+      "timestamp_epoch_s": 1787500827.6586316,
+      "timestamp_local": "2026-08-24 00:00:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500827.6586316,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500827.6586316,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 61,
+      "timestamp_epoch_s": 1787500827.7506416,
+      "timestamp_local": "2026-08-24 00:00:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500827.7506416,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500827.6586316,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 62,
+      "timestamp_epoch_s": 1787500827.906894,
+      "timestamp_local": "2026-08-24 00:00:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500827.906894,
+        "source": "vosk",
+        "rms": 1205,
+        "updated_at": 1787500827.906894,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 63,
+      "timestamp_epoch_s": 1787500828.808097,
+      "timestamp_local": "2026-08-24 00:00:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500828.808097,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500828.808097,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 64,
+      "timestamp_epoch_s": 1787500828.841204,
+      "timestamp_local": "2026-08-24 00:00:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500828.841204,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500828.808097,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 65,
+      "timestamp_epoch_s": 1787500829.3082569,
+      "timestamp_local": "2026-08-24 00:00:29",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500829.3082569,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500829.3082569,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 66,
+      "timestamp_epoch_s": 1787500829.34113,
+      "timestamp_local": "2026-08-24 00:00:29",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup unable",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500829.34113,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500829.3082569,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 67,
+      "timestamp_epoch_s": 1787500829.8082776,
+      "timestamp_local": "2026-08-24 00:00:29",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500829.8082776,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500829.3082569,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1787500829.8593504,
+      "timestamp_local": "2026-08-24 00:00:29",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on a really",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500829.8593504,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500829.3082569,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1787500830.3080077,
+      "timestamp_local": "2026-08-24 00:00:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500830.3080077,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500830.3080077,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1787500830.3398921,
+      "timestamp_local": "2026-08-24 00:00:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500830.3398921,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500830.3080077,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1787500830.5576453,
+      "timestamp_local": "2026-08-24 00:00:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500830.5576453,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500830.5576453,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1787500830.6091092,
+      "timestamp_local": "2026-08-24 00:00:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500830.6091092,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500830.5576453,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1787500830.8083076,
+      "timestamp_local": "2026-08-24 00:00:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500830.8083076,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500830.8083076,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1787500830.8347745,
+      "timestamp_local": "2026-08-24 00:00:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500830.8347745,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500830.8083076,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1787500831.058111,
+      "timestamp_local": "2026-08-24 00:00:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500831.058111,
+        "source": "vosk",
+        "rms": 1205,
+        "updated_at": 1787500831.058111,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1787500831.0848875,
+      "timestamp_local": "2026-08-24 00:00:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on a really sorry i never had",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500831.0848875,
+        "source": "vosk",
+        "rms": 1205,
+        "updated_at": 1787500831.058111,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1787500831.3087733,
+      "timestamp_local": "2026-08-24 00:00:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500831.3087733,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500831.3087733,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1787500831.3355057,
+      "timestamp_local": "2026-08-24 00:00:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500831.3355057,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500831.3087733,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1787500831.558399,
+      "timestamp_local": "2026-08-24 00:00:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500831.558399,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500831.558399,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 80,
+      "timestamp_epoch_s": 1787500831.6359472,
+      "timestamp_local": "2026-08-24 00:00:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500831.6359472,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500831.558399,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 81,
+      "timestamp_epoch_s": 1787500831.808257,
+      "timestamp_local": "2026-08-24 00:00:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500831.808257,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500831.808257,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 82,
+      "timestamp_epoch_s": 1787500831.8434634,
+      "timestamp_local": "2026-08-24 00:00:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500831.8434634,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500831.808257,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 83,
+      "timestamp_epoch_s": 1787500832.0591378,
+      "timestamp_local": "2026-08-24 00:00:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500832.0591378,
+        "source": "vosk",
+        "rms": 957,
+        "updated_at": 1787500832.0591378,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1787500832.1143754,
+      "timestamp_local": "2026-08-24 00:00:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life so",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500832.1143754,
+        "source": "vosk",
+        "rms": 957,
+        "updated_at": 1787500832.0591378,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1787500832.30747,
+      "timestamp_local": "2026-08-24 00:00:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500832.30747,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500832.30747,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1787500832.5584824,
+      "timestamp_local": "2026-08-24 00:00:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500832.5584824,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500832.5584824,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1787500832.5900457,
+      "timestamp_local": "2026-08-24 00:00:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life's or",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500832.5900457,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500832.5584824,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1787500832.8070772,
+      "timestamp_local": "2026-08-24 00:00:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500832.8070772,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500832.8070772,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1787500832.8531098,
+      "timestamp_local": "2026-08-24 00:00:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500832.8531098,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500832.8070772,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1787500833.057584,
+      "timestamp_local": "2026-08-24 00:00:33",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500833.057584,
+        "source": "vosk",
+        "rms": 1094,
+        "updated_at": 1787500833.057584,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 91,
+      "timestamp_epoch_s": 1787500833.0698848,
+      "timestamp_local": "2026-08-24 00:00:33",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500833.0698848,
+        "source": "vosk",
+        "rms": 1094,
+        "updated_at": 1787500833.057584,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 92,
+      "timestamp_epoch_s": 1787500833.3083286,
+      "timestamp_local": "2026-08-24 00:00:33",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500833.3083286,
+        "source": "vosk",
+        "rms": 878,
+        "updated_at": 1787500833.3083286,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 93,
+      "timestamp_epoch_s": 1787500833.3574748,
+      "timestamp_local": "2026-08-24 00:00:33",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't something",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500833.3574748,
+        "source": "vosk",
+        "rms": 878,
+        "updated_at": 1787500833.3083286,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 94,
+      "timestamp_epoch_s": 1787500833.5568385,
+      "timestamp_local": "2026-08-24 00:00:33",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500833.5568385,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500833.5568385,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 95,
+      "timestamp_epoch_s": 1787500833.610462,
+      "timestamp_local": "2026-08-24 00:00:33",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't sound",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500833.610462,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500833.5568385,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 96,
+      "timestamp_epoch_s": 1787500833.8072548,
+      "timestamp_local": "2026-08-24 00:00:33",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500833.8072548,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500833.8072548,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 97,
+      "timestamp_epoch_s": 1787500833.8754096,
+      "timestamp_local": "2026-08-24 00:00:33",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't suddenly",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500833.8754096,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500833.8072548,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 98,
+      "timestamp_epoch_s": 1787500834.058512,
+      "timestamp_local": "2026-08-24 00:00:34",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500834.058512,
+        "source": "vosk",
+        "rms": 937,
+        "updated_at": 1787500834.058512,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 99,
+      "timestamp_epoch_s": 1787500834.0892541,
+      "timestamp_local": "2026-08-24 00:00:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500834.0892541,
+        "source": "vosk",
+        "rms": 937,
+        "updated_at": 1787500834.058512,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 100,
+      "timestamp_epoch_s": 1787500834.306991,
+      "timestamp_local": "2026-08-24 00:00:34",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500834.306991,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500834.306991,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 101,
+      "timestamp_epoch_s": 1787500834.327706,
+      "timestamp_local": "2026-08-24 00:00:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't somebody will keep",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500834.327706,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500834.306991,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 102,
+      "timestamp_epoch_s": 1787500834.558535,
+      "timestamp_local": "2026-08-24 00:00:34",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500834.558535,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500834.558535,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 103,
+      "timestamp_epoch_s": 1787500834.5823889,
+      "timestamp_local": "2026-08-24 00:00:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't somebody will keep positive",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500834.5823889,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500834.558535,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 104,
+      "timestamp_epoch_s": 1787500834.8075294,
+      "timestamp_local": "2026-08-24 00:00:34",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500834.8075294,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1787500834.8075294,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 105,
+      "timestamp_epoch_s": 1787500834.8371222,
+      "timestamp_local": "2026-08-24 00:00:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500834.8371222,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1787500834.8075294,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 106,
+      "timestamp_epoch_s": 1787500835.3081148,
+      "timestamp_local": "2026-08-24 00:00:35",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500835.3081148,
+        "source": "vosk",
+        "rms": 802,
+        "updated_at": 1787500834.8075294,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 107,
+      "timestamp_epoch_s": 1787500835.5573616,
+      "timestamp_local": "2026-08-24 00:00:35",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500835.5573616,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500835.5573616,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 108,
+      "timestamp_epoch_s": 1787500835.5800138,
+      "timestamp_local": "2026-08-24 00:00:35",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't somebody will keep basra idea",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500835.5800138,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500835.5573616,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 109,
+      "timestamp_epoch_s": 1787500835.8083117,
+      "timestamp_local": "2026-08-24 00:00:35",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500835.8083117,
+        "source": "vosk",
+        "rms": 1159,
+        "updated_at": 1787500835.8083117,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 110,
+      "timestamp_epoch_s": 1787500835.8363922,
+      "timestamp_local": "2026-08-24 00:00:35",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500835.8363922,
+        "source": "vosk",
+        "rms": 1159,
+        "updated_at": 1787500835.8083117,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 111,
+      "timestamp_epoch_s": 1787500836.0579684,
+      "timestamp_local": "2026-08-24 00:00:36",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500836.0579684,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500836.0579684,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 112,
+      "timestamp_epoch_s": 1787500836.0846276,
+      "timestamp_local": "2026-08-24 00:00:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500836.0846276,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500836.0579684,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 113,
+      "timestamp_epoch_s": 1787500836.3081439,
+      "timestamp_local": "2026-08-24 00:00:36",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500836.3081439,
+        "source": "vosk",
+        "rms": 1204,
+        "updated_at": 1787500836.3081439,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 114,
+      "timestamp_epoch_s": 1787500836.3314178,
+      "timestamp_local": "2026-08-24 00:00:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500836.3314178,
+        "source": "vosk",
+        "rms": 1204,
+        "updated_at": 1787500836.3081439,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 115,
+      "timestamp_epoch_s": 1787500836.5585232,
+      "timestamp_local": "2026-08-24 00:00:36",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500836.5585232,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500836.5585232,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 116,
+      "timestamp_epoch_s": 1787500836.8071136,
+      "timestamp_local": "2026-08-24 00:00:36",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500836.8071136,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500836.8071136,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 117,
+      "timestamp_epoch_s": 1787500836.8427126,
+      "timestamp_local": "2026-08-24 00:00:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where these",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500836.8427126,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500836.8071136,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 118,
+      "timestamp_epoch_s": 1787500837.058262,
+      "timestamp_local": "2026-08-24 00:00:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500837.058262,
+        "source": "vosk",
+        "rms": 1127,
+        "updated_at": 1787500837.058262,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 119,
+      "timestamp_epoch_s": 1787500837.1012897,
+      "timestamp_local": "2026-08-24 00:00:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500837.1012897,
+        "source": "vosk",
+        "rms": 1127,
+        "updated_at": 1787500837.058262,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 120,
+      "timestamp_epoch_s": 1787500837.3083677,
+      "timestamp_local": "2026-08-24 00:00:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500837.3083677,
+        "source": "vosk",
+        "rms": 1127,
+        "updated_at": 1787500837.058262,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 121,
+      "timestamp_epoch_s": 1787500837.3254158,
+      "timestamp_local": "2026-08-24 00:00:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500837.3254158,
+        "source": "vosk",
+        "rms": 1127,
+        "updated_at": 1787500837.058262,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 122,
+      "timestamp_epoch_s": 1787500837.8084133,
+      "timestamp_local": "2026-08-24 00:00:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500837.8084133,
+        "source": "vosk",
+        "rms": 1127,
+        "updated_at": 1787500837.058262,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 123,
+      "timestamp_epoch_s": 1787500838.059023,
+      "timestamp_local": "2026-08-24 00:00:38",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500838.059023,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500838.059023,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 124,
+      "timestamp_epoch_s": 1787500838.3082416,
+      "timestamp_local": "2026-08-24 00:00:38",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500838.3082416,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500838.3082416,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 125,
+      "timestamp_epoch_s": 1787500838.377213,
+      "timestamp_local": "2026-08-24 00:00:38",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500838.377213,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500838.3082416,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 126,
+      "timestamp_epoch_s": 1787500838.5586832,
+      "timestamp_local": "2026-08-24 00:00:38",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500838.5586832,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500838.5586832,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 127,
+      "timestamp_epoch_s": 1787500838.8086543,
+      "timestamp_local": "2026-08-24 00:00:38",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500838.8086543,
+        "source": "vosk",
+        "rms": 1049,
+        "updated_at": 1787500838.8086543,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 128,
+      "timestamp_epoch_s": 1787500839.0585158,
+      "timestamp_local": "2026-08-24 00:00:39",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500839.0585158,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500839.0585158,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 129,
+      "timestamp_epoch_s": 1787500839.076615,
+      "timestamp_local": "2026-08-24 00:00:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500839.076615,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500839.0585158,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 130,
+      "timestamp_epoch_s": 1787500839.3084655,
+      "timestamp_local": "2026-08-24 00:00:39",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500839.3084655,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500839.3084655,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 131,
+      "timestamp_epoch_s": 1787500839.343943,
+      "timestamp_local": "2026-08-24 00:00:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500839.343943,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500839.3084655,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 132,
+      "timestamp_epoch_s": 1787500839.557019,
+      "timestamp_local": "2026-08-24 00:00:39",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500839.557019,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500839.557019,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 133,
+      "timestamp_epoch_s": 1787500839.8085442,
+      "timestamp_local": "2026-08-24 00:00:39",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500839.8085442,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500839.8085442,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 134,
+      "timestamp_epoch_s": 1787500839.8292353,
+      "timestamp_local": "2026-08-24 00:00:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500839.8292353,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500839.8085442,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 135,
+      "timestamp_epoch_s": 1787500840.0582335,
+      "timestamp_local": "2026-08-24 00:00:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500840.0582335,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500840.0582335,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 136,
+      "timestamp_epoch_s": 1787500840.0792732,
+      "timestamp_local": "2026-08-24 00:00:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500840.0792732,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500840.0582335,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 137,
+      "timestamp_epoch_s": 1787500840.3085856,
+      "timestamp_local": "2026-08-24 00:00:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500840.3085856,
+        "source": "vosk",
+        "rms": 1206,
+        "updated_at": 1787500840.3070834,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 138,
+      "timestamp_epoch_s": 1787500840.8079116,
+      "timestamp_local": "2026-08-24 00:00:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500840.8079116,
+        "source": "vosk",
+        "rms": 1117,
+        "updated_at": 1787500840.8079116,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 139,
+      "timestamp_epoch_s": 1787500840.8467443,
+      "timestamp_local": "2026-08-24 00:00:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500840.8467443,
+        "source": "vosk",
+        "rms": 1117,
+        "updated_at": 1787500840.8079116,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 140,
+      "timestamp_epoch_s": 1787500841.05938,
+      "timestamp_local": "2026-08-24 00:00:41",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500841.05938,
+        "source": "vosk",
+        "rms": 1174,
+        "updated_at": 1787500841.05938,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 141,
+      "timestamp_epoch_s": 1787500841.3084133,
+      "timestamp_local": "2026-08-24 00:00:41",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500841.3084133,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500841.3084133,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 142,
+      "timestamp_epoch_s": 1787500841.3715954,
+      "timestamp_local": "2026-08-24 00:00:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500841.3715954,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500841.3084133,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 143,
+      "timestamp_epoch_s": 1787500841.5583446,
+      "timestamp_local": "2026-08-24 00:00:41",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500841.5583446,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500841.5583446,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 144,
+      "timestamp_epoch_s": 1787500841.581514,
+      "timestamp_local": "2026-08-24 00:00:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500841.581514,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500841.5583446,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 145,
+      "timestamp_epoch_s": 1787500842.0573406,
+      "timestamp_local": "2026-08-24 00:00:42",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500842.0573406,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500842.0573406,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 146,
+      "timestamp_epoch_s": 1787500842.0766811,
+      "timestamp_local": "2026-08-24 00:00:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500842.0766811,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500842.0573406,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 147,
+      "timestamp_epoch_s": 1787500842.3083975,
+      "timestamp_local": "2026-08-24 00:00:42",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500842.3083975,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500842.3083975,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 148,
+      "timestamp_epoch_s": 1787500842.5582893,
+      "timestamp_local": "2026-08-24 00:00:42",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500842.5582893,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500842.5582893,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 149,
+      "timestamp_epoch_s": 1787500842.5801556,
+      "timestamp_local": "2026-08-24 00:00:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know watching",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500842.5801556,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500842.5582893,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 150,
+      "timestamp_epoch_s": 1787500842.8084629,
+      "timestamp_local": "2026-08-24 00:00:42",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500842.8084629,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500842.8084629,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 151,
+      "timestamp_epoch_s": 1787500842.8531103,
+      "timestamp_local": "2026-08-24 00:00:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500842.8531103,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500842.8084629,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 152,
+      "timestamp_epoch_s": 1787500843.057199,
+      "timestamp_local": "2026-08-24 00:00:43",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500843.057199,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500843.057199,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 153,
+      "timestamp_epoch_s": 1787500843.0891416,
+      "timestamp_local": "2026-08-24 00:00:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500843.0891416,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500843.057199,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 154,
+      "timestamp_epoch_s": 1787500843.308238,
+      "timestamp_local": "2026-08-24 00:00:43",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500843.308238,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500843.057199,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 155,
+      "timestamp_epoch_s": 1787500843.3414826,
+      "timestamp_local": "2026-08-24 00:00:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500843.3414826,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500843.057199,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 156,
+      "timestamp_epoch_s": 1787500843.5582864,
+      "timestamp_local": "2026-08-24 00:00:43",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500843.5582864,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500843.057199,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 157,
+      "timestamp_epoch_s": 1787500843.5905488,
+      "timestamp_local": "2026-08-24 00:00:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500843.5905488,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500843.057199,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 158,
+      "timestamp_epoch_s": 1787500843.8088064,
+      "timestamp_local": "2026-08-24 00:00:43",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500843.8088064,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500843.8088064,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 159,
+      "timestamp_epoch_s": 1787500843.8349001,
+      "timestamp_local": "2026-08-24 00:00:43",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500843.8349001,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500843.8088064,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 160,
+      "timestamp_epoch_s": 1787500844.059271,
+      "timestamp_local": "2026-08-24 00:00:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500844.059271,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500844.059271,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 161,
+      "timestamp_epoch_s": 1787500844.3082411,
+      "timestamp_local": "2026-08-24 00:00:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500844.3082411,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500844.3082411,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 162,
+      "timestamp_epoch_s": 1787500844.3315763,
+      "timestamp_local": "2026-08-24 00:00:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500844.3315763,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500844.3082411,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 163,
+      "timestamp_epoch_s": 1787500844.5583954,
+      "timestamp_local": "2026-08-24 00:00:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500844.5583954,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500844.5583954,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 164,
+      "timestamp_epoch_s": 1787500844.8084517,
+      "timestamp_local": "2026-08-24 00:00:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500844.8084517,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500844.8084517,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 165,
+      "timestamp_epoch_s": 1787500844.83618,
+      "timestamp_local": "2026-08-24 00:00:44",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted something we",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500844.83618,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500844.8084517,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 166,
+      "timestamp_epoch_s": 1787500845.0582485,
+      "timestamp_local": "2026-08-24 00:00:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500845.0582485,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500845.0582485,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 167,
+      "timestamp_epoch_s": 1787500845.0902324,
+      "timestamp_local": "2026-08-24 00:00:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted something we'd be",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500845.0902324,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500845.0582485,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 168,
+      "timestamp_epoch_s": 1787500845.3086329,
+      "timestamp_local": "2026-08-24 00:00:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500845.3086329,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500845.0582485,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 169,
+      "timestamp_epoch_s": 1787500845.5581555,
+      "timestamp_local": "2026-08-24 00:00:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500845.5581555,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500845.0582485,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 170,
+      "timestamp_epoch_s": 1787500845.8085477,
+      "timestamp_local": "2026-08-24 00:00:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500845.8085477,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500845.0582485,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 171,
+      "timestamp_epoch_s": 1787500846.058185,
+      "timestamp_local": "2026-08-24 00:00:46",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500846.058185,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500846.058185,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 172,
+      "timestamp_epoch_s": 1787500846.3082666,
+      "timestamp_local": "2026-08-24 00:00:46",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500846.3082666,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500846.3082666,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 173,
+      "timestamp_epoch_s": 1787500846.357224,
+      "timestamp_local": "2026-08-24 00:00:46",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted something we'd be he's",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500846.357224,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500846.3082666,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 174,
+      "timestamp_epoch_s": 1787500847.1253088,
+      "timestamp_local": "2026-08-24 00:00:47",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500847.1253088,
+        "source": "vosk",
+        "rms": 1205,
+        "updated_at": 1787500847.1253088,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 175,
+      "timestamp_epoch_s": 1787500847.180105,
+      "timestamp_local": "2026-08-24 00:00:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted something we'd be he's ruthless",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500847.180105,
+        "source": "vosk",
+        "rms": 1205,
+        "updated_at": 1787500847.1253088,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 176,
+      "timestamp_epoch_s": 1787500847.3690653,
+      "timestamp_local": "2026-08-24 00:00:47",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500847.3690653,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500847.3690653,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 177,
+      "timestamp_epoch_s": 1787500847.4524999,
+      "timestamp_local": "2026-08-24 00:00:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted something we'd be his rule is you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500847.4524999,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500847.3690653,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 178,
+      "timestamp_epoch_s": 1787500847.6178942,
+      "timestamp_local": "2026-08-24 00:00:47",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500847.6178942,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500847.6178942,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 179,
+      "timestamp_epoch_s": 1787500847.7920275,
+      "timestamp_local": "2026-08-24 00:00:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted something we'd be his roof and feel",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500847.7920275,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500847.6178942,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 180,
+      "timestamp_epoch_s": 1787500847.8702946,
+      "timestamp_local": "2026-08-24 00:00:47",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500847.8702946,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500847.8702946,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 181,
+      "timestamp_epoch_s": 1787500847.9100242,
+      "timestamp_local": "2026-08-24 00:00:47",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted something we'd be his roof is really bad",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500847.9100242,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500847.8702946,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 182,
+      "timestamp_epoch_s": 1787500848.3677607,
+      "timestamp_local": "2026-08-24 00:00:48",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500848.3677607,
+        "source": "vosk",
+        "rms": 1061,
+        "updated_at": 1787500848.3677607,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 183,
+      "timestamp_epoch_s": 1787500848.4028761,
+      "timestamp_local": "2026-08-24 00:00:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted something we'd be his roof is really bad shape",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500848.4028761,
+        "source": "vosk",
+        "rms": 1061,
+        "updated_at": 1787500848.3677607,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 184,
+      "timestamp_epoch_s": 1787500848.619696,
+      "timestamp_local": "2026-08-24 00:00:48",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500848.619696,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500848.619696,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 185,
+      "timestamp_epoch_s": 1787500848.6613338,
+      "timestamp_local": "2026-08-24 00:00:48",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted something we'd be his roof is really bad shape so",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500848.6613338,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500848.619696,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 186,
+      "timestamp_epoch_s": 1787500848.868394,
+      "timestamp_local": "2026-08-24 00:00:48",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500848.868394,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500848.868394,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 187,
+      "timestamp_epoch_s": 1787500849.1714199,
+      "timestamp_local": "2026-08-24 00:00:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500849.1714199,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500849.1714199,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 188,
+      "timestamp_epoch_s": 1787500849.2195902,
+      "timestamp_local": "2026-08-24 00:00:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted something we'd be his roof is really bad shape so here's the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500849.2195902,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500849.1714199,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 189,
+      "timestamp_epoch_s": 1787500849.3676782,
+      "timestamp_local": "2026-08-24 00:00:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500849.3676782,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500849.3676782,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 190,
+      "timestamp_epoch_s": 1787500849.453038,
+      "timestamp_local": "2026-08-24 00:00:49",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending story of my life stop something don't some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn't know why i joined by this morning we spotted something we'd be his roof is really bad shape so here's the black market",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500849.453038,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500849.3676782,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 191,
+      "timestamp_epoch_s": 1787500849.6179316,
+      "timestamp_local": "2026-08-24 00:00:49",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500849.6179316,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500849.6179316,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 192,
+      "timestamp_epoch_s": 1787500850.580242,
+      "timestamp_local": "2026-08-24 00:00:50",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "we also like to give back to new gallup on able to establish a never ending anything of my life s or something don t some okay boss right yeah this is where things get really interesting things to hear only to replace his old gutters or will he doesn t know why joined by this morning we spotted something we d be his roof is really bad shape so here s the black marks",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1787500850.580242,
+        "source": "final",
+        "rms": 1203,
+        "updated_at": 1787500849.6179316,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 193,
+      "timestamp_epoch_s": 1787500851.3470783,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500851.3470783,
+        "source": "vosk",
+        "rms": 1203,
+        "updated_at": 1787500849.6179316,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 194,
+      "timestamp_epoch_s": 1787500851.3470783,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500851.3470783,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500851.3470783,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 195,
+      "timestamp_epoch_s": 1787500851.4202075,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500851.4202075,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500851.3853424,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 196,
+      "timestamp_epoch_s": 1787500851.450284,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500851.450284,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500851.4202075,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 197,
+      "timestamp_epoch_s": 1787500851.485372,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet are",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500851.485372,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500851.450284,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 198,
+      "timestamp_epoch_s": 1787500851.5353503,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500851.5353503,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500851.485372,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 199,
+      "timestamp_epoch_s": 1787500851.5353503,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500851.5353503,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500851.485372,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 200,
+      "timestamp_epoch_s": 1787500851.5543857,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500851.5543857,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500851.485372,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 201,
+      "timestamp_epoch_s": 1787500851.9682367,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500851.9682367,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500851.9682367,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 202,
+      "timestamp_epoch_s": 1787500851.9974902,
+      "timestamp_local": "2026-08-24 00:00:51",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the got a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500851.9974902,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500851.9682367,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 203,
+      "timestamp_epoch_s": 1787500852.2190332,
+      "timestamp_local": "2026-08-24 00:00:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500852.2190332,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500852.2190332,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 204,
+      "timestamp_epoch_s": 1787500852.2732463,
+      "timestamp_local": "2026-08-24 00:00:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the gutters we gonna",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500852.2732463,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500852.2190332,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 205,
+      "timestamp_epoch_s": 1787500852.4681895,
+      "timestamp_local": "2026-08-24 00:00:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500852.4681895,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500852.4681895,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 206,
+      "timestamp_epoch_s": 1787500852.4916728,
+      "timestamp_local": "2026-08-24 00:00:52",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the gutters we gonna shock",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500852.4916728,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500852.4681895,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 207,
+      "timestamp_epoch_s": 1787500852.7175133,
+      "timestamp_local": "2026-08-24 00:00:52",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500852.7175133,
+        "source": "vosk",
+        "rms": 1202,
+        "updated_at": 1787500852.7175133,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 208,
+      "timestamp_epoch_s": 1787500853.335608,
+      "timestamp_local": "2026-08-24 00:00:53",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500853.335608,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500853.335608,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 209,
+      "timestamp_epoch_s": 1787500853.3636656,
+      "timestamp_local": "2026-08-24 00:00:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the gutters we gonna shock he",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500853.3636656,
+        "source": "vosk",
+        "rms": 1200,
+        "updated_at": 1787500853.335608,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 210,
+      "timestamp_epoch_s": 1787500853.5788527,
+      "timestamp_local": "2026-08-24 00:00:53",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1787500853.5788527,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500853.5788527,
+        "frequency_hz": 304.0
+      }
+    },
+    {
+      "id": 211,
+      "timestamp_epoch_s": 1787500853.646085,
+      "timestamp_local": "2026-08-24 00:00:53",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "country has yet our offer for the gutters we gonna shock keep i",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1787500853.646085,
+        "source": "vosk",
+        "rms": 1201,
+        "updated_at": 1787500853.5788527,
+        "frequency_hz": 304.0
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260824_001013.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260824_001013.md"
+  }
+}

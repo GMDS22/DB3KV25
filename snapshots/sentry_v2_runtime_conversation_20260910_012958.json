@@ -1,0 +1,1870 @@
+{
+  "generated_at_local": "2026-09-10 01:29:58",
+  "generated_at_epoch_s": 1788974998.3885546,
+  "entry_count": 103,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 58,
+    "operator": 42
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 58,
+    "spoken_confirmation": 1,
+    "voice_transcript_partial": 41,
+    "voice_transcript_final": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 101
+  },
+  "voice_transcript_summary": {
+    "partial_count": 41,
+    "final_count": 1,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "warning us uk college professor attribute don t think that my dog is also a member of the cost of what are they have the phillips the judicial a tabby morning attorney bash on this type for headstart",
+  "latest_operator_request": "warning us uk college professor attribute don t think that my dog is also a member of the cost of what are they have the phillips the judicial a tabby morning attorney bash on this type for headstart",
+  "latest_assistant_message": "Smart Sentry is ready.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 92,
+      "timestamp_epoch_s": 1788973650.7747324,
+      "timestamp_local": "2026-09-10 01:07:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973650.7747324,
+        "source": "vosk",
+        "rms": 144,
+        "updated_at": 1788973648.4719994
+      }
+    },
+    {
+      "id": 93,
+      "timestamp_epoch_s": 1788973650.7747324,
+      "timestamp_local": "2026-09-10 01:07:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973650.7747324,
+        "source": "vosk",
+        "rms": 144,
+        "updated_at": 1788973648.4719994
+      }
+    },
+    {
+      "id": 94,
+      "timestamp_epoch_s": 1788973650.887474,
+      "timestamp_local": "2026-09-10 01:07:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "do",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973650.887474,
+        "source": "vosk",
+        "rms": 185,
+        "updated_at": 1788973650.861351
+      }
+    },
+    {
+      "id": 95,
+      "timestamp_epoch_s": 1788973650.9829373,
+      "timestamp_local": "2026-09-10 01:07:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973650.9829373,
+        "source": "vosk",
+        "rms": 183,
+        "updated_at": 1788973650.9829373
+      }
+    },
+    {
+      "id": 96,
+      "timestamp_epoch_s": 1788973651.0642684,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "huge",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973651.0642684,
+        "source": "vosk",
+        "rms": 183,
+        "updated_at": 1788973650.9829373
+      }
+    },
+    {
+      "id": 97,
+      "timestamp_epoch_s": 1788973651.1307867,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it really",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973651.1307867,
+        "source": "vosk",
+        "rms": 566,
+        "updated_at": 1788973651.0642684
+      }
+    },
+    {
+      "id": 98,
+      "timestamp_epoch_s": 1788973651.1627893,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it really good",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973651.1627893,
+        "source": "vosk",
+        "rms": 323,
+        "updated_at": 1788973651.1307867
+      }
+    },
+    {
+      "id": 99,
+      "timestamp_epoch_s": 1788973651.1877184,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973651.1877184,
+        "source": "vosk",
+        "rms": 222,
+        "updated_at": 1788973651.1627893
+      }
+    },
+    {
+      "id": 100,
+      "timestamp_epoch_s": 1788973651.1877184,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it really good bye",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973651.1877184,
+        "source": "vosk",
+        "rms": 222,
+        "updated_at": 1788973651.1627893
+      }
+    },
+    {
+      "id": 101,
+      "timestamp_epoch_s": 1788973651.2339287,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it really good bye dad",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973651.2339287,
+        "source": "vosk",
+        "rms": 222,
+        "updated_at": 1788973651.1627893
+      }
+    },
+    {
+      "id": 102,
+      "timestamp_epoch_s": 1788973652.1258178,
+      "timestamp_local": "2026-09-10 01:07:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973652.1258178,
+        "source": "vosk",
+        "rms": 393,
+        "updated_at": 1788973652.1258178
+      }
+    },
+    {
+      "id": 103,
+      "timestamp_epoch_s": 1788973652.190462,
+      "timestamp_local": "2026-09-10 01:07:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it really good bye dad to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973652.190462,
+        "source": "vosk",
+        "rms": 393,
+        "updated_at": 1788973652.1258178
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1788973614.6237023,
+      "timestamp_local": "2026-09-10 01:06:54",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1788973614.6252823,
+      "timestamp_local": "2026-09-10 01:06:54",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1788973616.462816,
+      "timestamp_local": "2026-09-10 01:06:56",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973616.462816,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1788973618.7227938,
+      "timestamp_local": "2026-09-10 01:06:58",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973618.7227938,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1788973619.4713304,
+      "timestamp_local": "2026-09-10 01:06:59",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973619.4713304,
+        "source": "vosk",
+        "rms": 121,
+        "updated_at": 1788973618.9706035
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1788973620.7209218,
+      "timestamp_local": "2026-09-10 01:07:00",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973620.7209218,
+        "source": "vosk",
+        "rms": 256,
+        "updated_at": 1788973620.7209218
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1788973621.2208016,
+      "timestamp_local": "2026-09-10 01:07:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973621.2208016,
+        "source": "vosk",
+        "rms": 256,
+        "updated_at": 1788973620.7209218
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1788973624.9702735,
+      "timestamp_local": "2026-09-10 01:07:04",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973624.9702735,
+        "source": "vosk",
+        "rms": 256,
+        "updated_at": 1788973620.7209218
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1788973625.4711554,
+      "timestamp_local": "2026-09-10 01:07:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973625.4711554,
+        "source": "vosk",
+        "rms": 256,
+        "updated_at": 1788973620.7209218
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1788973651.8535874,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Smart Sentry is ready.",
+      "metadata": {
+        "interrupt": true,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1788973634.9705637,
+      "timestamp_local": "2026-09-10 01:07:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973634.9705637,
+        "source": "vosk",
+        "rms": 190,
+        "updated_at": 1788973634.9705637
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1788973635.8147442,
+      "timestamp_local": "2026-09-10 01:07:15",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sporting",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973635.8147442,
+        "source": "vosk",
+        "rms": 215,
+        "updated_at": 1788973635.720851
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1788973635.971865,
+      "timestamp_local": "2026-09-10 01:07:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973635.971865,
+        "source": "vosk",
+        "rms": 215,
+        "updated_at": 1788973635.720851
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1788973636.0693054,
+      "timestamp_local": "2026-09-10 01:07:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sporting a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973636.0693054,
+        "source": "vosk",
+        "rms": 215,
+        "updated_at": 1788973635.720851
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1788973636.238328,
+      "timestamp_local": "2026-09-10 01:07:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973636.238328,
+        "source": "vosk",
+        "rms": 424,
+        "updated_at": 1788973636.238328
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1788973636.3068085,
+      "timestamp_local": "2026-09-10 01:07:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "sporting a suitcase",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973636.3068085,
+        "source": "vosk",
+        "rms": 424,
+        "updated_at": 1788973636.238328
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1788973636.4712718,
+      "timestamp_local": "2026-09-10 01:07:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973636.4712718,
+        "source": "vosk",
+        "rms": 496,
+        "updated_at": 1788973636.4712718
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1788973636.5422475,
+      "timestamp_local": "2026-09-10 01:07:16",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973636.5422475,
+        "source": "vosk",
+        "rms": 496,
+        "updated_at": 1788973636.4712718
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1788973636.721184,
+      "timestamp_local": "2026-09-10 01:07:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973636.721184,
+        "source": "vosk",
+        "rms": 150,
+        "updated_at": 1788973636.721184
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1788973636.9719908,
+      "timestamp_local": "2026-09-10 01:07:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973636.9719908,
+        "source": "vosk",
+        "rms": 621,
+        "updated_at": 1788973636.9719908
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1788973637.0053391,
+      "timestamp_local": "2026-09-10 01:07:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973637.0053391,
+        "source": "vosk",
+        "rms": 621,
+        "updated_at": 1788973636.9719908
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1788973637.221379,
+      "timestamp_local": "2026-09-10 01:07:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973637.221379,
+        "source": "vosk",
+        "rms": 364,
+        "updated_at": 1788973637.221379
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1788973637.2865999,
+      "timestamp_local": "2026-09-10 01:07:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973637.2865999,
+        "source": "vosk",
+        "rms": 364,
+        "updated_at": 1788973637.221379
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1788973637.470622,
+      "timestamp_local": "2026-09-10 01:07:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973637.470622,
+        "source": "vosk",
+        "rms": 296,
+        "updated_at": 1788973637.470622
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1788973637.5802035,
+      "timestamp_local": "2026-09-10 01:07:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college of bought",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973637.5802035,
+        "source": "vosk",
+        "rms": 296,
+        "updated_at": 1788973637.470622
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1788973637.7212782,
+      "timestamp_local": "2026-09-10 01:07:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973637.7212782,
+        "source": "vosk",
+        "rms": 204,
+        "updated_at": 1788973637.7212782
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1788973637.867171,
+      "timestamp_local": "2026-09-10 01:07:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973637.867171,
+        "source": "vosk",
+        "rms": 204,
+        "updated_at": 1788973637.7212782
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1788973637.9712582,
+      "timestamp_local": "2026-09-10 01:07:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973637.9712582,
+        "source": "vosk",
+        "rms": 204,
+        "updated_at": 1788973637.7212782
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1788973638.2215462,
+      "timestamp_local": "2026-09-10 01:07:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973638.2215462,
+        "source": "vosk",
+        "rms": 404,
+        "updated_at": 1788973638.2215462
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1788973638.2586856,
+      "timestamp_local": "2026-09-10 01:07:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973638.2586856,
+        "source": "vosk",
+        "rms": 404,
+        "updated_at": 1788973638.2215462
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1788973638.4711905,
+      "timestamp_local": "2026-09-10 01:07:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973638.4711905,
+        "source": "vosk",
+        "rms": 564,
+        "updated_at": 1788973638.4711905
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1788973638.51424,
+      "timestamp_local": "2026-09-10 01:07:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute that they",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973638.51424,
+        "source": "vosk",
+        "rms": 564,
+        "updated_at": 1788973638.4711905
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1788973638.7206213,
+      "timestamp_local": "2026-09-10 01:07:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973638.7206213,
+        "source": "vosk",
+        "rms": 294,
+        "updated_at": 1788973638.7206213
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1788973638.9715211,
+      "timestamp_local": "2026-09-10 01:07:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973638.9715211,
+        "source": "vosk",
+        "rms": 511,
+        "updated_at": 1788973638.9715211
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1788973639.032943,
+      "timestamp_local": "2026-09-10 01:07:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973639.032943,
+        "source": "vosk",
+        "rms": 511,
+        "updated_at": 1788973638.9715211
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1788973639.220815,
+      "timestamp_local": "2026-09-10 01:07:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973639.220815,
+        "source": "vosk",
+        "rms": 378,
+        "updated_at": 1788973639.220815
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1788973639.4704144,
+      "timestamp_local": "2026-09-10 01:07:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973639.4704144,
+        "source": "vosk",
+        "rms": 186,
+        "updated_at": 1788973639.4704144
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1788973639.4981813,
+      "timestamp_local": "2026-09-10 01:07:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973639.4981813,
+        "source": "vosk",
+        "rms": 186,
+        "updated_at": 1788973639.4704144
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1788973639.7203128,
+      "timestamp_local": "2026-09-10 01:07:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973639.7203128,
+        "source": "vosk",
+        "rms": 579,
+        "updated_at": 1788973639.7203128
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1788973639.7473016,
+      "timestamp_local": "2026-09-10 01:07:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973639.7473016,
+        "source": "vosk",
+        "rms": 579,
+        "updated_at": 1788973639.7203128
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1788973639.9712074,
+      "timestamp_local": "2026-09-10 01:07:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973639.9712074,
+        "source": "vosk",
+        "rms": 481,
+        "updated_at": 1788973639.9712074
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1788973640.010314,
+      "timestamp_local": "2026-09-10 01:07:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973640.010314,
+        "source": "vosk",
+        "rms": 481,
+        "updated_at": 1788973639.9712074
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1788973640.2213,
+      "timestamp_local": "2026-09-10 01:07:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973640.2213,
+        "source": "vosk",
+        "rms": 507,
+        "updated_at": 1788973640.2213
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1788973640.2584643,
+      "timestamp_local": "2026-09-10 01:07:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973640.2584643,
+        "source": "vosk",
+        "rms": 507,
+        "updated_at": 1788973640.2213
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1788973640.470512,
+      "timestamp_local": "2026-09-10 01:07:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973640.470512,
+        "source": "vosk",
+        "rms": 377,
+        "updated_at": 1788973640.470512
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1788973640.5545635,
+      "timestamp_local": "2026-09-10 01:07:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973640.5545635,
+        "source": "vosk",
+        "rms": 377,
+        "updated_at": 1788973640.470512
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1788973640.7202325,
+      "timestamp_local": "2026-09-10 01:07:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973640.7202325,
+        "source": "vosk",
+        "rms": 198,
+        "updated_at": 1788973640.7202325
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1788973640.7820466,
+      "timestamp_local": "2026-09-10 01:07:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973640.7820466,
+        "source": "vosk",
+        "rms": 198,
+        "updated_at": 1788973640.7202325
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1788973640.9706442,
+      "timestamp_local": "2026-09-10 01:07:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973640.9706442,
+        "source": "vosk",
+        "rms": 235,
+        "updated_at": 1788973640.9706442
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1788973641.0036614,
+      "timestamp_local": "2026-09-10 01:07:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973641.0036614,
+        "source": "vosk",
+        "rms": 235,
+        "updated_at": 1788973640.9706442
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1788973641.2212632,
+      "timestamp_local": "2026-09-10 01:07:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973641.2212632,
+        "source": "vosk",
+        "rms": 471,
+        "updated_at": 1788973641.2212632
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1788973641.2554035,
+      "timestamp_local": "2026-09-10 01:07:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973641.2554035,
+        "source": "vosk",
+        "rms": 471,
+        "updated_at": 1788973641.2212632
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1788973641.4715388,
+      "timestamp_local": "2026-09-10 01:07:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973641.4715388,
+        "source": "vosk",
+        "rms": 456,
+        "updated_at": 1788973641.4715388
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1788973641.520129,
+      "timestamp_local": "2026-09-10 01:07:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of one",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973641.520129,
+        "source": "vosk",
+        "rms": 456,
+        "updated_at": 1788973641.4715388
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1788973641.7213876,
+      "timestamp_local": "2026-09-10 01:07:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973641.7213876,
+        "source": "vosk",
+        "rms": 256,
+        "updated_at": 1788973641.7213876
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1788973641.8028216,
+      "timestamp_local": "2026-09-10 01:07:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973641.8028216,
+        "source": "vosk",
+        "rms": 256,
+        "updated_at": 1788973641.7213876
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1788973641.970648,
+      "timestamp_local": "2026-09-10 01:07:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973641.970648,
+        "source": "vosk",
+        "rms": 348,
+        "updated_at": 1788973641.970648
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1788973642.0452545,
+      "timestamp_local": "2026-09-10 01:07:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973642.0452545,
+        "source": "vosk",
+        "rms": 348,
+        "updated_at": 1788973641.970648
+      }
+    },
+    {
+      "id": 59,
+      "timestamp_epoch_s": 1788973642.2209647,
+      "timestamp_local": "2026-09-10 01:07:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973642.2209647,
+        "source": "vosk",
+        "rms": 328,
+        "updated_at": 1788973642.2209647
+      }
+    },
+    {
+      "id": 60,
+      "timestamp_epoch_s": 1788973642.4707983,
+      "timestamp_local": "2026-09-10 01:07:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973642.4707983,
+        "source": "vosk",
+        "rms": 229,
+        "updated_at": 1788973642.4707983
+      }
+    },
+    {
+      "id": 61,
+      "timestamp_epoch_s": 1788973642.5113673,
+      "timestamp_local": "2026-09-10 01:07:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973642.5113673,
+        "source": "vosk",
+        "rms": 229,
+        "updated_at": 1788973642.4707983
+      }
+    },
+    {
+      "id": 62,
+      "timestamp_epoch_s": 1788973642.7212768,
+      "timestamp_local": "2026-09-10 01:07:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973642.7212768,
+        "source": "vosk",
+        "rms": 182,
+        "updated_at": 1788973642.7212768
+      }
+    },
+    {
+      "id": 63,
+      "timestamp_epoch_s": 1788973642.8352673,
+      "timestamp_local": "2026-09-10 01:07:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have the",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973642.8352673,
+        "source": "vosk",
+        "rms": 182,
+        "updated_at": 1788973642.7212768
+      }
+    },
+    {
+      "id": 64,
+      "timestamp_epoch_s": 1788973642.9702926,
+      "timestamp_local": "2026-09-10 01:07:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973642.9702926,
+        "source": "vosk",
+        "rms": 412,
+        "updated_at": 1788973642.9702926
+      }
+    },
+    {
+      "id": 65,
+      "timestamp_epoch_s": 1788973643.0364969,
+      "timestamp_local": "2026-09-10 01:07:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have a solution",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973643.0364969,
+        "source": "vosk",
+        "rms": 412,
+        "updated_at": 1788973642.9702926
+      }
+    },
+    {
+      "id": 66,
+      "timestamp_epoch_s": 1788973643.2209134,
+      "timestamp_local": "2026-09-10 01:07:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973643.2209134,
+        "source": "vosk",
+        "rms": 253,
+        "updated_at": 1788973643.2209134
+      }
+    },
+    {
+      "id": 67,
+      "timestamp_epoch_s": 1788973643.294306,
+      "timestamp_local": "2026-09-10 01:07:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have this looks legitimate",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973643.294306,
+        "source": "vosk",
+        "rms": 253,
+        "updated_at": 1788973643.2209134
+      }
+    },
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1788973643.4714599,
+      "timestamp_local": "2026-09-10 01:07:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973643.4714599,
+        "source": "vosk",
+        "rms": 551,
+        "updated_at": 1788973643.4714599
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1788973643.494812,
+      "timestamp_local": "2026-09-10 01:07:23",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have the full of the judicial",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973643.494812,
+        "source": "vosk",
+        "rms": 551,
+        "updated_at": 1788973643.4714599
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1788973643.9715865,
+      "timestamp_local": "2026-09-10 01:07:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973643.9715865,
+        "source": "vosk",
+        "rms": 566,
+        "updated_at": 1788973643.9715865
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1788973644.0110004,
+      "timestamp_local": "2026-09-10 01:07:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have the full of the judicial a tabby",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973644.0110004,
+        "source": "vosk",
+        "rms": 566,
+        "updated_at": 1788973643.9715865
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1788973644.2205665,
+      "timestamp_local": "2026-09-10 01:07:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973644.2205665,
+        "source": "vosk",
+        "rms": 180,
+        "updated_at": 1788973644.2205665
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1788973644.4712977,
+      "timestamp_local": "2026-09-10 01:07:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973644.4712977,
+        "source": "vosk",
+        "rms": 238,
+        "updated_at": 1788973644.4712977
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1788973644.7213702,
+      "timestamp_local": "2026-09-10 01:07:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973644.7213702,
+        "source": "vosk",
+        "rms": 490,
+        "updated_at": 1788973644.7213702
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1788973644.7554061,
+      "timestamp_local": "2026-09-10 01:07:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have the full of the judicial a tabby mark a turning point",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973644.7554061,
+        "source": "vosk",
+        "rms": 490,
+        "updated_at": 1788973644.7213702
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1788973644.971398,
+      "timestamp_local": "2026-09-10 01:07:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973644.971398,
+        "source": "vosk",
+        "rms": 169,
+        "updated_at": 1788973644.971398
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1788973645.0727928,
+      "timestamp_local": "2026-09-10 01:07:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have the full of the judicial a tabby morning attorney actually",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973645.0727928,
+        "source": "vosk",
+        "rms": 169,
+        "updated_at": 1788973644.971398
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1788973645.2205486,
+      "timestamp_local": "2026-09-10 01:07:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973645.2205486,
+        "source": "vosk",
+        "rms": 272,
+        "updated_at": 1788973645.2205486
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1788973645.36655,
+      "timestamp_local": "2026-09-10 01:07:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have the full of the judicial a tabby morning attorney explanation",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973645.36655,
+        "source": "vosk",
+        "rms": 272,
+        "updated_at": 1788973645.2205486
+      }
+    },
+    {
+      "id": 80,
+      "timestamp_epoch_s": 1788973645.4759843,
+      "timestamp_local": "2026-09-10 01:07:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973645.4759843,
+        "source": "vosk",
+        "rms": 296,
+        "updated_at": 1788973645.4759843
+      }
+    },
+    {
+      "id": 81,
+      "timestamp_epoch_s": 1788973645.5426328,
+      "timestamp_local": "2026-09-10 01:07:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have the full of the judicial a tabby morning attorney based on these types",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973645.5426328,
+        "source": "vosk",
+        "rms": 296,
+        "updated_at": 1788973645.4759843
+      }
+    },
+    {
+      "id": 82,
+      "timestamp_epoch_s": 1788973645.7210097,
+      "timestamp_local": "2026-09-10 01:07:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973645.7210097,
+        "source": "vosk",
+        "rms": 361,
+        "updated_at": 1788973645.7210097
+      }
+    },
+    {
+      "id": 83,
+      "timestamp_epoch_s": 1788973645.764411,
+      "timestamp_local": "2026-09-10 01:07:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have the full of the judicial a tabby morning attorney based on this type or had",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973645.764411,
+        "source": "vosk",
+        "rms": 361,
+        "updated_at": 1788973645.7210097
+      }
+    },
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1788973646.2206194,
+      "timestamp_local": "2026-09-10 01:07:26",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973646.2206194,
+        "source": "vosk",
+        "rms": 361,
+        "updated_at": 1788973645.7210097
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1788973647.2205145,
+      "timestamp_local": "2026-09-10 01:07:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973647.2205145,
+        "source": "vosk",
+        "rms": 183,
+        "updated_at": 1788973647.2205145
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1788973647.7207232,
+      "timestamp_local": "2026-09-10 01:07:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973647.7207232,
+        "source": "vosk",
+        "rms": 183,
+        "updated_at": 1788973647.2205145
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1788973647.7595713,
+      "timestamp_local": "2026-09-10 01:07:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don't think that my dog is also a member of the cost of what are they have the full of the judicial a tabby morning attorney based on this time for headstart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973647.7595713,
+        "source": "vosk",
+        "rms": 183,
+        "updated_at": 1788973647.2205145
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1788973647.9719973,
+      "timestamp_local": "2026-09-10 01:07:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973647.9719973,
+        "source": "vosk",
+        "rms": 196,
+        "updated_at": 1788973647.9719973
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1788973648.2214925,
+      "timestamp_local": "2026-09-10 01:07:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973648.2214925,
+        "source": "vosk",
+        "rms": 196,
+        "updated_at": 1788973647.9719973
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1788973648.4719994,
+      "timestamp_local": "2026-09-10 01:07:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973648.4719994,
+        "source": "vosk",
+        "rms": 144,
+        "updated_at": 1788973648.4719994
+      }
+    },
+    {
+      "id": 91,
+      "timestamp_epoch_s": 1788973649.5711715,
+      "timestamp_local": "2026-09-10 01:07:29",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "warning us uk college professor attribute don t think that my dog is also a member of the cost of what are they have the phillips the judicial a tabby morning attorney bash on this type for headstart",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1788973649.5711715,
+        "source": "final",
+        "rms": 144,
+        "updated_at": 1788973648.4719994
+      }
+    },
+    {
+      "id": 92,
+      "timestamp_epoch_s": 1788973650.7747324,
+      "timestamp_local": "2026-09-10 01:07:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973650.7747324,
+        "source": "vosk",
+        "rms": 144,
+        "updated_at": 1788973648.4719994
+      }
+    },
+    {
+      "id": 93,
+      "timestamp_epoch_s": 1788973650.7747324,
+      "timestamp_local": "2026-09-10 01:07:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973650.7747324,
+        "source": "vosk",
+        "rms": 144,
+        "updated_at": 1788973648.4719994
+      }
+    },
+    {
+      "id": 94,
+      "timestamp_epoch_s": 1788973650.887474,
+      "timestamp_local": "2026-09-10 01:07:30",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "do",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973650.887474,
+        "source": "vosk",
+        "rms": 185,
+        "updated_at": 1788973650.861351
+      }
+    },
+    {
+      "id": 95,
+      "timestamp_epoch_s": 1788973650.9829373,
+      "timestamp_local": "2026-09-10 01:07:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973650.9829373,
+        "source": "vosk",
+        "rms": 183,
+        "updated_at": 1788973650.9829373
+      }
+    },
+    {
+      "id": 96,
+      "timestamp_epoch_s": 1788973651.0642684,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "huge",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973651.0642684,
+        "source": "vosk",
+        "rms": 183,
+        "updated_at": 1788973650.9829373
+      }
+    },
+    {
+      "id": 97,
+      "timestamp_epoch_s": 1788973651.1307867,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it really",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973651.1307867,
+        "source": "vosk",
+        "rms": 566,
+        "updated_at": 1788973651.0642684
+      }
+    },
+    {
+      "id": 98,
+      "timestamp_epoch_s": 1788973651.1627893,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it really good",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973651.1627893,
+        "source": "vosk",
+        "rms": 323,
+        "updated_at": 1788973651.1307867
+      }
+    },
+    {
+      "id": 99,
+      "timestamp_epoch_s": 1788973651.1877184,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973651.1877184,
+        "source": "vosk",
+        "rms": 222,
+        "updated_at": 1788973651.1627893
+      }
+    },
+    {
+      "id": 100,
+      "timestamp_epoch_s": 1788973651.1877184,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it really good bye",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973651.1877184,
+        "source": "vosk",
+        "rms": 222,
+        "updated_at": 1788973651.1627893
+      }
+    },
+    {
+      "id": 101,
+      "timestamp_epoch_s": 1788973651.2339287,
+      "timestamp_local": "2026-09-10 01:07:31",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it really good bye dad",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973651.2339287,
+        "source": "vosk",
+        "rms": 222,
+        "updated_at": 1788973651.1627893
+      }
+    },
+    {
+      "id": 102,
+      "timestamp_epoch_s": 1788973652.1258178,
+      "timestamp_local": "2026-09-10 01:07:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788973652.1258178,
+        "source": "vosk",
+        "rms": 393,
+        "updated_at": 1788973652.1258178
+      }
+    },
+    {
+      "id": 103,
+      "timestamp_epoch_s": 1788973652.190462,
+      "timestamp_local": "2026-09-10 01:07:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "it really good bye dad to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788973652.190462,
+        "source": "vosk",
+        "rms": 393,
+        "updated_at": 1788973652.1258178
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260910_012958.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260910_012958.md"
+  }
+}

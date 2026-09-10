@@ -299,7 +299,7 @@
         "backend": "opencv_sface",
         "detector_model_path": "app/models/face/face_detection_yunet_2023mar.onnx",
         "recognizer_model_path": "app/models/face/face_recognition_sface_2021dec.onnx",
-        "allow_legacy_fallback": true,
+        "allow_legacy_fallback": false,
         "recognition_threshold": 0.82,
         "min_face_size_px": 56,
         "suppress_known_faces_from_engagement": true,

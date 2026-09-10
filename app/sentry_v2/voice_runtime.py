@@ -2378,6 +2378,8 @@ class VoskCommandListener:
             (r"\b(?:restart|relaunch|reload|reboot|reset)\b.*\b(?:app|application|program)\b", "restart the app"),
             (r"\bopen\b.*\b(camera|video)\b", "open camera"),
             (r"\bclose\b.*\b(camera|video)\b", "close camera"),
+            (r"\b(?:show|open|display|bring up|go to|take me to)\b.*\b(?:the\s+)?(?:master\s+profiles?|profiles?|presets?)\s+tab\b", "open master profiles tab"),
+            (r"\b(?:show|open|display|bring up|go to|take me to)\b.*\b(?:the\s+)?(?:master\s+profiles?|profiles?|presets?)\b", "open master profiles tab"),
             (r"\b(?:close|quit|exit)\b.*\b(?:app|application|smart\s+sentry)\b", "close the app"),
             *iter_voice_toggle_command_patterns(),
             (r"\bchange\b.*\btheme\b.*\b(anything|something|another|different)\b", "change the theme to anything else"),

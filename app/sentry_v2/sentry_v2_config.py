@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Tuple
 # Increment _CURRENT_SCHEMA_VERSION whenever a field is added, removed, or
 # renamed in SentryV2Config (or any sub-config that would break existing saves).
 # Bump this constant AND add a migration branch in SentryV2Config.from_dict().
-_CURRENT_SCHEMA_VERSION: int = 2
+_CURRENT_SCHEMA_VERSION: int = 3
 
 _log = logging.getLogger(__name__)
 
@@ -664,7 +664,7 @@ class FaceRecognitionConfig:
     backend: str = "opencv_sface"
     detector_model_path: str = "app/models/face/face_detection_yunet_2023mar.onnx"
     recognizer_model_path: str = "app/models/face/face_recognition_sface_2021dec.onnx"
-    allow_legacy_fallback: bool = True
+    allow_legacy_fallback: bool = False
     recognition_threshold: float = 0.82
     min_face_size_px: int = 56
     suppress_known_faces_from_engagement: bool = True
@@ -809,6 +809,9 @@ class SentryV2Config:
     show_guard_crosshair: bool = True
     show_no_fire_masks: bool = True
     show_fire_veto_overlay: bool = True
+    overlay_text_opacity_pct: int = 100
+    overlay_text_background_opacity_pct: int = 0
+    overlay_text_size_pct: int = 100
     scope_view_enabled: bool = False
     scope_radius_pct: int = 35
     scope_vignette_opacity: int = 60
@@ -1044,6 +1047,9 @@ class SentryV2Config:
             show_guard_crosshair=d.get("show_guard_crosshair", True),
             show_no_fire_masks=d.get("show_no_fire_masks", True),
             show_fire_veto_overlay=d.get("show_fire_veto_overlay", True),
+            overlay_text_opacity_pct=int(d.get("overlay_text_opacity_pct", 100)),
+            overlay_text_background_opacity_pct=int(d.get("overlay_text_background_opacity_pct", 0)),
+            overlay_text_size_pct=int(d.get("overlay_text_size_pct", 100)),
             scope_view_enabled=d.get("scope_view_enabled", False),
             scope_radius_pct=d.get("scope_radius_pct", 35),
             scope_vignette_opacity=d.get("scope_vignette_opacity", 60),

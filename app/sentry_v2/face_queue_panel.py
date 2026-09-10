@@ -36,19 +36,24 @@ _IMG_SIZE = 100
 def _bgr_crop_to_pixmap(crop_bgr: Optional[np.ndarray], size: int = _IMG_SIZE) -> QPixmap:
     if crop_bgr is None or crop_bgr.size == 0:
         return QPixmap()
-    h, w = crop_bgr.shape[:2]
-    if h <= 0 or w <= 0:
-        return QPixmap()
-    # Square-crop from centre
-    if w > h:
-        off = (w - h) // 2
-        crop_bgr = crop_bgr[:, off: off + h]
-    elif h > w:
-        off = (h - w) // 2
-        crop_bgr = crop_bgr[off: off + w, :]
     try:
+        crop_bgr = np.asarray(crop_bgr)
+        if crop_bgr.ndim == 2:
+            crop_bgr = cv2.cvtColor(crop_bgr, cv2.COLOR_GRAY2BGR)
+        if crop_bgr.ndim != 3 or crop_bgr.shape[2] < 3:
+            return QPixmap()
+        h, w = crop_bgr.shape[:2]
+        if h <= 0 or w <= 0:
+            return QPixmap()
+        # Square-crop from centre
+        if w > h:
+            off = (w - h) // 2
+            crop_bgr = crop_bgr[:, off: off + h]
+        elif h > w:
+            off = (h - w) // 2
+            crop_bgr = crop_bgr[off: off + w, :]
         crop_bgr = cv2.resize(crop_bgr, (size, size), interpolation=cv2.INTER_AREA)
-        rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
+        rgb = cv2.cvtColor(np.ascontiguousarray(crop_bgr), cv2.COLOR_BGR2RGB)
     except Exception:
         return QPixmap()
     qimg = QImage(
@@ -58,7 +63,7 @@ def _bgr_crop_to_pixmap(crop_bgr: Optional[np.ndarray], size: int = _IMG_SIZE) -
         int(rgb.strides[0]),
         QImage.Format_RGB888,
     )
-    return QPixmap.fromImage(qimg).copy()
+    return QPixmap.fromImage(qimg.copy()).copy()
 
 
 # ---------------------------------------------------------------------------

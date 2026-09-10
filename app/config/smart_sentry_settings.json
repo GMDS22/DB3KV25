@@ -1,10 +1,10 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "connection": {
     "connection_type": 2,
     "esp32_port": "COM27",
     "esp32_baud": 115200,
-    "debug_port": "COM32",
+    "debug_port": "COM36",
     "debug_baud": 115200,
     "udp_host": "192.168.4.1",
     "udp_port": 9000,
@@ -12,27 +12,27 @@
     "servo_udp_port": 9001,
     "pan_servo_id": 1,
     "tilt_servo_id": 2,
-    "bus_servo_time_ms": 12,
+    "bus_servo_time_ms": 0,
     "invert_pan": true,
     "invert_tilt": false,
     "wifi_interface": "",
     "camera_source": "0",
     "camera_width": 1280,
     "camera_height": 720,
-    "webcam_zoom_pct": 100,
-    "test_source_zoom_pct": 100
+    "webcam_zoom_pct": 93,
+    "test_source_zoom_pct": 67
   },
   "detection_mode": {
-    "detection_mode": 2,
-    "min_contour_area": 2340.0,
-    "max_contour_area": 2341.0,
-    "yolo_model_name": "yolov8n.pt",
-    "yolo_model_dir": "YOLO_MODELS",
-    "yolo_min_area": 1200,
-    "yolo_confidence": 0.44,
+    "detection_mode": 5,
+    "min_contour_area": 1200.0,
+    "max_contour_area": 12000.0,
+    "yolo_model_name": "ratdogcat_last.pt",
+    "yolo_model_dir": "F:\\SMART SENTRY_v2a\\SMART SENTRY\\YOLO_MODELS",
+    "yolo_min_area": 2000,
+    "yolo_confidence": 0.85,
     "color_preset": "any",
-    "color_min_area": 160,
-    "color_max_area": 1280,
+    "color_min_area": 120,
+    "color_max_area": 960,
     "color_fusion_strategy": "AND",
     "color_fusion_overlap": 15,
     "custom_h_min": 0,
@@ -46,21 +46,21 @@
   },
   "target_filter": {
     "allowed_classes": [
-      "person"
+      "rat"
     ],
     "class_priority": {
       "rat": 1.35,
       "cat": 1.15,
       "dog": 1.0
     },
-    "min_confidence": 0.5,
-    "min_size_ratio": 0.0015,
-    "max_size_ratio": 0.0,
+    "min_confidence": 0.8,
+    "min_size_ratio": 0.0025,
+    "max_size_ratio": 0.08,
     "shape_filter_enabled": true,
-    "shape_profile_name": "person",
-    "semantic_min_confirm_frames": 1,
-    "semantic_min_confirm_confidence": 0.5,
-    "semantic_confirm_ttl_s": 0.9,
+    "shape_profile_name": "rat",
+    "semantic_min_confirm_frames": 3,
+    "semantic_min_confirm_confidence": 0.72,
+    "semantic_confirm_ttl_s": 0.85,
     "engagement_zone": [
       0.0,
       0.0,
@@ -69,27 +69,27 @@
     ]
   },
   "threat_scoring": {
-    "w_proximity": 0.38,
-    "w_size": 0.08,
-    "w_confidence": 0.08,
-    "w_class_priority": 0.16,
-    "w_speed": 0.08,
-    "w_persistence": 0.12,
-    "w_approach": 0.1,
+    "w_proximity": 0.28,
+    "w_size": 0.12,
+    "w_confidence": 0.18,
+    "w_class_priority": 0.24,
+    "w_speed": 0.14,
+    "w_persistence": 0.06,
+    "w_approach": 0.08,
     "use_ml_model": false,
     "ml_model_path": "config/smart_sentry_v3_threat_model.pkl"
   },
   "engagement": {
-    "min_threat_score": 0.26,
+    "min_threat_score": 0.24,
     "burst_count": 6,
     "burst_interval_ms": 70,
-    "inter_target_cooldown": 1.0,
-    "cycle_cooldown": 2.0,
+    "inter_target_cooldown": 0.8,
+    "cycle_cooldown": 1.6,
     "max_queue_length": 6,
     "optimize_slew_order": true,
     "single_target_only": false,
-    "return_delay": 1.5,
-    "engagement_speed": 100,
+    "return_delay": 1.2,
+    "engagement_speed": 10,
     "auto_trigger_enabled": true,
     "trigger_mode_bb": false,
     "trigger_mosfet_pulse_ms": 200,
@@ -124,7 +124,7 @@
     "fire_trigger_max_tilt_rate": 9.4,
     "fire_trigger_hold_time": 0.05,
     "fire_trigger_refractory_time": 0.15,
-    "fire_trigger_min_confidence": 0.4,
+    "fire_trigger_min_confidence": 0.8,
     "fire_trigger_min_persistence": 0.08,
     "fire_center_tolerance_deg": 2.0,
     "fire_requires_lock": true,
@@ -174,19 +174,19 @@
     "stationary_release_hold_s": 5.0,
     "stationary_release_suppress_s": 10.0,
     "stationary_release_motion_px": 36.0,
-    "motion_policy_mode": "allow_stationary",
-    "motion_recent_window_s": 1.75,
-    "motion_recent_distance_px": 18.0,
-    "motion_average_velocity_px_s": 8.0,
-    "motion_confidence_min": 0.35,
-    "motion_stationary_timeout_s": 6.0,
-    "motion_suppression_cooldown_s": 1.5
+    "motion_policy_mode": "require_recent_motion",
+    "motion_recent_window_s": 1.0,
+    "motion_recent_distance_px": 14.0,
+    "motion_average_velocity_px_s": 12.0,
+    "motion_confidence_min": 0.65,
+    "motion_stationary_timeout_s": 1.5,
+    "motion_suppression_cooldown_s": 1.2
   },
   "guard": {
     "guard_pan": 140.0,
-    "guard_tilt": 83.0,
+    "guard_tilt": 80.0,
     "rest_pan": 137.16,
-    "rest_tilt": 35.0,
+    "rest_tilt": 110.0,
     "rest_on_startup_enabled": false,
     "rest_on_close_enabled": true,
     "rest_startup_delay_ms": 900,
@@ -198,8 +198,8 @@
     "guided_move_approach_window_deg": 10.0,
     "pan_min": 0.0,
     "pan_max": 270.0,
-    "tilt_min": 50.0,
-    "tilt_max": 110.0,
+    "tilt_min": 0.0,
+    "tilt_max": 80.0,
     "camera_hfov": 83.0,
     "camera_vfov": 44.0,
     "pan_center_bias_deg": 0.0,
@@ -208,7 +208,7 @@
     "frame_height": 720,
     "guard_mode": 2,
     "sweep_pan_min": 0.0,
-    "sweep_pan_max": 270.0,
+    "sweep_pan_max": 200.0,
     "sweep_tilt": 70.0,
     "sweep_speed": 22.0,
     "patrol_waypoints": [
@@ -218,11 +218,11 @@
       ],
       [
         167.46127846271855,
-        94.92060151996809
+        80.0
       ],
       [
         183.662248077472,
-        80.94830770632076
+        80.0
       ],
       [
         207.81663246858943,
@@ -230,7 +230,7 @@
       ],
       [
         150.9230769230769,
-        82.08791208791209
+        80.0
       ],
       [
         202.15384615384616,
@@ -242,15 +242,15 @@
       ],
       [
         140.3076923076923,
-        81.82417582417582
+        80.0
       ]
     ],
     "patrol_dwell": 1.0,
     "patrol_speed": 20.0,
     "random_pan_min": 0.0,
-    "random_pan_max": 270.0,
+    "random_pan_max": 200.0,
     "random_tilt_min": 50.0,
-    "random_tilt_max": 110.0,
+    "random_tilt_max": 80.0,
     "random_dwell": 1.2,
     "random_speed": 20.0,
     "sentry_behaviour": 2,
@@ -307,7 +307,7 @@
   },
   "sound": {
     "enabled": true,
-    "volume_pct": 68,
+    "volume_pct": 39,
     "personality": "playful",
     "attitude_pct": 90,
     "cue_output_route": "both",
@@ -321,7 +321,7 @@
     "human_voice_style": "neutral",
     "human_voice_rate_pct": 125,
     "human_voice_pitch_pct": 130,
-    "human_voice_volume_pct": 23,
+    "human_voice_volume_pct": 13,
     "human_voice_cleanup_enabled": true,
     "known_face_hello_once_per_session": true,
     "name_announce_cooldown_s": 18.0,
@@ -419,20 +419,20 @@
   },
   "shortcuts": {
     "enabled": true,
-    "manual_controls_enabled": false,
+    "manual_controls_enabled": true,
     "quick_view_doc_path": "SMART_SENTRY_SHORTCUT_KEYS.md",
     "bindings": {}
   },
   "theme": {
     "preset": "mono_guard",
-    "accent_strength_pct": 100,
-    "surface_opacity_pct": 94,
-    "video_panel_opacity_pct": 100,
+    "accent_strength_pct": 65,
+    "surface_opacity_pct": 86,
+    "video_panel_opacity_pct": 99,
     "window_opacity_pct": 100,
-    "hero_glow_pct": 100,
-    "divider_strength_pct": 100,
+    "hero_glow_pct": 119,
+    "divider_strength_pct": 88,
     "corner_radius_px": 14,
-    "font_scale_pct": 100,
+    "font_scale_pct": 75,
     "contrast_pct": 100
   },
   "show_overlay": true,
@@ -442,32 +442,35 @@
   "show_guard_crosshair": true,
   "show_no_fire_masks": true,
   "show_fire_veto_overlay": true,
-  "scope_view_enabled": false,
+  "overlay_text_opacity_pct": 85,
+  "overlay_text_background_opacity_pct": 0,
+  "overlay_text_size_pct": 100,
+  "scope_view_enabled": true,
   "scope_radius_pct": 35,
-  "scope_vignette_opacity": 60,
-  "settings_panel_width": 557,
+  "scope_vignette_opacity": 45,
+  "settings_panel_width": 558,
   "main_splitter_sizes": [
-    1979,
-    557
+    1978,
+    558
   ],
   "layout_splitter_sizes": [
-    1032,
-    348
+    1085,
+    295
   ],
   "bottom_info_splitter_sizes": [
-    481,
-    942,
-    540
+    520,
+    956,
+    486
   ],
   "telemetry_voice_splitter_sizes": [
     189,
-    284
+    323
   ],
   "quick_access_expanded": false,
   "quick_access_pinned": false,
   "quick_access_panel_height": 156,
-  "window_x": 1988,
-  "window_y": 180,
+  "window_x": 2691,
+  "window_y": -35,
   "window_width": 1280,
   "window_height": 860,
   "window_maximized": true,

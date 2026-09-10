@@ -75,37 +75,65 @@ class SentryV2Overlay:
     def _scaled_px(cls, frame: np.ndarray, value: float, minimum: int = 1) -> int:
         return max(int(minimum), int(round(float(value) * cls._ui_scale(frame))))
 
-    @classmethod
-    def _font_scale(cls, frame: np.ndarray, base_scale: float) -> float:
-        # Text is fixed-size: ignore frame resolution, use base_scale directly.
-        return max(0.20, float(base_scale))
+    @staticmethod
+    def _clamp_pct(value: float, low: float = 0.0, high: float = 100.0) -> float:
+        return float(np.clip(float(value), low, high))
 
-    @classmethod
-    def _text_size(cls, frame: np.ndarray, text: str, base_scale: float, thickness: int = 1) -> tuple[int, int, int]:
+    def _font_scale(self, frame: np.ndarray, base_scale: float) -> float:
+        size_pct = float(getattr(self.cfg, "overlay_text_size_pct", 100.0) or 100.0)
+        return max(0.20, float(base_scale) * (self._clamp_pct(size_pct, 0.0, 200.0) / 100.0))
+
+    def _text_size(self, frame: np.ndarray, text: str, base_scale: float, thickness: int = 1) -> tuple[int, int, int]:
         (w, h), baseline = cv2.getTextSize(
             text,
             _FONT,
-            cls._font_scale(frame, base_scale),
+            self._font_scale(frame, base_scale),
             1,
         )
         return w, h, baseline
 
-    @classmethod
     def _put_text(
-        cls,
+        self,
         frame: np.ndarray,
         text: str,
         origin: tuple[int, int],
         base_scale: float,
         color: tuple[int, int, int],
         thickness: int = 1,
+        *,
+        background_opacity_pct: float | None = None,
+        text_opacity_pct: float | None = None,
     ) -> None:
-        # Draw a dark shadow offset by 1px for legibility without a background box.
+        alpha = self._clamp_pct(text_opacity_pct if text_opacity_pct is not None else getattr(self.cfg, "overlay_text_opacity_pct", 100.0), 0.0, 100.0) / 100.0
+        bg_alpha = self._clamp_pct(background_opacity_pct if background_opacity_pct is not None else getattr(self.cfg, "overlay_text_background_opacity_pct", 0.0), 0.0, 100.0) / 100.0
         ox, oy = origin
+        text_scale = self._font_scale(frame, base_scale)
+        (tw, th), _ = cv2.getTextSize(text, _FONT, text_scale, 1)
+
+        if bg_alpha > 0.0:
+            pad_x = max(4, int(round(0.18 * tw)))
+            pad_y = max(4, int(round(0.35 * th)))
+            x0 = max(0, ox - pad_x)
+            y0 = max(0, oy - th - pad_y)
+            x1 = min(frame.shape[1], ox + tw + pad_x)
+            y1 = min(frame.shape[0], oy + pad_y)
+            panel = frame.copy()
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (x0, y0), (x1, y1), _COL_PANEL_FILL, -1, cv2.LINE_AA)
+            cv2.addWeighted(overlay, bg_alpha, panel, 1.0 - bg_alpha, 0.0, panel)
+            frame[:] = panel
+
+        if alpha < 1.0:
+            overlay = frame.copy()
+            cv2.putText(overlay, text, (ox + 1, oy + 1), _FONT, text_scale, (0, 0, 0), 2, cv2.LINE_AA)
+            cv2.putText(overlay, text, origin, _FONT, text_scale, color, 1, cv2.LINE_AA)
+            cv2.addWeighted(overlay, alpha, frame, 1.0 - alpha, 0.0, frame)
+            return
+
         cv2.putText(frame, text, (ox + 1, oy + 1), _FONT,
-                    cls._font_scale(frame, base_scale), (0, 0, 0), 2, cv2.LINE_AA)
+                    text_scale, (0, 0, 0), 2, cv2.LINE_AA)
         cv2.putText(frame, text, origin,              _FONT,
-                    cls._font_scale(frame, base_scale), color,    1, cv2.LINE_AA)
+                    text_scale, color,    1, cv2.LINE_AA)
 
     # ------------------------------------------------------------------ #
     # Main draw call
@@ -144,7 +172,8 @@ class SentryV2Overlay:
                 self._draw_secondary_target(frame, target, queue_index)
 
         self._draw_state_badge(frame, engine)
-        self._draw_auto_trigger_badge(frame)
+        auto_badge_bottom = self._draw_auto_trigger_badge(frame)
+        self._draw_target_classes_badge(frame, engine, top_y=auto_badge_bottom + self._scaled_px(frame, 10))
         self._draw_tracking_debug(frame, engine)
         self._draw_fire_feedback(frame, w, h)
 
@@ -590,9 +619,17 @@ class SentryV2Overlay:
         col = self._get_crosshair_color(engine)
         margin = 10
         _, nh, _ = self._text_size(frame, name, _FS_LARGE)
-        self._put_text(frame, name, (margin, margin + nh), _FS_LARGE, col)
+        self._put_text(
+            frame,
+            name,
+            (margin, margin + nh),
+            _FS_LARGE,
+            col,
+            background_opacity_pct=getattr(self.cfg, "overlay_text_background_opacity_pct", 0.0),
+            text_opacity_pct=getattr(self.cfg, "overlay_text_opacity_pct", 100.0),
+        )
 
-    def _draw_auto_trigger_badge(self, frame: np.ndarray) -> None:
+    def _draw_auto_trigger_badge(self, frame: np.ndarray) -> int:
         enabled = bool(self.cfg.engagement.auto_trigger_enabled)
         accent = _COL_RETICLE_RED if enabled else _COL_RETICLE_GREEN
         text = "AUTO FIRE ON" if enabled else "AUTO FIRE OFF"
@@ -602,8 +639,75 @@ class SentryV2Overlay:
         _, hh, _ = self._text_size(frame, hint, _FS_TINY)
         tw, th, _ = self._text_size(frame, text, _FS_MEDIUM)
         rx = fw - margin - max(tw, self._text_size(frame, hint, _FS_TINY)[0])
-        self._put_text(frame, hint,  (rx, margin + hh),          _FS_TINY,   _COL_PANEL_MUTED)
-        self._put_text(frame, text,  (rx, margin + hh + 4 + th), _FS_MEDIUM, accent)
+        self._put_text(frame, hint,  (rx, margin + hh),          _FS_TINY,   _COL_PANEL_MUTED,
+                       background_opacity_pct=getattr(self.cfg, "overlay_text_background_opacity_pct", 0.0),
+                       text_opacity_pct=getattr(self.cfg, "overlay_text_opacity_pct", 100.0))
+        self._put_text(frame, text,  (rx, margin + hh + 4 + th), _FS_MEDIUM, accent,
+                       background_opacity_pct=getattr(self.cfg, "overlay_text_background_opacity_pct", 0.0),
+                       text_opacity_pct=getattr(self.cfg, "overlay_text_opacity_pct", 100.0))
+        return margin + hh + 4 + th
+
+    def _active_target_classes(self, engine: SentryV2Engine) -> List[str]:
+        target_cfg = getattr(getattr(engine, "cfg", None), "target_filter", None)
+        raw_classes = list(getattr(target_cfg, "allowed_classes", []) or [])
+        deduped: List[str] = []
+        seen: set[str] = set()
+        for item in raw_classes:
+            cleaned = str(item or "").strip()
+            if not cleaned:
+                continue
+            key = cleaned.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(cleaned.title())
+        return deduped
+
+    @staticmethod
+    def _wrap_target_class_lines(items: List[str], max_chars: int = 38) -> List[str]:
+        if not items:
+            return ["All detectable classes"]
+        lines: List[str] = []
+        current = ""
+        for item in items:
+            segment = item if not current else f"{current}, {item}"
+            if len(segment) <= max_chars:
+                current = segment
+                continue
+            if current:
+                lines.append(current)
+            current = item
+        if current:
+            lines.append(current)
+        return lines
+
+    def _draw_target_classes_badge(self, frame: np.ndarray, engine: SentryV2Engine, *, top_y: int) -> None:
+        classes = self._active_target_classes(engine)
+        header = f"TARGET CLASSES ({len(classes)})" if classes else "TARGET CLASSES"
+        lines = self._wrap_target_class_lines(classes)
+
+        margin = 10
+        frame_w = frame.shape[1]
+        max_width = 0
+        header_w, header_h, _ = self._text_size(frame, header, _FS_TINY)
+        max_width = max(max_width, header_w)
+        for line in lines:
+            line_w, _, _ = self._text_size(frame, line, _FS_SMALL)
+            max_width = max(max_width, line_w)
+        origin_x = max(margin, frame_w - margin - max_width)
+
+        y = max(top_y, margin + header_h)
+        self._put_text(frame, header, (origin_x, y), _FS_TINY, _COL_PANEL_MUTED,
+                       background_opacity_pct=getattr(self.cfg, "overlay_text_background_opacity_pct", 0.0),
+                       text_opacity_pct=getattr(self.cfg, "overlay_text_opacity_pct", 100.0))
+
+        _, line_h, _ = self._text_size(frame, "Target", _FS_SMALL)
+        y += line_h + 5
+        for line in lines:
+            self._put_text(frame, line, (origin_x, y), _FS_SMALL, _COL_PANEL_TEXT,
+                           background_opacity_pct=getattr(self.cfg, "overlay_text_background_opacity_pct", 0.0),
+                           text_opacity_pct=getattr(self.cfg, "overlay_text_opacity_pct", 100.0))
+            y += line_h + 3
 
     def _draw_fire_feedback(self, frame: np.ndarray, w: int, h: int) -> None:
         strength = self._fire_flash_strength()
@@ -654,14 +758,21 @@ class SentryV2Overlay:
                 veto_line = f"VETO {veto_reason}"
 
         margin = 10
-        # Place below the state badge.
-        _, nh, _ = self._text_size(frame, "ENGAGING", _FS_LARGE)
-        y = margin + nh + 14
-        self._put_text(frame, "TRACKING DIAGNOSTICS", (margin, y), _FS_TINY, _COL_PANEL_MUTED)
-        _, lh, _ = self._text_size(frame, lines[0], _FS_SMALL)
-        y += lh + 6
+        _, header_h, _ = self._text_size(frame, "TRACKING DIAGNOSTICS", _FS_TINY)
+        _, line_h, _ = self._text_size(frame, lines[0], _FS_SMALL)
+        line_count = len(lines) + (1 if veto_line else 0)
+        block_height = header_h + 6 + (line_count * (line_h + 3))
+        y = max(margin + header_h, frame.shape[0] - margin - block_height + header_h)
+        self._put_text(frame, "TRACKING DIAGNOSTICS", (margin, y), _FS_TINY, _COL_PANEL_MUTED,
+                       background_opacity_pct=getattr(self.cfg, "overlay_text_background_opacity_pct", 0.0),
+                       text_opacity_pct=getattr(self.cfg, "overlay_text_opacity_pct", 100.0))
+        y += line_h + 6
         for line in lines:
-            self._put_text(frame, line, (margin, y), _FS_SMALL, _COL_PANEL_TEXT)
-            y += lh + 3
+            self._put_text(frame, line, (margin, y), _FS_SMALL, _COL_PANEL_TEXT,
+                           background_opacity_pct=getattr(self.cfg, "overlay_text_background_opacity_pct", 0.0),
+                           text_opacity_pct=getattr(self.cfg, "overlay_text_opacity_pct", 100.0))
+            y += line_h + 3
         if veto_line:
-            self._put_text(frame, veto_line, (margin, y), _FS_SMALL, _COL_RETICLE_RED)
+            self._put_text(frame, veto_line, (margin, y), _FS_SMALL, _COL_RETICLE_RED,
+                           background_opacity_pct=getattr(self.cfg, "overlay_text_background_opacity_pct", 0.0),
+                           text_opacity_pct=getattr(self.cfg, "overlay_text_opacity_pct", 100.0))

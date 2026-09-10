@@ -134,16 +134,15 @@ def _run_main_with_retry() -> int:
                 + traceback.format_exc().rstrip()
             )
             code = 1
-        elapsed = time.monotonic() - start_t
-        _append_startup_log(f"launch attempt={attempt} exit_code={code} elapsed_s={elapsed:.3f}")
 
-        # If startup fails quickly with exit code 1, retry once to bypass transient init races.
+        elapsed = time.monotonic() - start_t
+
         if code == 1 and attempt < max_attempts and elapsed < 20.0:
             _append_startup_log("quick exit_code=1 detected; retrying once")
             time.sleep(0.75)
             continue
         return code
-        
+
     return 1
 
 if __name__ == "__main__":

@@ -88,6 +88,8 @@ class EngagementPlanner:
         # Convert each target to pan/tilt
         orders: List[EngagementOrder] = []
         for t in qualified:
+            if not self.target_is_reachable(t, current_pan, current_tilt):
+                continue
             pan, tilt = self._pixel_to_pantilt(t, current_pan, current_tilt)
             orders.append(EngagementOrder(target=t, pan=pan, tilt=tilt, rank=0))
 
@@ -99,6 +101,23 @@ class EngagementPlanner:
                 o.rank = i
 
         return orders
+
+    def target_is_reachable(
+        self,
+        target: TrackedTarget,
+        current_pan: float,
+        current_tilt: float,
+    ) -> bool:
+        pan_err, tilt_err = self.pixel_error_to_angle_error(
+            target.det.norm_cx,
+            target.det.norm_cy,
+        )
+        requested_pan = float(current_pan) + float(pan_err)
+        requested_tilt = float(current_tilt) + float(tilt_err)
+        return (
+            float(self.guard.pan_min) <= requested_pan <= float(self.guard.pan_max)
+            and float(self.guard.tilt_min) <= requested_tilt <= float(self.guard.tilt_max)
+        )
 
     # ------------------------------------------------------------------ #
     # Pixel → Pan / Tilt conversion

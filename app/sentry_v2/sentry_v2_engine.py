@@ -27,6 +27,7 @@ from .sentry_v2_no_fire_masks import find_blocking_mask
 from .target_filter import (
     DetectedObject,
     FilterDecision,
+    SEMANTIC_IDENTITY_CLASSES,
     SHAPE_FILTER_PROFILES,
     SHAPE_PROFILE_ALIASES,
     TargetFilter,
@@ -95,6 +96,7 @@ class SentryV2Engine:
         self._frame_number: int = 0
         self._last_update_timestamp: float = 0.0
         self._last_fire_gate_trace: Dict[str, Any] = {}
+        self.last_profile_timings_ms: Dict[str, float] = {}
 
         # Turret state (tracked by main app, seeded from guard config)
         self.current_pan: float = config.guard.guard_pan
@@ -498,6 +500,7 @@ class SentryV2Engine:
         now = timestamp or time.time()
         self._frame_number += 1
         self._last_update_timestamp = now
+        self.last_profile_timings_ms = {}
 
         # Increment frame counter for logging
         if self._log_autotracking:
@@ -511,7 +514,9 @@ class SentryV2Engine:
         self._update_track_identity_cache(detections, now)
 
         # 1. Filter
+        filter_started = time.perf_counter()
         qualified, diagnostics = self._filter.filter_with_diagnostics(detections, now)
+        filter_ms = (time.perf_counter() - filter_started) * 1000.0
         self.last_filter_diagnostics = diagnostics
         self.last_qualified = qualified
         
@@ -526,7 +531,10 @@ class SentryV2Engine:
                 )
 
         # 2. Score
+        scoring_started = time.perf_counter()
         scored = self._scorer.score(qualified, now)
+        threat_scoring_ms = (time.perf_counter() - scoring_started) * 1000.0
+        self.last_profile_timings_ms = {"target_filter_ms": filter_ms, "threat_scoring_ms": threat_scoring_ms}
         engageable_targets, motion_snapshots = self._apply_motion_policy_to_targets(scored, now)
         self.last_targets = scored
         self._last_motion_policy_snapshots = {int(item.get("track_id", -1)): dict(item) for item in motion_snapshots}
@@ -776,12 +784,12 @@ class SentryV2Engine:
             semantic_hits = int(getattr(decision, "confirm_hits", 0) or 0) if decision is not None else 0
             semantic_required = int(getattr(decision, "confirm_required", 1) or 1) if decision is not None else 1
 
-            if track_id == active_track_id or track_id in selected_track_ids:
-                qualification_status = "qualified"
-                rejection_reason = ""
-            elif decision is not None and not bool(decision.passed):
+            if decision is not None and not bool(decision.passed):
                 qualification_status = "rejected"
                 rejection_reason = str(decision.reason)
+            elif track_id == active_track_id or track_id in selected_track_ids:
+                qualification_status = "qualified"
+                rejection_reason = ""
             elif target is not None and float(getattr(target, "threat_score", 0.0) or 0.0) < threshold:
                 qualification_status = "candidate"
                 rejection_reason = "below_threat_threshold"
@@ -1843,6 +1851,13 @@ class SentryV2Engine:
             self._target_lost_since = 0.0
             self._reset_loss_recovery_state()
 
+            if not self._planner.target_is_reachable(target, self.current_pan, self.current_tilt):
+                self._last_reacquire_note = (
+                    f"target released: servo envelope exceeded for track {int(target.det.track_id)}"
+                )
+                self._advance_queue(now)
+                return
+
             aim_err_pan, aim_err_tilt = self._compute_tracking_angle_error(target, now, for_fire=False)
             corr_pan, corr_tilt, lock_pan, lock_tilt = self._compute_visual_servo_correction(
                 aim_err_pan,
@@ -2823,6 +2838,11 @@ class SentryV2Engine:
         track_id = int(det.track_id)
         entry = self._motion_policy_entry(track_id)
         mode = self._motion_policy_mode()
+        if (
+            str(det.class_name or "").strip().lower() in SEMANTIC_IDENTITY_CLASSES
+            and mode == "allow_stationary"
+        ):
+            mode = "require_recent_motion"
         motion_snapshot = self._scorer.get_motion_history_snapshot(det, now, window_s=self._motion_policy_window_s())
         engage_mode_allowed = bool(getattr(self.cfg.engagement, "motion_allow_stationary_engagement", True))
         recent_distance_px = float(motion_snapshot.recent_motion_distance_px)
@@ -3044,6 +3064,11 @@ class SentryV2Engine:
             motion_policy_state = {}
 
         combined_stages = list(filter_stages) + self._build_gate_stage_records(stages)
+        final_gate_result = {
+            "approved": bool(firing_approved),
+            "reason": "approved" if firing_approved else str(firing_rejected_reason or "rejected"),
+            "stages": list(combined_stages),
+        }
         rejection_reason = str(firing_rejected_reason or "").strip()
         if not firing_approved:
             rejection_reason = self._normalized_rejection_reason(rejection_reason)
@@ -3096,6 +3121,7 @@ class SentryV2Engine:
                 "approved": bool(firing_approved),
                 "rejected_reason": "" if firing_approved else rejection_reason,
             },
+            "final_gate_result": final_gate_result,
             "qualification_stages": combined_stages,
         }
 
@@ -3125,6 +3151,7 @@ class SentryV2Engine:
                 "threat_score": float(threat_score),
                 "motion_score": float(motion_score),
                 "motion_policy_state": str(motion_policy_state.get("state", "TRACKING") or "TRACKING"),
+                "final_gate_result": dict(final_gate_result),
                 "qualification_stages": list(combined_stages),
             },
         )
@@ -3302,14 +3329,84 @@ class SentryV2Engine:
         return False
 
     def _target_meets_fire_requirements(self, target: TrackedTarget, *, now: Optional[float] = None) -> bool:
+        """Run the complete, current target-quality gate used by every fire path."""
         eng = self.cfg.engagement
         check_time = time.time() if now is None else float(now)
-        return (
-            self._person_target_is_fire_authorized(target, check_time)
-            and
-            float(target.det.confidence) >= float(eng.fire_trigger_min_confidence)
-            and float(target.persistence) >= float(eng.fire_trigger_min_persistence)
+        stages: List[Dict[str, Any]] = []
+
+        def reject(stage: str, reason: str, inputs: Dict[str, Any], threshold: Dict[str, Any]) -> bool:
+            stages.append({"stage": stage, "inputs": inputs, "threshold": threshold, "pass": False, "reason": reason})
+            self._last_fire_gate_trace = {"approved": False, "reason": reason, "stages": stages}
+            self._set_fire_veto_reason(reason, check_time)
+            return False
+
+        class_name = str(getattr(target.det, "class_name", "") or "").strip().lower()
+        motion_entry = self._motion_policy_state.get(int(target.det.track_id), {})
+        track_age_s = float(getattr(target, "age", getattr(target, "persistence", 0.0)) or 0.0)
+        displacement = float(motion_entry.get("recent_motion_distance_px", 0.0) or 0.0)
+        if track_age_s > 5.0 and class_name in SEMANTIC_IDENTITY_CLASSES and displacement < 18.0:
+            return reject("stale_target_block", f"target too old ({track_age_s:.1f}s) with insufficient motion/displacement ({displacement:.1f}px)", {"track_age_s": track_age_s, "displacement_px": displacement}, {"max_age_s": 5.0, "min_displacement_px": 18.0})
+        if class_name in SEMANTIC_IDENTITY_CLASSES and self._motion_policy_mode() != "allow_stationary" and not bool(motion_entry.get("motion_allowed", False)):
+            return reject("motion_policy", str(motion_entry.get("suppression_reason", "motion policy rejected target") or "motion policy rejected target"), {"motion_allowed": False}, {"motion_policy_mode": self._motion_policy_mode()})
+        current_detection = next(
+            (det for det in self.last_detections if int(getattr(det, "track_id", -1) or -1) == int(target.det.track_id)),
+            None,
         )
+        if current_detection is None:
+            return reject("target_continuity", "target continuity failed: detection is not current", {}, {"current_frame_required": True})
+
+        decision = self._find_filter_decision_for_track(int(target.det.track_id))
+        if decision is None or not bool(getattr(decision, "passed", False)):
+            return reject(
+                "fresh_target_validation",
+                "fresh target validation failed",
+                {"track_id": int(target.det.track_id), "decision": str(getattr(decision, "reason", "missing") or "missing")},
+                {"filter_decision_pass": True},
+            )
+        stages.append({"stage": "fresh_target_validation", "inputs": {"track_id": int(target.det.track_id)}, "threshold": {"filter_decision_pass": True}, "pass": True, "reason": "current filter decision passed"})
+
+        shape_info = self._shape_profile_telemetry(current_detection)
+        if not bool(shape_info.get("shape_passed", False)):
+            return reject("shape_profile", "shape profile rejected", {"shape_profile": shape_info.get("shape_profile_used", "")}, {"aspect_ratio": [shape_info.get("min_aspect_ratio", 0.0), shape_info.get("max_aspect_ratio", 0.0)]})
+        stages.append({"stage": "shape_profile", "inputs": {"shape_profile": shape_info.get("shape_profile_used", ""), "aspect_ratio": shape_info.get("aspect_ratio", 0.0)}, "threshold": {"min": shape_info.get("min_aspect_ratio", 0.0), "max": shape_info.get("max_aspect_ratio", 0.0)}, "pass": True, "reason": "shape profile passed"})
+
+        semantic_pass = class_name not in SEMANTIC_IDENTITY_CLASSES or int(getattr(decision, "confirm_hits", 0) or 0) >= max(1, int(getattr(decision, "confirm_required", 1) or 1))
+        if not semantic_pass:
+            return reject("semantic_confirmation", "semantic confirmation failed", {"hits": int(getattr(decision, "confirm_hits", 0) or 0)}, {"required": int(getattr(decision, "confirm_required", 1) or 1)})
+        stages.append({"stage": "semantic_confirmation", "inputs": {"hits": int(getattr(decision, "confirm_hits", 0) or 0)}, "threshold": {"required": int(getattr(decision, "confirm_required", 1) or 1)}, "pass": True, "reason": "semantic confirmation passed"})
+
+        stages.append({"stage": "track_age", "inputs": {"track_age_s": track_age_s}, "threshold": {"stale_block_age_s": 5.0}, "pass": True, "reason": "track age accepted"})
+
+        motion_mode = self._motion_policy_mode()
+
+        # Check motion policy for animal targets in require_recent_motion mode
+        if (
+            class_name in SEMANTIC_IDENTITY_CLASSES
+            and motion_mode != "allow_stationary"
+            and not bool(motion_entry.get("motion_allowed", False))
+        ):
+            self._set_fire_veto_reason(
+                str(motion_entry.get("suppression_reason", "motion policy rejected target") or "motion policy rejected target"),
+                check_time,
+            )
+            return False
+
+        motion_distance = float(motion_entry.get("recent_motion_distance_px", 0.0) or 0.0)
+        motion_confidence = float(motion_entry.get("motion_confidence", 0.0) or 0.0)
+        velocity = float(motion_entry.get("average_velocity_px_s", 0.0) or 0.0)
+        motion_pass = class_name not in SEMANTIC_IDENTITY_CLASSES or (motion_distance >= 18.0 and motion_confidence >= float(getattr(eng, "motion_confidence_min", 0.45) or 0.45))
+        if not motion_pass:
+            return reject("motion_evidence", "meaningful displacement and corroborating motion required", {"displacement_px": motion_distance, "motion_confidence": motion_confidence, "velocity_px_s": velocity}, {"min_displacement_px": 18.0, "min_motion_confidence": float(getattr(eng, "motion_confidence_min", 0.45) or 0.45)})
+        stages.append({"stage": "motion_evidence", "inputs": {"displacement_px": motion_distance, "motion_confidence": motion_confidence, "velocity_px_s": velocity}, "threshold": {"min_displacement_px": 18.0, "min_motion_confidence": float(getattr(eng, "motion_confidence_min", 0.45) or 0.45)}, "pass": True, "reason": "motion evidence passed"})
+
+        if not self._person_target_is_fire_authorized(target, check_time):
+            return reject("person_fire_authorization", "person identity authorization failed", {"class_name": class_name}, {"authorization_required": True})
+        quality_pass = float(target.det.confidence) >= float(eng.fire_trigger_min_confidence) and float(target.persistence) >= float(eng.fire_trigger_min_persistence)
+        if not quality_pass:
+            return reject("target_quality", "confidence or persistence below fire threshold", {"confidence": float(target.det.confidence), "persistence": float(target.persistence)}, {"min_confidence": float(eng.fire_trigger_min_confidence), "min_persistence": float(eng.fire_trigger_min_persistence)})
+        stages.append({"stage": "target_quality", "inputs": {"confidence": float(target.det.confidence), "persistence": float(target.persistence)}, "threshold": {"min_confidence": float(eng.fire_trigger_min_confidence), "min_persistence": float(eng.fire_trigger_min_persistence)}, "pass": True, "reason": "target quality passed"})
+        self._last_fire_gate_trace = {"approved": True, "reason": "approved", "stages": stages}
+        return True
 
     def _engagement_pose_freshness_s(self, *, for_fire: bool = False) -> float:
         # ENGAGING needs materially fresher pose than patrol/returning. Fire
@@ -3526,7 +3623,7 @@ class SentryV2Engine:
 
     def _begin_fire(self, order: EngagementOrder, now: float) -> None:
         """Transition to fire phase — respects auto_trigger_enabled gate."""
-        if not self._person_target_is_fire_authorized(order.target, now):
+        if not self._target_meets_fire_requirements(order.target, now=now):
             self._trigger_gate_active = False
             self._trigger_hold_start = 0.0
             self._emit_engagement_telemetry(
@@ -3535,7 +3632,7 @@ class SentryV2Engine:
                 target=order.target,
                 attempt_type="final",
                 firing_approved=False,
-                firing_rejected_reason="person_fire_authorization_failed",
+                firing_rejected_reason=str((self._last_fire_gate_trace or {}).get("reason", "target_fire_authorization_failed")),
                 stages=list((self._last_fire_gate_trace or {}).get("stages", []) or []),
             )
             return
@@ -4492,6 +4589,12 @@ class SentryV2Engine:
             "mask clear",
         )
 
+        if not self._target_meets_fire_requirements(target, now=now):
+            self._trigger_hold_start = 0.0
+            self._trigger_gate_active = False
+            return False
+        stage_trace.extend(list((self._last_fire_gate_trace or {}).get("stages", []) or []))
+
         if not self._person_target_is_fire_authorized(target, now):
             self._trigger_hold_start = 0.0
             self._trigger_gate_active = False
@@ -4931,6 +5034,7 @@ class SentryV2Engine:
         Smoothly interpolate current position toward target at *speed* deg/sec.
         Returns True when within 0.3° of the target (arrived).
         """
+        target_pan, target_tilt = self._clamp_angles(target_pan, target_tilt)
         dp = target_pan - self.current_pan
         dtilt = target_tilt - self.current_tilt
         dist = (dp ** 2 + dtilt ** 2) ** 0.5

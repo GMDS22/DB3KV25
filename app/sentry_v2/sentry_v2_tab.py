@@ -18,7 +18,8 @@ Provides:
 
 from __future__ import annotations
 
-from collections import deque
+from collections import defaultdict, deque
+import ctypes
 import hashlib
 import hmac
 import json
@@ -40,6 +41,10 @@ from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 import cv2
 import numpy as np
+try:
+    import psutil
+except Exception:
+    psutil = None
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QCheckBox, QSlider, QGroupBox, QFrame, QSizePolicy,
@@ -3708,6 +3713,78 @@ def _rgba_hex(color: str, alpha_pct: int) -> str:
     return f"rgba({red}, {green}, {blue}, {alpha}%)"
 
 
+class _FrameTimingCollector:
+    """Keeps a bounded runtime timing window without affecting control flow."""
+
+    def __init__(self, max_samples: int = 600) -> None:
+        self._samples: deque[Dict[str, float]] = deque(maxlen=max(1, int(max_samples)))
+        self._counters: Dict[str, int] = defaultdict(int)
+        self._command_times: deque[float] = deque(maxlen=max(1, int(max_samples)))
+        self._lock = threading.Lock()
+
+    def record(self, stages_ms: Dict[str, float]) -> None:
+        sample = {
+            str(name): max(0.0, float(value))
+            for name, value in stages_ms.items()
+            if value is not None
+        }
+        if not sample:
+            return
+        with self._lock:
+            self._samples.append(sample)
+
+    def increment(self, name: str, amount: int = 1) -> None:
+        with self._lock:
+            self._counters[str(name)] += int(amount)
+
+    def record_command(self) -> None:
+        with self._lock:
+            self._command_times.append(time.monotonic())
+
+    def snapshot(self) -> Dict[str, object]:
+        with self._lock:
+            samples = list(self._samples)
+            counters = dict(self._counters)
+            command_times = list(self._command_times)
+        if not samples:
+            return {
+                "sample_count": 0,
+                "stages_ms": {},
+                "counters": counters,
+                "commands_per_second": 0.0,
+            }
+
+        stage_values: Dict[str, List[float]] = {}
+        for sample in samples:
+            for name, value in sample.items():
+                stage_values.setdefault(name, []).append(float(value))
+
+        def _percentile(values: List[float], percentile: float) -> float:
+            ordered = sorted(values)
+            index = max(0, min(len(ordered) - 1, int(round((len(ordered) - 1) * percentile))))
+            return ordered[index]
+
+        summary: Dict[str, Dict[str, float]] = {}
+        for name, values in stage_values.items():
+            summary[name] = {
+                "mean": sum(values) / len(values),
+                "min": min(values),
+                "max": max(values),
+                "p50": _percentile(values, 0.50),
+                "p95": _percentile(values, 0.95),
+                "p99": _percentile(values, 0.99),
+                "samples": float(len(values)),
+            }
+        now = time.monotonic()
+        recent_commands = [stamp for stamp in command_times if now - stamp <= 1.0]
+        return {
+            "sample_count": len(samples),
+            "stages_ms": summary,
+            "counters": counters,
+            "commands_per_second": float(len(recent_commands)),
+        }
+
+
 class SentryV2TabWidget(QWidget):
     """Primary Smart Sentry desktop control surface and runtime host."""
 
@@ -3815,7 +3892,7 @@ class SentryV2TabWidget(QWidget):
             preferred_backend=str(getattr(self.config.face_recognition, "backend", FACE_EMBEDDING_BACKEND_SFACE) or FACE_EMBEDDING_BACKEND_SFACE),
             detector_model_path=str(getattr(self.config.face_recognition, "detector_model_path", DEFAULT_FACE_DETECTOR_MODEL_RELATIVE_PATH) or DEFAULT_FACE_DETECTOR_MODEL_RELATIVE_PATH),
             recognizer_model_path=str(getattr(self.config.face_recognition, "recognizer_model_path", DEFAULT_FACE_RECOGNIZER_MODEL_RELATIVE_PATH) or DEFAULT_FACE_RECOGNIZER_MODEL_RELATIVE_PATH),
-            allow_legacy_fallback=bool(getattr(self.config.face_recognition, "allow_legacy_fallback", True)),
+            allow_legacy_fallback=bool(getattr(self.config.face_recognition, "allow_legacy_fallback", False)),
         )
 
         # Standalone detector
@@ -4057,6 +4134,34 @@ class SentryV2TabWidget(QWidget):
         self._startup_rest_pending: bool = bool(getattr(self.config.guard, "rest_on_startup_enabled", True))
         self._startup_rest_schedule_token: int = 0
         self._connection_busy: bool = False
+        self._frame_timing = _FrameTimingCollector()
+        self._frame_timing_pending: Dict[int, Dict[str, float]] = {}
+        self._frame_timing_pending_lock = threading.Lock()
+        self._frame_timing_last_log_s: float = 0.0
+        self._frame_timing_log_interval_s: float = 5.0
+        self._developer_performance_overlay_enabled: bool = True
+        self._developer_performance_lines: List[str] = []
+        self._perf_process_cpu_pct: float = 0.0
+        self._perf_rss_bytes: int = 0
+        self._perf_peak_rss_bytes: int = 0
+        self._perf_cpu_sample_wall_s: float = time.perf_counter()
+        self._perf_cpu_sample_process_s: float = time.process_time()
+        self._perf_process = psutil.Process() if psutil is not None else None
+        self._perf_thread_cpu_last_s: Dict[int, float] = {}
+        self._perf_thread_cpu_pct: Dict[str, float] = {}
+        self._main_thread_native_id: int = int(threading.main_thread().native_id or 0)
+        self._detector_thread_native_id: int = 0
+        self._comm_thread_native_id: int = 0
+        self._perf_overlay_timer = QTimer(self)
+        self._perf_overlay_timer.setInterval(500)
+        self._perf_overlay_timer.timeout.connect(self._refresh_developer_performance_overlay)
+        self._perf_overlay_timer.start()
+        self._performance_baseline_scenario: str = ""
+        self._performance_baseline_started_s: float = 0.0
+        self._performance_baseline_samples: deque[Dict[str, object]] = deque(maxlen=18_100)
+        self._performance_baseline_timer = QTimer(self)
+        self._performance_baseline_timer.setInterval(1000)
+        self._performance_baseline_timer.timeout.connect(self._record_performance_baseline_sample)
         self._comm_task_queue: "queue.Queue[object]" = queue.Queue()
         self._pending_move_lock = threading.Lock()
         self._pending_move_commands = deque()
@@ -4129,6 +4234,9 @@ class SentryV2TabWidget(QWidget):
         self._tabs_nav_layout: Optional[QHBoxLayout] = None
         self._tabs_nav_title_label: Optional[QLabel] = None
         self._btn_settings_tab_help: Optional[QPushButton] = None
+        self._settings_search_edit: Optional[QLineEdit] = None
+        self._settings_search_results: Optional[QComboBox] = None
+        self._settings_search_index: list[dict[str, object]] = []
         self._hero_layout: Optional[QHBoxLayout] = None
         self._hero_action_row: Optional[QVBoxLayout] = None
         self._hero_actions_layout: Optional[QVBoxLayout] = None
@@ -4155,6 +4263,7 @@ class SentryV2TabWidget(QWidget):
         self._build_ui()
         self._optimize_numeric_entry_performance()
         self._apply_theme()
+        self._build_settings_search_index()
         self._install_global_shortcuts()
 
         self._quiet_save_timer = QTimer(self)
@@ -5628,6 +5737,23 @@ class SentryV2TabWidget(QWidget):
         self._settings_nav_label.setObjectName("sentryV2TabsNavCount")
         self._settings_nav_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
         tabs_nav_layout.addWidget(self._settings_nav_label)
+        self._settings_search_edit = QLineEdit()
+        self._settings_search_edit.setObjectName("sentryV2SettingsSearch")
+        self._settings_search_edit.setPlaceholderText("Search settings...")
+        self._settings_search_edit.setClearButtonEnabled(True)
+        self._settings_search_edit.setMinimumWidth(150)
+        self._settings_search_edit.setMaximumWidth(280)
+        self._settings_search_edit.setToolTip("Search setting names, descriptions, and tab locations")
+        self._settings_search_edit.textChanged.connect(self._search_settings)
+        tabs_nav_layout.addWidget(self._settings_search_edit)
+        self._settings_search_results = QComboBox()
+        self._settings_search_results.setObjectName("sentryV2SettingsSearchResults")
+        self._settings_search_results.setMinimumWidth(150)
+        self._settings_search_results.setMaximumWidth(300)
+        self._settings_search_results.setToolTip("Select a result to open its settings tab and focus the control")
+        self._settings_search_results.setVisible(False)
+        self._settings_search_results.activated.connect(self._open_settings_search_result)
+        tabs_nav_layout.addWidget(self._settings_search_results)
         tabs_nav_layout.addStretch(1)
         self._btn_settings_tab_help = QPushButton("?")
         self._btn_settings_tab_help.setToolTip("Open documentation help for the active settings tab")
@@ -5697,6 +5823,7 @@ class SentryV2TabWidget(QWidget):
             page = self._settings_tabs.widget(index)
             if page is not None:
                 page.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self._build_settings_search_index()
         self._apply_settings_tab_colors()
         self._update_settings_tab_nav_label(self._settings_tabs.currentIndex())
 
@@ -6002,6 +6129,25 @@ QWidget#sentryV2Root QLabel#sentryV2TabsNavCount {{
     font-size: {nav_count:.2f}pt;
     font-weight: 700;
     padding-left: 8px;
+}}
+QWidget#sentryV2Root QLineEdit#sentryV2SettingsSearch {{
+    min-height: 24px;
+    padding: 2px 8px;
+    color: {tokens['text']};
+    background-color: {tokens['field_rgba']};
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_small}px;
+}}
+QWidget#sentryV2Root QLineEdit#sentryV2SettingsSearch:focus {{
+    border-color: {tokens['accent']};
+}}
+QWidget#sentryV2Root QComboBox#sentryV2SettingsSearchResults {{
+    min-height: 24px;
+    padding: 2px 6px;
+    color: {tokens['text']};
+    background-color: {tokens['field_rgba']};
+    border: 1px solid {tokens['border']};
+    border-radius: {radius_small}px;
 }}
 QWidget#sentryV2Root QWidget#sentryV2ToggleRow {{
     background-color: {tokens['surface_alt_rgba']};
@@ -6552,6 +6698,110 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 tab_bar.setTabTextColor(idx, QColor(resolved_color))
                 tab_bar.setTabIcon(idx, _build_settings_tab_icon(icon_key, resolved_color, max(24, tab_bar.iconSize().width() or 24)))
 
+    @staticmethod
+    def _settings_search_control_title(widget: QWidget) -> str:
+        object_name = str(widget.objectName() or "").strip()
+        for prefix in ("_chk_", "_spin_", "_edit_", "_combo_", "_slider_", "_btn_", "_txt_"):
+            if object_name.startswith(prefix):
+                object_name = object_name[len(prefix):]
+                break
+        if object_name:
+            return object_name.replace("_", " ").strip().title()
+        text_getter = getattr(widget, "text", None)
+        if callable(text_getter):
+            try:
+                text = str(text_getter() or "").strip()
+                if text:
+                    return text
+            except Exception:
+                pass
+        return "Setting"
+
+    def _build_settings_search_index(self) -> None:
+        """Index existing setting controls without creating a second config model."""
+        if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
+            return
+        searchable_types = (QCheckBox, QComboBox, QDoubleSpinBox, QLineEdit, QSlider, QSpinBox)
+        entries: list[dict[str, object]] = []
+        for tab_index in range(self._settings_tabs.count()):
+            tab_title = self._settings_tab_title(tab_index)
+            page = self._settings_tabs.widget(tab_index)
+            if page is None:
+                continue
+            for widget in page.findChildren(searchable_types):
+                tooltip = re.sub(r"<[^>]+>", " ", str(widget.toolTip() or "")).strip()
+                title = self._settings_search_control_title(widget)
+                object_name = str(widget.objectName() or "").strip()
+                search_text = " ".join((title, object_name, tooltip, tab_title)).lower()
+                if not search_text.strip():
+                    continue
+                entries.append({
+                    "tab_index": tab_index,
+                    "tab_title": tab_title,
+                    "widget": widget,
+                    "title": title,
+                    "tooltip": tooltip,
+                    "search_text": search_text,
+                })
+        self._settings_search_index = entries
+
+    def _search_settings(self, query: str) -> None:
+        results = self._settings_search_results
+        if results is None:
+            return
+        normalized = re.sub(r"\s+", " ", str(query or "").strip().lower())
+        results.blockSignals(True)
+        results.clear()
+        if not normalized:
+            results.setVisible(False)
+            results.blockSignals(False)
+            return
+        tokens = [token for token in normalized.split(" ") if token]
+        matches = [
+            entry for entry in self._settings_search_index
+            if all(token in str(entry.get("search_text", "")) for token in tokens)
+        ]
+        for entry in matches[:40]:
+            title = str(entry.get("title", "Setting"))
+            tab_title = str(entry.get("tab_title", ""))
+            results.addItem(f"{title}  —  {tab_title}", entry)
+        if matches:
+            results.setVisible(True)
+            results.setCurrentIndex(-1)
+            results.setToolTip(f"{len(matches)} matching setting(s). Select one to open its location.")
+        else:
+            results.addItem("No matching settings")
+            results.setVisible(True)
+            results.setEnabled(False)
+        results.blockSignals(False)
+        if matches:
+            results.setEnabled(True)
+            QTimer.singleShot(0, self._show_settings_search_popup)
+
+    def _show_settings_search_popup(self) -> None:
+        results = self._settings_search_results
+        if results is None or not results.isEnabled() or results.count() <= 0:
+            return
+        results.showPopup()
+
+    def _open_settings_search_result(self, result_index: int) -> None:
+        results = self._settings_search_results
+        if results is None:
+            return
+        entry = results.itemData(int(result_index))
+        if not isinstance(entry, dict):
+            return
+        tab_index = int(entry.get("tab_index", -1))
+        widget = entry.get("widget")
+        if tab_index < 0 or tab_index >= self._settings_tabs.count():
+            return
+        self._settings_tabs.setCurrentIndex(tab_index)
+        if isinstance(widget, QWidget):
+            widget.setFocus(Qt.OtherFocusReason)
+            page = self._settings_tabs.widget(tab_index)
+            if isinstance(page, QScrollArea):
+                QTimer.singleShot(0, lambda target=widget, scroll=page: scroll.ensureWidgetVisible(target))
+
     def _update_settings_tab_nav_label(self, index: int) -> None:
         if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
             return
@@ -6686,8 +6936,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             item = layout.itemAt(index)
             widget = item.widget() if item is not None else None
             if isinstance(widget, QGroupBox):
+                collapsed = True
+                if getattr(widget, "objectName", lambda: "")() == "hud_overlay_group" or str(widget.title() or "").strip().lower() == "hud overlay":
+                    collapsed = False
                 layout.takeAt(index)
-                layout.insertWidget(index, self._collapsible(widget, collapsed=True))
+                layout.insertWidget(index, self._collapsible(widget, collapsed=collapsed))
             else:
                 index += 1
 
@@ -10075,29 +10328,70 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         lay.addWidget(self._collapsible(acoustic_grp, collapsed=True))
 
         # Overlay toggles
+        self._grp_hud_overlay = QGroupBox("HUD Overlay")
+        self._grp_hud_overlay.setObjectName("hud_overlay_group")
+        hud_overlay_lay = QVBoxLayout(self._grp_hud_overlay)
+        hud_overlay_lay.setSpacing(4)
+
         self._chk_overlay = QCheckBox("Show overlay")
         self._chk_overlay.setChecked(self.config.show_overlay)
         self._chk_overlay.toggled.connect(self._on_overlay_changed)
         self._apply_tooltip(self._chk_overlay, "show_overlay")
-        lay.addWidget(self._chk_overlay)
+        hud_overlay_lay.addWidget(self._chk_overlay)
 
         self._chk_scores = QCheckBox("Show threat scores")
         self._chk_scores.setChecked(self.config.show_threat_scores)
         self._chk_scores.toggled.connect(self._on_overlay_changed)
         self._apply_tooltip(self._chk_scores, "show_scores")
-        lay.addWidget(self._chk_scores)
+        hud_overlay_lay.addWidget(self._chk_scores)
+
+        text_style_row = QHBoxLayout()
+        text_style_row.addWidget(QLabel("HUD text size (%):"))
+        self._spin_overlay_text_size = QSpinBox()
+        self._spin_overlay_text_size.setRange(60, 160)
+        self._spin_overlay_text_size.setSingleStep(5)
+        self._spin_overlay_text_size.setValue(int(getattr(self.config, "overlay_text_size_pct", 100)))
+        self._spin_overlay_text_size.valueChanged.connect(self._on_overlay_text_changed)
+        self._apply_tooltip(self._spin_overlay_text_size, "overlay_text_size")
+        text_style_row.addWidget(self._spin_overlay_text_size)
+        hud_overlay_lay.addLayout(text_style_row)
+
+        text_opacity_row = QHBoxLayout()
+        text_opacity_row.addWidget(QLabel("HUD text opacity (%):"))
+        self._spin_overlay_text_opacity = QSpinBox()
+        self._spin_overlay_text_opacity.setRange(0, 100)
+        self._spin_overlay_text_opacity.setSingleStep(5)
+        self._spin_overlay_text_opacity.setValue(int(getattr(self.config, "overlay_text_opacity_pct", 100)))
+        self._spin_overlay_text_opacity.valueChanged.connect(self._on_overlay_text_changed)
+        self._apply_tooltip(self._spin_overlay_text_opacity, "overlay_text_opacity")
+        text_opacity_row.addWidget(self._spin_overlay_text_opacity)
+        hud_overlay_lay.addLayout(text_opacity_row)
+
+        text_bg_row = QHBoxLayout()
+        text_bg_row.addWidget(QLabel("HUD text bg opacity (%):"))
+        self._spin_overlay_text_background = QSpinBox()
+        self._spin_overlay_text_background.setRange(0, 100)
+        self._spin_overlay_text_background.setSingleStep(5)
+        self._spin_overlay_text_background.setValue(int(getattr(self.config, "overlay_text_background_opacity_pct", 0)))
+        self._spin_overlay_text_background.valueChanged.connect(self._on_overlay_text_changed)
+        self._apply_tooltip(self._spin_overlay_text_background, "overlay_text_background_opacity")
+        text_bg_row.addWidget(self._spin_overlay_text_background)
+        hud_overlay_lay.addLayout(text_bg_row)
 
         self._chk_zone = QCheckBox("Show engagement zone")
         self._chk_zone.setChecked(self.config.show_engagement_zone)
         self._chk_zone.toggled.connect(self._on_overlay_changed)
         self._apply_tooltip(self._chk_zone, "show_zone")
-        lay.addWidget(self._chk_zone)
+        hud_overlay_lay.addWidget(self._chk_zone)
 
         self._chk_guard_crosshair = QCheckBox("Show guard crosshair")
         self._chk_guard_crosshair.setChecked(self.config.show_guard_crosshair)
         self._chk_guard_crosshair.toggled.connect(self._on_overlay_changed)
         self._apply_tooltip(self._chk_guard_crosshair, "show_guard_crosshair")
-        lay.addWidget(self._chk_guard_crosshair)
+        hud_overlay_lay.addWidget(self._chk_guard_crosshair)
+
+        self._section_hud_overlay = self._collapsible(self._grp_hud_overlay, collapsed=False)
+        lay.addWidget(self._section_hud_overlay)
 
         self._refresh_no_fire_mask_list()
         self._update_mask_editor_ui()
@@ -11898,6 +12192,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         # Own camera takes priority — skip external pushes
         if self._has_local_source() and not _from_own_camera:
             return
+        frame_started = time.perf_counter()
+        stages_ms = self._take_detector_timing(frame) if _from_own_camera else {}
         now = time.time()
         self._last_processed_frame_s = now
         h, w_frame = frame.shape[:2]
@@ -11905,8 +12201,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         raw_detections = detections or []
         if use_internal_detector and not _from_own_camera:
+            detect_started = time.perf_counter()
             mode = self.config.detection_mode.detection_mode
             raw_detections = self._detector.detect(frame, mode)
+            stages_ms["detector_ms"] = (time.perf_counter() - detect_started) * 1000.0
         else:
             mode = self.config.detection_mode.detection_mode
 
@@ -11914,6 +12212,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self.config.guard.frame_width = w_frame
         self.config.guard.frame_height = h
 
+        tracking_started = time.perf_counter()
         base_objects = self._raw_detections_to_objects(raw_detections, w_frame, h)
         engine_objects, face_matches = self._apply_face_identity_to_objects(frame, base_objects, now)
         self._maybe_seek_face_from_yolo_person(engine_objects, face_matches, mode, now)
@@ -11925,15 +12224,20 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if bool(self.config.prompted_targets_enabled):
             prompted_objects = self._prompted_matcher.detect(frame, engine_objects, now)
         det_objects = self._tracker.assign_tracks(engine_objects + prompted_objects, now)
+        stages_ms["tracking_enrichment_ms"] = (time.perf_counter() - tracking_started) * 1000.0
+        stages_ms["detection_count"] = float(len(raw_detections))
 
         # Auto-lighting: sample scene brightness every N frames
+        lighting_started = time.perf_counter()
         self._auto_lighting_frame_counter += 1
         interval = max(1, int(getattr(self.config.lighting, "auto_sample_interval_frames", 8)))
         if self._auto_lighting_frame_counter >= interval:
             self._auto_lighting_frame_counter = 0
             self._update_auto_lighting(frame)
+        stages_ms["auto_lighting_ms"] = (time.perf_counter() - lighting_started) * 1000.0
 
         # Run engine
+        engine_started = time.perf_counter()
         self._sync_engine_pose_from_feedback()
         voice_tracking_pause_requested = bool(getattr(self, "_voice_protocol_hold_paused", False))
         if voice_tracking_pause_requested:
@@ -11947,29 +12251,43 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                     self.engine.start()
                     self._log("Voice interaction window ended: autotracking resumed")
             self.engine.update(det_objects, now)
+        stages_ms["engine_ms"] = (time.perf_counter() - engine_started) * 1000.0
+        stages_ms.update(dict(getattr(self.engine, "last_profile_timings_ms", {}) or {}))
+        diagnostics_started = time.perf_counter()
         self._log_tracking_pipeline_diagnostics(det_objects, now)
         self._update_sound_runtime_cues()
         self._last_detected_objects = list(det_objects)
+        stages_ms["diagnostics_sound_ms"] = (time.perf_counter() - diagnostics_started) * 1000.0
 
         if self._show_video_feed and not self._should_present_display_frame(now):
             self._set_preview_perf_mode("throttled")
+            stages_ms["process_total_ms"] = (time.perf_counter() - frame_started) * 1000.0
+            stages_ms["total_frame_ms"] = stages_ms.get("capture_to_process_start_ms", 0.0) + stages_ms["process_total_ms"]
+            self._record_frame_timing(stages_ms)
             return
 
         # Copy frame so overlay drawing doesn't corrupt main app's buffer
+        display_started = time.perf_counter()
         display = self._build_display_frame(
             frame,
             mode=mode,
             use_internal_detector=use_internal_detector,
         )
         self._last_display_frame = display
+        stages_ms["display_build_ms"] = (time.perf_counter() - display_started) * 1000.0
 
         # Update video label (only if show_video_feed is enabled)
+        present_started = time.perf_counter()
         if self._show_video_feed:
             self._show_frame(display)
             self._mark_display_present(now, mode="full")
         else:
             self._sync_home_screen_visibility()
             self._mark_display_present(now, mode="hidden")
+        stages_ms["ui_present_ms"] = (time.perf_counter() - present_started) * 1000.0
+        stages_ms["process_total_ms"] = (time.perf_counter() - frame_started) * 1000.0
+        stages_ms["total_frame_ms"] = stages_ms.get("capture_to_process_start_ms", 0.0) + stages_ms["process_total_ms"]
+        self._record_frame_timing(stages_ms)
 
     def _voice_interaction_window_active(self, now: Optional[float] = None) -> bool:
         current = time.time() if now is None else float(now)
@@ -13355,12 +13673,22 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         include_scope_view: bool = True,
     ) -> np.ndarray:
         if self._overlay_display_mode == OVERLAY_MODE_NONE:
-            return frame.copy()
+            display = frame.copy()
+            self._draw_developer_performance_overlay(display)
+            self._frame_timing.record({"frame_copies": 1.0, "overlay_ms": 0.0})
+            return display
         if self._overlay_display_mode == OVERLAY_MODE_MINIMAL:
+            overlay_started = time.perf_counter()
             display = frame.copy()
             self._draw_minimal_overlay(display, include_target_boxes=include_target_boxes)
+            self._draw_developer_performance_overlay(display)
+            self._frame_timing.record({
+                "frame_copies": 1.0,
+                "overlay_ms": (time.perf_counter() - overlay_started) * 1000.0,
+            })
             return display
 
+        overlay_started = time.perf_counter()
         display = frame.copy()
         display = self.overlay.draw(display, self.engine, include_target_boxes=include_target_boxes)
         self._draw_face_identity_overlays(display, list(getattr(self, "_last_face_matches", []) or []))
@@ -13369,6 +13697,11 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             display = self.overlay.apply_scope_view(display, self.engine)
         self._draw_no_fire_mask_draft(display)
         self._draw_color_gate_status(display, mode, use_internal_detector)
+        self._draw_developer_performance_overlay(display)
+        self._frame_timing.record({
+            "frame_copies": 1.0,
+            "overlay_ms": (time.perf_counter() - overlay_started) * 1000.0,
+        })
         return display
 
     def set_enabled(self, enabled: bool) -> None:
@@ -15265,22 +15598,19 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             QTimer.singleShot(0, app.quit)
 
     def _request_full_application_close(self) -> None:
+        # Always go through the normal GUI close event path so voice shutdown,
+        # title-bar close, Alt+F4, and manual close all share one sequence.
         window = self.window()
-        if window is not None and window is not self and hasattr(window, "begin_graceful_shutdown"):
-            try:
-                window.begin_graceful_shutdown(on_complete=window.close)
-                return
-            except Exception:
-                pass
-        if self.isWindow():
-            try:
-                self.begin_graceful_shutdown(on_complete=self.close)
-                return
-            except Exception:
-                pass
-        app = QApplication.instance()
-        if app is not None:
-            QTimer.singleShot(0, app.quit)
+        close_target = window if (window is not None and hasattr(window, "close")) else self
+        try:
+            QTimer.singleShot(0, close_target.close)
+            return
+        except Exception:
+            pass
+        try:
+            QTimer.singleShot(0, self.close)
+        except Exception:
+            pass
 
     def _on_source_zoom_changed(self) -> None:
         cc = self.config.connection
@@ -15399,7 +15729,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             )
             self._btn_return_to_camera.setEnabled(can_return)
 
-    def _queue_local_frame(self, frame: np.ndarray) -> None:
+    def _queue_local_frame(self, frame: np.ndarray, *, capture_ms: float = 0.0) -> None:
         if self._local_source_kind in {"test_video", "test_image"}:
             self._test_media_last_frame = frame.copy()
         effective_frame = self._apply_source_zoom(frame)
@@ -15407,7 +15737,19 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if self._should_show_live_preview_fallback(now):
             self._present_live_preview_frame(effective_frame, now)
         with self._detector_frame_lock:
+            replaced_frame = self._detector_pending_frame
+            if replaced_frame is not None:
+                self._frame_timing.increment("dropped_frames")
+                self._frame_timing.increment("skipped_detections")
             self._detector_pending_frame = effective_frame
+        with self._frame_timing_pending_lock:
+            if replaced_frame is not None:
+                self._frame_timing_pending.pop(id(replaced_frame), None)
+            self._frame_timing_pending[id(effective_frame)] = {
+                "queued_at": time.perf_counter(),
+                "capture_ms": max(0.0, float(capture_ms)),
+            }
+        self._frame_timing.record({"detector_queue_depth": 1.0, "frame_copies": 1.0})
 
     def _read_next_test_video_frame(self, *, force_step: bool = False) -> Optional[np.ndarray]:
         if self._cap is None or not self._cap.isOpened():
@@ -15994,6 +16336,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         """Timer-driven: grab a frame from own camera, run detection, push to engine."""
         if self._closing:
             return
+        capture_started = time.perf_counter()
         frame: Optional[np.ndarray] = None
         if self._test_media_image_frame is not None:
             frame = self._test_media_image_frame.copy()
@@ -16051,9 +16394,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self._grab_fail_count = 0
         if self._handle_camera_frame_health(safe_frame):
             return
-        self._queue_local_frame(safe_frame)
+        self._queue_local_frame(safe_frame, capture_ms=(time.perf_counter() - capture_started) * 1000.0)
 
     def _detector_worker_loop(self) -> None:
+        self._detector_thread_native_id = int(threading.get_native_id())
         while not self._detector_worker_stop.is_set():
             frame = None
             generation = 0
@@ -16068,12 +16412,27 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             try:
                 self._detector_worker_busy = True
                 mode = self.config.detection_mode.detection_mode
+                detect_started = time.perf_counter()
+                with self._frame_timing_pending_lock:
+                    timing = self._frame_timing_pending.get(id(frame))
+                    if timing is not None:
+                        timing["detector_queue_wait_ms"] = (detect_started - timing["queued_at"]) * 1000.0
                 raw_boxes = self._detector.detect(frame, mode)
+                detect_finished = time.perf_counter()
+                detector_stages = self._detector.consume_profile_timings_ms()
+                with self._frame_timing_pending_lock:
+                    timing = self._frame_timing_pending.get(id(frame))
+                    if timing is not None:
+                        timing["detector_ms"] = (detect_finished - detect_started) * 1000.0
+                        timing["capture_to_detector_result_ms"] = (detect_finished - timing["queued_at"]) * 1000.0
+                        timing.update(detector_stages)
+                self._frame_timing.increment("detector_frames_processed")
                 if not self._closing:
                     self.detection_result_ready.emit(frame, raw_boxes, generation)
             except Exception as exc:
                 # Store error locally — do NOT write to self._comm from this thread.
                 self._last_detector_error = str(exc)
+                self._frame_timing.increment("detection_failures")
             finally:
                 self._detector_worker_busy = False
 
@@ -16088,6 +16447,244 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self.process_frame(frame, raw_boxes or [], _from_own_camera=True)
         except Exception as exc:
             self._log(f"Detection result error: {exc}")
+
+    def _take_detector_timing(self, frame: object) -> Dict[str, float]:
+        now = time.perf_counter()
+        with self._frame_timing_pending_lock:
+            timing = self._frame_timing_pending.pop(id(frame), None)
+            if len(self._frame_timing_pending) > 8:
+                oldest_keys = list(self._frame_timing_pending)[:-8]
+                for key in oldest_keys:
+                    self._frame_timing_pending.pop(key, None)
+        if timing is None:
+            return {}
+        values = {name: value for name, value in timing.items() if name != "queued_at"}
+        values["capture_to_process_start_ms"] = max(0.0, (now - float(timing["queued_at"])) * 1000.0)
+        return values
+
+    def _record_frame_timing(self, stages_ms: Dict[str, float]) -> None:
+        self._frame_timing.record(stages_ms)
+        now = time.monotonic()
+        if now - self._frame_timing_last_log_s < self._frame_timing_log_interval_s:
+            return
+        self._frame_timing_last_log_s = now
+        summary = self._frame_timing.snapshot()
+        sample_count = int(summary.get("sample_count", 0) or 0)
+        stage_summary = summary.get("stages_ms", {})
+        if sample_count < 30 or not isinstance(stage_summary, dict):
+            return
+        total = stage_summary.get("process_total_ms", {})
+        detector = stage_summary.get("detector_ms", {})
+        if not isinstance(total, dict):
+            return
+        total_p50 = float(total.get("p50", 0.0) or 0.0)
+        total_p95 = float(total.get("p95", 0.0) or 0.0)
+        detector_p50 = float(detector.get("p50", 0.0) or 0.0) if isinstance(detector, dict) else 0.0
+        detector_p95 = float(detector.get("p95", 0.0) or 0.0) if isinstance(detector, dict) else 0.0
+        fps = (1000.0 / total_p50) if total_p50 > 0.0 else 0.0
+        self._log(
+            f"[FRAME-TIMING] samples={sample_count} process p50={total_p50:.1f}ms "
+            f"p95={total_p95:.1f}ms fps_p50={fps:.1f} "
+            f"detector p50={detector_p50:.1f}ms p95={detector_p95:.1f}ms"
+        )
+
+    def get_frame_timing_snapshot(self) -> Dict[str, object]:
+        """Return bounded runtime stage metrics for performance validation."""
+        snapshot = self._frame_timing.snapshot()
+        now = time.perf_counter()
+        with self._detector_frame_lock:
+            detector_depth = 1 if self._detector_pending_frame is not None else 0
+        with self._frame_timing_pending_lock:
+            detector_age_ms = 0.0
+            if self._frame_timing_pending:
+                queued_at = min(float(item.get("queued_at", now)) for item in self._frame_timing_pending.values())
+                detector_age_ms = max(0.0, (now - queued_at) * 1000.0)
+        with self._pending_move_lock:
+            move_depth = len(self._pending_move_commands)
+            move_age_ms = max(0.0, (now - float(self._pending_move_commands[0][6])) * 1000.0) if move_depth else 0.0
+        command_depth = int(self._comm_task_queue.qsize())
+        command_age_ms = 0.0
+        try:
+            with self._comm_task_queue.mutex:
+                if self._comm_task_queue.queue:
+                    command_age_ms = max(0.0, (now - float(self._comm_task_queue.queue[0][3])) * 1000.0)
+        except Exception:
+            pass
+        snapshot["queue_state"] = {
+            "detector_depth": detector_depth,
+            "command_depth": command_depth,
+            "move_depth": move_depth,
+            "oldest_frame_age_ms": detector_age_ms,
+            "oldest_command_age_ms": max(command_age_ms, move_age_ms),
+        }
+        snapshot["process"] = {
+            "cpu_percent": self._perf_process_cpu_pct,
+            "rss_bytes": self._perf_rss_bytes,
+            "peak_rss_bytes": self._perf_peak_rss_bytes,
+            "thread_cpu_percent": dict(self._perf_thread_cpu_pct),
+        }
+        return snapshot
+
+    def set_developer_performance_overlay_enabled(self, enabled: bool) -> None:
+        self._developer_performance_overlay_enabled = bool(enabled)
+
+    def start_performance_baseline(self, scenario: str) -> None:
+        """Start a one-second profiler capture for a named benchmark scenario."""
+        self._performance_baseline_scenario = str(scenario or "unnamed").strip() or "unnamed"
+        self._performance_baseline_started_s = time.time()
+        self._performance_baseline_samples.clear()
+        self._performance_baseline_timer.start()
+        self._record_performance_baseline_sample()
+        self._log(f"Performance baseline started: {self._performance_baseline_scenario}")
+
+    def stop_performance_baseline(self) -> Optional[Path]:
+        """Persist the current benchmark capture and return its JSON report path."""
+        if not self._performance_baseline_scenario:
+            return None
+        self._performance_baseline_timer.stop()
+        finished_s = time.time()
+        scenario = self._performance_baseline_scenario
+        self._performance_baseline_scenario = ""
+        report = {
+            "scenario": scenario,
+            "started_at_epoch_s": self._performance_baseline_started_s,
+            "finished_at_epoch_s": finished_s,
+            "duration_s": max(0.0, finished_s - self._performance_baseline_started_s),
+            "final_snapshot": self.get_frame_timing_snapshot(),
+            "samples": list(self._performance_baseline_samples),
+        }
+        directory = RUNTIME_ROOT_PATH / "logs" / "performance_baselines"
+        directory.mkdir(parents=True, exist_ok=True)
+        safe_scenario = re.sub(r"[^A-Za-z0-9_-]+", "_", scenario).strip("_") or "unnamed"
+        report_path = directory / f"{time.strftime('%Y%m%d_%H%M%S')}_{safe_scenario}.json"
+        report_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+        self._log(f"Performance baseline saved: {report_path}")
+        return report_path
+
+    def _record_performance_baseline_sample(self) -> None:
+        if not self._performance_baseline_scenario:
+            return
+        self._performance_baseline_samples.append({
+            "timestamp_epoch_s": time.time(),
+            "snapshot": self.get_frame_timing_snapshot(),
+        })
+
+    def _refresh_developer_performance_overlay(self) -> None:
+        now_wall = time.perf_counter()
+        elapsed_wall = max(0.001, now_wall - self._perf_cpu_sample_wall_s)
+        elapsed_process = max(0.0, time.process_time() - self._perf_cpu_sample_process_s)
+        self._perf_process_cpu_pct = min(100.0, (elapsed_process / elapsed_wall) * 100.0)
+        self._perf_cpu_sample_wall_s = now_wall
+        self._perf_cpu_sample_process_s = time.process_time()
+        self._sample_thread_cpu_percentages(elapsed_wall)
+        snapshot = self.get_frame_timing_snapshot()
+        stages = snapshot.get("stages_ms", {})
+        counters = snapshot.get("counters", {})
+        queue_state = snapshot.get("queue_state", {})
+        if not isinstance(stages, dict) or not isinstance(counters, dict) or not isinstance(queue_state, dict):
+            return
+
+        def _p50(name: str) -> float:
+            values = stages.get(name, {})
+            return float(values.get("p50", 0.0) or 0.0) if isinstance(values, dict) else 0.0
+
+        total = _p50("process_total_ms")
+        fps = 1000.0 / total if total > 0.0 else 0.0
+        self._perf_rss_bytes, peak_rss_bytes = self._current_process_memory_bytes()
+        self._perf_peak_rss_bytes = max(self._perf_peak_rss_bytes, peak_rss_bytes)
+        rss_mb = self._perf_rss_bytes / (1024.0 * 1024.0)
+        self._developer_performance_lines = [
+            f"FPS {fps:.1f}  CPU {self._perf_process_cpu_pct:.0f}%  RAM {rss_mb:.0f} MB",
+            f"CPU main {self._perf_thread_cpu_pct.get('main', 0.0):.0f}%  detector {self._perf_thread_cpu_pct.get('detector', 0.0):.0f}%  comm {self._perf_thread_cpu_pct.get('comm', 0.0):.0f}%",
+            f"CAP {_p50('capture_ms'):.1f}  Q {_p50('detector_queue_wait_ms'):.1f}  DET {_p50('detector_ms'):.1f} ms",
+            f"TRACK {_p50('tracking_enrichment_ms'):.1f}  THREAT {_p50('threat_scoring_ms'):.1f}  ENG {_p50('engine_ms'):.1f} ms",
+            f"OVR {_p50('overlay_ms'):.1f}  QT {_p50('ui_present_ms'):.1f}  COMM {_p50('command_latency_ms'):.1f}  UI {total:.1f} ms",
+            f"CAP->DONE {_p50('total_frame_ms'):.1f} ms",
+            f"FQ {int(queue_state.get('detector_depth', 0))} CQ {int(queue_state.get('command_depth', 0))} AGE {float(queue_state.get('oldest_command_age_ms', 0.0)):.1f} ms",
+            f"DROP-F {int(counters.get('dropped_frames', 0))} DROP-C {int(counters.get('dropped_commands', 0))} CMD/s {float(snapshot.get('commands_per_second', 0.0)):.0f}",
+        ]
+
+    @staticmethod
+    def _current_process_memory_bytes() -> Tuple[int, int]:
+        if os.name != "nt":
+            return 0, 0
+        try:
+            class _ProcessMemoryCounters(ctypes.Structure):
+                _fields_ = [
+                    ("cb", ctypes.c_ulong),
+                    ("PageFaultCount", ctypes.c_ulong),
+                    ("PeakWorkingSetSize", ctypes.c_size_t),
+                    ("WorkingSetSize", ctypes.c_size_t),
+                ]
+            counters = _ProcessMemoryCounters()
+            counters.cb = ctypes.sizeof(counters)
+            ok = ctypes.windll.psapi.GetProcessMemoryInfo(
+                ctypes.windll.kernel32.GetCurrentProcess(),
+                ctypes.byref(counters),
+                counters.cb,
+            )
+            if not ok:
+                return 0, 0
+            return int(counters.WorkingSetSize), int(counters.PeakWorkingSetSize)
+        except Exception:
+            return 0, 0
+
+    def _sample_thread_cpu_percentages(self, elapsed_wall_s: float) -> None:
+        if self._perf_process is None or elapsed_wall_s <= 0.0:
+            return
+        thread_ids = {
+            "main": self._main_thread_native_id,
+            "detector": self._detector_thread_native_id,
+            "comm": self._comm_thread_native_id,
+        }
+        try:
+            cpu_by_thread = {
+                int(item.id): float(item.user_time) + float(item.system_time)
+                for item in self._perf_process.threads()
+            }
+        except Exception:
+            return
+        for name, thread_id in thread_ids.items():
+            if thread_id <= 0 or thread_id not in cpu_by_thread:
+                continue
+            current_cpu_s = cpu_by_thread[thread_id]
+            previous_cpu_s = self._perf_thread_cpu_last_s.get(thread_id)
+            self._perf_thread_cpu_last_s[thread_id] = current_cpu_s
+            if previous_cpu_s is not None:
+                self._perf_thread_cpu_pct[name] = max(
+                    0.0,
+                    ((current_cpu_s - previous_cpu_s) / elapsed_wall_s) * 100.0,
+                )
+
+    def format_frame_timing_report(self) -> str:
+        """Format the rolling timing window without recording or mutating metrics."""
+        snapshot = self.get_frame_timing_snapshot()
+        sample_count = int(snapshot.get("sample_count", 0) or 0)
+        stages = snapshot.get("stages_ms", {})
+        if not isinstance(stages, dict) or sample_count == 0:
+            return "Frame timing: no samples collected."
+
+        def _line(label: str, stage_name: str) -> str:
+            values = stages.get(stage_name, {})
+            if not isinstance(values, dict):
+                return f"{label}: n/a"
+            return (
+                f"{label}: p50={float(values.get('p50', 0.0) or 0.0):.1f}ms "
+                f"p95={float(values.get('p95', 0.0) or 0.0):.1f}ms "
+                f"p99={float(values.get('p99', 0.0) or 0.0):.1f}ms"
+            )
+
+        return "\n".join([
+            f"Frame timing (rolling {sample_count} samples)",
+            _line("tracking cycle", "process_total_ms"),
+            _line("|- detector worker", "detector_ms"),
+            _line("|- capture to detector result", "capture_to_detector_result_ms"),
+            _line("|- tracking and enrichment", "tracking_enrichment_ms"),
+            _line("|- engine update", "engine_ms"),
+            _line("|- diagnostics and sound", "diagnostics_sound_ms"),
+            _line("|- display build", "display_build_ms"),
+            _line("`- Qt presentation", "ui_present_ms"),
+        ])
 
     def _invalidate_detector_runtime(self) -> None:
         self._detector_runtime_generation += 1
@@ -17450,6 +18047,17 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         self.config.show_guard_crosshair = self._chk_guard_crosshair.isChecked()
         self.config.show_no_fire_masks = self._chk_show_no_fire_masks.isChecked()
         self.overlay.update_config(self.config)
+        self._force_next_display_refresh = True
+        self._push_config()
+        self._note_sound_settings_changed()
+
+    def _on_overlay_text_changed(self) -> None:
+        self.config.overlay_text_size_pct = int(self._spin_overlay_text_size.value())
+        self.config.overlay_text_opacity_pct = int(self._spin_overlay_text_opacity.value())
+        self.config.overlay_text_background_opacity_pct = int(self._spin_overlay_text_background.value())
+        self.overlay.update_config(self.config)
+        self._force_next_display_refresh = True
+        self._push_config()
         self._note_sound_settings_changed()
 
     def _normalize_overlay_display_mode(self, mode: str) -> str:
@@ -18286,7 +18894,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         )
         self.engine.update_runtime_pose(new_pan, new_tilt, measured=False)
         if self._host_controls_hardware():
-            self.manual_move_requested.emit(int(pan_dir * step), int(tilt_dir * step))
+            self.turret_move_requested.emit(float(new_pan), float(new_tilt))
         else:
             self._queue_move_command(new_pan, new_tilt, move_time_ms=move_time_ms, manual_override=True)
         self._remember_commanded_position(new_pan, new_tilt, move_time_ms=move_time_ms)
@@ -20648,10 +21256,6 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             self._last_face_person_boxes = []
             return list(objects), []
         person_boxes = list(self._face_person_boxes(objects) or [])
-        if not person_boxes:
-            self._last_face_match_eval_s = now
-            self._last_face_person_boxes = []
-            return list(objects), []
 
         refresh_interval_s = self._face_match_refresh_interval_s(frame)
         last_eval_s = float(getattr(self, "_last_face_match_eval_s", 0.0) or 0.0)
@@ -20673,7 +21277,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             matches = self._face_runtime.match_known_faces(
                 frame,
                 min_face_size_px=int(self.config.face_recognition.min_face_size_px),
-                person_boxes=person_boxes,
+                person_boxes=person_boxes or None,
                 threshold=float(self.config.face_recognition.recognition_threshold),
                 min_profile_embeddings=self._face_identity_required_samples(),
             )
@@ -20707,7 +21311,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         try:
             unknowns = self._face_runtime.detect_unknown_faces(
                 frame,
-                min_face_size_px=int(self.config.face_recognition.min_face_size_px),
+                min_face_size_px=max(32, int(self.config.face_recognition.min_face_size_px)),
                 person_boxes=person_boxes,
                 threshold=float(self.config.face_recognition.recognition_threshold),
                 min_profile_embeddings=self._face_identity_required_samples(),
@@ -20769,13 +21373,19 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         key = str(match.profile_id or match.name).strip().lower()
         if not key:
             return
-        if bool(getattr(self.config.sound, "known_face_hello_once_per_session", True)) and key in self._announced_identity_session_keys:
-            return
         last_at = float(self._last_announced_identity_at.get(key, 0.0) or 0.0)
         cooldown_s = float(getattr(self.config.sound, "name_announce_cooldown_s", 18.0) or 18.0)
         if now - last_at < cooldown_s:
+            if bool(getattr(self.config.sound, "known_face_hello_once_per_session", True)):
+                self._announced_identity_session_keys.add(key)
             return
+        if bool(getattr(self.config.sound, "known_face_hello_once_per_session", True)) and key in self._announced_identity_session_keys:
+            return
+
         self._last_announced_identity_at[key] = now
+        if bool(getattr(self.config.sound, "known_face_hello_once_per_session", True)):
+            self._announced_identity_session_keys.add(key)
+
         if bool(getattr(self.config.sound, "human_voice_enabled", False)):
             friendly = bool(match.friendly)
             lower_name = str(match.name or "").strip().lower()
@@ -20783,8 +21393,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 phrase = "Welcome back, Gino. Guard systems recognize you."
             else:
                 phrase = f"Hello {match.name}." if friendly else f"Recognized {match.name}."
-            if self._speak_human_phrase(phrase):
-                self._announced_identity_session_keys.add(key)
+            self._speak_human_phrase(phrase)
+
         if bool(getattr(self.config.sound, "robot_voice_enabled", False)) and not self._buzzer_suppressed_for_human_voice():
             self._sound_engine.note_identity_recognized(match.name, friendly=bool(match.friendly))
         self._log(f"Recognized face: {match.name} ({match.confidence:.2f})")
@@ -20818,8 +21428,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2, cv2.LINE_AA)
             label = f"{match.name} {match.confidence:.2f}"
             ty = max(18, y - 8)
-            cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.48, (0, 0, 0), 2, cv2.LINE_AA)
-            cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.48, color, 1, cv2.LINE_AA)
+            self.overlay._put_text(frame, label, (x, ty), 0.48, color)
 
     def _draw_face_registration_preview_overlays(self, frame: np.ndarray) -> None:
         for index, candidate in enumerate(self._face_registration_candidates, start=1):
@@ -20835,8 +21444,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             cv2.rectangle(frame, (x, y), (x + w, y + h), color, 1, cv2.LINE_AA)
             label = f"{name} {'TARGET' if is_target else 'NON-TARGET'}"
             ty = max(18, y + h + 18 if y < 22 else y - 6)
-            cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.42, (0, 0, 0), 2, cv2.LINE_AA)
-            cv2.putText(frame, label, (x, ty), cv2.FONT_HERSHEY_DUPLEX, 0.42, color, 1, cv2.LINE_AA)
+            self.overlay._put_text(frame, label, (x, ty), 0.42, color)
 
     def _manual_shortcut_definitions(self) -> List[Tuple[str, str, Callable[[], None], str]]:
         if not bool(getattr(self.config.shortcuts, "manual_controls_enabled", False)):
@@ -21831,7 +22439,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         normalized = re.sub(r"\s+", " ", normalized).strip()
         if not normalized:
             return -1
-        normalized = re.sub(r"\b(?:tab|settings|setting|page|panel|open|the)\b", " ", normalized)
+        normalized = re.sub(r"^(?:can you|could you|would you|please|show me|take me to|bring up|go to|open|display|can you please|could you please|would you please)\s+", "", normalized)
+        normalized = re.sub(r"\b(?:tab|settings|setting|page|panel|open|show|display|take me to|bring up|go to|the|me)\b", " ", normalized)
         normalized = re.sub(r"\s+", " ", normalized).strip()
         if not normalized:
             return -1
@@ -21844,6 +22453,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             "connect": "Connection",
             "profile": "Master Profiles",
             "profiles": "Master Profiles",
+            "preset": "Master Profiles",
+            "presets": "Master Profiles",
+            "master profile": "Master Profiles",
             "master profiles": "Master Profiles",
             "detection": "Detection Mode",
             "detection mode": "Detection Mode",
@@ -21855,6 +22467,13 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             "threat scoring": "Threat Scoring",
             "engagement": "Engagement",
             "guard": "Guard",
+            "hud": "Guard",
+            "hud settings": "Guard",
+            "hud overlay": "Guard",
+            "overlay": "Guard",
+            "overlay settings": "Guard",
+            "overlay text": "Guard",
+            "text overlay": "Guard",
             "theme": "Theme",
             "manual": "Manual Control",
             "manual control": "Manual Control",
@@ -21880,6 +22499,32 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                 return idx
         return -1
 
+    def _reveal_tab_section_for_query(self, query_text: str, *, tab_index: int) -> None:
+        normalized = re.sub(r"\s+", " ", str(query_text or "").strip().lower())
+        if not normalized:
+            return
+        should_reveal_hud = any(token in normalized for token in ("hud", "overlay", "opacity", "text background", "text size", "text opacity"))
+        if not should_reveal_hud:
+            return
+
+        target_widget = getattr(self, "_grp_hud_overlay", None)
+        if target_widget is None:
+            target_widget = getattr(self, "_chk_overlay", None)
+        if target_widget is None:
+            return
+
+        section_widget = getattr(self, "_section_hud_overlay", None)
+        if section_widget is not None and hasattr(section_widget, "set_collapsed"):
+            section_widget.set_collapsed(False)
+        if hasattr(target_widget, "setFocus"):
+            try:
+                tab_scroll = self._settings_tabs.widget(tab_index)
+                if isinstance(tab_scroll, QScrollArea):
+                    tab_scroll.ensureWidgetVisible(target_widget, 20, 24)
+                    QTimer.singleShot(0, lambda: target_widget.setFocus())
+            except Exception:
+                pass
+
     def _open_settings_tab_by_voice(self, query_text: str) -> Tuple[bool, str, str]:
         if not hasattr(self, "_settings_tabs") or self._settings_tabs is None:
             return False, "", "Settings tabs are unavailable."
@@ -21889,6 +22534,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if not self._settings_tabs.isTabEnabled(tab_index):
             return False, "", "That tab is currently unavailable."
         self._settings_tabs.setCurrentIndex(tab_index)
+        self._reveal_tab_section_for_query(query_text, tab_index=tab_index)
         tab_title = str(self._settings_tabs.tabToolTip(tab_index) or "").strip() or str((getattr(self, "_settings_tab_titles", []) or ["Tab"])[tab_index])
         spoken = self._voice_pick_phrase(
             "voice_open_tab",
@@ -26262,9 +26908,10 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             return
         # CHANGE WARNING: automatic motion-disable must not strand manual recovery controls.
         if not self._pan_tilt_motion_enabled and not manual_override:
+            self._frame_timing.increment("suppressed_commands")
             return
         move_time = int(self._get_manual_move_time_ms() if move_time_ms is None else move_time_ms)
-        queued_move = (float(pan), float(tilt), int(fire), move_time, bool(manual_override), bool(allow_rest_tilt))
+        queued_move = (float(pan), float(tilt), int(fire), move_time, bool(manual_override), bool(allow_rest_tilt), time.perf_counter())
         now = time.time()
         with self._pending_move_lock:
             if manual_override:
@@ -26277,30 +26924,42 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                     now + float(getattr(self, "_manual_position_hold_s", 1.25) or 1.25),
                 )
                 if self._pending_move_commands:
+                    prior_count = len(self._pending_move_commands)
                     self._pending_move_commands = deque(
                         cmd for cmd in self._pending_move_commands if bool(cmd[4])
                     )
+                    self._frame_timing.increment("dropped_commands", prior_count - len(self._pending_move_commands))
                 self._pending_move_commands.append(queued_move)
             else:
                 if now < self._manual_move_priority_until:
+                    self._frame_timing.increment("suppressed_commands")
                     return
                 if self._pending_move_commands and not bool(self._pending_move_commands[-1][4]):
+                    prior = self._pending_move_commands[-1]
+                    if prior[0:3] == queued_move[0:3]:
+                        self._frame_timing.increment("duplicate_commands")
+                    self._frame_timing.increment("move_coalesced")
                     self._pending_move_commands[-1] = queued_move
                 else:
                     self._pending_move_commands.append(queued_move)
 
             while len(self._pending_move_commands) > 6:
                 self._pending_move_commands.popleft()
+                self._frame_timing.increment("dropped_commands")
+            move_depth = len(self._pending_move_commands)
+        self._frame_timing.record({"move_queue_depth": float(move_depth)})
 
     def _queue_comm_task(self, task_name: str, *args, **kwargs) -> None:
         if self._closing:
             return
         try:
-            self._comm_task_queue.put_nowait((task_name, args, kwargs))
+            self._comm_task_queue.put_nowait((task_name, args, kwargs, time.perf_counter()))
+            self._frame_timing.record({"command_queue_depth": float(self._comm_task_queue.qsize())})
         except Exception as exc:
             self._report_runtime_warning(f"Comm task enqueue failed ({task_name})", exc)
 
     def _comm_worker_loop(self) -> None:
+        self._comm_thread_native_id = int(threading.get_native_id())
         while not self._comm_worker_stop.is_set():
             task = None
             try:
@@ -26315,7 +26974,8 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                     break
             else:
                 try:
-                    task_name, args, kwargs = task
+                    task_name, args, kwargs, queued_at = task
+                    self._frame_timing.record({"command_queue_wait_ms": (time.perf_counter() - queued_at) * 1000.0})
                     self._execute_comm_task(task_name, *args, **kwargs)
                 except Exception as exc:
                     self.command_result_ready.emit("task", False, str(exc))
@@ -26326,7 +26986,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                     move_command = self._pending_move_commands.popleft()
             if move_command is not None and not self._closing:
                 try:
-                    pan, tilt, fire, move_time, _manual_override, _allow_rest_tilt = move_command
+                    pan, tilt, fire, move_time, _manual_override, _allow_rest_tilt, queued_at = move_command
+                    send_started = time.perf_counter()
+                    queue_wait_ms = (send_started - queued_at) * 1000.0
                     if int(fire) != 0:
                         ok = self._comm.send_command(pan, tilt, fire=fire, move_time_ms=move_time, allow_rest_tilt=_allow_rest_tilt)
                         detail = getattr(self._comm, "_last_error", "") or ""
@@ -26339,6 +27001,15 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                             detail = getattr(self._comm, "_last_cmd", "") or ""
                         if not ok:
                             detail = getattr(self._comm, "_last_error", "") or "movement command failed"
+                    send_ms = (time.perf_counter() - send_started) * 1000.0
+                    correction_angle = abs(float(pan) - float(self.engine.current_pan)) + abs(float(tilt) - float(self.engine.current_tilt))
+                    self._frame_timing.record({
+                        "command_queue_wait_ms": queue_wait_ms,
+                        "command_send_ms": send_ms,
+                        "command_latency_ms": queue_wait_ms + send_ms,
+                        "correction_angle_deg": correction_angle,
+                    })
+                    self._frame_timing.record_command()
                     self.command_result_ready.emit(
                         "move",
                         bool(ok),
@@ -28745,6 +29416,27 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         normalized = re.sub(r"\s+", " ", " ".join(parts)).strip()
         return normalized
 
+    def _voice_profile_lookup_tokens(self, text: str) -> List[str]:
+        stop_words = {
+            "the",
+            "a",
+            "an",
+            "profile",
+            "preset",
+            "mode",
+            "to",
+            "as",
+            "now",
+            "please",
+            "right",
+            "for",
+        }
+        return [
+            token
+            for token in self._normalize_voice_profile_lookup_text(text).split(" ")
+            if token and token not in stop_words
+        ]
+
     def _extract_voice_master_profile_request(self, command: str) -> str:
         normalized = self._normalize_explicit_voice_command(command)
         if not normalized:
@@ -28763,60 +29455,110 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             candidate = re.sub(r"\s+", " ", str(match.group(1) or "").strip())
             candidate = re.sub(r"\b(?:please|now|right now|for now)\b", " ", candidate)
             candidate = re.sub(r"\b(?:profile|preset|mode)\b$", " ", candidate)
-            candidate = re.sub(r"\s+", " ", candidate).strip(" ,.:;!?")
+            candidate = re.sub(r"\s+", " ", candidate).strip(" \"' ,.:;!?")
             if candidate:
                 return candidate
         return ""
 
-    def _resolve_voice_master_profile_name(self, requested_name: str) -> str:
+    def _extract_voice_master_profile_short_request(self, command: str) -> str:
+        """Handle natural profile commands like 'switch to rat' or 'use guard dog'."""
+        normalized = self._normalize_explicit_voice_command(command)
+        if not normalized:
+            return ""
+
+        match = re.search(
+            r"^(?:change|set|switch(?:\s+to)?|use|load|apply|activate)\s+(?:the\s+)?(.+)$",
+            normalized,
+        )
+        if not match:
+            return ""
+
+        candidate = re.sub(r"\s+", " ", str(match.group(1) or "").strip())
+        candidate = re.sub(r"\b(?:please|now|right now|for now)\b", " ", candidate)
+        candidate = re.sub(r"\b(?:profile|preset|mode)\b$", " ", candidate)
+        candidate = re.sub(r"\s+", " ", candidate).strip(" \"' ,.:;!?")
+        if not candidate:
+            return ""
+
+        blocked_tokens = {
+            "tracking",
+            "smart sentry",
+            "sentry",
+            "app",
+            "camera",
+            "voice",
+            "safety",
+            "fire",
+            "brightness",
+            "confidence",
+            "diagnostics",
+            "status",
+            "overlay",
+        }
+        candidate_norm = self._normalize_voice_profile_lookup_text(candidate)
+        if any(token in candidate_norm for token in blocked_tokens):
+            return ""
+        return candidate
+
+    def _voice_master_profile_match_candidates(self, requested_name: str) -> List[Tuple[str, float, str]]:
         profiles = self._get_master_profiles()
         if not profiles:
-            return ""
+            return []
+
         requested_norm = self._normalize_voice_profile_lookup_text(requested_name)
-        if not requested_norm:
+        requested_tokens = set(self._voice_profile_lookup_tokens(requested_name))
+        if not requested_norm or not requested_tokens:
+            return []
+
+        candidates: List[Tuple[str, float, str]] = []
+        for profile_name, preset in profiles.items():
+            label = str(preset.get("label", profile_name) or profile_name).strip()
+            variants = (label, str(profile_name))
+            best_score = 0.0
+            for variant in variants:
+                variant_norm = self._normalize_voice_profile_lookup_text(variant)
+                if not variant_norm:
+                    continue
+
+                score = 0.0
+                if variant_norm == requested_norm:
+                    score = 1.0
+                elif variant_norm.startswith(requested_norm) or requested_norm.startswith(variant_norm):
+                    score = 0.93
+                elif requested_norm in variant_norm:
+                    score = 0.88
+                else:
+                    variant_tokens = set(self._voice_profile_lookup_tokens(variant_norm))
+                    if not variant_tokens:
+                        continue
+                    overlap = len(requested_tokens & variant_tokens)
+                    if overlap <= 0:
+                        continue
+                    req_coverage = overlap / float(max(1, len(requested_tokens)))
+                    variant_coverage = overlap / float(max(1, len(variant_tokens)))
+                    score = (0.62 * req_coverage) + (0.38 * variant_coverage)
+                    if requested_tokens.issubset(variant_tokens):
+                        score = max(score, 0.84)
+
+                if score > best_score:
+                    best_score = score
+
+            if best_score >= 0.60:
+                candidates.append((str(profile_name), float(best_score), label))
+
+        candidates.sort(key=lambda item: (-item[1], item[2].lower()))
+        return candidates
+
+    def _resolve_voice_master_profile_name(self, requested_name: str) -> str:
+        matches = self._voice_master_profile_match_candidates(requested_name)
+        if not matches:
             return ""
-
-        candidates: list[tuple[str, str]] = []
-        for key, preset in profiles.items():
-            label = str(preset.get("label", key) or key).strip()
-            candidates.append((str(key), label))
-
-        # Pass 1: exact normalized label match.
-        for profile_name, label in candidates:
-            if self._normalize_voice_profile_lookup_text(label) == requested_norm:
-                return profile_name
-            if self._normalize_voice_profile_lookup_text(profile_name) == requested_norm:
-                return profile_name
-
-        # Pass 2: containment in either direction.
-        for profile_name, label in candidates:
-            label_norm = self._normalize_voice_profile_lookup_text(label)
-            if not label_norm:
-                continue
-            if requested_norm in label_norm or label_norm in requested_norm:
-                return profile_name
-
-        # Pass 3: token-overlap fallback for near matches (e.g. "speed four" vs "speed 4").
-        requested_tokens = {tok for tok in requested_norm.split(" ") if tok}
-        if not requested_tokens:
-            return ""
-        best_name = ""
-        best_score = 0.0
-        for profile_name, label in candidates:
-            label_norm = self._normalize_voice_profile_lookup_text(label)
-            label_tokens = {tok for tok in label_norm.split(" ") if tok}
-            if not label_tokens:
-                continue
-            overlap = len(requested_tokens & label_tokens)
-            if overlap <= 0:
-                continue
-            score = overlap / float(max(len(requested_tokens), len(label_tokens)))
-            if score > best_score:
-                best_score = score
-                best_name = profile_name
-        if best_score >= 0.55:
-            return best_name
-        return ""
+        top_name, top_score, _ = matches[0]
+        if len(matches) > 1:
+            second_score = float(matches[1][1])
+            if top_score < 0.96 and (top_score - second_score) <= 0.08:
+                return ""
+        return str(top_name)
 
     def _voice_command_requests_connect_and_enable(self, command: str) -> bool:
         normalized = re.sub(r"\s+", " ", str(command or "").strip().lower())
@@ -29211,11 +29953,14 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             cmd_no_cue = re.sub(r"\bvoicwe\b", "voice", cmd_no_cue)
 
             open_tab_match = (
-                re.search(r"\bopen\s+(?:the\s+)?(.+?)\s+tab\b", cmd_no_cue)
-                or re.search(r"\bopen\s+tab\s+(.+)$", cmd_no_cue)
+                re.search(r"\b(?:open|show|display|bring up|go to|take me to)\s+(?:the\s+)?(?:can you\s+|could you\s+|would you\s+)?(?:me\s+)?(.+?)\s+tab\b", cmd_no_cue)
+                or re.search(r"\b(?:open|show|display|bring up|go to|take me to)\s+(?:the\s+)?(?:can you\s+|could you\s+|would you\s+)?(?:me\s+)?(.+)$", cmd_no_cue)
+                or re.search(r"\b(?:can you|could you|would you)\s+(?:show|display|open|bring up|go to|take me to)\s+(?:me\s+)?(?:the\s+)?(.+?)\s+tab\b", cmd_no_cue)
             )
             if not handled and open_tab_match:
                 tab_query = str(open_tab_match.group(1) or "").strip()
+                if not tab_query:
+                    tab_query = "presets"
                 ok_open, open_spoken, open_summary = self._open_settings_tab_by_voice(tab_query)
                 handled = True
                 acknowledge_event = ""
@@ -29603,18 +30348,47 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             # Profile switch: support broad phrasing like
             # "change the profile to <name>" / "set profile to <name>" /
             # "switch to <name> profile" / "load profile <name>".
-            requested_profile = self._extract_voice_master_profile_request(cmd)
+            explicit_profile_request = self._extract_voice_master_profile_request(cmd)
+            implicit_profile_request = ""
+            if not explicit_profile_request:
+                implicit_profile_request = self._extract_voice_master_profile_short_request(cmd)
+            requested_profile = explicit_profile_request or implicit_profile_request
             if not handled and requested_profile:
-                resolved_profile = self._resolve_voice_master_profile_name(requested_profile)
+                profile_matches = self._voice_master_profile_match_candidates(requested_profile)
                 all_profiles = self._get_master_profiles()
-                if resolved_profile and resolved_profile in all_profiles:
-                    resolved_label = str(all_profiles[resolved_profile].get("label", requested_profile) or requested_profile).strip()
-                    self._apply_master_profile(resolved_profile)
-                    handled = True
-                    acknowledge_event = "acknowledged"
-                    spoken_confirmation = f"Loaded {resolved_label} profile."
-                    handled_summary = f"Profile {resolved_label} loaded."
-                elif all_profiles:
+                explicit_request = bool(explicit_profile_request)
+                if profile_matches:
+                    top_name, top_score, _ = profile_matches[0]
+                    is_ambiguous = False
+                    if len(profile_matches) > 1:
+                        second_score = float(profile_matches[1][1])
+                        if top_score < 0.96 and (top_score - second_score) <= 0.08:
+                            is_ambiguous = True
+
+                    if is_ambiguous:
+                        option_labels = [
+                            str(all_profiles[name].get("label", name) or name).strip()
+                            for name, _score, _label in profile_matches[:5]
+                            if name in all_profiles
+                        ]
+                        option_text = ", ".join(option_labels)
+                        spoken_confirmation = (
+                            f"I found {len(profile_matches)} matching profiles for '{requested_profile}'. "
+                            f"Which one should I load? {option_text}."
+                            if option_text
+                            else f"I found multiple matching profiles for '{requested_profile}'. Which one should I load?"
+                        )
+                        handled = True
+                        acknowledge_event = ""
+                        handled_summary = f"Profile selection ambiguous for {requested_profile}."
+                    elif top_name in all_profiles:
+                        resolved_label = str(all_profiles[top_name].get("label", requested_profile) or requested_profile).strip()
+                        self._apply_master_profile(top_name)
+                        handled = True
+                        acknowledge_event = "acknowledged"
+                        spoken_confirmation = f"Loaded {resolved_label} profile."
+                        handled_summary = f"Profile {resolved_label} loaded."
+                elif explicit_request and all_profiles:
                     sample_labels = [
                         str(preset.get("label", name) or name).strip()
                         for name, preset in list(all_profiles.items())[:3]
@@ -29622,9 +30396,9 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
                     ]
                     hint_text = ", ".join(sample_labels)
                     if hint_text:
-                        spoken_confirmation = f"I could not find a matching profile for {requested_profile}. Try one of these: {hint_text}."
+                        spoken_confirmation = f"I couldn't find a profile named '{requested_profile}'. Try one of these: {hint_text}."
                     else:
-                        spoken_confirmation = f"I could not find a matching profile for {requested_profile}."
+                        spoken_confirmation = f"I couldn't find a profile named '{requested_profile}'."
                     handled = True
                     acknowledge_event = ""
                     handled_summary = f"Profile not found: {requested_profile}."
@@ -31091,8 +31865,33 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
             qimg = QImage(rgb.data, w, h, bytes_per_line, QImage.Format_RGB888).copy()
             pixmap = QPixmap.fromImage(qimg)
             self._video_label.set_frame(pixmap, w, h)
+            self._frame_timing.record({"qimage_allocations": 1.0, "pixmap_allocations": 1.0})
         except Exception as e:
             print(f"[SENTRY_V2] _show_frame error: {e}")
+
+    def _draw_developer_performance_overlay(self, frame: np.ndarray) -> None:
+        if (
+            not bool(getattr(self.config, "show_overlay", True))
+            or not self._developer_performance_overlay_enabled
+            or not self._developer_performance_lines
+        ):
+            return
+        line_height = 17
+        width = min(frame.shape[1] - 12, 470)
+        height = 10 + line_height * len(self._developer_performance_lines)
+        background_opacity = max(
+            0.0,
+            min(
+                100.0,
+                float(getattr(self.config, "overlay_text_background_opacity_pct", 0.0) or 0.0),
+            ),
+        ) / 100.0
+        if background_opacity > 0.0:
+            panel = frame.copy()
+            cv2.rectangle(panel, (6, 6), (6 + width, 6 + height), (12, 18, 18), -1)
+            cv2.addWeighted(panel, background_opacity, frame, 1.0 - background_opacity, 0.0, frame)
+        for index, text in enumerate(self._developer_performance_lines):
+            self.overlay._put_text(frame, text, (12, 21 + index * line_height), 0.43, (170, 255, 190))
 
     def _sync_home_screen_visibility(self, *, force_home: bool = False, force_video: bool = False) -> None:
         stack = getattr(self, "_video_stack", None)
@@ -31140,15 +31939,12 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
         if len(points) >= 3:
             cv2.line(frame, points[-1], points[0], (0, 128, 220), 1, cv2.LINE_AA)
         anchor = points[-1]
-        cv2.putText(
+        self.overlay._put_text(
             frame,
             f"MASK DRAFT: {len(points)} pts",
             (int(anchor[0]) + 8, int(anchor[1]) - 8),
-            cv2.FONT_HERSHEY_SIMPLEX,
             0.45,
             (0, 196, 255),
-            1,
-            cv2.LINE_AA,
         )
 
     def _draw_color_gate_status(self, frame: np.ndarray, mode: int, use_internal_detector: bool) -> None:
@@ -31183,10 +31979,7 @@ QWidget#sentryV2Root QLabel#qaTuneLabel {{
 
         x = 10
         y = frame.shape[0] - 12
-        font = cv2.FONT_HERSHEY_DUPLEX
-        font_scale = 0.38
-        cv2.putText(frame, text, (x + 1, y + 1), font, font_scale, (0, 0, 0), 2, cv2.LINE_AA)
-        cv2.putText(frame, text, (x, y),           font, font_scale, color,    1, cv2.LINE_AA)
+        self.overlay._put_text(frame, text, (x, y), 0.38, color)
 
     def _refresh_status(self) -> None:
         """Periodic status label update."""

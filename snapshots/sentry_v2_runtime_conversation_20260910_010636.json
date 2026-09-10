@@ -1,0 +1,4208 @@
+{
+  "generated_at_local": "2026-09-10 01:06:36",
+  "generated_at_epoch_s": 1788973596.5527809,
+  "entry_count": 249,
+  "counts_by_role": {
+    "assistant": 3,
+    "system": 147,
+    "operator": 99
+  },
+  "counts_by_event_type": {
+    "assistant_prompt": 1,
+    "assistant_analysis": 1,
+    "voice_status": 147,
+    "voice_transcript_partial": 95,
+    "voice_transcript_final": 4,
+    "spoken_confirmation": 1
+  },
+  "counts_by_channel": {
+    "text": 2,
+    "voice": 247
+  },
+  "voice_transcript_summary": {
+    "partial_count": 95,
+    "final_count": 4,
+    "voice_command_count": 0,
+    "typed_request_count": 0
+  },
+  "latest_operator_final_transcript": "yeah be dead",
+  "latest_operator_request": "yeah be dead",
+  "latest_assistant_message": "Smart Sentry is ready.",
+  "analysis_hints": [
+    "Partial transcript fragments are much more frequent than final transcripts. Review wake-window timing, VAD gating, or microphone noise cleanup."
+  ],
+  "recent_turns": [
+    {
+      "id": 238,
+      "timestamp_epoch_s": 1788970904.9084837,
+      "timestamp_local": "2026-09-10 00:21:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970904.9084837,
+        "source": "vosk",
+        "rms": 541,
+        "updated_at": 1788970903.3629797
+      }
+    },
+    {
+      "id": 239,
+      "timestamp_epoch_s": 1788970904.9084837,
+      "timestamp_local": "2026-09-10 00:21:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970904.9084837,
+        "source": "vosk",
+        "rms": 1159,
+        "updated_at": 1788970904.9084837
+      }
+    },
+    {
+      "id": 240,
+      "timestamp_epoch_s": 1788970905.089776,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "yeah",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970905.089776,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970905.0297227
+      }
+    },
+    {
+      "id": 241,
+      "timestamp_epoch_s": 1788970905.0907793,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970905.0907793,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970905.0297227
+      }
+    },
+    {
+      "id": 242,
+      "timestamp_epoch_s": 1788970905.1815886,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "yeah began",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970905.1815886,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970905.0297227
+      }
+    },
+    {
+      "id": 243,
+      "timestamp_epoch_s": 1788970905.369466,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970905.369466,
+        "source": "vosk",
+        "rms": 550,
+        "updated_at": 1788970905.369466
+      }
+    },
+    {
+      "id": 244,
+      "timestamp_epoch_s": 1788970905.435803,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "yeah be dead",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970905.435803,
+        "source": "vosk",
+        "rms": 550,
+        "updated_at": 1788970905.369466
+      }
+    },
+    {
+      "id": 245,
+      "timestamp_epoch_s": 1788970905.6126268,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970905.6126268,
+        "source": "vosk",
+        "rms": 1155,
+        "updated_at": 1788970905.6126268
+      }
+    },
+    {
+      "id": 246,
+      "timestamp_epoch_s": 1788970905.8631465,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970905.8631465,
+        "source": "vosk",
+        "rms": 965,
+        "updated_at": 1788970905.8631465
+      }
+    },
+    {
+      "id": 247,
+      "timestamp_epoch_s": 1788970906.4142897,
+      "timestamp_local": "2026-09-10 00:21:46",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "yeah be dead",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1788970906.4142897,
+        "source": "final",
+        "rms": 965,
+        "updated_at": 1788970905.8631465
+      }
+    },
+    {
+      "id": 248,
+      "timestamp_epoch_s": 1788970906.5835578,
+      "timestamp_local": "2026-09-10 00:21:46",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970906.5835578,
+        "source": "vosk",
+        "rms": 965,
+        "updated_at": 1788970905.8631465
+      }
+    },
+    {
+      "id": 249,
+      "timestamp_epoch_s": 1788970906.5835578,
+      "timestamp_local": "2026-09-10 00:21:46",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970906.5835578,
+        "source": "vosk",
+        "rms": 888,
+        "updated_at": 1788970906.5835578
+      }
+    }
+  ],
+  "entries": [
+    {
+      "id": 1,
+      "timestamp_epoch_s": 1788970851.748931,
+      "timestamp_local": "2026-09-10 00:20:51",
+      "role": "assistant",
+      "event_type": "assistant_prompt",
+      "channel": "text",
+      "text": "Local AI assistant ready. It will use Ollama when available and fall back to deterministic runtime guidance if the model is offline.",
+      "metadata": {
+        "task_kind": "prompt",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 2,
+      "timestamp_epoch_s": 1788970851.7524364,
+      "timestamp_local": "2026-09-10 00:20:51",
+      "role": "assistant",
+      "event_type": "assistant_analysis",
+      "channel": "text",
+      "text": "Runtime Analyst ready. Use this tab for current-state analysis and recommendation drafts.",
+      "metadata": {
+        "task_kind": "analysis",
+        "speak_requested": false
+      }
+    },
+    {
+      "id": 3,
+      "timestamp_epoch_s": 1788970855.3554862,
+      "timestamp_local": "2026-09-10 00:20:55",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "listening",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970855.3554862,
+        "source": "vosk"
+      }
+    },
+    {
+      "id": 4,
+      "timestamp_epoch_s": 1788970856.3627176,
+      "timestamp_local": "2026-09-10 00:20:56",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970856.3627176,
+        "source": "vosk",
+        "rms": 513,
+        "updated_at": 1788970856.3627176
+      }
+    },
+    {
+      "id": 5,
+      "timestamp_epoch_s": 1788970857.5175397,
+      "timestamp_local": "2026-09-10 00:20:57",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970857.5175397,
+        "source": "vosk",
+        "rms": 320,
+        "updated_at": 1788970857.361832
+      }
+    },
+    {
+      "id": 6,
+      "timestamp_epoch_s": 1788970857.6118317,
+      "timestamp_local": "2026-09-10 00:20:57",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970857.6118317,
+        "source": "vosk",
+        "rms": 321,
+        "updated_at": 1788970857.6118317
+      }
+    },
+    {
+      "id": 7,
+      "timestamp_epoch_s": 1788970857.7611332,
+      "timestamp_local": "2026-09-10 00:20:57",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to an",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970857.7611332,
+        "source": "vosk",
+        "rms": 321,
+        "updated_at": 1788970857.6118317
+      }
+    },
+    {
+      "id": 8,
+      "timestamp_epoch_s": 1788970857.8614619,
+      "timestamp_local": "2026-09-10 00:20:57",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970857.8614619,
+        "source": "vosk",
+        "rms": 319,
+        "updated_at": 1788970857.8614619
+      }
+    },
+    {
+      "id": 9,
+      "timestamp_epoch_s": 1788970857.9951334,
+      "timestamp_local": "2026-09-10 00:20:57",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970857.9951334,
+        "source": "vosk",
+        "rms": 319,
+        "updated_at": 1788970857.8614619
+      }
+    },
+    {
+      "id": 10,
+      "timestamp_epoch_s": 1788970858.6127152,
+      "timestamp_local": "2026-09-10 00:20:58",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970858.6127152,
+        "source": "vosk",
+        "rms": 762,
+        "updated_at": 1788970858.6127152
+      }
+    },
+    {
+      "id": 11,
+      "timestamp_epoch_s": 1788970858.6534941,
+      "timestamp_local": "2026-09-10 00:20:58",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970858.6534941,
+        "source": "vosk",
+        "rms": 762,
+        "updated_at": 1788970858.6127152
+      }
+    },
+    {
+      "id": 12,
+      "timestamp_epoch_s": 1788970858.8610456,
+      "timestamp_local": "2026-09-10 00:20:58",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970858.8610456,
+        "source": "vosk",
+        "rms": 828,
+        "updated_at": 1788970858.8610456
+      }
+    },
+    {
+      "id": 13,
+      "timestamp_epoch_s": 1788970859.112317,
+      "timestamp_local": "2026-09-10 00:20:59",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970859.112317,
+        "source": "vosk",
+        "rms": 890,
+        "updated_at": 1788970859.1118
+      }
+    },
+    {
+      "id": 14,
+      "timestamp_epoch_s": 1788970859.361615,
+      "timestamp_local": "2026-09-10 00:20:59",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970859.361615,
+        "source": "vosk",
+        "rms": 186,
+        "updated_at": 1788970859.361615
+      }
+    },
+    {
+      "id": 15,
+      "timestamp_epoch_s": 1788970859.389781,
+      "timestamp_local": "2026-09-10 00:20:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed yeah",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970859.389781,
+        "source": "vosk",
+        "rms": 186,
+        "updated_at": 1788970859.361615
+      }
+    },
+    {
+      "id": 16,
+      "timestamp_epoch_s": 1788970859.6137419,
+      "timestamp_local": "2026-09-10 00:20:59",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970859.6137419,
+        "source": "vosk",
+        "rms": 720,
+        "updated_at": 1788970859.6137419
+      }
+    },
+    {
+      "id": 17,
+      "timestamp_epoch_s": 1788970859.6312153,
+      "timestamp_local": "2026-09-10 00:20:59",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed yeah yeah",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970859.6312153,
+        "source": "vosk",
+        "rms": 720,
+        "updated_at": 1788970859.6137419
+      }
+    },
+    {
+      "id": 18,
+      "timestamp_epoch_s": 1788970859.862435,
+      "timestamp_local": "2026-09-10 00:20:59",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970859.862435,
+        "source": "vosk",
+        "rms": 558,
+        "updated_at": 1788970859.862435
+      }
+    },
+    {
+      "id": 19,
+      "timestamp_epoch_s": 1788970860.3622274,
+      "timestamp_local": "2026-09-10 00:21:00",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970860.3622274,
+        "source": "vosk",
+        "rms": 312,
+        "updated_at": 1788970860.3622274
+      }
+    },
+    {
+      "id": 20,
+      "timestamp_epoch_s": 1788970860.4978163,
+      "timestamp_local": "2026-09-10 00:21:00",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed yeah yeah you're right i",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970860.4978163,
+        "source": "vosk",
+        "rms": 312,
+        "updated_at": 1788970860.3622274
+      }
+    },
+    {
+      "id": 21,
+      "timestamp_epoch_s": 1788970860.6125314,
+      "timestamp_local": "2026-09-10 00:21:00",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970860.6125314,
+        "source": "vosk",
+        "rms": 749,
+        "updated_at": 1788970860.6120098
+      }
+    },
+    {
+      "id": 22,
+      "timestamp_epoch_s": 1788970860.8618205,
+      "timestamp_local": "2026-09-10 00:21:00",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970860.8618205,
+        "source": "vosk",
+        "rms": 825,
+        "updated_at": 1788970860.8618205
+      }
+    },
+    {
+      "id": 23,
+      "timestamp_epoch_s": 1788970860.9970977,
+      "timestamp_local": "2026-09-10 00:21:00",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed yeah yeah you're right i have",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970860.9970977,
+        "source": "vosk",
+        "rms": 825,
+        "updated_at": 1788970860.8618205
+      }
+    },
+    {
+      "id": 24,
+      "timestamp_epoch_s": 1788970861.1112216,
+      "timestamp_local": "2026-09-10 00:21:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970861.1112216,
+        "source": "vosk",
+        "rms": 649,
+        "updated_at": 1788970861.1112216
+      }
+    },
+    {
+      "id": 25,
+      "timestamp_epoch_s": 1788970861.2000384,
+      "timestamp_local": "2026-09-10 00:21:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed yeah yeah you're right i'm not",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970861.2000384,
+        "source": "vosk",
+        "rms": 649,
+        "updated_at": 1788970861.1112216
+      }
+    },
+    {
+      "id": 26,
+      "timestamp_epoch_s": 1788970861.3611517,
+      "timestamp_local": "2026-09-10 00:21:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970861.3611517,
+        "source": "vosk",
+        "rms": 276,
+        "updated_at": 1788970861.3611517
+      }
+    },
+    {
+      "id": 27,
+      "timestamp_epoch_s": 1788970861.4502525,
+      "timestamp_local": "2026-09-10 00:21:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed yeah yeah you're right i have not been",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970861.4502525,
+        "source": "vosk",
+        "rms": 276,
+        "updated_at": 1788970861.3611517
+      }
+    },
+    {
+      "id": 28,
+      "timestamp_epoch_s": 1788970861.6116896,
+      "timestamp_local": "2026-09-10 00:21:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970861.6116896,
+        "source": "vosk",
+        "rms": 263,
+        "updated_at": 1788970861.6116896
+      }
+    },
+    {
+      "id": 29,
+      "timestamp_epoch_s": 1788970861.6866224,
+      "timestamp_local": "2026-09-10 00:21:01",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed yeah yeah you're right i'm not putting",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970861.6866224,
+        "source": "vosk",
+        "rms": 263,
+        "updated_at": 1788970861.6116896
+      }
+    },
+    {
+      "id": 30,
+      "timestamp_epoch_s": 1788970861.862888,
+      "timestamp_local": "2026-09-10 00:21:01",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970861.862888,
+        "source": "vosk",
+        "rms": 771,
+        "updated_at": 1788970861.861379
+      }
+    },
+    {
+      "id": 31,
+      "timestamp_epoch_s": 1788970862.1134264,
+      "timestamp_local": "2026-09-10 00:21:02",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970862.1134264,
+        "source": "vosk",
+        "rms": 564,
+        "updated_at": 1788970862.1134264
+      }
+    },
+    {
+      "id": 32,
+      "timestamp_epoch_s": 1788970862.213871,
+      "timestamp_local": "2026-09-10 00:21:02",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed yeah yeah you're right i have not been a regular",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970862.213871,
+        "source": "vosk",
+        "rms": 564,
+        "updated_at": 1788970862.1134264
+      }
+    },
+    {
+      "id": 33,
+      "timestamp_epoch_s": 1788970862.3627074,
+      "timestamp_local": "2026-09-10 00:21:02",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970862.3627074,
+        "source": "vosk",
+        "rms": 648,
+        "updated_at": 1788970862.3627074
+      }
+    },
+    {
+      "id": 34,
+      "timestamp_epoch_s": 1788970862.6131175,
+      "timestamp_local": "2026-09-10 00:21:02",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970862.6131175,
+        "source": "vosk",
+        "rms": 552,
+        "updated_at": 1788970862.6126003
+      }
+    },
+    {
+      "id": 35,
+      "timestamp_epoch_s": 1788970862.7391462,
+      "timestamp_local": "2026-09-10 00:21:02",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed yeah yeah you're right i have not been a regulated",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970862.7391462,
+        "source": "vosk",
+        "rms": 552,
+        "updated_at": 1788970862.6126003
+      }
+    },
+    {
+      "id": 36,
+      "timestamp_epoch_s": 1788970862.862269,
+      "timestamp_local": "2026-09-10 00:21:02",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970862.862269,
+        "source": "vosk",
+        "rms": 369,
+        "updated_at": 1788970862.862269
+      }
+    },
+    {
+      "id": 37,
+      "timestamp_epoch_s": 1788970862.976744,
+      "timestamp_local": "2026-09-10 00:21:02",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed yeah yeah you're right i have not been a regular",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970862.976744,
+        "source": "vosk",
+        "rms": 369,
+        "updated_at": 1788970862.862269
+      }
+    },
+    {
+      "id": 38,
+      "timestamp_epoch_s": 1788970863.112475,
+      "timestamp_local": "2026-09-10 00:21:03",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970863.112475,
+        "source": "vosk",
+        "rms": 335,
+        "updated_at": 1788970863.112475
+      }
+    },
+    {
+      "id": 39,
+      "timestamp_epoch_s": 1788970863.1699798,
+      "timestamp_local": "2026-09-10 00:21:03",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "responding to any expressed yeah yeah you're right i have not been a radioactive isotope",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970863.1699798,
+        "source": "vosk",
+        "rms": 335,
+        "updated_at": 1788970863.112475
+      }
+    },
+    {
+      "id": 40,
+      "timestamp_epoch_s": 1788970863.362078,
+      "timestamp_local": "2026-09-10 00:21:03",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970863.362078,
+        "source": "vosk",
+        "rms": 241,
+        "updated_at": 1788970863.362078
+      }
+    },
+    {
+      "id": 41,
+      "timestamp_epoch_s": 1788970863.8622851,
+      "timestamp_local": "2026-09-10 00:21:03",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970863.8622851,
+        "source": "vosk",
+        "rms": 241,
+        "updated_at": 1788970863.362078
+      }
+    },
+    {
+      "id": 42,
+      "timestamp_epoch_s": 1788970864.1122034,
+      "timestamp_local": "2026-09-10 00:21:04",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970864.1122034,
+        "source": "vosk",
+        "rms": 289,
+        "updated_at": 1788970864.1122034
+      }
+    },
+    {
+      "id": 43,
+      "timestamp_epoch_s": 1788970864.361429,
+      "timestamp_local": "2026-09-10 00:21:04",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970864.361429,
+        "source": "vosk",
+        "rms": 912,
+        "updated_at": 1788970864.361429
+      }
+    },
+    {
+      "id": 44,
+      "timestamp_epoch_s": 1788970864.8038173,
+      "timestamp_local": "2026-09-10 00:21:04",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "responding to any expressed yeah yeah you re right i have not a right attitude",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1788970864.8038173,
+        "source": "final",
+        "rms": 912,
+        "updated_at": 1788970864.361429
+      }
+    },
+    {
+      "id": 45,
+      "timestamp_epoch_s": 1788970864.924031,
+      "timestamp_local": "2026-09-10 00:21:04",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970864.924031,
+        "source": "vosk",
+        "rms": 912,
+        "updated_at": 1788970864.361429
+      }
+    },
+    {
+      "id": 46,
+      "timestamp_epoch_s": 1788970864.924031,
+      "timestamp_local": "2026-09-10 00:21:04",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970864.924031,
+        "source": "vosk",
+        "rms": 460,
+        "updated_at": 1788970864.924031
+      }
+    },
+    {
+      "id": 47,
+      "timestamp_epoch_s": 1788970865.1209497,
+      "timestamp_local": "2026-09-10 00:21:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970865.1209497,
+        "source": "vosk",
+        "rms": 310,
+        "updated_at": 1788970865.1118438
+      }
+    },
+    {
+      "id": 48,
+      "timestamp_epoch_s": 1788970865.3625395,
+      "timestamp_local": "2026-09-10 00:21:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970865.3625395,
+        "source": "vosk",
+        "rms": 916,
+        "updated_at": 1788970865.3625395
+      }
+    },
+    {
+      "id": 49,
+      "timestamp_epoch_s": 1788970865.388896,
+      "timestamp_local": "2026-09-10 00:21:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay in",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970865.388896,
+        "source": "vosk",
+        "rms": 916,
+        "updated_at": 1788970865.3625395
+      }
+    },
+    {
+      "id": 50,
+      "timestamp_epoch_s": 1788970865.6125886,
+      "timestamp_local": "2026-09-10 00:21:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970865.6125886,
+        "source": "vosk",
+        "rms": 376,
+        "updated_at": 1788970865.6125886
+      }
+    },
+    {
+      "id": 51,
+      "timestamp_epoch_s": 1788970865.6529367,
+      "timestamp_local": "2026-09-10 00:21:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970865.6529367,
+        "source": "vosk",
+        "rms": 376,
+        "updated_at": 1788970865.6125886
+      }
+    },
+    {
+      "id": 52,
+      "timestamp_epoch_s": 1788970865.8610618,
+      "timestamp_local": "2026-09-10 00:21:05",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970865.8610618,
+        "source": "vosk",
+        "rms": 208,
+        "updated_at": 1788970865.8610618
+      }
+    },
+    {
+      "id": 53,
+      "timestamp_epoch_s": 1788970865.95954,
+      "timestamp_local": "2026-09-10 00:21:05",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay in a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970865.95954,
+        "source": "vosk",
+        "rms": 208,
+        "updated_at": 1788970865.8610618
+      }
+    },
+    {
+      "id": 54,
+      "timestamp_epoch_s": 1788970866.1119595,
+      "timestamp_local": "2026-09-10 00:21:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970866.1119595,
+        "source": "vosk",
+        "rms": 573,
+        "updated_at": 1788970866.1119595
+      }
+    },
+    {
+      "id": 55,
+      "timestamp_epoch_s": 1788970866.1652846,
+      "timestamp_local": "2026-09-10 00:21:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay adding",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970866.1652846,
+        "source": "vosk",
+        "rms": 573,
+        "updated_at": 1788970866.1119595
+      }
+    },
+    {
+      "id": 56,
+      "timestamp_epoch_s": 1788970866.6124644,
+      "timestamp_local": "2026-09-10 00:21:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970866.6124644,
+        "source": "vosk",
+        "rms": 668,
+        "updated_at": 1788970866.6124644
+      }
+    },
+    {
+      "id": 57,
+      "timestamp_epoch_s": 1788970892.0655127,
+      "timestamp_local": "2026-09-10 00:21:32",
+      "role": "assistant",
+      "event_type": "spoken_confirmation",
+      "channel": "voice",
+      "text": "Smart Sentry is ready.",
+      "metadata": {
+        "interrupt": true,
+        "assistant_output": false,
+        "spoken": true
+      }
+    },
+    {
+      "id": 58,
+      "timestamp_epoch_s": 1788970866.680707,
+      "timestamp_local": "2026-09-10 00:21:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been through",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970866.680707,
+        "source": "vosk",
+        "rms": 668,
+        "updated_at": 1788970866.6124644
+      }
+    },
+    {
+      "id": 59,
+      "timestamp_epoch_s": 1788970866.8622894,
+      "timestamp_local": "2026-09-10 00:21:06",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970866.8622894,
+        "source": "vosk",
+        "rms": 412,
+        "updated_at": 1788970866.8622894
+      }
+    },
+    {
+      "id": 60,
+      "timestamp_epoch_s": 1788970866.977087,
+      "timestamp_local": "2026-09-10 00:21:06",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay adding strict",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970866.977087,
+        "source": "vosk",
+        "rms": 412,
+        "updated_at": 1788970866.8622894
+      }
+    },
+    {
+      "id": 61,
+      "timestamp_epoch_s": 1788970867.1122293,
+      "timestamp_local": "2026-09-10 00:21:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970867.1122293,
+        "source": "vosk",
+        "rms": 627,
+        "updated_at": 1788970867.1122293
+      }
+    },
+    {
+      "id": 62,
+      "timestamp_epoch_s": 1788970867.1355784,
+      "timestamp_local": "2026-09-10 00:21:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay adding shrugged his shoulders",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970867.1355784,
+        "source": "vosk",
+        "rms": 627,
+        "updated_at": 1788970867.1122293
+      }
+    },
+    {
+      "id": 63,
+      "timestamp_epoch_s": 1788970867.3616273,
+      "timestamp_local": "2026-09-10 00:21:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970867.3616273,
+        "source": "vosk",
+        "rms": 498,
+        "updated_at": 1788970867.3616273
+      }
+    },
+    {
+      "id": 64,
+      "timestamp_epoch_s": 1788970867.400564,
+      "timestamp_local": "2026-09-10 00:21:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970867.400564,
+        "source": "vosk",
+        "rms": 498,
+        "updated_at": 1788970867.3616273
+      }
+    },
+    {
+      "id": 65,
+      "timestamp_epoch_s": 1788970867.6114225,
+      "timestamp_local": "2026-09-10 00:21:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970867.6114225,
+        "source": "vosk",
+        "rms": 498,
+        "updated_at": 1788970867.3616273
+      }
+    },
+    {
+      "id": 66,
+      "timestamp_epoch_s": 1788970867.6761868,
+      "timestamp_local": "2026-09-10 00:21:07",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970867.6761868,
+        "source": "vosk",
+        "rms": 498,
+        "updated_at": 1788970867.3616273
+      }
+    },
+    {
+      "id": 67,
+      "timestamp_epoch_s": 1788970867.8622487,
+      "timestamp_local": "2026-09-10 00:21:07",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970867.8622487,
+        "source": "vosk",
+        "rms": 821,
+        "updated_at": 1788970867.8622487
+      }
+    },
+    {
+      "id": 68,
+      "timestamp_epoch_s": 1788970868.1126342,
+      "timestamp_local": "2026-09-10 00:21:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970868.1126342,
+        "source": "vosk",
+        "rms": 821,
+        "updated_at": 1788970867.8622487
+      }
+    },
+    {
+      "id": 69,
+      "timestamp_epoch_s": 1788970868.151313,
+      "timestamp_local": "2026-09-10 00:21:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970868.151313,
+        "source": "vosk",
+        "rms": 821,
+        "updated_at": 1788970867.8622487
+      }
+    },
+    {
+      "id": 70,
+      "timestamp_epoch_s": 1788970868.6120672,
+      "timestamp_local": "2026-09-10 00:21:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970868.6120672,
+        "source": "vosk",
+        "rms": 821,
+        "updated_at": 1788970867.8622487
+      }
+    },
+    {
+      "id": 71,
+      "timestamp_epoch_s": 1788970868.8611188,
+      "timestamp_local": "2026-09-10 00:21:08",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970868.8611188,
+        "source": "vosk",
+        "rms": 821,
+        "updated_at": 1788970867.8622487
+      }
+    },
+    {
+      "id": 72,
+      "timestamp_epoch_s": 1788970868.9552903,
+      "timestamp_local": "2026-09-10 00:21:08",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that a good",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970868.9552903,
+        "source": "vosk",
+        "rms": 821,
+        "updated_at": 1788970867.8622487
+      }
+    },
+    {
+      "id": 73,
+      "timestamp_epoch_s": 1788970869.1119525,
+      "timestamp_local": "2026-09-10 00:21:09",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970869.1119525,
+        "source": "vosk",
+        "rms": 821,
+        "updated_at": 1788970867.8622487
+      }
+    },
+    {
+      "id": 74,
+      "timestamp_epoch_s": 1788970869.1620238,
+      "timestamp_local": "2026-09-10 00:21:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that of when we",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970869.1620238,
+        "source": "vosk",
+        "rms": 821,
+        "updated_at": 1788970867.8622487
+      }
+    },
+    {
+      "id": 75,
+      "timestamp_epoch_s": 1788970869.611593,
+      "timestamp_local": "2026-09-10 00:21:09",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970869.611593,
+        "source": "vosk",
+        "rms": 821,
+        "updated_at": 1788970867.8622487
+      }
+    },
+    {
+      "id": 76,
+      "timestamp_epoch_s": 1788970869.6227436,
+      "timestamp_local": "2026-09-10 00:21:09",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970869.6227436,
+        "source": "vosk",
+        "rms": 821,
+        "updated_at": 1788970867.8622487
+      }
+    },
+    {
+      "id": 77,
+      "timestamp_epoch_s": 1788970870.1114025,
+      "timestamp_local": "2026-09-10 00:21:10",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970870.1114025,
+        "source": "vosk",
+        "rms": 821,
+        "updated_at": 1788970867.8622487
+      }
+    },
+    {
+      "id": 78,
+      "timestamp_epoch_s": 1788970870.6116412,
+      "timestamp_local": "2026-09-10 00:21:10",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970870.6116412,
+        "source": "vosk",
+        "rms": 1072,
+        "updated_at": 1788970870.6116412
+      }
+    },
+    {
+      "id": 79,
+      "timestamp_epoch_s": 1788970870.6519034,
+      "timestamp_local": "2026-09-10 00:21:10",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970870.6519034,
+        "source": "vosk",
+        "rms": 1072,
+        "updated_at": 1788970870.6116412
+      }
+    },
+    {
+      "id": 80,
+      "timestamp_epoch_s": 1788970871.1128504,
+      "timestamp_local": "2026-09-10 00:21:11",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970871.1128504,
+        "source": "vosk",
+        "rms": 725,
+        "updated_at": 1788970871.1118479
+      }
+    },
+    {
+      "id": 81,
+      "timestamp_epoch_s": 1788970871.3620453,
+      "timestamp_local": "2026-09-10 00:21:11",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970871.3620453,
+        "source": "vosk",
+        "rms": 595,
+        "updated_at": 1788970871.3620453
+      }
+    },
+    {
+      "id": 82,
+      "timestamp_epoch_s": 1788970871.401361,
+      "timestamp_local": "2026-09-10 00:21:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970871.401361,
+        "source": "vosk",
+        "rms": 595,
+        "updated_at": 1788970871.3620453
+      }
+    },
+    {
+      "id": 83,
+      "timestamp_epoch_s": 1788970871.6113012,
+      "timestamp_local": "2026-09-10 00:21:11",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970871.6113012,
+        "source": "vosk",
+        "rms": 608,
+        "updated_at": 1788970871.6113012
+      }
+    },
+    {
+      "id": 84,
+      "timestamp_epoch_s": 1788970871.649022,
+      "timestamp_local": "2026-09-10 00:21:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into our i mean",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970871.649022,
+        "source": "vosk",
+        "rms": 608,
+        "updated_at": 1788970871.6113012
+      }
+    },
+    {
+      "id": 85,
+      "timestamp_epoch_s": 1788970871.8619556,
+      "timestamp_local": "2026-09-10 00:21:11",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970871.8619556,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970871.8619556
+      }
+    },
+    {
+      "id": 86,
+      "timestamp_epoch_s": 1788970871.9256618,
+      "timestamp_local": "2026-09-10 00:21:11",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into our i mean that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970871.9256618,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970871.8619556
+      }
+    },
+    {
+      "id": 87,
+      "timestamp_epoch_s": 1788970872.1119628,
+      "timestamp_local": "2026-09-10 00:21:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970872.1119628,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970871.8619556
+      }
+    },
+    {
+      "id": 88,
+      "timestamp_epoch_s": 1788970872.146163,
+      "timestamp_local": "2026-09-10 00:21:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970872.146163,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970871.8619556
+      }
+    },
+    {
+      "id": 89,
+      "timestamp_epoch_s": 1788970872.36171,
+      "timestamp_local": "2026-09-10 00:21:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970872.36171,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970871.8619556
+      }
+    },
+    {
+      "id": 90,
+      "timestamp_epoch_s": 1788970872.3841474,
+      "timestamp_local": "2026-09-10 00:21:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it were",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970872.3841474,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970871.8619556
+      }
+    },
+    {
+      "id": 91,
+      "timestamp_epoch_s": 1788970872.6117926,
+      "timestamp_local": "2026-09-10 00:21:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970872.6117926,
+        "source": "vosk",
+        "rms": 864,
+        "updated_at": 1788970872.6117926
+      }
+    },
+    {
+      "id": 92,
+      "timestamp_epoch_s": 1788970872.6354752,
+      "timestamp_local": "2026-09-10 00:21:12",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it would",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970872.6354752,
+        "source": "vosk",
+        "rms": 864,
+        "updated_at": 1788970872.6117926
+      }
+    },
+    {
+      "id": 93,
+      "timestamp_epoch_s": 1788970872.861224,
+      "timestamp_local": "2026-09-10 00:21:12",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970872.861224,
+        "source": "vosk",
+        "rms": 908,
+        "updated_at": 1788970872.861224
+      }
+    },
+    {
+      "id": 94,
+      "timestamp_epoch_s": 1788970873.1115344,
+      "timestamp_local": "2026-09-10 00:21:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970873.1115344,
+        "source": "vosk",
+        "rms": 771,
+        "updated_at": 1788970873.1115344
+      }
+    },
+    {
+      "id": 95,
+      "timestamp_epoch_s": 1788970873.167626,
+      "timestamp_local": "2026-09-10 00:21:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it would bypass",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970873.167626,
+        "source": "vosk",
+        "rms": 771,
+        "updated_at": 1788970873.1115344
+      }
+    },
+    {
+      "id": 96,
+      "timestamp_epoch_s": 1788970873.3611376,
+      "timestamp_local": "2026-09-10 00:21:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970873.3611376,
+        "source": "vosk",
+        "rms": 541,
+        "updated_at": 1788970873.3611376
+      }
+    },
+    {
+      "id": 97,
+      "timestamp_epoch_s": 1788970873.4232676,
+      "timestamp_local": "2026-09-10 00:21:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970873.4232676,
+        "source": "vosk",
+        "rms": 541,
+        "updated_at": 1788970873.3611376
+      }
+    },
+    {
+      "id": 98,
+      "timestamp_epoch_s": 1788970873.8615842,
+      "timestamp_local": "2026-09-10 00:21:13",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970873.8615842,
+        "source": "vosk",
+        "rms": 858,
+        "updated_at": 1788970873.8615842
+      }
+    },
+    {
+      "id": 99,
+      "timestamp_epoch_s": 1788970873.9343598,
+      "timestamp_local": "2026-09-10 00:21:13",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five hundred",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970873.9343598,
+        "source": "vosk",
+        "rms": 858,
+        "updated_at": 1788970873.8615842
+      }
+    },
+    {
+      "id": 100,
+      "timestamp_epoch_s": 1788970874.1117063,
+      "timestamp_local": "2026-09-10 00:21:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970874.1117063,
+        "source": "vosk",
+        "rms": 881,
+        "updated_at": 1788970874.1117063
+      }
+    },
+    {
+      "id": 101,
+      "timestamp_epoch_s": 1788970874.1746826,
+      "timestamp_local": "2026-09-10 00:21:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had a bank or",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970874.1746826,
+        "source": "vosk",
+        "rms": 881,
+        "updated_at": 1788970874.1117063
+      }
+    },
+    {
+      "id": 102,
+      "timestamp_epoch_s": 1788970874.3629637,
+      "timestamp_local": "2026-09-10 00:21:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970874.3629637,
+        "source": "vosk",
+        "rms": 1094,
+        "updated_at": 1788970874.3629637
+      }
+    },
+    {
+      "id": 103,
+      "timestamp_epoch_s": 1788970874.4139233,
+      "timestamp_local": "2026-09-10 00:21:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five hundred",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970874.4139233,
+        "source": "vosk",
+        "rms": 1094,
+        "updated_at": 1788970874.3629637
+      }
+    },
+    {
+      "id": 104,
+      "timestamp_epoch_s": 1788970874.6119082,
+      "timestamp_local": "2026-09-10 00:21:14",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970874.6119082,
+        "source": "vosk",
+        "rms": 764,
+        "updated_at": 1788970874.6119082
+      }
+    },
+    {
+      "id": 105,
+      "timestamp_epoch_s": 1788970874.674236,
+      "timestamp_local": "2026-09-10 00:21:14",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970874.674236,
+        "source": "vosk",
+        "rms": 764,
+        "updated_at": 1788970874.6119082
+      }
+    },
+    {
+      "id": 106,
+      "timestamp_epoch_s": 1788970875.1113353,
+      "timestamp_local": "2026-09-10 00:21:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970875.1113353,
+        "source": "vosk",
+        "rms": 764,
+        "updated_at": 1788970874.6119082
+      }
+    },
+    {
+      "id": 107,
+      "timestamp_epoch_s": 1788970875.8612344,
+      "timestamp_local": "2026-09-10 00:21:15",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970875.8612344,
+        "source": "vosk",
+        "rms": 764,
+        "updated_at": 1788970874.6119082
+      }
+    },
+    {
+      "id": 108,
+      "timestamp_epoch_s": 1788970876.3618002,
+      "timestamp_local": "2026-09-10 00:21:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970876.3618002,
+        "source": "vosk",
+        "rms": 764,
+        "updated_at": 1788970874.6119082
+      }
+    },
+    {
+      "id": 109,
+      "timestamp_epoch_s": 1788970876.6117353,
+      "timestamp_local": "2026-09-10 00:21:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970876.6117353,
+        "source": "vosk",
+        "rms": 764,
+        "updated_at": 1788970874.6119082
+      }
+    },
+    {
+      "id": 110,
+      "timestamp_epoch_s": 1788970876.862198,
+      "timestamp_local": "2026-09-10 00:21:16",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970876.862198,
+        "source": "vosk",
+        "rms": 851,
+        "updated_at": 1788970876.862198
+      }
+    },
+    {
+      "id": 111,
+      "timestamp_epoch_s": 1788970877.1118436,
+      "timestamp_local": "2026-09-10 00:21:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970877.1118436,
+        "source": "vosk",
+        "rms": 851,
+        "updated_at": 1788970876.862198
+      }
+    },
+    {
+      "id": 112,
+      "timestamp_epoch_s": 1788970877.156472,
+      "timestamp_local": "2026-09-10 00:21:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by ideas",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970877.156472,
+        "source": "vosk",
+        "rms": 851,
+        "updated_at": 1788970876.862198
+      }
+    },
+    {
+      "id": 113,
+      "timestamp_epoch_s": 1788970877.363627,
+      "timestamp_local": "2026-09-10 00:21:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970877.363627,
+        "source": "vosk",
+        "rms": 851,
+        "updated_at": 1788970876.862198
+      }
+    },
+    {
+      "id": 114,
+      "timestamp_epoch_s": 1788970877.391245,
+      "timestamp_local": "2026-09-10 00:21:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970877.391245,
+        "source": "vosk",
+        "rms": 851,
+        "updated_at": 1788970876.862198
+      }
+    },
+    {
+      "id": 115,
+      "timestamp_epoch_s": 1788970877.6117663,
+      "timestamp_local": "2026-09-10 00:21:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970877.6117663,
+        "source": "vosk",
+        "rms": 676,
+        "updated_at": 1788970877.6117663
+      }
+    },
+    {
+      "id": 116,
+      "timestamp_epoch_s": 1788970877.6426015,
+      "timestamp_local": "2026-09-10 00:21:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970877.6426015,
+        "source": "vosk",
+        "rms": 676,
+        "updated_at": 1788970877.6117663
+      }
+    },
+    {
+      "id": 117,
+      "timestamp_epoch_s": 1788970877.8611312,
+      "timestamp_local": "2026-09-10 00:21:17",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970877.8611312,
+        "source": "vosk",
+        "rms": 581,
+        "updated_at": 1788970877.8611312
+      }
+    },
+    {
+      "id": 118,
+      "timestamp_epoch_s": 1788970877.9181864,
+      "timestamp_local": "2026-09-10 00:21:17",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970877.9181864,
+        "source": "vosk",
+        "rms": 581,
+        "updated_at": 1788970877.8611312
+      }
+    },
+    {
+      "id": 119,
+      "timestamp_epoch_s": 1788970878.1116378,
+      "timestamp_local": "2026-09-10 00:21:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970878.1116378,
+        "source": "vosk",
+        "rms": 618,
+        "updated_at": 1788970878.1116378
+      }
+    },
+    {
+      "id": 120,
+      "timestamp_epoch_s": 1788970878.145441,
+      "timestamp_local": "2026-09-10 00:21:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970878.145441,
+        "source": "vosk",
+        "rms": 618,
+        "updated_at": 1788970878.1116378
+      }
+    },
+    {
+      "id": 121,
+      "timestamp_epoch_s": 1788970878.3620312,
+      "timestamp_local": "2026-09-10 00:21:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970878.3620312,
+        "source": "vosk",
+        "rms": 578,
+        "updated_at": 1788970878.3620312
+      }
+    },
+    {
+      "id": 122,
+      "timestamp_epoch_s": 1788970878.6118155,
+      "timestamp_local": "2026-09-10 00:21:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970878.6118155,
+        "source": "vosk",
+        "rms": 578,
+        "updated_at": 1788970878.3620312
+      }
+    },
+    {
+      "id": 123,
+      "timestamp_epoch_s": 1788970878.6493957,
+      "timestamp_local": "2026-09-10 00:21:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970878.6493957,
+        "source": "vosk",
+        "rms": 578,
+        "updated_at": 1788970878.3620312
+      }
+    },
+    {
+      "id": 124,
+      "timestamp_epoch_s": 1788970878.8618248,
+      "timestamp_local": "2026-09-10 00:21:18",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970878.8618248,
+        "source": "vosk",
+        "rms": 936,
+        "updated_at": 1788970878.8618248
+      }
+    },
+    {
+      "id": 125,
+      "timestamp_epoch_s": 1788970878.8927066,
+      "timestamp_local": "2026-09-10 00:21:18",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970878.8927066,
+        "source": "vosk",
+        "rms": 936,
+        "updated_at": 1788970878.8618248
+      }
+    },
+    {
+      "id": 126,
+      "timestamp_epoch_s": 1788970879.1120703,
+      "timestamp_local": "2026-09-10 00:21:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970879.1120703,
+        "source": "vosk",
+        "rms": 703,
+        "updated_at": 1788970879.1120703
+      }
+    },
+    {
+      "id": 127,
+      "timestamp_epoch_s": 1788970879.1447675,
+      "timestamp_local": "2026-09-10 00:21:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to eighteen",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970879.1447675,
+        "source": "vosk",
+        "rms": 703,
+        "updated_at": 1788970879.1120703
+      }
+    },
+    {
+      "id": 128,
+      "timestamp_epoch_s": 1788970879.6115382,
+      "timestamp_local": "2026-09-10 00:21:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970879.6115382,
+        "source": "vosk",
+        "rms": 547,
+        "updated_at": 1788970879.6115382
+      }
+    },
+    {
+      "id": 129,
+      "timestamp_epoch_s": 1788970879.647048,
+      "timestamp_local": "2026-09-10 00:21:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to a",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970879.647048,
+        "source": "vosk",
+        "rms": 547,
+        "updated_at": 1788970879.6115382
+      }
+    },
+    {
+      "id": 130,
+      "timestamp_epoch_s": 1788970879.8615072,
+      "timestamp_local": "2026-09-10 00:21:19",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970879.8615072,
+        "source": "vosk",
+        "rms": 465,
+        "updated_at": 1788970879.8615072
+      }
+    },
+    {
+      "id": 131,
+      "timestamp_epoch_s": 1788970879.9261389,
+      "timestamp_local": "2026-09-10 00:21:19",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i asked",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970879.9261389,
+        "source": "vosk",
+        "rms": 465,
+        "updated_at": 1788970879.8615072
+      }
+    },
+    {
+      "id": 132,
+      "timestamp_epoch_s": 1788970880.1119647,
+      "timestamp_local": "2026-09-10 00:21:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970880.1119647,
+        "source": "vosk",
+        "rms": 465,
+        "updated_at": 1788970879.8615072
+      }
+    },
+    {
+      "id": 133,
+      "timestamp_epoch_s": 1788970880.1555321,
+      "timestamp_local": "2026-09-10 00:21:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970880.1555321,
+        "source": "vosk",
+        "rms": 465,
+        "updated_at": 1788970879.8615072
+      }
+    },
+    {
+      "id": 134,
+      "timestamp_epoch_s": 1788970880.362997,
+      "timestamp_local": "2026-09-10 00:21:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970880.362997,
+        "source": "vosk",
+        "rms": 507,
+        "updated_at": 1788970880.362997
+      }
+    },
+    {
+      "id": 135,
+      "timestamp_epoch_s": 1788970880.3760517,
+      "timestamp_local": "2026-09-10 00:21:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that it",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970880.3760517,
+        "source": "vosk",
+        "rms": 507,
+        "updated_at": 1788970880.362997
+      }
+    },
+    {
+      "id": 136,
+      "timestamp_epoch_s": 1788970880.6126697,
+      "timestamp_local": "2026-09-10 00:21:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970880.6126697,
+        "source": "vosk",
+        "rms": 627,
+        "updated_at": 1788970880.6126697
+      }
+    },
+    {
+      "id": 137,
+      "timestamp_epoch_s": 1788970880.665227,
+      "timestamp_local": "2026-09-10 00:21:20",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the guy",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970880.665227,
+        "source": "vosk",
+        "rms": 627,
+        "updated_at": 1788970880.6126697
+      }
+    },
+    {
+      "id": 138,
+      "timestamp_epoch_s": 1788970880.861261,
+      "timestamp_local": "2026-09-10 00:21:20",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970880.861261,
+        "source": "vosk",
+        "rms": 627,
+        "updated_at": 1788970880.6126697
+      }
+    },
+    {
+      "id": 139,
+      "timestamp_epoch_s": 1788970881.3613665,
+      "timestamp_local": "2026-09-10 00:21:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970881.3613665,
+        "source": "vosk",
+        "rms": 643,
+        "updated_at": 1788970881.3613665
+      }
+    },
+    {
+      "id": 140,
+      "timestamp_epoch_s": 1788970881.3784087,
+      "timestamp_local": "2026-09-10 00:21:21",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970881.3784087,
+        "source": "vosk",
+        "rms": 643,
+        "updated_at": 1788970881.3613665
+      }
+    },
+    {
+      "id": 141,
+      "timestamp_epoch_s": 1788970881.8615398,
+      "timestamp_local": "2026-09-10 00:21:21",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970881.8615398,
+        "source": "vosk",
+        "rms": 643,
+        "updated_at": 1788970881.3613665
+      }
+    },
+    {
+      "id": 142,
+      "timestamp_epoch_s": 1788970882.8618095,
+      "timestamp_local": "2026-09-10 00:21:22",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970882.8618095,
+        "source": "vosk",
+        "rms": 643,
+        "updated_at": 1788970881.3613665
+      }
+    },
+    {
+      "id": 143,
+      "timestamp_epoch_s": 1788970882.8859715,
+      "timestamp_local": "2026-09-10 00:21:22",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970882.8859715,
+        "source": "vosk",
+        "rms": 643,
+        "updated_at": 1788970881.3613665
+      }
+    },
+    {
+      "id": 144,
+      "timestamp_epoch_s": 1788970883.3629737,
+      "timestamp_local": "2026-09-10 00:21:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970883.3629737,
+        "source": "vosk",
+        "rms": 643,
+        "updated_at": 1788970881.3613665
+      }
+    },
+    {
+      "id": 145,
+      "timestamp_epoch_s": 1788970883.8616064,
+      "timestamp_local": "2026-09-10 00:21:23",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970883.8616064,
+        "source": "vosk",
+        "rms": 643,
+        "updated_at": 1788970881.3613665
+      }
+    },
+    {
+      "id": 146,
+      "timestamp_epoch_s": 1788970884.1116178,
+      "timestamp_local": "2026-09-10 00:21:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970884.1116178,
+        "source": "vosk",
+        "rms": 643,
+        "updated_at": 1788970881.3613665
+      }
+    },
+    {
+      "id": 147,
+      "timestamp_epoch_s": 1788970884.1355011,
+      "timestamp_local": "2026-09-10 00:21:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970884.1355011,
+        "source": "vosk",
+        "rms": 643,
+        "updated_at": 1788970881.3613665
+      }
+    },
+    {
+      "id": 148,
+      "timestamp_epoch_s": 1788970884.3616204,
+      "timestamp_local": "2026-09-10 00:21:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970884.3616204,
+        "source": "vosk",
+        "rms": 600,
+        "updated_at": 1788970884.3616204
+      }
+    },
+    {
+      "id": 149,
+      "timestamp_epoch_s": 1788970884.6111329,
+      "timestamp_local": "2026-09-10 00:21:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970884.6111329,
+        "source": "vosk",
+        "rms": 600,
+        "updated_at": 1788970884.3616204
+      }
+    },
+    {
+      "id": 150,
+      "timestamp_epoch_s": 1788970884.7013688,
+      "timestamp_local": "2026-09-10 00:21:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your role",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970884.7013688,
+        "source": "vosk",
+        "rms": 600,
+        "updated_at": 1788970884.3616204
+      }
+    },
+    {
+      "id": 151,
+      "timestamp_epoch_s": 1788970884.8616083,
+      "timestamp_local": "2026-09-10 00:21:24",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970884.8616083,
+        "source": "vosk",
+        "rms": 778,
+        "updated_at": 1788970884.8616083
+      }
+    },
+    {
+      "id": 152,
+      "timestamp_epoch_s": 1788970884.9090586,
+      "timestamp_local": "2026-09-10 00:21:24",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your well i don't",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970884.9090586,
+        "source": "vosk",
+        "rms": 778,
+        "updated_at": 1788970884.8616083
+      }
+    },
+    {
+      "id": 153,
+      "timestamp_epoch_s": 1788970885.3616693,
+      "timestamp_local": "2026-09-10 00:21:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970885.3616693,
+        "source": "vosk",
+        "rms": 778,
+        "updated_at": 1788970884.8616083
+      }
+    },
+    {
+      "id": 154,
+      "timestamp_epoch_s": 1788970885.611542,
+      "timestamp_local": "2026-09-10 00:21:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970885.611542,
+        "source": "vosk",
+        "rms": 778,
+        "updated_at": 1788970884.8616083
+      }
+    },
+    {
+      "id": 155,
+      "timestamp_epoch_s": 1788970885.658759,
+      "timestamp_local": "2026-09-10 00:21:25",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your well i don't know how",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970885.658759,
+        "source": "vosk",
+        "rms": 778,
+        "updated_at": 1788970884.8616083
+      }
+    },
+    {
+      "id": 156,
+      "timestamp_epoch_s": 1788970885.8614,
+      "timestamp_local": "2026-09-10 00:21:25",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970885.8614,
+        "source": "vosk",
+        "rms": 778,
+        "updated_at": 1788970884.8616083
+      }
+    },
+    {
+      "id": 157,
+      "timestamp_epoch_s": 1788970886.1113896,
+      "timestamp_local": "2026-09-10 00:21:26",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970886.1113896,
+        "source": "vosk",
+        "rms": 778,
+        "updated_at": 1788970884.8616083
+      }
+    },
+    {
+      "id": 158,
+      "timestamp_epoch_s": 1788970886.135878,
+      "timestamp_local": "2026-09-10 00:21:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your well i don't know how to much",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970886.135878,
+        "source": "vosk",
+        "rms": 778,
+        "updated_at": 1788970884.8616083
+      }
+    },
+    {
+      "id": 159,
+      "timestamp_epoch_s": 1788970886.6117437,
+      "timestamp_local": "2026-09-10 00:21:26",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970886.6117437,
+        "source": "vosk",
+        "rms": 613,
+        "updated_at": 1788970886.6117437
+      }
+    },
+    {
+      "id": 160,
+      "timestamp_epoch_s": 1788970886.6529934,
+      "timestamp_local": "2026-09-10 00:21:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your well i don't know how to much for your",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970886.6529934,
+        "source": "vosk",
+        "rms": 613,
+        "updated_at": 1788970886.6117437
+      }
+    },
+    {
+      "id": 161,
+      "timestamp_epoch_s": 1788970886.8627872,
+      "timestamp_local": "2026-09-10 00:21:26",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970886.8627872,
+        "source": "vosk",
+        "rms": 512,
+        "updated_at": 1788970886.8627872
+      }
+    },
+    {
+      "id": 162,
+      "timestamp_epoch_s": 1788970886.9143589,
+      "timestamp_local": "2026-09-10 00:21:26",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your well i don't know how to much for your title",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970886.9143589,
+        "source": "vosk",
+        "rms": 512,
+        "updated_at": 1788970886.8627872
+      }
+    },
+    {
+      "id": 163,
+      "timestamp_epoch_s": 1788970887.1113954,
+      "timestamp_local": "2026-09-10 00:21:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970887.1113954,
+        "source": "vosk",
+        "rms": 512,
+        "updated_at": 1788970886.8627872
+      }
+    },
+    {
+      "id": 164,
+      "timestamp_epoch_s": 1788970887.1384714,
+      "timestamp_local": "2026-09-10 00:21:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your well i don't know how to much for your can i tell you what",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970887.1384714,
+        "source": "vosk",
+        "rms": 512,
+        "updated_at": 1788970886.8627872
+      }
+    },
+    {
+      "id": 165,
+      "timestamp_epoch_s": 1788970887.3614507,
+      "timestamp_local": "2026-09-10 00:21:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970887.3614507,
+        "source": "vosk",
+        "rms": 512,
+        "updated_at": 1788970886.8627872
+      }
+    },
+    {
+      "id": 166,
+      "timestamp_epoch_s": 1788970887.4177997,
+      "timestamp_local": "2026-09-10 00:21:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your well i don't know how to much for your can i tell you what he told",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970887.4177997,
+        "source": "vosk",
+        "rms": 512,
+        "updated_at": 1788970886.8627872
+      }
+    },
+    {
+      "id": 167,
+      "timestamp_epoch_s": 1788970887.6114955,
+      "timestamp_local": "2026-09-10 00:21:27",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970887.6114955,
+        "source": "vosk",
+        "rms": 512,
+        "updated_at": 1788970886.8627872
+      }
+    },
+    {
+      "id": 168,
+      "timestamp_epoch_s": 1788970887.6636097,
+      "timestamp_local": "2026-09-10 00:21:27",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your well i don't know how to much for your can i tell you what he told us",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970887.6636097,
+        "source": "vosk",
+        "rms": 512,
+        "updated_at": 1788970886.8627872
+      }
+    },
+    {
+      "id": 169,
+      "timestamp_epoch_s": 1788970888.1122851,
+      "timestamp_local": "2026-09-10 00:21:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970888.1122851,
+        "source": "vosk",
+        "rms": 512,
+        "updated_at": 1788970886.8627872
+      }
+    },
+    {
+      "id": 170,
+      "timestamp_epoch_s": 1788970888.61199,
+      "timestamp_local": "2026-09-10 00:21:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970888.61199,
+        "source": "vosk",
+        "rms": 512,
+        "updated_at": 1788970886.8627872
+      }
+    },
+    {
+      "id": 171,
+      "timestamp_epoch_s": 1788970888.6435857,
+      "timestamp_local": "2026-09-10 00:21:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your well i don't know how to much for your can i tell you what he told us about it",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970888.6435857,
+        "source": "vosk",
+        "rms": 512,
+        "updated_at": 1788970886.8627872
+      }
+    },
+    {
+      "id": 172,
+      "timestamp_epoch_s": 1788970888.8615272,
+      "timestamp_local": "2026-09-10 00:21:28",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970888.8615272,
+        "source": "vosk",
+        "rms": 1140,
+        "updated_at": 1788970888.8615272
+      }
+    },
+    {
+      "id": 173,
+      "timestamp_epoch_s": 1788970888.884351,
+      "timestamp_local": "2026-09-10 00:21:28",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "okay i've been struck his description is that it literally into i'm i'm even if it was five and had advised by idea probably a little too much more right age to and i don't think that if the good idea to get your well i don't know how to much for your can i tell you what he told us about",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970888.884351,
+        "source": "vosk",
+        "rms": 1140,
+        "updated_at": 1788970888.8615272
+      }
+    },
+    {
+      "id": 174,
+      "timestamp_epoch_s": 1788970889.1120958,
+      "timestamp_local": "2026-09-10 00:21:29",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970889.1120958,
+        "source": "vosk",
+        "rms": 1140,
+        "updated_at": 1788970888.8615272
+      }
+    },
+    {
+      "id": 175,
+      "timestamp_epoch_s": 1788970889.6127422,
+      "timestamp_local": "2026-09-10 00:21:29",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970889.6127422,
+        "source": "vosk",
+        "rms": 1140,
+        "updated_at": 1788970888.8615272
+      }
+    },
+    {
+      "id": 176,
+      "timestamp_epoch_s": 1788970890.361782,
+      "timestamp_local": "2026-09-10 00:21:30",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970890.361782,
+        "source": "vosk",
+        "rms": 1140,
+        "updated_at": 1788970888.8615272
+      }
+    },
+    {
+      "id": 177,
+      "timestamp_epoch_s": 1788970891.3176498,
+      "timestamp_local": "2026-09-10 00:21:31",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "okay adding strict his description is that of literally into i m i m even if it would buy that i had advised by idea probably a little too much more right age to and i don t think that if the good idea to get your well i don t know how to much for your can i tell you what he told us about it",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1788970891.3176498,
+        "source": "final",
+        "rms": 1140,
+        "updated_at": 1788970888.8615272
+      }
+    },
+    {
+      "id": 178,
+      "timestamp_epoch_s": 1788970892.0635052,
+      "timestamp_local": "2026-09-10 00:21:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970892.0635052,
+        "source": "vosk",
+        "rms": 1140,
+        "updated_at": 1788970888.8615272
+      }
+    },
+    {
+      "id": 179,
+      "timestamp_epoch_s": 1788970892.0635052,
+      "timestamp_local": "2026-09-10 00:21:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970892.0635052,
+        "source": "vosk",
+        "rms": 1140,
+        "updated_at": 1788970888.8615272
+      }
+    },
+    {
+      "id": 180,
+      "timestamp_epoch_s": 1788970892.195452,
+      "timestamp_local": "2026-09-10 00:21:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970892.195452,
+        "source": "vosk",
+        "rms": 1140,
+        "updated_at": 1788970888.8615272
+      }
+    },
+    {
+      "id": 181,
+      "timestamp_epoch_s": 1788970892.246323,
+      "timestamp_local": "2026-09-10 00:21:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970892.246323,
+        "source": "vosk",
+        "rms": 1140,
+        "updated_at": 1788970888.8615272
+      }
+    },
+    {
+      "id": 182,
+      "timestamp_epoch_s": 1788970892.246323,
+      "timestamp_local": "2026-09-10 00:21:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970892.246323,
+        "source": "vosk",
+        "rms": 1140,
+        "updated_at": 1788970888.8615272
+      }
+    },
+    {
+      "id": 183,
+      "timestamp_epoch_s": 1788970892.2758505,
+      "timestamp_local": "2026-09-10 00:21:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970892.2758505,
+        "source": "vosk",
+        "rms": 495,
+        "updated_at": 1788970892.246323
+      }
+    },
+    {
+      "id": 184,
+      "timestamp_epoch_s": 1788970892.3171606,
+      "timestamp_local": "2026-09-10 00:21:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970892.3171606,
+        "source": "vosk",
+        "rms": 495,
+        "updated_at": 1788970892.246323
+      }
+    },
+    {
+      "id": 185,
+      "timestamp_epoch_s": 1788970892.6124299,
+      "timestamp_local": "2026-09-10 00:21:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970892.6124299,
+        "source": "vosk",
+        "rms": 495,
+        "updated_at": 1788970892.246323
+      }
+    },
+    {
+      "id": 186,
+      "timestamp_epoch_s": 1788970892.8627806,
+      "timestamp_local": "2026-09-10 00:21:32",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970892.8627806,
+        "source": "vosk",
+        "rms": 495,
+        "updated_at": 1788970892.246323
+      }
+    },
+    {
+      "id": 187,
+      "timestamp_epoch_s": 1788970892.8913722,
+      "timestamp_local": "2026-09-10 00:21:32",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970892.8913722,
+        "source": "vosk",
+        "rms": 495,
+        "updated_at": 1788970892.246323
+      }
+    },
+    {
+      "id": 188,
+      "timestamp_epoch_s": 1788970893.112646,
+      "timestamp_local": "2026-09-10 00:21:33",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970893.112646,
+        "source": "vosk",
+        "rms": 710,
+        "updated_at": 1788970893.112646
+      }
+    },
+    {
+      "id": 189,
+      "timestamp_epoch_s": 1788970893.362991,
+      "timestamp_local": "2026-09-10 00:21:33",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970893.362991,
+        "source": "vosk",
+        "rms": 710,
+        "updated_at": 1788970893.112646
+      }
+    },
+    {
+      "id": 190,
+      "timestamp_epoch_s": 1788970893.3749866,
+      "timestamp_local": "2026-09-10 00:21:33",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970893.3749866,
+        "source": "vosk",
+        "rms": 710,
+        "updated_at": 1788970893.112646
+      }
+    },
+    {
+      "id": 191,
+      "timestamp_epoch_s": 1788970893.6114516,
+      "timestamp_local": "2026-09-10 00:21:33",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970893.6114516,
+        "source": "vosk",
+        "rms": 437,
+        "updated_at": 1788970893.6114516
+      }
+    },
+    {
+      "id": 192,
+      "timestamp_epoch_s": 1788970893.621511,
+      "timestamp_local": "2026-09-10 00:21:33",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970893.621511,
+        "source": "vosk",
+        "rms": 437,
+        "updated_at": 1788970893.6114516
+      }
+    },
+    {
+      "id": 193,
+      "timestamp_epoch_s": 1788970894.1127477,
+      "timestamp_local": "2026-09-10 00:21:34",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970894.1127477,
+        "source": "vosk",
+        "rms": 437,
+        "updated_at": 1788970893.6114516
+      }
+    },
+    {
+      "id": 194,
+      "timestamp_epoch_s": 1788970894.6115427,
+      "timestamp_local": "2026-09-10 00:21:34",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970894.6115427,
+        "source": "vosk",
+        "rms": 1016,
+        "updated_at": 1788970894.6115427
+      }
+    },
+    {
+      "id": 195,
+      "timestamp_epoch_s": 1788970894.6446476,
+      "timestamp_local": "2026-09-10 00:21:34",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970894.6446476,
+        "source": "vosk",
+        "rms": 1016,
+        "updated_at": 1788970894.6115427
+      }
+    },
+    {
+      "id": 196,
+      "timestamp_epoch_s": 1788970894.9819665,
+      "timestamp_local": "2026-09-10 00:21:34",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970894.9819665,
+        "source": "vosk",
+        "rms": 439,
+        "updated_at": 1788970894.9819665
+      }
+    },
+    {
+      "id": 197,
+      "timestamp_epoch_s": 1788970895.069253,
+      "timestamp_local": "2026-09-10 00:21:35",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's knowledge on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970895.069253,
+        "source": "vosk",
+        "rms": 439,
+        "updated_at": 1788970894.9819665
+      }
+    },
+    {
+      "id": 198,
+      "timestamp_epoch_s": 1788970895.6128252,
+      "timestamp_local": "2026-09-10 00:21:35",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970895.6128252,
+        "source": "vosk",
+        "rms": 439,
+        "updated_at": 1788970894.9819665
+      }
+    },
+    {
+      "id": 199,
+      "timestamp_epoch_s": 1788970896.6126494,
+      "timestamp_local": "2026-09-10 00:21:36",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970896.6126494,
+        "source": "vosk",
+        "rms": 439,
+        "updated_at": 1788970894.9819665
+      }
+    },
+    {
+      "id": 200,
+      "timestamp_epoch_s": 1788970896.6501029,
+      "timestamp_local": "2026-09-10 00:21:36",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970896.6501029,
+        "source": "vosk",
+        "rms": 439,
+        "updated_at": 1788970894.9819665
+      }
+    },
+    {
+      "id": 201,
+      "timestamp_epoch_s": 1788970896.8614783,
+      "timestamp_local": "2026-09-10 00:21:36",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970896.8614783,
+        "source": "vosk",
+        "rms": 658,
+        "updated_at": 1788970896.8614783
+      }
+    },
+    {
+      "id": 202,
+      "timestamp_epoch_s": 1788970897.1119895,
+      "timestamp_local": "2026-09-10 00:21:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970897.1119895,
+        "source": "vosk",
+        "rms": 1139,
+        "updated_at": 1788970897.1119895
+      }
+    },
+    {
+      "id": 203,
+      "timestamp_epoch_s": 1788970897.2612538,
+      "timestamp_local": "2026-09-10 00:21:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah he says",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970897.2612538,
+        "source": "vosk",
+        "rms": 1139,
+        "updated_at": 1788970897.1119895
+      }
+    },
+    {
+      "id": 204,
+      "timestamp_epoch_s": 1788970897.3628914,
+      "timestamp_local": "2026-09-10 00:21:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970897.3628914,
+        "source": "vosk",
+        "rms": 714,
+        "updated_at": 1788970897.3628914
+      }
+    },
+    {
+      "id": 205,
+      "timestamp_epoch_s": 1788970897.4145203,
+      "timestamp_local": "2026-09-10 00:21:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said the smartest",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970897.4145203,
+        "source": "vosk",
+        "rms": 714,
+        "updated_at": 1788970897.3628914
+      }
+    },
+    {
+      "id": 206,
+      "timestamp_epoch_s": 1788970897.6126273,
+      "timestamp_local": "2026-09-10 00:21:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970897.6126273,
+        "source": "vosk",
+        "rms": 537,
+        "updated_at": 1788970897.6126273
+      }
+    },
+    {
+      "id": 207,
+      "timestamp_epoch_s": 1788970897.6580012,
+      "timestamp_local": "2026-09-10 00:21:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said smart",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970897.6580012,
+        "source": "vosk",
+        "rms": 537,
+        "updated_at": 1788970897.6126273
+      }
+    },
+    {
+      "id": 208,
+      "timestamp_epoch_s": 1788970897.8614056,
+      "timestamp_local": "2026-09-10 00:21:37",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970897.8614056,
+        "source": "vosk",
+        "rms": 787,
+        "updated_at": 1788970897.8614056
+      }
+    },
+    {
+      "id": 209,
+      "timestamp_epoch_s": 1788970897.8958411,
+      "timestamp_local": "2026-09-10 00:21:37",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said smart century is",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970897.8958411,
+        "source": "vosk",
+        "rms": 787,
+        "updated_at": 1788970897.8614056
+      }
+    },
+    {
+      "id": 210,
+      "timestamp_epoch_s": 1788970898.3627799,
+      "timestamp_local": "2026-09-10 00:21:38",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970898.3627799,
+        "source": "vosk",
+        "rms": 787,
+        "updated_at": 1788970897.8614056
+      }
+    },
+    {
+      "id": 211,
+      "timestamp_epoch_s": 1788970898.6130102,
+      "timestamp_local": "2026-09-10 00:21:38",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970898.6130102,
+        "source": "vosk",
+        "rms": 539,
+        "updated_at": 1788970898.6130102
+      }
+    },
+    {
+      "id": 212,
+      "timestamp_epoch_s": 1788970898.8627627,
+      "timestamp_local": "2026-09-10 00:21:38",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970898.8627627,
+        "source": "vosk",
+        "rms": 539,
+        "updated_at": 1788970898.6130102
+      }
+    },
+    {
+      "id": 213,
+      "timestamp_epoch_s": 1788970898.9243903,
+      "timestamp_local": "2026-09-10 00:21:38",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said smart century is my entire",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970898.9243903,
+        "source": "vosk",
+        "rms": 539,
+        "updated_at": 1788970898.6130102
+      }
+    },
+    {
+      "id": 214,
+      "timestamp_epoch_s": 1788970899.113434,
+      "timestamp_local": "2026-09-10 00:21:39",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970899.113434,
+        "source": "vosk",
+        "rms": 539,
+        "updated_at": 1788970898.6130102
+      }
+    },
+    {
+      "id": 215,
+      "timestamp_epoch_s": 1788970899.152728,
+      "timestamp_local": "2026-09-10 00:21:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said smart century is were times when",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970899.152728,
+        "source": "vosk",
+        "rms": 539,
+        "updated_at": 1788970898.6130102
+      }
+    },
+    {
+      "id": 216,
+      "timestamp_epoch_s": 1788970899.3631392,
+      "timestamp_local": "2026-09-10 00:21:39",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970899.3631392,
+        "source": "vosk",
+        "rms": 429,
+        "updated_at": 1788970899.3626354
+      }
+    },
+    {
+      "id": 217,
+      "timestamp_epoch_s": 1788970899.862843,
+      "timestamp_local": "2026-09-10 00:21:39",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970899.862843,
+        "source": "vosk",
+        "rms": 429,
+        "updated_at": 1788970899.3626354
+      }
+    },
+    {
+      "id": 218,
+      "timestamp_epoch_s": 1788970899.9999945,
+      "timestamp_local": "2026-09-10 00:21:39",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said smart century is my time with that",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970899.9999945,
+        "source": "vosk",
+        "rms": 429,
+        "updated_at": 1788970899.3626354
+      }
+    },
+    {
+      "id": 219,
+      "timestamp_epoch_s": 1788970900.114728,
+      "timestamp_local": "2026-09-10 00:21:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970900.114728,
+        "source": "vosk",
+        "rms": 490,
+        "updated_at": 1788970900.114728
+      }
+    },
+    {
+      "id": 220,
+      "timestamp_epoch_s": 1788970900.3626754,
+      "timestamp_local": "2026-09-10 00:21:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970900.3626754,
+        "source": "vosk",
+        "rms": 541,
+        "updated_at": 1788970900.3626754
+      }
+    },
+    {
+      "id": 221,
+      "timestamp_epoch_s": 1788970900.411909,
+      "timestamp_local": "2026-09-10 00:21:40",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said smart century is my time with that phrase",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970900.411909,
+        "source": "vosk",
+        "rms": 541,
+        "updated_at": 1788970900.3626754
+      }
+    },
+    {
+      "id": 222,
+      "timestamp_epoch_s": 1788970900.6125865,
+      "timestamp_local": "2026-09-10 00:21:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970900.6125865,
+        "source": "vosk",
+        "rms": 541,
+        "updated_at": 1788970900.3626754
+      }
+    },
+    {
+      "id": 223,
+      "timestamp_epoch_s": 1788970900.862962,
+      "timestamp_local": "2026-09-10 00:21:40",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970900.862962,
+        "source": "vosk",
+        "rms": 632,
+        "updated_at": 1788970900.862962
+      }
+    },
+    {
+      "id": 224,
+      "timestamp_epoch_s": 1788970901.1128676,
+      "timestamp_local": "2026-09-10 00:21:41",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970901.1128676,
+        "source": "vosk",
+        "rms": 632,
+        "updated_at": 1788970900.862962
+      }
+    },
+    {
+      "id": 225,
+      "timestamp_epoch_s": 1788970901.147611,
+      "timestamp_local": "2026-09-10 00:21:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said smart century is my time with that phrase makes",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970901.147611,
+        "source": "vosk",
+        "rms": 632,
+        "updated_at": 1788970900.862962
+      }
+    },
+    {
+      "id": 226,
+      "timestamp_epoch_s": 1788970901.3634174,
+      "timestamp_local": "2026-09-10 00:21:41",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970901.3634174,
+        "source": "vosk",
+        "rms": 632,
+        "updated_at": 1788970900.862962
+      }
+    },
+    {
+      "id": 227,
+      "timestamp_epoch_s": 1788970901.397928,
+      "timestamp_local": "2026-09-10 00:21:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said smart century is my time with that phrase make out",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970901.397928,
+        "source": "vosk",
+        "rms": 632,
+        "updated_at": 1788970900.862962
+      }
+    },
+    {
+      "id": 228,
+      "timestamp_epoch_s": 1788970901.6126232,
+      "timestamp_local": "2026-09-10 00:21:41",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970901.6126232,
+        "source": "vosk",
+        "rms": 483,
+        "updated_at": 1788970901.6126232
+      }
+    },
+    {
+      "id": 229,
+      "timestamp_epoch_s": 1788970901.631412,
+      "timestamp_local": "2026-09-10 00:21:41",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said smart century is my time with that phrase make out on",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970901.631412,
+        "source": "vosk",
+        "rms": 483,
+        "updated_at": 1788970901.6126232
+      }
+    },
+    {
+      "id": 230,
+      "timestamp_epoch_s": 1788970902.1177847,
+      "timestamp_local": "2026-09-10 00:21:42",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970902.1177847,
+        "source": "vosk",
+        "rms": 483,
+        "updated_at": 1788970901.6126232
+      }
+    },
+    {
+      "id": 231,
+      "timestamp_epoch_s": 1788970902.176253,
+      "timestamp_local": "2026-09-10 00:21:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said smart century is my time with that phrase make out on special",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970902.176253,
+        "source": "vosk",
+        "rms": 483,
+        "updated_at": 1788970901.6126232
+      }
+    },
+    {
+      "id": 232,
+      "timestamp_epoch_s": 1788970902.61704,
+      "timestamp_local": "2026-09-10 00:21:42",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970902.61704,
+        "source": "vosk",
+        "rms": 475,
+        "updated_at": 1788970902.61704
+      }
+    },
+    {
+      "id": 233,
+      "timestamp_epoch_s": 1788970902.6643445,
+      "timestamp_local": "2026-09-10 00:21:42",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "so he said you guys got set up as your mom's know each other ah said smart century is my time with that phrase make out on his bed",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970902.6643445,
+        "source": "vosk",
+        "rms": 475,
+        "updated_at": 1788970902.61704
+      }
+    },
+    {
+      "id": 234,
+      "timestamp_epoch_s": 1788970902.862681,
+      "timestamp_local": "2026-09-10 00:21:42",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970902.862681,
+        "source": "vosk",
+        "rms": 677,
+        "updated_at": 1788970902.862681
+      }
+    },
+    {
+      "id": 235,
+      "timestamp_epoch_s": 1788970903.1129856,
+      "timestamp_local": "2026-09-10 00:21:43",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970903.1129856,
+        "source": "vosk",
+        "rms": 677,
+        "updated_at": 1788970902.862681
+      }
+    },
+    {
+      "id": 236,
+      "timestamp_epoch_s": 1788970903.3629797,
+      "timestamp_local": "2026-09-10 00:21:43",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970903.3629797,
+        "source": "vosk",
+        "rms": 541,
+        "updated_at": 1788970903.3629797
+      }
+    },
+    {
+      "id": 237,
+      "timestamp_epoch_s": 1788970904.128394,
+      "timestamp_local": "2026-09-10 00:21:44",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "so he said you guys got set of as your mom s know on ah said smart sentry is my time with that phrase make out on his bed",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1788970904.128394,
+        "source": "final",
+        "rms": 541,
+        "updated_at": 1788970903.3629797
+      }
+    },
+    {
+      "id": 238,
+      "timestamp_epoch_s": 1788970904.9084837,
+      "timestamp_local": "2026-09-10 00:21:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970904.9084837,
+        "source": "vosk",
+        "rms": 541,
+        "updated_at": 1788970903.3629797
+      }
+    },
+    {
+      "id": 239,
+      "timestamp_epoch_s": 1788970904.9084837,
+      "timestamp_local": "2026-09-10 00:21:44",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970904.9084837,
+        "source": "vosk",
+        "rms": 1159,
+        "updated_at": 1788970904.9084837
+      }
+    },
+    {
+      "id": 240,
+      "timestamp_epoch_s": 1788970905.089776,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "yeah",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970905.089776,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970905.0297227
+      }
+    },
+    {
+      "id": 241,
+      "timestamp_epoch_s": 1788970905.0907793,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970905.0907793,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970905.0297227
+      }
+    },
+    {
+      "id": 242,
+      "timestamp_epoch_s": 1788970905.1815886,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "yeah began",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970905.1815886,
+        "source": "vosk",
+        "rms": 494,
+        "updated_at": 1788970905.0297227
+      }
+    },
+    {
+      "id": 243,
+      "timestamp_epoch_s": 1788970905.369466,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970905.369466,
+        "source": "vosk",
+        "rms": 550,
+        "updated_at": 1788970905.369466
+      }
+    },
+    {
+      "id": 244,
+      "timestamp_epoch_s": 1788970905.435803,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "operator",
+      "event_type": "voice_transcript_partial",
+      "channel": "voice",
+      "text": "yeah be dead",
+      "metadata": {
+        "kind": "partial",
+        "timestamp": 1788970905.435803,
+        "source": "vosk",
+        "rms": 550,
+        "updated_at": 1788970905.369466
+      }
+    },
+    {
+      "id": 245,
+      "timestamp_epoch_s": 1788970905.6126268,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970905.6126268,
+        "source": "vosk",
+        "rms": 1155,
+        "updated_at": 1788970905.6126268
+      }
+    },
+    {
+      "id": 246,
+      "timestamp_epoch_s": 1788970905.8631465,
+      "timestamp_local": "2026-09-10 00:21:45",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970905.8631465,
+        "source": "vosk",
+        "rms": 965,
+        "updated_at": 1788970905.8631465
+      }
+    },
+    {
+      "id": 247,
+      "timestamp_epoch_s": 1788970906.4142897,
+      "timestamp_local": "2026-09-10 00:21:46",
+      "role": "operator",
+      "event_type": "voice_transcript_final",
+      "channel": "voice",
+      "text": "yeah be dead",
+      "metadata": {
+        "kind": "final",
+        "timestamp": 1788970906.4142897,
+        "source": "final",
+        "rms": 965,
+        "updated_at": 1788970905.8631465
+      }
+    },
+    {
+      "id": 248,
+      "timestamp_epoch_s": 1788970906.5835578,
+      "timestamp_local": "2026-09-10 00:21:46",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "idle",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970906.5835578,
+        "source": "vosk",
+        "rms": 965,
+        "updated_at": 1788970905.8631465
+      }
+    },
+    {
+      "id": 249,
+      "timestamp_epoch_s": 1788970906.5835578,
+      "timestamp_local": "2026-09-10 00:21:46",
+      "role": "system",
+      "event_type": "voice_status",
+      "channel": "voice",
+      "text": "hearing",
+      "metadata": {
+        "kind": "status",
+        "timestamp": 1788970906.5835578,
+        "source": "vosk",
+        "rms": 888,
+        "updated_at": 1788970906.5835578
+      }
+    }
+  ],
+  "exported_files": {
+    "json": "snapshots/sentry_v2_runtime_conversation_20260910_010636.json",
+    "markdown": "snapshots/sentry_v2_runtime_conversation_20260910_010636.md"
+  }
+}
